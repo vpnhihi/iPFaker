@@ -66,3 +66,5 @@ pc_app/last_error.txt
 pc_app/startup.log
 pc_app/_stderr.txt
 pc_app/last_captcha.png
+pc_app/workflow_data/config.json
+pc_app/last_captcha.png

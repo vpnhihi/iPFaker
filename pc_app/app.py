@@ -93,8 +93,9 @@ class IPfakerPC:
         self.messagebox = messagebox
         self.root = tk.Tk()
         self.root.title("iPFaker PC")
-        self.root.geometry("980x820")
-        self.root.minsize(880, 680)
+        self.root.geometry("1020x900")
+        self.root.minsize(900, 720)
+        self.pipeline = None
         self.root.configure(bg=BG)
 
         self.client = None
@@ -206,19 +207,21 @@ class IPfakerPC:
         )
         self.lbl_status.pack(fill="x", padx=8, pady=(2, 8))
 
-        # Notebook: Dieu khien | API
+        # Notebook
         nb = ttk.Notebook(self.root)
         nb.pack(fill="both", expand=True, padx=12, pady=4)
 
         tab_ctrl = ttk.Frame(nb, style="Card.TFrame")
+        tab_wf = ttk.Frame(nb, style="Card.TFrame")
         tab_api = ttk.Frame(nb, style="Card.TFrame")
         nb.add(tab_ctrl, text="  Dieu khien  ")
-        nb.add(tab_api, text="  API SMS / Captcha  ")
+        nb.add(tab_wf, text="  Quy trinh 18 buoc  ")
+        nb.add(tab_api, text="  API keys  ")
 
         # --- Control tab ---
         ttk.Label(
             tab_ctrl,
-            text="May + iOS lay tu pool tren dien thoai (khong chon o day).",
+            text="Pool may/iOS: chon tren iPhone (iPFaker). PC doc pools.json.",
             style="Muted.TLabel",
         ).pack(anchor="w", padx=10, pady=(10, 4))
 
@@ -238,107 +241,79 @@ class IPfakerPC:
         self._mkbtn(ar, "Chi xoa data", self._wipe_only, ORANGE)
         self._mkbtn(ar, "Mo Zalo", self._open_zalo, PANEL)
 
-        # Reg
         reg = ttk.Frame(tab_ctrl, style="Card.TFrame")
-        reg.pack(fill="x", padx=10, pady=6)
-        ttk.Label(reg, text="Reg Zalo tu dong", style="Card.TLabel", font=("Segoe UI Semibold", 11)).pack(
-            anchor="w", pady=(4, 2)
-        )
+        reg.pack(fill="x", padx=10, pady=8)
         ttk.Label(
             reg,
-            text="Bat API SMS de tu lay SDT+OTP · bat AchiCaptcha de giai captcha (chup man hinh).",
+            text="Reg day du 18 buoc (Proxy → Shadowrocket → Reset → Zalo → OTP → AppManager)",
+            style="Card.TLabel",
+            font=("Segoe UI Semibold", 11),
+        ).pack(anchor="w")
+        ttk.Label(
+            reg,
+            text="Cau hinh: tab «Quy trinh 18 buoc» + «API keys». Mo khoa man hinh may.",
             style="Muted.TLabel",
         ).pack(anchor="w")
+        rb = ttk.Frame(reg, style="Card.TFrame")
+        rb.pack(fill="x", pady=8)
+        self._mkbtn(rb, "CHAY QUY TRINH REG", self._run_pipeline, PURPLE)
+        self._mkbtn(rb, "Dung pipeline", self._stop_pipeline, PANEL)
 
+        # placeholders for old settings keys
         self.var_phone = tk.StringVar(value="")
         self.var_name = tk.StringVar(value="Lab User")
         self.var_otp = tk.StringVar(value="")
-        self.var_reg_wipe = tk.BooleanVar(value=True)
-        self.var_reg_spoof = tk.BooleanVar(value=True)
-        self.var_use_sms = tk.BooleanVar(value=True)
-        self.var_use_captcha = tk.BooleanVar(value=True)
 
-        form = ttk.Frame(reg, style="Card.TFrame")
-        form.pack(fill="x", pady=6)
-        for lab, var, w in (
-            ("SDT (hoac de trong neu dung API)", self.var_phone, 22),
-            ("Ten hien thi", self.var_name, 14),
-            ("OTP tay", self.var_otp, 10),
-        ):
-            f = ttk.Frame(form, style="Card.TFrame")
-            f.pack(side="left", padx=(0, 10))
-            ttk.Label(f, text=lab, style="Muted.TLabel").pack(anchor="w")
-            ttk.Entry(f, textvariable=var, width=w).pack()
+        # --- Workflow tab: names, profiles, delays ---
+        self._build_workflow_tab(tab_wf, scrolledtext)
 
-        opts = ttk.Frame(reg, style="Card.TFrame")
-        opts.pack(fill="x")
-        for text, var in (
-            ("Random spoof (pool DT)", self.var_reg_spoof),
-            ("Xoa data Zalo truoc", self.var_reg_wipe),
-            ("Dung API SMS (SDT+OTP)", self.var_use_sms),
-            ("Dung AchiCaptcha", self.var_use_captcha),
-        ):
-            ttk.Checkbutton(opts, text=text, variable=var).pack(side="left", padx=(0, 12))
-
-        rb = ttk.Frame(reg, style="Card.TFrame")
-        rb.pack(fill="x", pady=8)
-        self._mkbtn(rb, "Reg tu dong (full)", self._auto_reg_start, PURPLE)
-        self._mkbtn(rb, "Gui OTP / Tiep", self._auto_reg_otp, GREEN)
-        self._mkbtn(rb, "Dung Frida", self._auto_reg_stop, PANEL)
-
-        # --- API tab ---
+        # --- API keys tab ---
         api_in = ttk.Frame(tab_api, style="Card.TFrame")
         api_in.pack(fill="both", expand=True, padx=10, pady=10)
 
-        ttk.Label(api_in, text="API thue so / OTP", style="Card.TLabel", font=("Segoe UI Semibold", 11)).pack(
-            anchor="w"
-        )
-        self.var_sms_enabled = tk.BooleanVar(value=False)
-        self.var_sms_key = tk.StringVar(value="")
-        self.var_sms_rent = tk.StringVar(value="")
-        self.var_sms_otp = tk.StringVar(value="")
-        self.var_sms_cancel = tk.StringVar(value="")
-        self.var_sms_phone_path = tk.StringVar(value="phone|data.phone|number")
-        self.var_sms_order_path = tk.StringVar(value="id|data.id|order_id|request_id")
-        self.var_sms_otp_path = tk.StringVar(value="otp|code|data.otp|data.code|message")
+        self.var_boss_token = tk.StringVar(value="")
+        self.var_boss_network = tk.StringVar(value="")
+        self.var_boss_prefix = tk.StringVar(value="")
+        self.var_rota_key = tk.StringVar(value="")
+        self.var_rota_app = tk.StringVar(value="")
+        self.var_achi_key = tk.StringVar(value="")
+        self.var_privacy = tk.StringVar(value="first_only")
+        self.var_contacts = tk.StringVar(value="skip")
+        self.var_appmgr = tk.StringVar(value="")
 
-        ttk.Checkbutton(api_in, text="Bat API SMS", variable=self.var_sms_enabled).pack(anchor="w", pady=2)
-        self._api_field(api_in, "API key SMS", self.var_sms_key, 56, show="*")
+        ttk.Label(api_in, text="BossOTP.net", style="Card.TLabel", font=("Segoe UI Semibold", 11)).pack(anchor="w")
+        self._api_field(api_in, "API token (sk_...)", self.var_boss_token, 64, show="*")
+        self._api_field(api_in, "Network (VIETTEL/MOBIFONE/... de trong = bat ky)", self.var_boss_network, 40)
+        self._api_field(api_in, "Prefixs (vd 56|57|95)", self.var_boss_prefix, 40)
+
+        ttk.Label(api_in, text="RotaProxy.com", style="Card.TLabel", font=("Segoe UI Semibold", 11)).pack(
+            anchor="w", pady=(10, 0)
+        )
+        self._api_field(api_in, "package_api_key", self.var_rota_key, 64, show="*")
+        self._api_field(api_in, "app_id (optional)", self.var_rota_app, 20)
+
+        ttk.Label(api_in, text="AchiCaptcha (ShopeeCaptchaTask slider)", style="Card.TLabel", font=("Segoe UI Semibold", 11)).pack(
+            anchor="w", pady=(10, 0)
+        )
+        self._api_field(api_in, "clientKey", self.var_achi_key, 64, show="*")
+
+        ttk.Label(api_in, text="Tuy chon reg", style="Card.TLabel", font=("Segoe UI Semibold", 11)).pack(
+            anchor="w", pady=(10, 0)
+        )
         self._api_field(
             api_in,
-            "URL thue so  (placeholder: {api_key})",
-            self.var_sms_rent,
-            70,
+            "Privacy mode: first_only | first_two | all_three",
+            self.var_privacy,
+            20,
         )
-        self._api_field(
-            api_in,
-            "URL lay OTP  (placeholder: {api_key} {order_id})",
-            self.var_sms_otp,
-            70,
-        )
-        self._api_field(api_in, "URL huy so (optional)", self.var_sms_cancel, 70)
-        self._api_field(api_in, "JSON path SDT", self.var_sms_phone_path, 40)
-        self._api_field(api_in, "JSON path order id", self.var_sms_order_path, 40)
-        self._api_field(api_in, "JSON path OTP", self.var_sms_otp_path, 40)
+        self._api_field(api_in, "Contacts: skip | continue", self.var_contacts, 16)
+        self._api_field(api_in, "AppManager bundle id (neu co)", self.var_appmgr, 40)
 
-        ttk.Label(api_in, text="AchiCaptcha", style="Card.TLabel", font=("Segoe UI Semibold", 11)).pack(
-            anchor="w", pady=(12, 2)
-        )
-        self.var_cap_enabled = tk.BooleanVar(value=False)
-        self.var_cap_key = tk.StringVar(value="")
-        self.var_cap_create = tk.StringVar(value="https://achicaptcha.com/api/createTask")
-        self.var_cap_result = tk.StringVar(value="https://achicaptcha.com/api/getTaskResult")
-
-        ttk.Checkbutton(api_in, text="Bat AchiCaptcha", variable=self.var_cap_enabled).pack(anchor="w")
-        self._api_field(api_in, "API key AchiCaptcha", self.var_cap_key, 56, show="*")
-        self._api_field(api_in, "URL createTask", self.var_cap_create, 70)
-        self._api_field(api_in, "URL getTaskResult", self.var_cap_result, 70)
-
-        ttk.Button(api_in, text="Luu cau hinh API", command=self._save_settings).pack(anchor="w", pady=10)
+        ttk.Button(api_in, text="Luu API + tuy chon", command=self._save_settings).pack(anchor="w", pady=12)
         ttk.Label(
             api_in,
-            text="Huong dan: dien URL dung voi nha cung cap cua ban. Placeholder {api_key}, {order_id}.\n"
-            "AchiCaptcha mac dinh kieu clientKey + ImageToTextTask (doi URL neu docs khac).",
+            text="Token chi luu tren PC (%APPDATA%\\iPFakerPC\\settings.json) — KHONG commit git.\n"
+            "Ban da gui token trong chat: nen xoay key moi tren BossOTP neu lo.",
             style="Muted.TLabel",
             justify="left",
         ).pack(anchor="w")
@@ -358,6 +333,64 @@ class IPfakerPC:
         f.pack(fill="x", pady=2)
         self.ttk.Label(f, text=label, style="Muted.TLabel").pack(anchor="w")
         self.ttk.Entry(f, textvariable=var, width=width, show=show or "").pack(anchor="w")
+
+    def _build_workflow_tab(self, tab, scrolledtext):
+        """Names table, DOB/gender profiles, per-step delay min/max."""
+        from workflow_data import load_delays, load_names, load_profiles
+
+        tk, ttk = self.tk, self.ttk
+        outer = ttk.Frame(tab, style="Card.TFrame")
+        outer.pack(fill="both", expand=True, padx=8, pady=8)
+
+        # left: names + profiles
+        left = ttk.Frame(outer, style="Card.TFrame")
+        left.pack(side="left", fill="both", expand=True, padx=(0, 6))
+        right = ttk.Frame(outer, style="Card.TFrame")
+        right.pack(side="right", fill="both", expand=True, padx=(6, 0))
+
+        ttk.Label(left, text="Bang ten Zalo (1 dong = 1 ten, random)", style="Card.TLabel").pack(anchor="w")
+        self.txt_names = scrolledtext.ScrolledText(
+            left, height=8, bg=ENTRY_BG, fg=FG, insertbackground=FG, font=("Segoe UI", 10), relief="flat"
+        )
+        self.txt_names.pack(fill="both", expand=True, pady=4)
+        self.txt_names.insert("1.0", "\n".join(load_names()))
+
+        ttk.Label(
+            left,
+            text="Bang sinh nhat + gioi tinh (moi dong: dd/mm/yyyy|nam hoac nu)",
+            style="Card.TLabel",
+        ).pack(anchor="w", pady=(8, 0))
+        self.txt_profiles = scrolledtext.ScrolledText(
+            left, height=8, bg=ENTRY_BG, fg=FG, insertbackground=FG, font=("Segoe UI", 10), relief="flat"
+        )
+        self.txt_profiles.pack(fill="both", expand=True, pady=4)
+        lines = []
+        for p in load_profiles():
+            lines.append(f"{p.get('dob')}|{p.get('gender')}")
+        self.txt_profiles.insert("1.0", "\n".join(lines))
+
+        ttk.Button(left, text="Luu bang ten + profile", command=self._save_tables).pack(anchor="w", pady=6)
+
+        ttk.Label(
+            right,
+            text="Delay random tung buoc (giay): min max — moi dong: key min max",
+            style="Card.TLabel",
+        ).pack(anchor="w")
+        self.txt_delays = scrolledtext.ScrolledText(
+            right, height=22, bg=ENTRY_BG, fg=FG, insertbackground=FG, font=("Consolas", 9), relief="flat"
+        )
+        self.txt_delays.pack(fill="both", expand=True, pady=4)
+        delays = load_delays()
+        delay_lines = [f"{k}  {v[0]}  {v[1]}" for k, v in sorted(delays.items())]
+        self.txt_delays.insert("1.0", "\n".join(delay_lines))
+        ttk.Button(right, text="Luu delay", command=self._save_delays_ui).pack(anchor="w", pady=4)
+        ttk.Label(
+            right,
+            text="Vi du: 13_soak  30  120  = ngam 30–120s\n"
+            "01_rotate_proxy  2  5\nMoi buoc deu random min–max.",
+            style="Muted.TLabel",
+            justify="left",
+        ).pack(anchor="w")
 
     def _mkbtn(self, parent, text, cmd, color):
         b = self.tk.Button(
@@ -382,31 +415,25 @@ class IPfakerPC:
                 return
             data = _read_json(SETTINGS_PATH)
             self._settings = data
-            for k, var in (
+            mapping = (
                 ("host", self.var_host),
                 ("user", self.var_user),
                 ("password", self.var_pass),
-                ("phone", self.var_phone),
-                ("reg_name", self.var_name),
-                ("sms_api_key", self.var_sms_key),
-                ("sms_rent_url", self.var_sms_rent),
-                ("sms_otp_url", self.var_sms_otp),
-                ("sms_cancel_url", self.var_sms_cancel),
-                ("sms_phone_path", self.var_sms_phone_path),
-                ("sms_order_path", self.var_sms_order_path),
-                ("sms_otp_path", self.var_sms_otp_path),
-                ("captcha_api_key", self.var_cap_key),
-                ("captcha_create_url", self.var_cap_create),
-                ("captcha_result_url", self.var_cap_result),
-            ):
-                if data.get(k):
+                ("bossotp_token", self.var_boss_token),
+                ("bossotp_network", self.var_boss_network),
+                ("bossotp_prefixs", self.var_boss_prefix),
+                ("rotaproxy_key", self.var_rota_key),
+                ("rotaproxy_app_id", self.var_rota_app),
+                ("achicaptcha_key", self.var_achi_key),
+                ("privacy_mode", self.var_privacy),
+                ("contacts_action", self.var_contacts),
+                ("appmanager_bundle", self.var_appmgr),
+            )
+            for k, var in mapping:
+                if data.get(k) is not None and str(data.get(k)) != "":
                     var.set(str(data[k]))
             if data.get("port"):
                 self.var_port.set(str(data["port"]))
-            if "sms_enabled" in data:
-                self.var_sms_enabled.set(bool(data["sms_enabled"]))
-            if "captcha_enabled" in data:
-                self.var_cap_enabled.set(bool(data["captcha_enabled"]))
         except Exception as e:
             self.log(f"Khong doc settings: {e}")
 
@@ -419,31 +446,78 @@ class IPfakerPC:
                 "port": int(self.var_port.get() or 22),
                 "remember_pass": True,
                 "password": self.var_pass.get(),
-                "phone": self.var_phone.get().strip(),
-                "reg_name": self.var_name.get().strip(),
-                "sms_enabled": self.var_sms_enabled.get(),
-                "sms_api_key": self.var_sms_key.get().strip(),
-                "sms_rent_url": self.var_sms_rent.get().strip(),
-                "sms_otp_url": self.var_sms_otp.get().strip(),
-                "sms_cancel_url": self.var_sms_cancel.get().strip(),
-                "sms_phone_path": self.var_sms_phone_path.get().strip(),
-                "sms_order_path": self.var_sms_order_path.get().strip(),
-                "sms_otp_path": self.var_sms_otp_path.get().strip(),
-                "captcha_enabled": self.var_cap_enabled.get(),
-                "captcha_api_key": self.var_cap_key.get().strip(),
-                "captcha_create_url": self.var_cap_create.get().strip(),
-                "captcha_result_url": self.var_cap_result.get().strip(),
+                "bossotp_token": self.var_boss_token.get().strip(),
+                "bossotp_network": self.var_boss_network.get().strip(),
+                "bossotp_prefixs": self.var_boss_prefix.get().strip(),
+                "rotaproxy_key": self.var_rota_key.get().strip(),
+                "rotaproxy_app_id": self.var_rota_app.get().strip(),
+                "achicaptcha_key": self.var_achi_key.get().strip(),
+                "privacy_mode": self.var_privacy.get().strip() or "first_only",
+                "contacts_action": self.var_contacts.get().strip() or "skip",
+                "appmanager_bundle": self.var_appmgr.get().strip(),
             }
-            # write without BOM
             SETTINGS_PATH.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
             self._settings = data
+            # also sync workflow_data/config.json (non-secret optional)
+            try:
+                from workflow_data import save_config
+
+                save_config(
+                    {
+                        "bossotp_token": data["bossotp_token"],
+                        "bossotp_network": data["bossotp_network"],
+                        "bossotp_prefixs": data["bossotp_prefixs"],
+                        "rotaproxy_key": data["rotaproxy_key"],
+                        "rotaproxy_app_id": data["rotaproxy_app_id"],
+                        "achicaptcha_key": data["achicaptcha_key"],
+                        "privacy_mode": data["privacy_mode"],
+                        "contacts_action": data["contacts_action"],
+                        "appmanager_bundle": data["appmanager_bundle"],
+                    }
+                )
+            except Exception as e:
+                self.log(f"sync workflow config: {e}")
             self.log(f"Da luu settings → {SETTINGS_PATH}")
         except Exception as e:
             self.log(f"Luu settings loi: {e}")
 
-    def _api_cfg(self) -> dict:
-        self._save_settings()
-        return dict(self._settings)
+    def _save_tables(self):
+        from workflow_data import save_names, save_profiles
+
+        names = [ln.strip() for ln in self.txt_names.get("1.0", "end").splitlines() if ln.strip()]
+        save_names(names)
+        profiles = []
+        for ln in self.txt_profiles.get("1.0", "end").splitlines():
+            ln = ln.strip()
+            if not ln:
+                continue
+            if "|" in ln:
+                dob, gen = ln.split("|", 1)
+            elif "," in ln:
+                dob, gen = ln.split(",", 1)
+            else:
+                dob, gen = ln, "nam"
+            profiles.append({"dob": dob.strip(), "gender": gen.strip()})
+        save_profiles(profiles)
+        self.log(f"Luu {len(names)} ten, {len(profiles)} profile")
+
+    def _save_delays_ui(self):
+        from workflow_data import save_delays
+
+        delays = {}
+        for ln in self.txt_delays.get("1.0", "end").splitlines():
+            ln = ln.strip()
+            if not ln or ln.startswith("#"):
+                continue
+            parts = ln.split()
+            if len(parts) >= 3:
+                try:
+                    delays[parts[0]] = [float(parts[1]), float(parts[2])]
+                except ValueError:
+                    pass
+        if delays:
+            save_delays(delays)
+            self.log(f"Luu {len(delays)} delay keys")
 
     # ── helpers ────────────────────────────────────────────
     def log(self, msg: str):
@@ -649,152 +723,63 @@ class IPfakerPC:
 
         self._run_bg("Mo Zalo", job)
 
-    def _auto_reg_start(self):
+    def _workflow_cfg(self) -> dict:
         self._save_settings()
+        try:
+            self._save_tables()
+            self._save_delays_ui()
+        except Exception as e:
+            self.log(f"save tables/delays: {e}")
+        return {
+            "bossotp_token": self.var_boss_token.get().strip(),
+            "bossotp_network": self.var_boss_network.get().strip(),
+            "bossotp_prefixs": self.var_boss_prefix.get().strip(),
+            "rotaproxy_key": self.var_rota_key.get().strip(),
+            "rotaproxy_app_id": self.var_rota_app.get().strip(),
+            "achicaptcha_key": self.var_achi_key.get().strip(),
+            "privacy_mode": self.var_privacy.get().strip() or "first_only",
+            "contacts_action": self.var_contacts.get().strip() or "skip",
+            "appmanager_bundle": self.var_appmgr.get().strip(),
+        }
 
+    def _run_pipeline(self):
         def job():
-            from auto_reg import AutoRegRunner
-            from captcha_api import CaptchaApi
-            from sms_api import SmsApi
+            from reg_pipeline import RegPipeline
 
             client = self._need_client()
-            cfg = self._api_cfg()
-            sms = SmsApi(cfg, log=self.log)
-            cap = CaptchaApi(cfg, log=self.log)
-
-            # spoof from phone pool
-            if self.var_reg_spoof.get():
-                dev, ios, meta = self._pick_from_phone_pool()
-                self.log(f"Reg spoof {dev.get('MarketingName')} / {ios}")
-                self._build_and_deploy(dev, ios, meta)
-            if self.var_reg_wipe.get():
-                client.wipe_apps(["vn.com.vng.zingalo", "com.zing.zalo"], skip_keychain=False)
-
-            # phone from SMS API or manual
-            phone = self.var_phone.get().strip()
-            order_id = None
-            if self.var_use_sms.get() and self.var_sms_enabled.get() and sms.enabled:
-                order = sms.rent_number()
-                phone = order.phone
-                order_id = order.order_id
-                self.root.after(0, lambda p=phone: self.var_phone.set(p))
-                self.log(f"API SMS → {phone} (order {order_id})")
-            if not phone:
-                raise RuntimeError("Can SDT: nhap tay hoac bat API SMS + URL thue so.")
-
-            if self.reg_runner:
+            cfg = self._workflow_cfg()
+            if not cfg.get("bossotp_token"):
+                raise RuntimeError("Nhap BossOTP token o tab API keys.")
+            if self.pipeline:
                 try:
-                    self.reg_runner.close()
+                    self.pipeline.close()
                 except Exception:
                     pass
-            self.reg_runner = AutoRegRunner(client, log=self.log)
-            self.reg_runner.run_full_until_otp(phone)
+            self.pipeline = RegPipeline(client, self.catalog, log=self.log, ui_cfg=cfg)
+            msg = self.pipeline.run(self._build_and_deploy)
+            self.root.after(0, lambda: self.messagebox.showinfo("Pipeline", msg))
 
-            # captcha attempt: screenshot + solve
-            if self.var_use_captcha.get() and self.var_cap_enabled.get() and cap.enabled:
-                self._try_solve_captcha(client, cap)
+        self._run_bg("Quy trinh 18 buoc", job)
 
-            # OTP from API
-            otp = self.var_otp.get().strip()
-            if self.var_use_sms.get() and self.var_sms_enabled.get() and sms.enabled and order_id:
-                self.log("Cho OTP tu API SMS…")
-                try:
-                    otp = sms.wait_otp(order_id, timeout=180)
-                    self.root.after(0, lambda o=otp: self.var_otp.set(o))
-                except Exception as e:
-                    self.log(f"OTP API: {e} — nhap tay neu can")
-
-            if otp:
-                self.reg_runner.submit_otp_and_finish(
-                    otp=otp, name=self.var_name.get().strip() or "Lab User"
-                )
-                # second captcha pass after OTP
-                if self.var_use_captcha.get() and self.var_cap_enabled.get() and cap.enabled:
-                    self._try_solve_captcha(client, cap)
-                msg = f"Reg xong luong UI.\nSDT {phone}\nOTP {otp}"
-            else:
-                msg = f"Da dien SDT {phone}.\nCho OTP: nhap o OTP + Gui OTP, hoac doi API."
-
-            self.root.after(0, lambda m=msg: self.messagebox.showinfo("Reg", m))
-
-        self._run_bg("Reg tu dong", job)
-
-    def _try_solve_captcha(self, client, cap) -> None:
-        """Screenshot device → AchiCaptcha image solve → type into Zalo via Frida."""
-        try:
-            remote = "/var/mobile/Library/iPFaker/logs/cap_screen.png"
-            # iOS screencapture variants
-            out = client.run(
-                f"rm -f {remote}; "
-                f"(screencapture {remote} 2>/dev/null || "
-                f"screencapture -t png {remote} 2>/dev/null || "
-                f"/var/jb/usr/bin/screencapture {remote} 2>/dev/null || true); "
-                f"ls -la {remote} 2>/dev/null || echo NO_SHOT",
-                sudo=True,
-                timeout=30,
-            )
-            self.log(f"Screenshot: {out[-200:]}")
-            if "NO_SHOT" in out or "No such" in out:
-                self.log("Khong chup duoc man hinh — captcha can tay hoac cai screencapture.")
-                return
-            # pull via sftp
-            local = PC_DIR / "last_captcha.png"
-            c = client._require()
-            sftp = c.open_sftp()
-            try:
-                sftp.get(remote, str(local))
-            finally:
-                sftp.close()
-            if not local.is_file() or local.stat().st_size < 100:
-                self.log("File screenshot rong.")
-                return
-            text = cap.solve_image_file(str(local))
-            self.log(f"Captcha text: {text}")
-            if self.reg_runner and self.reg_runner._script:
-                self.reg_runner._rpc("settext", text)
-                self.reg_runner._tap_any(
-                    ["Xac nhan", "Xác nhận", "Tiep tuc", "Tiếp tục", "OK", "Submit", "Confirm"],
-                    pause=1.5,
-                )
-        except Exception as e:
-            self.log(f"Captcha auto: {e}")
-
-    def _auto_reg_otp(self):
+    def _stop_pipeline(self):
         def job():
-            if not self.reg_runner or not getattr(self.reg_runner, "_script", None):
-                raise RuntimeError("Chua chay Reg tu dong.")
-            self.reg_runner.submit_otp_and_finish(
-                otp=self.var_otp.get().strip(),
-                name=self.var_name.get().strip() or "Lab User",
-            )
-            cfg = self._api_cfg()
-            if self.var_use_captcha.get() and self.var_cap_enabled.get():
-                from captcha_api import CaptchaApi
-
-                self._try_solve_captcha(self._need_client(), CaptchaApi(cfg, log=self.log))
-            self.root.after(0, lambda: self.messagebox.showinfo("OTP", "Da gui buoc tiep."))
-
-        self._run_bg("Gui OTP", job)
-
-    def _auto_reg_stop(self):
-        def job():
-            if self.reg_runner:
-                self.reg_runner.close()
-                self.reg_runner = None
-                self.log("Da dung Frida.")
+            if self.pipeline:
+                self.pipeline.close()
+                self.pipeline = None
+                self.log("Da dung pipeline.")
             else:
-                self.log("Khong co session.")
+                self.log("Khong co pipeline.")
 
-        self._run_bg("Dung", job)
+        self._run_bg("Dung pipeline", job)
 
     def _on_close(self):
         try:
             self._save_settings()
         except Exception:
             pass
-        if self.reg_runner:
+        if self.pipeline:
             try:
-                self.reg_runner.close()
+                self.pipeline.close()
             except Exception:
                 pass
         if self.client:

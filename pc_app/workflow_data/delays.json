@@ -1,0 +1,82 @@
+{
+  "01_rotate_proxy": [
+    2.0,
+    5.0
+  ],
+  "02_shadowrocket_off": [
+    1.5,
+    3.0
+  ],
+  "02b_shadowrocket_on": [
+    2.0,
+    4.0
+  ],
+  "03_ipfaker_reset": [
+    3.0,
+    6.0
+  ],
+  "04_zalo_create_account": [
+    2.0,
+    4.0
+  ],
+  "05_phone_and_terms": [
+    1.5,
+    3.5
+  ],
+  "06_captcha": [
+    2.0,
+    5.0
+  ],
+  "07_otp": [
+    2.0,
+    4.0
+  ],
+  "08_privacy": [
+    1.5,
+    3.0
+  ],
+  "09_name": [
+    1.5,
+    3.0
+  ],
+  "10_personal": [
+    2.0,
+    4.0
+  ],
+  "11_avatar_skip": [
+    1.0,
+    2.5
+  ],
+  "12_contacts": [
+    1.0,
+    2.5
+  ],
+  "13_soak": [
+    30.0,
+    120.0
+  ],
+  "14_open_appmanager": [
+    2.0,
+    4.0
+  ],
+  "15_backup_zalo_btn": [
+    1.5,
+    3.0
+  ],
+  "16_backup_clock_btn": [
+    1.5,
+    3.0
+  ],
+  "17_rename_backup": [
+    2.0,
+    4.0
+  ],
+  "18_delete_app_section": [
+    1.5,
+    3.0
+  ],
+  "between_actions": [
+    0.4,
+    1.2
+  ]
+}
