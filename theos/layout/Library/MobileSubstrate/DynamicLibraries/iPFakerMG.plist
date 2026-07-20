@@ -9,10 +9,6 @@
 			<string>vn.com.vng.zingalo</string>
 			<string>com.zing.zalo</string>
 		</array>
-		<key>Executables</key>
-		<array>
-			<string>Zalo</string>
-		</array>
 		<key>Mode</key>
 		<string>Any</string>
 	</dict>

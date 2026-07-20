@@ -9,7 +9,7 @@ include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME = iPFakerMG iPFakerCT
 
-iPFakerMG_FILES = TweakMG.x src/IPFConfig.m src/IPFHooksMG.m
+iPFakerMG_FILES = TweakMG.x src/IPFConfig.m src/IPFHooksMG.m src/fishhook.c
 iPFakerMG_CFLAGS = -fobjc-arc -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
 iPFakerMG_FRAMEWORKS = UIKit Foundation AdSupport
 # ElleKit exposes /var/jb/usr/lib/libsubstrate.dylib — match HIOS LC_LOAD_DYLIB
