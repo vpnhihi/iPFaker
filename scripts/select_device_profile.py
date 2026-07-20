@@ -67,15 +67,24 @@ def find_device(cat: dict, query: str) -> dict | None:
 
 
 def list_devices(cat: dict) -> None:
-    print(f"{'ID':22} {'MarketingName':30} {'ProductType':12} {'RAM':>5}  Screen        Chip")
-    print("-" * 100)
+    print(
+        f"{'ID':22} {'MarketingName':28} {'ProductType':12} {'RAM':>5}  "
+        f"{'Screen':16} {'Inch':>4}  {'Chip':12} Year  Battery"
+    )
+    print("-" * 118)
     for d in cat["devices"]:
         disp = d["display"]
+        lab = " *" if d.get("lab") else ""
+        inch = disp.get("DiagonalInches", "")
+        bat = d.get("batteryMah") or ""
         print(
-            f"{d['id']:22} {d['MarketingName'][:30]:30} {d['ProductType']:12} "
-            f"{d['PhysicalMemoryMB']:>5}  {disp['NativeWidth']}x{disp['NativeHeight']}@{disp['ScreenScale']}  {d['chip']}"
+            f"{d['id']:22} {d['MarketingName'][:28]:28} {d['ProductType']:12} "
+            f"{d['PhysicalMemoryMB']:>5}  "
+            f"{disp['NativeWidth']}x{disp['NativeHeight']}@{disp['ScreenScale']:<2} "
+            f"{str(inch):>4}  "
+            f"{(d.get('chip') or ''):12} {d.get('year', ''):4}  {str(bat)+'mAh' if bat else '':>8}{lab}"
         )
-    print(f"\nTotal devices: {len(cat['devices'])}")
+    print(f"\nTotal devices: {len(cat['devices'])}  (* = lab model)")
     print("iOS builds in catalog:", len(cat["ios_releases"]))
 
 
@@ -198,6 +207,12 @@ def build_profile(device: dict, ios_ver: str, ios_meta: dict, name: str | None) 
         "hw.logicalcpu": int(device.get("cpuCores", 6)),
         "ChipName": device.get("chip", ""),
         "DeviceCatalogId": device["id"],
+        "LogicalScreenWidth": int(disp.get("LogicalWidth") or (disp["NativeWidth"] // max(1, disp["ScreenScale"]))),
+        "LogicalScreenHeight": int(disp.get("LogicalHeight") or (disp["NativeHeight"] // max(1, disp["ScreenScale"]))),
+        "ScreenDiagonalInches": str(disp.get("DiagonalInches", "")),
+        "MaxRefreshHz": int(disp.get("MaxRefreshHz", 60)),
+        "BatteryMah": int(device.get("batteryMah", 0) or 0),
+        "DeviceYear": int(device.get("year", 0) or 0),
     }
 
     active = {
@@ -228,6 +243,19 @@ def build_profile(device: dict, ios_ver: str, ios_meta: dict, name: str | None) 
             "NativeHeight": disp["NativeHeight"],
             "ScreenScale": disp["ScreenScale"],
             "main-screen-pitch": disp.get("Pitch", 460),
+            "LogicalWidth": disp.get("LogicalWidth"),
+            "LogicalHeight": disp.get("LogicalHeight"),
+            "DiagonalInches": disp.get("DiagonalInches"),
+            "MaxRefreshHz": disp.get("MaxRefreshHz", 60),
+        },
+        "hardware": {
+            "chip": device.get("chip"),
+            "cpuCores": device.get("cpuCores"),
+            "gpuCores": device.get("gpuCores"),
+            "PhysicalMemoryMB": ram_mb,
+            "batteryMah": device.get("batteryMah"),
+            "year": device.get("year"),
+            "storageOptionsGB": device.get("storageOptionsGB"),
         },
         "identity": {
             "SerialNumber": serial,
@@ -294,6 +322,11 @@ def write_plist(flat: dict, path: Path) -> None:
         "hw.ncpu",
         "hw.physicalcpu",
         "hw.logicalcpu",
+        "LogicalScreenWidth",
+        "LogicalScreenHeight",
+        "MaxRefreshHz",
+        "BatteryMah",
+        "DeviceYear",
     }
     bool_keys = {"Enabled"}
     for k, v in flat.items():
@@ -402,9 +435,17 @@ def main() -> int:
     print("Selected:")
     print(f"  Device : {device['MarketingName']} ({device['id']})")
     print(f"  Type   : {device['ProductType']} / {device['HWModelStr']}")
-    print(f"  Chip   : {device.get('chip')}  RAM={device['PhysicalMemoryMB']}MB  CPU={device.get('cpuCores')}")
+    print(
+        f"  Chip   : {device.get('chip')}  RAM={device['PhysicalMemoryMB']}MB  "
+        f"CPU={device.get('cpuCores')}  GPU={device.get('gpuCores')}"
+    )
     d = device["display"]
-    print(f"  Screen : {d['NativeWidth']}x{d['NativeHeight']} @{d['ScreenScale']}  {d.get('Pitch')} ppi")
+    print(
+        f"  Screen : {d['NativeWidth']}x{d['NativeHeight']} @{d['ScreenScale']}  "
+        f"{d.get('Pitch')} ppi  {d.get('DiagonalInches')}\"  {d.get('MaxRefreshHz', 60)}Hz"
+    )
+    if device.get("batteryMah"):
+        print(f"  Battery: {device['batteryMah']} mAh  year={device.get('year')}  storage={device.get('storageOptionsGB')}")
     print(f"  iOS    : {ios_ver} ({ios_meta['BuildVersion']})" + (" [lab build]" if ios_meta.get("lab") else ""))
     print(f"  Wrote  : {OUT_PLIST.relative_to(ROOT)}")
     print(f"           {OUT_ACTIVE.relative_to(ROOT)}")

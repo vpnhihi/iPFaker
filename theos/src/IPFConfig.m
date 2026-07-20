@@ -245,8 +245,10 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
     static dispatch_once_t once;
     dispatch_once(&once, ^{
         aliases = @{
+            // Settings → General → About (Giới thiệu) + Zalo
             @"marketing-name": @"MarketingName",
             @"Marketing-Name": @"MarketingName",
+            @"MarketingProductName": @"MarketingName",
             @"product-type": @"ProductType",
             @"Product-Type": @"ProductType",
             @"hw.model": @"HWModelStr",
@@ -255,6 +257,7 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
             @"DeviceName": @"DeviceName",
             @"device-name": @"UserAssignedDeviceName",
             @"user-assigned-device-name": @"UserAssignedDeviceName",
+            @"UserAssignedDeviceName": @"UserAssignedDeviceName",
             @"SerialNumber": @"SerialNumber",
             @"serial-number": @"SerialNumber",
             @"UniqueDeviceID": @"UniqueDeviceID",
@@ -264,6 +267,12 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
             @"BuildVersion": @"BuildVersion",
             @"build-version": @"BuildVersion",
             @"ProductBuildVersion": @"ProductBuildVersion",
+            @"ModelNumber": @"ModelNumber",
+            @"model-number": @"ModelNumber",
+            @"RegulatoryModelNumber": @"RegulatoryModelNumber",
+            @"regulatory-model-number": @"RegulatoryModelNumber",
+            @"RegionInfo": @"RegionInfo",
+            @"region-info": @"RegionInfo",
         };
     });
     NSString *canon = aliases[key];

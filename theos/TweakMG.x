@@ -44,11 +44,13 @@ static void IPFMark(const char *msg) {
         IPFMark("CTOR_ENTER");
 
         NSString *bid = [[NSBundle mainBundle] bundleIdentifier] ?: @"";
-        // Filter already scopes inject. Only refuse known non-targets.
+        // Filter scopes inject; allow Zalo + Settings (About / Giới thiệu).
         if (bid.length > 0) {
-            BOOL zalo = [bid isEqualToString:@"vn.com.vng.zingalo"]
-                     || [bid isEqualToString:@"com.zing.zalo"];
-            if (!zalo) {
+            BOOL ok =
+                [bid isEqualToString:@"vn.com.vng.zingalo"]
+                || [bid isEqualToString:@"com.zing.zalo"]
+                || [bid isEqualToString:@"com.apple.Preferences"];
+            if (!ok) {
                 IPFMark("CTOR_SKIP_BID");
                 return;
             }

@@ -1,143 +1,967 @@
 {
-  "version": 1,
-  "note": "Lab profiles iPhone 6 → 17 Pro Max. Screen = physical pixels (Native). RAM in MB. iOS 15–18 builds real; 19–26 lab placeholders.",
+  "version": 2,
+  "note": "Lab profiles iPhone 6 → 17 Pro Max (+ dual ProductType boards). Screen = physical pixels + logical points. RAM MB. iOS 15–18 builds near-real; 19–26 lab placeholders.",
   "ios_releases": {
-    "15.0":   { "BuildVersion": "19A346", "ProductVersion": "15.0" },
-    "15.0.1": { "BuildVersion": "19A348", "ProductVersion": "15.0.1" },
-    "15.0.2": { "BuildVersion": "19A404", "ProductVersion": "15.0.2" },
-    "15.1":   { "BuildVersion": "19B74",  "ProductVersion": "15.1" },
-    "15.1.1": { "BuildVersion": "19B81",  "ProductVersion": "15.1.1" },
-    "15.2":   { "BuildVersion": "19C56",  "ProductVersion": "15.2" },
-    "15.2.1": { "BuildVersion": "19C63",  "ProductVersion": "15.2.1" },
-    "15.3":   { "BuildVersion": "19D50",  "ProductVersion": "15.3" },
-    "15.3.1": { "BuildVersion": "19D52",  "ProductVersion": "15.3.1" },
-    "15.4":   { "BuildVersion": "19E241", "ProductVersion": "15.4" },
-    "15.4.1": { "BuildVersion": "19E258", "ProductVersion": "15.4.1" },
-    "15.5":   { "BuildVersion": "19F77",  "ProductVersion": "15.5" },
-    "15.6":   { "BuildVersion": "19G71",  "ProductVersion": "15.6" },
-    "15.6.1": { "BuildVersion": "19G82",  "ProductVersion": "15.6.1" },
-    "15.7":   { "BuildVersion": "19H12",  "ProductVersion": "15.7" },
-    "15.7.1": { "BuildVersion": "19H117", "ProductVersion": "15.7.1" },
-    "15.8":   { "BuildVersion": "19H370", "ProductVersion": "15.8" },
-    "15.8.1": { "BuildVersion": "19H380", "ProductVersion": "15.8.1" },
-    "15.8.2": { "BuildVersion": "19H384", "ProductVersion": "15.8.2" },
-    "15.8.3": { "BuildVersion": "19H386", "ProductVersion": "15.8.3" },
-    "15.8.4": { "BuildVersion": "19H390", "ProductVersion": "15.8.4" },
-    "15.8.5": { "BuildVersion": "19H394", "ProductVersion": "15.8.5" },
-    "16.0":   { "BuildVersion": "20A362", "ProductVersion": "16.0" },
-    "16.0.2": { "BuildVersion": "20A380", "ProductVersion": "16.0.2" },
-    "16.0.3": { "BuildVersion": "20A392", "ProductVersion": "16.0.3" },
-    "16.1":   { "BuildVersion": "20B82",  "ProductVersion": "16.1" },
-    "16.1.1": { "BuildVersion": "20B101", "ProductVersion": "16.1.1" },
-    "16.1.2": { "BuildVersion": "20B110", "ProductVersion": "16.1.2" },
-    "16.2":   { "BuildVersion": "20C65",  "ProductVersion": "16.2" },
-    "16.3":   { "BuildVersion": "20D47",  "ProductVersion": "16.3" },
-    "16.3.1": { "BuildVersion": "20D67",  "ProductVersion": "16.3.1" },
-    "16.4":   { "BuildVersion": "20E247", "ProductVersion": "16.4" },
-    "16.4.1": { "BuildVersion": "20E252", "ProductVersion": "16.4.1" },
-    "16.5":   { "BuildVersion": "20F66",  "ProductVersion": "16.5" },
-    "16.5.1": { "BuildVersion": "20F75",  "ProductVersion": "16.5.1" },
-    "16.6":   { "BuildVersion": "20G75",  "ProductVersion": "16.6" },
-    "16.6.1": { "BuildVersion": "20G81",  "ProductVersion": "16.6.1" },
-    "16.7":   { "BuildVersion": "20H19",  "ProductVersion": "16.7" },
-    "16.7.1": { "BuildVersion": "20H30",  "ProductVersion": "16.7.1" },
-    "16.7.2": { "BuildVersion": "20H115", "ProductVersion": "16.7.2" },
-    "16.7.5": { "BuildVersion": "20H307", "ProductVersion": "16.7.5" },
-    "16.7.10":{ "BuildVersion": "20H350", "ProductVersion": "16.7.10" },
-    "17.0":   { "BuildVersion": "21A329", "ProductVersion": "17.0" },
-    "17.0.1": { "BuildVersion": "21A340", "ProductVersion": "17.0.1" },
-    "17.0.2": { "BuildVersion": "21A351", "ProductVersion": "17.0.2" },
-    "17.0.3": { "BuildVersion": "21A360", "ProductVersion": "17.0.3" },
-    "17.1":   { "BuildVersion": "21B74",  "ProductVersion": "17.1" },
-    "17.1.1": { "BuildVersion": "21B91",  "ProductVersion": "17.1.1" },
-    "17.1.2": { "BuildVersion": "21B101", "ProductVersion": "17.1.2" },
-    "17.2":   { "BuildVersion": "21C62",  "ProductVersion": "17.2" },
-    "17.2.1": { "BuildVersion": "21C66",  "ProductVersion": "17.2.1" },
-    "17.3":   { "BuildVersion": "21D50",  "ProductVersion": "17.3" },
-    "17.3.1": { "BuildVersion": "21D61",  "ProductVersion": "17.3.1" },
-    "17.4":   { "BuildVersion": "21E219", "ProductVersion": "17.4" },
-    "17.4.1": { "BuildVersion": "21E236", "ProductVersion": "17.4.1" },
-    "17.5":   { "BuildVersion": "21F79",  "ProductVersion": "17.5" },
-    "17.5.1": { "BuildVersion": "21F90",  "ProductVersion": "17.5.1" },
-    "17.6":   { "BuildVersion": "21G80",  "ProductVersion": "17.6" },
-    "17.6.1": { "BuildVersion": "21G93",  "ProductVersion": "17.6.1" },
-    "17.7":   { "BuildVersion": "21H16",  "ProductVersion": "17.7" },
-    "17.7.1": { "BuildVersion": "21H216", "ProductVersion": "17.7.1" },
-    "17.7.2": { "BuildVersion": "21H221", "ProductVersion": "17.7.2" },
-    "18.0":   { "BuildVersion": "22A3354","ProductVersion": "18.0" },
-    "18.0.1": { "BuildVersion": "22A3370","ProductVersion": "18.0.1" },
-    "18.1":   { "BuildVersion": "22B83",  "ProductVersion": "18.1" },
-    "18.1.1": { "BuildVersion": "22B91",  "ProductVersion": "18.1.1" },
-    "18.2":   { "BuildVersion": "22C152", "ProductVersion": "18.2" },
-    "18.2.1": { "BuildVersion": "22C161", "ProductVersion": "18.2.1" },
-    "18.3":   { "BuildVersion": "22D63",  "ProductVersion": "18.3" },
-    "18.3.1": { "BuildVersion": "22D72",  "ProductVersion": "18.3.1" },
-    "18.3.2": { "BuildVersion": "22D82",  "ProductVersion": "18.3.2" },
-    "18.4":   { "BuildVersion": "22E240", "ProductVersion": "18.4" },
-    "18.4.1": { "BuildVersion": "22E252", "ProductVersion": "18.4.1" },
-    "18.5":   { "BuildVersion": "22F76",  "ProductVersion": "18.5" },
-    "18.6":   { "BuildVersion": "22G86",  "ProductVersion": "18.6" },
-    "18.6.1": { "BuildVersion": "22G90",  "ProductVersion": "18.6.1" },
-    "18.6.2": { "BuildVersion": "22G100", "ProductVersion": "18.6.2" },
-    "18.7":   { "BuildVersion": "22H20",  "ProductVersion": "18.7" },
-    "19.0":   { "BuildVersion": "23A341", "ProductVersion": "19.0", "lab": true },
-    "19.0.1": { "BuildVersion": "23A355", "ProductVersion": "19.0.1", "lab": true },
-    "19.1":   { "BuildVersion": "23B85",  "ProductVersion": "19.1", "lab": true },
-    "19.2":   { "BuildVersion": "23C55",  "ProductVersion": "19.2", "lab": true },
-    "19.3":   { "BuildVersion": "23D60",  "ProductVersion": "19.3", "lab": true },
-    "19.4":   { "BuildVersion": "23E240", "ProductVersion": "19.4", "lab": true },
-    "19.5":   { "BuildVersion": "23F70",  "ProductVersion": "19.5", "lab": true },
-    "19.6":   { "BuildVersion": "23G80",  "ProductVersion": "19.6", "lab": true },
-    "20.0":   { "BuildVersion": "24A340", "ProductVersion": "20.0", "lab": true },
-    "20.1":   { "BuildVersion": "24B80",  "ProductVersion": "20.1", "lab": true },
-    "20.2":   { "BuildVersion": "24C50",  "ProductVersion": "20.2", "lab": true },
-    "20.3":   { "BuildVersion": "24D60",  "ProductVersion": "20.3", "lab": true },
-    "20.4":   { "BuildVersion": "24E240", "ProductVersion": "20.4", "lab": true },
-    "20.5":   { "BuildVersion": "24F70",  "ProductVersion": "20.5", "lab": true },
-    "20.6":   { "BuildVersion": "24G80",  "ProductVersion": "20.6", "lab": true },
-    "21.0":   { "BuildVersion": "25A340", "ProductVersion": "21.0", "lab": true },
-    "21.1":   { "BuildVersion": "25B80",  "ProductVersion": "21.1", "lab": true },
-    "21.2":   { "BuildVersion": "25C50",  "ProductVersion": "21.2", "lab": true },
-    "21.3":   { "BuildVersion": "25D60",  "ProductVersion": "21.3", "lab": true },
-    "21.4":   { "BuildVersion": "25E240", "ProductVersion": "21.4", "lab": true },
-    "21.5":   { "BuildVersion": "25F70",  "ProductVersion": "21.5", "lab": true },
-    "21.6":   { "BuildVersion": "25G80",  "ProductVersion": "21.6", "lab": true },
-    "22.0":   { "BuildVersion": "26A340", "ProductVersion": "22.0", "lab": true },
-    "22.1":   { "BuildVersion": "26B80",  "ProductVersion": "22.1", "lab": true },
-    "22.2":   { "BuildVersion": "26C50",  "ProductVersion": "22.2", "lab": true },
-    "22.3":   { "BuildVersion": "26D60",  "ProductVersion": "22.3", "lab": true },
-    "22.4":   { "BuildVersion": "26E240", "ProductVersion": "22.4", "lab": true },
-    "22.5":   { "BuildVersion": "26F70",  "ProductVersion": "22.5", "lab": true },
-    "22.6":   { "BuildVersion": "26G80",  "ProductVersion": "22.6", "lab": true },
-    "23.0":   { "BuildVersion": "27A340", "ProductVersion": "23.0", "lab": true },
-    "23.1":   { "BuildVersion": "27B80",  "ProductVersion": "23.1", "lab": true },
-    "23.2":   { "BuildVersion": "27C50",  "ProductVersion": "23.2", "lab": true },
-    "23.3":   { "BuildVersion": "27D60",  "ProductVersion": "23.3", "lab": true },
-    "23.4":   { "BuildVersion": "27E240", "ProductVersion": "23.4", "lab": true },
-    "23.5":   { "BuildVersion": "27F70",  "ProductVersion": "23.5", "lab": true },
-    "23.6":   { "BuildVersion": "27G80",  "ProductVersion": "23.6", "lab": true },
-    "24.0":   { "BuildVersion": "28A340", "ProductVersion": "24.0", "lab": true },
-    "24.1":   { "BuildVersion": "28B80",  "ProductVersion": "24.1", "lab": true },
-    "24.2":   { "BuildVersion": "28C50",  "ProductVersion": "24.2", "lab": true },
-    "24.3":   { "BuildVersion": "28D60",  "ProductVersion": "24.3", "lab": true },
-    "24.4":   { "BuildVersion": "28E240", "ProductVersion": "24.4", "lab": true },
-    "24.5":   { "BuildVersion": "28F70",  "ProductVersion": "24.5", "lab": true },
-    "24.6":   { "BuildVersion": "28G80",  "ProductVersion": "24.6", "lab": true },
-    "25.0":   { "BuildVersion": "29A340", "ProductVersion": "25.0", "lab": true },
-    "25.1":   { "BuildVersion": "29B80",  "ProductVersion": "25.1", "lab": true },
-    "25.2":   { "BuildVersion": "29C50",  "ProductVersion": "25.2", "lab": true },
-    "25.3":   { "BuildVersion": "29D60",  "ProductVersion": "25.3", "lab": true },
-    "25.4":   { "BuildVersion": "29E240", "ProductVersion": "25.4", "lab": true },
-    "25.5":   { "BuildVersion": "29F70",  "ProductVersion": "25.5", "lab": true },
-    "25.6":   { "BuildVersion": "29G80",  "ProductVersion": "25.6", "lab": true },
-    "26.0":   { "BuildVersion": "30A340", "ProductVersion": "26.0", "lab": true },
-    "26.0.1": { "BuildVersion": "30A350", "ProductVersion": "26.0.1", "lab": true },
-    "26.1":   { "BuildVersion": "30B80",  "ProductVersion": "26.1", "lab": true },
-    "26.2":   { "BuildVersion": "30C50",  "ProductVersion": "26.2", "lab": true },
-    "26.3":   { "BuildVersion": "30D60",  "ProductVersion": "26.3", "lab": true },
-    "26.4":   { "BuildVersion": "30E240", "ProductVersion": "26.4", "lab": true },
-    "26.5":   { "BuildVersion": "30F70",  "ProductVersion": "26.5", "lab": true },
-    "26.6":   { "BuildVersion": "30G80",  "ProductVersion": "26.6", "lab": true }
+    "15.0": {
+      "BuildVersion": "19A346",
+      "ProductVersion": "15.0"
+    },
+    "15.0.1": {
+      "BuildVersion": "19A348",
+      "ProductVersion": "15.0.1"
+    },
+    "15.0.2": {
+      "BuildVersion": "19A404",
+      "ProductVersion": "15.0.2"
+    },
+    "15.1": {
+      "BuildVersion": "19B74",
+      "ProductVersion": "15.1"
+    },
+    "15.1.1": {
+      "BuildVersion": "19B81",
+      "ProductVersion": "15.1.1"
+    },
+    "15.2": {
+      "BuildVersion": "19C56",
+      "ProductVersion": "15.2"
+    },
+    "15.2.1": {
+      "BuildVersion": "19C63",
+      "ProductVersion": "15.2.1"
+    },
+    "15.3": {
+      "BuildVersion": "19D50",
+      "ProductVersion": "15.3"
+    },
+    "15.3.1": {
+      "BuildVersion": "19D52",
+      "ProductVersion": "15.3.1"
+    },
+    "15.4": {
+      "BuildVersion": "19E241",
+      "ProductVersion": "15.4"
+    },
+    "15.4.1": {
+      "BuildVersion": "19E258",
+      "ProductVersion": "15.4.1"
+    },
+    "15.5": {
+      "BuildVersion": "19F77",
+      "ProductVersion": "15.5"
+    },
+    "15.6": {
+      "BuildVersion": "19G71",
+      "ProductVersion": "15.6"
+    },
+    "15.6.1": {
+      "BuildVersion": "19G82",
+      "ProductVersion": "15.6.1"
+    },
+    "15.7": {
+      "BuildVersion": "19H12",
+      "ProductVersion": "15.7"
+    },
+    "15.7.1": {
+      "BuildVersion": "19H117",
+      "ProductVersion": "15.7.1"
+    },
+    "15.7.2": {
+      "BuildVersion": "19H218",
+      "ProductVersion": "15.7.2"
+    },
+    "15.7.3": {
+      "BuildVersion": "19H307",
+      "ProductVersion": "15.7.3"
+    },
+    "15.7.4": {
+      "BuildVersion": "19H321",
+      "ProductVersion": "15.7.4"
+    },
+    "15.7.5": {
+      "BuildVersion": "19H332",
+      "ProductVersion": "15.7.5"
+    },
+    "15.7.6": {
+      "BuildVersion": "19H349",
+      "ProductVersion": "15.7.6"
+    },
+    "15.7.7": {
+      "BuildVersion": "19H357",
+      "ProductVersion": "15.7.7"
+    },
+    "15.7.8": {
+      "BuildVersion": "19H364",
+      "ProductVersion": "15.7.8"
+    },
+    "15.7.9": {
+      "BuildVersion": "19H365",
+      "ProductVersion": "15.7.9"
+    },
+    "15.8": {
+      "BuildVersion": "19H370",
+      "ProductVersion": "15.8"
+    },
+    "15.8.1": {
+      "BuildVersion": "19H380",
+      "ProductVersion": "15.8.1"
+    },
+    "15.8.2": {
+      "BuildVersion": "19H384",
+      "ProductVersion": "15.8.2"
+    },
+    "15.8.3": {
+      "BuildVersion": "19H386",
+      "ProductVersion": "15.8.3"
+    },
+    "15.8.4": {
+      "BuildVersion": "19H390",
+      "ProductVersion": "15.8.4"
+    },
+    "15.8.5": {
+      "BuildVersion": "19H394",
+      "ProductVersion": "15.8.5"
+    },
+    "16.0": {
+      "BuildVersion": "20A362",
+      "ProductVersion": "16.0"
+    },
+    "16.0.1": {
+      "BuildVersion": "20A371",
+      "ProductVersion": "16.0.1"
+    },
+    "16.0.2": {
+      "BuildVersion": "20A380",
+      "ProductVersion": "16.0.2"
+    },
+    "16.0.3": {
+      "BuildVersion": "20A392",
+      "ProductVersion": "16.0.3"
+    },
+    "16.1": {
+      "BuildVersion": "20B82",
+      "ProductVersion": "16.1"
+    },
+    "16.1.1": {
+      "BuildVersion": "20B101",
+      "ProductVersion": "16.1.1"
+    },
+    "16.1.2": {
+      "BuildVersion": "20B110",
+      "ProductVersion": "16.1.2"
+    },
+    "16.2": {
+      "BuildVersion": "20C65",
+      "ProductVersion": "16.2"
+    },
+    "16.3": {
+      "BuildVersion": "20D47",
+      "ProductVersion": "16.3"
+    },
+    "16.3.1": {
+      "BuildVersion": "20D67",
+      "ProductVersion": "16.3.1"
+    },
+    "16.4": {
+      "BuildVersion": "20E247",
+      "ProductVersion": "16.4"
+    },
+    "16.4.1": {
+      "BuildVersion": "20E252",
+      "ProductVersion": "16.4.1"
+    },
+    "16.5": {
+      "BuildVersion": "20F66",
+      "ProductVersion": "16.5"
+    },
+    "16.5.1": {
+      "BuildVersion": "20F75",
+      "ProductVersion": "16.5.1"
+    },
+    "16.6": {
+      "BuildVersion": "20G75",
+      "ProductVersion": "16.6"
+    },
+    "16.6.1": {
+      "BuildVersion": "20G81",
+      "ProductVersion": "16.6.1"
+    },
+    "16.7": {
+      "BuildVersion": "20H19",
+      "ProductVersion": "16.7"
+    },
+    "16.7.1": {
+      "BuildVersion": "20H30",
+      "ProductVersion": "16.7.1"
+    },
+    "16.7.2": {
+      "BuildVersion": "20H115",
+      "ProductVersion": "16.7.2"
+    },
+    "16.7.3": {
+      "BuildVersion": "20H232",
+      "ProductVersion": "16.7.3"
+    },
+    "16.7.4": {
+      "BuildVersion": "20H240",
+      "ProductVersion": "16.7.4"
+    },
+    "16.7.5": {
+      "BuildVersion": "20H307",
+      "ProductVersion": "16.7.5"
+    },
+    "16.7.6": {
+      "BuildVersion": "20H320",
+      "ProductVersion": "16.7.6"
+    },
+    "16.7.7": {
+      "BuildVersion": "20H330",
+      "ProductVersion": "16.7.7"
+    },
+    "16.7.8": {
+      "BuildVersion": "20H343",
+      "ProductVersion": "16.7.8"
+    },
+    "16.7.9": {
+      "BuildVersion": "20H348",
+      "ProductVersion": "16.7.9"
+    },
+    "16.7.10": {
+      "BuildVersion": "20H350",
+      "ProductVersion": "16.7.10"
+    },
+    "16.7.11": {
+      "BuildVersion": "20H360",
+      "ProductVersion": "16.7.11"
+    },
+    "17.0": {
+      "BuildVersion": "21A329",
+      "ProductVersion": "17.0"
+    },
+    "17.0.1": {
+      "BuildVersion": "21A340",
+      "ProductVersion": "17.0.1"
+    },
+    "17.0.2": {
+      "BuildVersion": "21A351",
+      "ProductVersion": "17.0.2"
+    },
+    "17.0.3": {
+      "BuildVersion": "21A360",
+      "ProductVersion": "17.0.3"
+    },
+    "17.1": {
+      "BuildVersion": "21B74",
+      "ProductVersion": "17.1"
+    },
+    "17.1.1": {
+      "BuildVersion": "21B91",
+      "ProductVersion": "17.1.1"
+    },
+    "17.1.2": {
+      "BuildVersion": "21B101",
+      "ProductVersion": "17.1.2"
+    },
+    "17.2": {
+      "BuildVersion": "21C62",
+      "ProductVersion": "17.2"
+    },
+    "17.2.1": {
+      "BuildVersion": "21C66",
+      "ProductVersion": "17.2.1"
+    },
+    "17.3": {
+      "BuildVersion": "21D50",
+      "ProductVersion": "17.3"
+    },
+    "17.3.1": {
+      "BuildVersion": "21D61",
+      "ProductVersion": "17.3.1"
+    },
+    "17.4": {
+      "BuildVersion": "21E219",
+      "ProductVersion": "17.4"
+    },
+    "17.4.1": {
+      "BuildVersion": "21E236",
+      "ProductVersion": "17.4.1"
+    },
+    "17.5": {
+      "BuildVersion": "21F79",
+      "ProductVersion": "17.5"
+    },
+    "17.5.1": {
+      "BuildVersion": "21F90",
+      "ProductVersion": "17.5.1"
+    },
+    "17.6": {
+      "BuildVersion": "21G80",
+      "ProductVersion": "17.6"
+    },
+    "17.6.1": {
+      "BuildVersion": "21G93",
+      "ProductVersion": "17.6.1"
+    },
+    "17.7": {
+      "BuildVersion": "21H16",
+      "ProductVersion": "17.7"
+    },
+    "17.7.1": {
+      "BuildVersion": "21H216",
+      "ProductVersion": "17.7.1"
+    },
+    "17.7.2": {
+      "BuildVersion": "21H221",
+      "ProductVersion": "17.7.2"
+    },
+    "17.7.3": {
+      "BuildVersion": "21H316",
+      "ProductVersion": "17.7.3"
+    },
+    "17.7.4": {
+      "BuildVersion": "21H340",
+      "ProductVersion": "17.7.4"
+    },
+    "17.7.5": {
+      "BuildVersion": "21H350",
+      "ProductVersion": "17.7.5"
+    },
+    "17.7.6": {
+      "BuildVersion": "21H360",
+      "ProductVersion": "17.7.6"
+    },
+    "18.0": {
+      "BuildVersion": "22A3354",
+      "ProductVersion": "18.0"
+    },
+    "18.0.1": {
+      "BuildVersion": "22A3370",
+      "ProductVersion": "18.0.1"
+    },
+    "18.1": {
+      "BuildVersion": "22B83",
+      "ProductVersion": "18.1"
+    },
+    "18.1.1": {
+      "BuildVersion": "22B91",
+      "ProductVersion": "18.1.1"
+    },
+    "18.2": {
+      "BuildVersion": "22C152",
+      "ProductVersion": "18.2"
+    },
+    "18.2.1": {
+      "BuildVersion": "22C161",
+      "ProductVersion": "18.2.1"
+    },
+    "18.3": {
+      "BuildVersion": "22D63",
+      "ProductVersion": "18.3"
+    },
+    "18.3.1": {
+      "BuildVersion": "22D72",
+      "ProductVersion": "18.3.1"
+    },
+    "18.3.2": {
+      "BuildVersion": "22D82",
+      "ProductVersion": "18.3.2"
+    },
+    "18.4": {
+      "BuildVersion": "22E240",
+      "ProductVersion": "18.4"
+    },
+    "18.4.1": {
+      "BuildVersion": "22E252",
+      "ProductVersion": "18.4.1"
+    },
+    "18.5": {
+      "BuildVersion": "22F76",
+      "ProductVersion": "18.5"
+    },
+    "18.6": {
+      "BuildVersion": "22G86",
+      "ProductVersion": "18.6"
+    },
+    "18.6.1": {
+      "BuildVersion": "22G90",
+      "ProductVersion": "18.6.1"
+    },
+    "18.6.2": {
+      "BuildVersion": "22G100",
+      "ProductVersion": "18.6.2"
+    },
+    "18.7": {
+      "BuildVersion": "22H20",
+      "ProductVersion": "18.7"
+    },
+    "18.7.1": {
+      "BuildVersion": "22H30",
+      "ProductVersion": "18.7.1"
+    },
+    "18.7.2": {
+      "BuildVersion": "22H40",
+      "ProductVersion": "18.7.2"
+    },
+    "19.0": {
+      "BuildVersion": "23A341",
+      "ProductVersion": "19.0",
+      "lab": true
+    },
+    "19.0.1": {
+      "BuildVersion": "23A355",
+      "ProductVersion": "19.0.1",
+      "lab": true
+    },
+    "19.1": {
+      "BuildVersion": "23B85",
+      "ProductVersion": "19.1",
+      "lab": true
+    },
+    "19.1.1": {
+      "BuildVersion": "23B91",
+      "ProductVersion": "19.1.1",
+      "lab": true
+    },
+    "19.2": {
+      "BuildVersion": "23C55",
+      "ProductVersion": "19.2",
+      "lab": true
+    },
+    "19.2.1": {
+      "BuildVersion": "23C61",
+      "ProductVersion": "19.2.1",
+      "lab": true
+    },
+    "19.3": {
+      "BuildVersion": "23D60",
+      "ProductVersion": "19.3",
+      "lab": true
+    },
+    "19.3.1": {
+      "BuildVersion": "23D72",
+      "ProductVersion": "19.3.1",
+      "lab": true
+    },
+    "19.4": {
+      "BuildVersion": "23E240",
+      "ProductVersion": "19.4",
+      "lab": true
+    },
+    "19.4.1": {
+      "BuildVersion": "23E252",
+      "ProductVersion": "19.4.1",
+      "lab": true
+    },
+    "19.5": {
+      "BuildVersion": "23F70",
+      "ProductVersion": "19.5",
+      "lab": true
+    },
+    "19.5.1": {
+      "BuildVersion": "23F80",
+      "ProductVersion": "19.5.1",
+      "lab": true
+    },
+    "19.6": {
+      "BuildVersion": "23G80",
+      "ProductVersion": "19.6",
+      "lab": true
+    },
+    "19.6.1": {
+      "BuildVersion": "23G90",
+      "ProductVersion": "19.6.1",
+      "lab": true
+    },
+    "20.0": {
+      "BuildVersion": "24A341",
+      "ProductVersion": "20.0",
+      "lab": true
+    },
+    "20.0.1": {
+      "BuildVersion": "24A355",
+      "ProductVersion": "20.0.1",
+      "lab": true
+    },
+    "20.1": {
+      "BuildVersion": "24B85",
+      "ProductVersion": "20.1",
+      "lab": true
+    },
+    "20.1.1": {
+      "BuildVersion": "24B91",
+      "ProductVersion": "20.1.1",
+      "lab": true
+    },
+    "20.2": {
+      "BuildVersion": "24C55",
+      "ProductVersion": "20.2",
+      "lab": true
+    },
+    "20.2.1": {
+      "BuildVersion": "24C61",
+      "ProductVersion": "20.2.1",
+      "lab": true
+    },
+    "20.3": {
+      "BuildVersion": "24D60",
+      "ProductVersion": "20.3",
+      "lab": true
+    },
+    "20.3.1": {
+      "BuildVersion": "24D72",
+      "ProductVersion": "20.3.1",
+      "lab": true
+    },
+    "20.4": {
+      "BuildVersion": "24E240",
+      "ProductVersion": "20.4",
+      "lab": true
+    },
+    "20.4.1": {
+      "BuildVersion": "24E252",
+      "ProductVersion": "20.4.1",
+      "lab": true
+    },
+    "20.5": {
+      "BuildVersion": "24F70",
+      "ProductVersion": "20.5",
+      "lab": true
+    },
+    "20.5.1": {
+      "BuildVersion": "24F80",
+      "ProductVersion": "20.5.1",
+      "lab": true
+    },
+    "20.6": {
+      "BuildVersion": "24G80",
+      "ProductVersion": "20.6",
+      "lab": true
+    },
+    "20.6.1": {
+      "BuildVersion": "24G90",
+      "ProductVersion": "20.6.1",
+      "lab": true
+    },
+    "21.0": {
+      "BuildVersion": "25A341",
+      "ProductVersion": "21.0",
+      "lab": true
+    },
+    "21.0.1": {
+      "BuildVersion": "25A355",
+      "ProductVersion": "21.0.1",
+      "lab": true
+    },
+    "21.1": {
+      "BuildVersion": "25B85",
+      "ProductVersion": "21.1",
+      "lab": true
+    },
+    "21.1.1": {
+      "BuildVersion": "25B91",
+      "ProductVersion": "21.1.1",
+      "lab": true
+    },
+    "21.2": {
+      "BuildVersion": "25C55",
+      "ProductVersion": "21.2",
+      "lab": true
+    },
+    "21.2.1": {
+      "BuildVersion": "25C61",
+      "ProductVersion": "21.2.1",
+      "lab": true
+    },
+    "21.3": {
+      "BuildVersion": "25D60",
+      "ProductVersion": "21.3",
+      "lab": true
+    },
+    "21.3.1": {
+      "BuildVersion": "25D72",
+      "ProductVersion": "21.3.1",
+      "lab": true
+    },
+    "21.4": {
+      "BuildVersion": "25E240",
+      "ProductVersion": "21.4",
+      "lab": true
+    },
+    "21.4.1": {
+      "BuildVersion": "25E252",
+      "ProductVersion": "21.4.1",
+      "lab": true
+    },
+    "21.5": {
+      "BuildVersion": "25F70",
+      "ProductVersion": "21.5",
+      "lab": true
+    },
+    "21.5.1": {
+      "BuildVersion": "25F80",
+      "ProductVersion": "21.5.1",
+      "lab": true
+    },
+    "21.6": {
+      "BuildVersion": "25G80",
+      "ProductVersion": "21.6",
+      "lab": true
+    },
+    "21.6.1": {
+      "BuildVersion": "25G90",
+      "ProductVersion": "21.6.1",
+      "lab": true
+    },
+    "22.0": {
+      "BuildVersion": "26A341",
+      "ProductVersion": "22.0",
+      "lab": true
+    },
+    "22.0.1": {
+      "BuildVersion": "26A355",
+      "ProductVersion": "22.0.1",
+      "lab": true
+    },
+    "22.1": {
+      "BuildVersion": "26B85",
+      "ProductVersion": "22.1",
+      "lab": true
+    },
+    "22.1.1": {
+      "BuildVersion": "26B91",
+      "ProductVersion": "22.1.1",
+      "lab": true
+    },
+    "22.2": {
+      "BuildVersion": "26C55",
+      "ProductVersion": "22.2",
+      "lab": true
+    },
+    "22.2.1": {
+      "BuildVersion": "26C61",
+      "ProductVersion": "22.2.1",
+      "lab": true
+    },
+    "22.3": {
+      "BuildVersion": "26D60",
+      "ProductVersion": "22.3",
+      "lab": true
+    },
+    "22.3.1": {
+      "BuildVersion": "26D72",
+      "ProductVersion": "22.3.1",
+      "lab": true
+    },
+    "22.4": {
+      "BuildVersion": "26E240",
+      "ProductVersion": "22.4",
+      "lab": true
+    },
+    "22.4.1": {
+      "BuildVersion": "26E252",
+      "ProductVersion": "22.4.1",
+      "lab": true
+    },
+    "22.5": {
+      "BuildVersion": "26F70",
+      "ProductVersion": "22.5",
+      "lab": true
+    },
+    "22.5.1": {
+      "BuildVersion": "26F80",
+      "ProductVersion": "22.5.1",
+      "lab": true
+    },
+    "22.6": {
+      "BuildVersion": "26G80",
+      "ProductVersion": "22.6",
+      "lab": true
+    },
+    "22.6.1": {
+      "BuildVersion": "26G90",
+      "ProductVersion": "22.6.1",
+      "lab": true
+    },
+    "23.0": {
+      "BuildVersion": "27A341",
+      "ProductVersion": "23.0",
+      "lab": true
+    },
+    "23.0.1": {
+      "BuildVersion": "27A355",
+      "ProductVersion": "23.0.1",
+      "lab": true
+    },
+    "23.1": {
+      "BuildVersion": "27B85",
+      "ProductVersion": "23.1",
+      "lab": true
+    },
+    "23.1.1": {
+      "BuildVersion": "27B91",
+      "ProductVersion": "23.1.1",
+      "lab": true
+    },
+    "23.2": {
+      "BuildVersion": "27C55",
+      "ProductVersion": "23.2",
+      "lab": true
+    },
+    "23.2.1": {
+      "BuildVersion": "27C61",
+      "ProductVersion": "23.2.1",
+      "lab": true
+    },
+    "23.3": {
+      "BuildVersion": "27D60",
+      "ProductVersion": "23.3",
+      "lab": true
+    },
+    "23.3.1": {
+      "BuildVersion": "27D72",
+      "ProductVersion": "23.3.1",
+      "lab": true
+    },
+    "23.4": {
+      "BuildVersion": "27E240",
+      "ProductVersion": "23.4",
+      "lab": true
+    },
+    "23.4.1": {
+      "BuildVersion": "27E252",
+      "ProductVersion": "23.4.1",
+      "lab": true
+    },
+    "23.5": {
+      "BuildVersion": "27F70",
+      "ProductVersion": "23.5",
+      "lab": true
+    },
+    "23.5.1": {
+      "BuildVersion": "27F80",
+      "ProductVersion": "23.5.1",
+      "lab": true
+    },
+    "23.6": {
+      "BuildVersion": "27G80",
+      "ProductVersion": "23.6",
+      "lab": true
+    },
+    "23.6.1": {
+      "BuildVersion": "27G90",
+      "ProductVersion": "23.6.1",
+      "lab": true
+    },
+    "24.0": {
+      "BuildVersion": "28A341",
+      "ProductVersion": "24.0",
+      "lab": true
+    },
+    "24.0.1": {
+      "BuildVersion": "28A355",
+      "ProductVersion": "24.0.1",
+      "lab": true
+    },
+    "24.1": {
+      "BuildVersion": "28B85",
+      "ProductVersion": "24.1",
+      "lab": true
+    },
+    "24.1.1": {
+      "BuildVersion": "28B91",
+      "ProductVersion": "24.1.1",
+      "lab": true
+    },
+    "24.2": {
+      "BuildVersion": "28C55",
+      "ProductVersion": "24.2",
+      "lab": true
+    },
+    "24.2.1": {
+      "BuildVersion": "28C61",
+      "ProductVersion": "24.2.1",
+      "lab": true
+    },
+    "24.3": {
+      "BuildVersion": "28D60",
+      "ProductVersion": "24.3",
+      "lab": true
+    },
+    "24.3.1": {
+      "BuildVersion": "28D72",
+      "ProductVersion": "24.3.1",
+      "lab": true
+    },
+    "24.4": {
+      "BuildVersion": "28E240",
+      "ProductVersion": "24.4",
+      "lab": true
+    },
+    "24.4.1": {
+      "BuildVersion": "28E252",
+      "ProductVersion": "24.4.1",
+      "lab": true
+    },
+    "24.5": {
+      "BuildVersion": "28F70",
+      "ProductVersion": "24.5",
+      "lab": true
+    },
+    "24.5.1": {
+      "BuildVersion": "28F80",
+      "ProductVersion": "24.5.1",
+      "lab": true
+    },
+    "24.6": {
+      "BuildVersion": "28G80",
+      "ProductVersion": "24.6",
+      "lab": true
+    },
+    "24.6.1": {
+      "BuildVersion": "28G90",
+      "ProductVersion": "24.6.1",
+      "lab": true
+    },
+    "25.0": {
+      "BuildVersion": "29A341",
+      "ProductVersion": "25.0",
+      "lab": true
+    },
+    "25.0.1": {
+      "BuildVersion": "29A355",
+      "ProductVersion": "25.0.1",
+      "lab": true
+    },
+    "25.1": {
+      "BuildVersion": "29B85",
+      "ProductVersion": "25.1",
+      "lab": true
+    },
+    "25.1.1": {
+      "BuildVersion": "29B91",
+      "ProductVersion": "25.1.1",
+      "lab": true
+    },
+    "25.2": {
+      "BuildVersion": "29C55",
+      "ProductVersion": "25.2",
+      "lab": true
+    },
+    "25.2.1": {
+      "BuildVersion": "29C61",
+      "ProductVersion": "25.2.1",
+      "lab": true
+    },
+    "25.3": {
+      "BuildVersion": "29D60",
+      "ProductVersion": "25.3",
+      "lab": true
+    },
+    "25.3.1": {
+      "BuildVersion": "29D72",
+      "ProductVersion": "25.3.1",
+      "lab": true
+    },
+    "25.4": {
+      "BuildVersion": "29E240",
+      "ProductVersion": "25.4",
+      "lab": true
+    },
+    "25.4.1": {
+      "BuildVersion": "29E252",
+      "ProductVersion": "25.4.1",
+      "lab": true
+    },
+    "25.5": {
+      "BuildVersion": "29F70",
+      "ProductVersion": "25.5",
+      "lab": true
+    },
+    "25.5.1": {
+      "BuildVersion": "29F80",
+      "ProductVersion": "25.5.1",
+      "lab": true
+    },
+    "25.6": {
+      "BuildVersion": "29G80",
+      "ProductVersion": "25.6",
+      "lab": true
+    },
+    "25.6.1": {
+      "BuildVersion": "29G90",
+      "ProductVersion": "25.6.1",
+      "lab": true
+    },
+    "26.0": {
+      "BuildVersion": "30A341",
+      "ProductVersion": "26.0",
+      "lab": true
+    },
+    "26.0.1": {
+      "BuildVersion": "30A355",
+      "ProductVersion": "26.0.1",
+      "lab": true
+    },
+    "26.1": {
+      "BuildVersion": "30B85",
+      "ProductVersion": "26.1",
+      "lab": true
+    },
+    "26.1.1": {
+      "BuildVersion": "30B91",
+      "ProductVersion": "26.1.1",
+      "lab": true
+    },
+    "26.2": {
+      "BuildVersion": "30C55",
+      "ProductVersion": "26.2",
+      "lab": true
+    },
+    "26.2.1": {
+      "BuildVersion": "30C61",
+      "ProductVersion": "26.2.1",
+      "lab": true
+    },
+    "26.3": {
+      "BuildVersion": "30D60",
+      "ProductVersion": "26.3",
+      "lab": true
+    },
+    "26.3.1": {
+      "BuildVersion": "30D72",
+      "ProductVersion": "26.3.1",
+      "lab": true
+    },
+    "26.4": {
+      "BuildVersion": "30E240",
+      "ProductVersion": "26.4",
+      "lab": true
+    },
+    "26.4.1": {
+      "BuildVersion": "30E252",
+      "ProductVersion": "26.4.1",
+      "lab": true
+    },
+    "26.5": {
+      "BuildVersion": "30F70",
+      "ProductVersion": "26.5",
+      "lab": true
+    },
+    "26.5.1": {
+      "BuildVersion": "30F80",
+      "ProductVersion": "26.5.1",
+      "lab": true
+    },
+    "26.6": {
+      "BuildVersion": "30G80",
+      "ProductVersion": "26.6",
+      "lab": true
+    },
+    "26.6.1": {
+      "BuildVersion": "30G90",
+      "ProductVersion": "26.6.1",
+      "lab": true
+    }
   },
   "devices": [
     {
@@ -153,10 +977,26 @@
       "cpuCores": 2,
       "gpuCores": 4,
       "PhysicalMemoryMB": 1024,
-      "display": { "NativeWidth": 750, "NativeHeight": 1334, "ScreenScale": 2, "Pitch": 326 },
+      "display": {
+        "NativeWidth": 750,
+        "NativeHeight": 1334,
+        "ScreenScale": 2,
+        "Pitch": 326,
+        "LogicalWidth": 375,
+        "LogicalHeight": 667,
+        "DiagonalInches": 4.7,
+        "MaxRefreshHz": 60
+      },
       "defaultIOS": "15.8.3",
       "minIOS": "15.0",
-      "maxIOS": "15.8.5"
+      "maxIOS": "15.8.5",
+      "year": 2014,
+      "batteryMah": 1810,
+      "storageOptionsGB": [
+        16,
+        64,
+        128
+      ]
     },
     {
       "id": "iphone6-plus",
@@ -171,10 +1011,26 @@
       "cpuCores": 2,
       "gpuCores": 4,
       "PhysicalMemoryMB": 1024,
-      "display": { "NativeWidth": 1080, "NativeHeight": 1920, "ScreenScale": 3, "Pitch": 401 },
+      "display": {
+        "NativeWidth": 1080,
+        "NativeHeight": 1920,
+        "ScreenScale": 3,
+        "Pitch": 401,
+        "LogicalWidth": 414,
+        "LogicalHeight": 736,
+        "DiagonalInches": 5.5,
+        "MaxRefreshHz": 60
+      },
       "defaultIOS": "15.8.3",
       "minIOS": "15.0",
-      "maxIOS": "15.8.5"
+      "maxIOS": "15.8.5",
+      "year": 2014,
+      "batteryMah": 2915,
+      "storageOptionsGB": [
+        16,
+        64,
+        128
+      ]
     },
     {
       "id": "iphone6s",
@@ -189,10 +1045,27 @@
       "cpuCores": 2,
       "gpuCores": 6,
       "PhysicalMemoryMB": 2048,
-      "display": { "NativeWidth": 750, "NativeHeight": 1334, "ScreenScale": 2, "Pitch": 326 },
+      "display": {
+        "NativeWidth": 750,
+        "NativeHeight": 1334,
+        "ScreenScale": 2,
+        "Pitch": 326,
+        "LogicalWidth": 375,
+        "LogicalHeight": 667,
+        "DiagonalInches": 4.7,
+        "MaxRefreshHz": 60
+      },
       "defaultIOS": "15.8.3",
       "minIOS": "15.0",
-      "maxIOS": "15.8.5"
+      "maxIOS": "15.8.5",
+      "year": 2015,
+      "batteryMah": 1715,
+      "storageOptionsGB": [
+        16,
+        32,
+        64,
+        128
+      ]
     },
     {
       "id": "iphone6s-plus",
@@ -207,14 +1080,31 @@
       "cpuCores": 2,
       "gpuCores": 6,
       "PhysicalMemoryMB": 2048,
-      "display": { "NativeWidth": 1080, "NativeHeight": 1920, "ScreenScale": 3, "Pitch": 401 },
+      "display": {
+        "NativeWidth": 1080,
+        "NativeHeight": 1920,
+        "ScreenScale": 3,
+        "Pitch": 401,
+        "LogicalWidth": 414,
+        "LogicalHeight": 736,
+        "DiagonalInches": 5.5,
+        "MaxRefreshHz": 60
+      },
       "defaultIOS": "15.8.3",
       "minIOS": "15.0",
-      "maxIOS": "15.8.5"
+      "maxIOS": "15.8.5",
+      "year": 2015,
+      "batteryMah": 2750,
+      "storageOptionsGB": [
+        16,
+        32,
+        64,
+        128
+      ]
     },
     {
       "id": "iphone-se-1",
-      "MarketingName": "iPhone SE",
+      "MarketingName": "iPhone SE (1st generation)",
       "ProductType": "iPhone8,4",
       "HWModelStr": "N69AP",
       "HardwarePlatform": "s8000",
@@ -225,10 +1115,27 @@
       "cpuCores": 2,
       "gpuCores": 6,
       "PhysicalMemoryMB": 2048,
-      "display": { "NativeWidth": 640, "NativeHeight": 1136, "ScreenScale": 2, "Pitch": 326 },
+      "display": {
+        "NativeWidth": 640,
+        "NativeHeight": 1136,
+        "ScreenScale": 2,
+        "Pitch": 326,
+        "LogicalWidth": 320,
+        "LogicalHeight": 568,
+        "DiagonalInches": 4.0,
+        "MaxRefreshHz": 60
+      },
       "defaultIOS": "15.8.3",
       "minIOS": "15.0",
-      "maxIOS": "15.8.5"
+      "maxIOS": "15.8.5",
+      "year": 2016,
+      "batteryMah": 1624,
+      "storageOptionsGB": [
+        16,
+        32,
+        64,
+        128
+      ]
     },
     {
       "id": "iphone7",
@@ -243,10 +1150,62 @@
       "cpuCores": 4,
       "gpuCores": 6,
       "PhysicalMemoryMB": 2048,
-      "display": { "NativeWidth": 750, "NativeHeight": 1334, "ScreenScale": 2, "Pitch": 326 },
+      "display": {
+        "NativeWidth": 750,
+        "NativeHeight": 1334,
+        "ScreenScale": 2,
+        "Pitch": 326,
+        "LogicalWidth": 375,
+        "LogicalHeight": 667,
+        "DiagonalInches": 4.7,
+        "MaxRefreshHz": 60
+      },
       "defaultIOS": "15.8.3",
       "minIOS": "15.0",
-      "maxIOS": "15.8.5"
+      "maxIOS": "15.8.5",
+      "year": 2016,
+      "batteryMah": 1960,
+      "storageOptionsGB": [
+        32,
+        128,
+        256
+      ],
+      "note": "GSM Global"
+    },
+    {
+      "id": "iphone7-cdma",
+      "MarketingName": "iPhone 7",
+      "ProductType": "iPhone9,1",
+      "HWModelStr": "D10AP",
+      "HardwarePlatform": "t8010",
+      "ModelNumber": "MN8G2",
+      "RegulatoryModelNumber": "A1660",
+      "CPUArchitecture": "arm64",
+      "chip": "A10 Fusion",
+      "cpuCores": 4,
+      "gpuCores": 6,
+      "PhysicalMemoryMB": 2048,
+      "display": {
+        "NativeWidth": 750,
+        "NativeHeight": 1334,
+        "ScreenScale": 2,
+        "Pitch": 326,
+        "LogicalWidth": 375,
+        "LogicalHeight": 667,
+        "DiagonalInches": 4.7,
+        "MaxRefreshHz": 60
+      },
+      "defaultIOS": "15.8.3",
+      "minIOS": "15.0",
+      "maxIOS": "15.8.5",
+      "year": 2016,
+      "batteryMah": 1960,
+      "storageOptionsGB": [
+        32,
+        128,
+        256
+      ],
+      "note": "CDMA / US / JP board"
     },
     {
       "id": "iphone7-plus",
@@ -261,10 +1220,62 @@
       "cpuCores": 4,
       "gpuCores": 6,
       "PhysicalMemoryMB": 3072,
-      "display": { "NativeWidth": 1080, "NativeHeight": 1920, "ScreenScale": 3, "Pitch": 401 },
+      "display": {
+        "NativeWidth": 1080,
+        "NativeHeight": 1920,
+        "ScreenScale": 3,
+        "Pitch": 401,
+        "LogicalWidth": 414,
+        "LogicalHeight": 736,
+        "DiagonalInches": 5.5,
+        "MaxRefreshHz": 60
+      },
       "defaultIOS": "15.8.3",
       "minIOS": "15.0",
-      "maxIOS": "15.8.5"
+      "maxIOS": "15.8.5",
+      "year": 2016,
+      "batteryMah": 2900,
+      "storageOptionsGB": [
+        32,
+        128,
+        256
+      ],
+      "note": "GSM Global"
+    },
+    {
+      "id": "iphone7-plus-cdma",
+      "MarketingName": "iPhone 7 Plus",
+      "ProductType": "iPhone9,2",
+      "HWModelStr": "D11AP",
+      "HardwarePlatform": "t8010",
+      "ModelNumber": "MN4L2",
+      "RegulatoryModelNumber": "A1661",
+      "CPUArchitecture": "arm64",
+      "chip": "A10 Fusion",
+      "cpuCores": 4,
+      "gpuCores": 6,
+      "PhysicalMemoryMB": 3072,
+      "display": {
+        "NativeWidth": 1080,
+        "NativeHeight": 1920,
+        "ScreenScale": 3,
+        "Pitch": 401,
+        "LogicalWidth": 414,
+        "LogicalHeight": 736,
+        "DiagonalInches": 5.5,
+        "MaxRefreshHz": 60
+      },
+      "defaultIOS": "15.8.3",
+      "minIOS": "15.0",
+      "maxIOS": "15.8.5",
+      "year": 2016,
+      "batteryMah": 2900,
+      "storageOptionsGB": [
+        32,
+        128,
+        256
+      ],
+      "note": "CDMA board"
     },
     {
       "id": "iphone8",
@@ -279,10 +1290,60 @@
       "cpuCores": 6,
       "gpuCores": 3,
       "PhysicalMemoryMB": 2048,
-      "display": { "NativeWidth": 750, "NativeHeight": 1334, "ScreenScale": 2, "Pitch": 326 },
+      "display": {
+        "NativeWidth": 750,
+        "NativeHeight": 1334,
+        "ScreenScale": 2,
+        "Pitch": 326,
+        "LogicalWidth": 375,
+        "LogicalHeight": 667,
+        "DiagonalInches": 4.7,
+        "MaxRefreshHz": 60
+      },
       "defaultIOS": "16.7.10",
       "minIOS": "15.0",
-      "maxIOS": "16.7.10"
+      "maxIOS": "16.7.11",
+      "year": 2017,
+      "batteryMah": 1821,
+      "storageOptionsGB": [
+        64,
+        256
+      ],
+      "note": "GSM"
+    },
+    {
+      "id": "iphone8-cdma",
+      "MarketingName": "iPhone 8",
+      "ProductType": "iPhone10,1",
+      "HWModelStr": "D20AP",
+      "HardwarePlatform": "t8015",
+      "ModelNumber": "MQ6F2",
+      "RegulatoryModelNumber": "A1863",
+      "CPUArchitecture": "arm64",
+      "chip": "A11 Bionic",
+      "cpuCores": 6,
+      "gpuCores": 3,
+      "PhysicalMemoryMB": 2048,
+      "display": {
+        "NativeWidth": 750,
+        "NativeHeight": 1334,
+        "ScreenScale": 2,
+        "Pitch": 326,
+        "LogicalWidth": 375,
+        "LogicalHeight": 667,
+        "DiagonalInches": 4.7,
+        "MaxRefreshHz": 60
+      },
+      "defaultIOS": "16.7.10",
+      "minIOS": "15.0",
+      "maxIOS": "16.7.11",
+      "year": 2017,
+      "batteryMah": 1821,
+      "storageOptionsGB": [
+        64,
+        256
+      ],
+      "note": "CDMA"
     },
     {
       "id": "iphone8-plus",
@@ -297,10 +1358,60 @@
       "cpuCores": 6,
       "gpuCores": 3,
       "PhysicalMemoryMB": 3072,
-      "display": { "NativeWidth": 1080, "NativeHeight": 1920, "ScreenScale": 3, "Pitch": 401 },
+      "display": {
+        "NativeWidth": 1080,
+        "NativeHeight": 1920,
+        "ScreenScale": 3,
+        "Pitch": 401,
+        "LogicalWidth": 414,
+        "LogicalHeight": 736,
+        "DiagonalInches": 5.5,
+        "MaxRefreshHz": 60
+      },
       "defaultIOS": "16.7.10",
       "minIOS": "15.0",
-      "maxIOS": "16.7.10"
+      "maxIOS": "16.7.11",
+      "year": 2017,
+      "batteryMah": 2691,
+      "storageOptionsGB": [
+        64,
+        256
+      ],
+      "note": "GSM"
+    },
+    {
+      "id": "iphone8-plus-cdma",
+      "MarketingName": "iPhone 8 Plus",
+      "ProductType": "iPhone10,2",
+      "HWModelStr": "D21AP",
+      "HardwarePlatform": "t8015",
+      "ModelNumber": "MQ8E2",
+      "RegulatoryModelNumber": "A1864",
+      "CPUArchitecture": "arm64",
+      "chip": "A11 Bionic",
+      "cpuCores": 6,
+      "gpuCores": 3,
+      "PhysicalMemoryMB": 3072,
+      "display": {
+        "NativeWidth": 1080,
+        "NativeHeight": 1920,
+        "ScreenScale": 3,
+        "Pitch": 401,
+        "LogicalWidth": 414,
+        "LogicalHeight": 736,
+        "DiagonalInches": 5.5,
+        "MaxRefreshHz": 60
+      },
+      "defaultIOS": "16.7.10",
+      "minIOS": "15.0",
+      "maxIOS": "16.7.11",
+      "year": 2017,
+      "batteryMah": 2691,
+      "storageOptionsGB": [
+        64,
+        256
+      ],
+      "note": "CDMA"
     },
     {
       "id": "iphonex",
@@ -315,10 +1426,60 @@
       "cpuCores": 6,
       "gpuCores": 3,
       "PhysicalMemoryMB": 3072,
-      "display": { "NativeWidth": 1125, "NativeHeight": 2436, "ScreenScale": 3, "Pitch": 458 },
+      "display": {
+        "NativeWidth": 1125,
+        "NativeHeight": 2436,
+        "ScreenScale": 3,
+        "Pitch": 458,
+        "LogicalWidth": 375,
+        "LogicalHeight": 812,
+        "DiagonalInches": 5.8,
+        "MaxRefreshHz": 60
+      },
       "defaultIOS": "16.7.10",
       "minIOS": "15.0",
-      "maxIOS": "16.7.10"
+      "maxIOS": "16.7.11",
+      "year": 2017,
+      "batteryMah": 2716,
+      "storageOptionsGB": [
+        64,
+        256
+      ],
+      "note": "Global GSM"
+    },
+    {
+      "id": "iphonex-global",
+      "MarketingName": "iPhone X",
+      "ProductType": "iPhone10,3",
+      "HWModelStr": "D22AP",
+      "HardwarePlatform": "t8015",
+      "ModelNumber": "MQA52",
+      "RegulatoryModelNumber": "A1865",
+      "CPUArchitecture": "arm64",
+      "chip": "A11 Bionic",
+      "cpuCores": 6,
+      "gpuCores": 3,
+      "PhysicalMemoryMB": 3072,
+      "display": {
+        "NativeWidth": 1125,
+        "NativeHeight": 2436,
+        "ScreenScale": 3,
+        "Pitch": 458,
+        "LogicalWidth": 375,
+        "LogicalHeight": 812,
+        "DiagonalInches": 5.8,
+        "MaxRefreshHz": 60
+      },
+      "defaultIOS": "16.7.10",
+      "minIOS": "15.0",
+      "maxIOS": "16.7.11",
+      "year": 2017,
+      "batteryMah": 2716,
+      "storageOptionsGB": [
+        64,
+        256
+      ],
+      "note": "Global Qualcomm"
     },
     {
       "id": "iphonexr",
@@ -333,10 +1494,26 @@
       "cpuCores": 6,
       "gpuCores": 4,
       "PhysicalMemoryMB": 3072,
-      "display": { "NativeWidth": 828, "NativeHeight": 1792, "ScreenScale": 2, "Pitch": 326 },
+      "display": {
+        "NativeWidth": 828,
+        "NativeHeight": 1792,
+        "ScreenScale": 2,
+        "Pitch": 326,
+        "LogicalWidth": 414,
+        "LogicalHeight": 896,
+        "DiagonalInches": 6.1,
+        "MaxRefreshHz": 60
+      },
       "defaultIOS": "17.7.2",
       "minIOS": "15.0",
-      "maxIOS": "18.7"
+      "maxIOS": "18.7.2",
+      "year": 2018,
+      "batteryMah": 2942,
+      "storageOptionsGB": [
+        64,
+        128,
+        256
+      ]
     },
     {
       "id": "iphonexs",
@@ -351,10 +1528,26 @@
       "cpuCores": 6,
       "gpuCores": 4,
       "PhysicalMemoryMB": 4096,
-      "display": { "NativeWidth": 1125, "NativeHeight": 2436, "ScreenScale": 3, "Pitch": 458 },
+      "display": {
+        "NativeWidth": 1125,
+        "NativeHeight": 2436,
+        "ScreenScale": 3,
+        "Pitch": 458,
+        "LogicalWidth": 375,
+        "LogicalHeight": 812,
+        "DiagonalInches": 5.8,
+        "MaxRefreshHz": 60
+      },
       "defaultIOS": "17.7.2",
       "minIOS": "15.0",
-      "maxIOS": "18.7"
+      "maxIOS": "18.7.2",
+      "year": 2018,
+      "batteryMah": 2658,
+      "storageOptionsGB": [
+        64,
+        256,
+        512
+      ]
     },
     {
       "id": "iphonexs-max",
@@ -369,10 +1562,62 @@
       "cpuCores": 6,
       "gpuCores": 4,
       "PhysicalMemoryMB": 4096,
-      "display": { "NativeWidth": 1242, "NativeHeight": 2688, "ScreenScale": 3, "Pitch": 458 },
+      "display": {
+        "NativeWidth": 1242,
+        "NativeHeight": 2688,
+        "ScreenScale": 3,
+        "Pitch": 458,
+        "LogicalWidth": 414,
+        "LogicalHeight": 896,
+        "DiagonalInches": 6.5,
+        "MaxRefreshHz": 60
+      },
       "defaultIOS": "17.7.2",
       "minIOS": "15.0",
-      "maxIOS": "18.7"
+      "maxIOS": "18.7.2",
+      "year": 2018,
+      "batteryMah": 3174,
+      "storageOptionsGB": [
+        64,
+        256,
+        512
+      ],
+      "note": "Global"
+    },
+    {
+      "id": "iphonexs-max-cn",
+      "MarketingName": "iPhone XS Max",
+      "ProductType": "iPhone11,4",
+      "HWModelStr": "D331AP",
+      "HardwarePlatform": "t8020",
+      "ModelNumber": "MT5C2",
+      "RegulatoryModelNumber": "A2104",
+      "CPUArchitecture": "arm64e",
+      "chip": "A12 Bionic",
+      "cpuCores": 6,
+      "gpuCores": 4,
+      "PhysicalMemoryMB": 4096,
+      "display": {
+        "NativeWidth": 1242,
+        "NativeHeight": 2688,
+        "ScreenScale": 3,
+        "Pitch": 458,
+        "LogicalWidth": 414,
+        "LogicalHeight": 896,
+        "DiagonalInches": 6.5,
+        "MaxRefreshHz": 60
+      },
+      "defaultIOS": "17.7.2",
+      "minIOS": "15.0",
+      "maxIOS": "18.7.2",
+      "year": 2018,
+      "batteryMah": 3174,
+      "storageOptionsGB": [
+        64,
+        256,
+        512
+      ],
+      "note": "China dual-SIM board"
     },
     {
       "id": "iphone11",
@@ -387,10 +1632,26 @@
       "cpuCores": 6,
       "gpuCores": 4,
       "PhysicalMemoryMB": 4096,
-      "display": { "NativeWidth": 828, "NativeHeight": 1792, "ScreenScale": 2, "Pitch": 326 },
+      "display": {
+        "NativeWidth": 828,
+        "NativeHeight": 1792,
+        "ScreenScale": 2,
+        "Pitch": 326,
+        "LogicalWidth": 414,
+        "LogicalHeight": 896,
+        "DiagonalInches": 6.1,
+        "MaxRefreshHz": 60
+      },
       "defaultIOS": "18.5",
       "minIOS": "15.0",
-      "maxIOS": "26.0"
+      "maxIOS": "26.6",
+      "year": 2019,
+      "batteryMah": 3110,
+      "storageOptionsGB": [
+        64,
+        128,
+        256
+      ]
     },
     {
       "id": "iphone11-pro",
@@ -405,10 +1666,26 @@
       "cpuCores": 6,
       "gpuCores": 4,
       "PhysicalMemoryMB": 4096,
-      "display": { "NativeWidth": 1125, "NativeHeight": 2436, "ScreenScale": 3, "Pitch": 458 },
+      "display": {
+        "NativeWidth": 1125,
+        "NativeHeight": 2436,
+        "ScreenScale": 3,
+        "Pitch": 458,
+        "LogicalWidth": 375,
+        "LogicalHeight": 812,
+        "DiagonalInches": 5.8,
+        "MaxRefreshHz": 60
+      },
       "defaultIOS": "18.5",
       "minIOS": "15.0",
-      "maxIOS": "26.0"
+      "maxIOS": "26.6",
+      "year": 2019,
+      "batteryMah": 3046,
+      "storageOptionsGB": [
+        64,
+        256,
+        512
+      ]
     },
     {
       "id": "iphone11-pro-max",
@@ -423,10 +1700,26 @@
       "cpuCores": 6,
       "gpuCores": 4,
       "PhysicalMemoryMB": 4096,
-      "display": { "NativeWidth": 1242, "NativeHeight": 2688, "ScreenScale": 3, "Pitch": 458 },
+      "display": {
+        "NativeWidth": 1242,
+        "NativeHeight": 2688,
+        "ScreenScale": 3,
+        "Pitch": 458,
+        "LogicalWidth": 414,
+        "LogicalHeight": 896,
+        "DiagonalInches": 6.5,
+        "MaxRefreshHz": 60
+      },
       "defaultIOS": "18.5",
       "minIOS": "15.0",
-      "maxIOS": "26.0"
+      "maxIOS": "26.6",
+      "year": 2019,
+      "batteryMah": 3969,
+      "storageOptionsGB": [
+        64,
+        256,
+        512
+      ]
     },
     {
       "id": "iphone-se-2",
@@ -441,10 +1734,26 @@
       "cpuCores": 6,
       "gpuCores": 4,
       "PhysicalMemoryMB": 3072,
-      "display": { "NativeWidth": 750, "NativeHeight": 1334, "ScreenScale": 2, "Pitch": 326 },
+      "display": {
+        "NativeWidth": 750,
+        "NativeHeight": 1334,
+        "ScreenScale": 2,
+        "Pitch": 326,
+        "LogicalWidth": 375,
+        "LogicalHeight": 667,
+        "DiagonalInches": 4.7,
+        "MaxRefreshHz": 60
+      },
       "defaultIOS": "18.5",
       "minIOS": "15.0",
-      "maxIOS": "26.0"
+      "maxIOS": "26.6",
+      "year": 2020,
+      "batteryMah": 1821,
+      "storageOptionsGB": [
+        64,
+        128,
+        256
+      ]
     },
     {
       "id": "iphone12-mini",
@@ -459,10 +1768,26 @@
       "cpuCores": 6,
       "gpuCores": 4,
       "PhysicalMemoryMB": 4096,
-      "display": { "NativeWidth": 1080, "NativeHeight": 2340, "ScreenScale": 3, "Pitch": 476 },
+      "display": {
+        "NativeWidth": 1080,
+        "NativeHeight": 2340,
+        "ScreenScale": 3,
+        "Pitch": 476,
+        "LogicalWidth": 360,
+        "LogicalHeight": 780,
+        "DiagonalInches": 5.4,
+        "MaxRefreshHz": 60
+      },
       "defaultIOS": "18.5",
       "minIOS": "15.0",
-      "maxIOS": "26.0"
+      "maxIOS": "26.6",
+      "year": 2020,
+      "batteryMah": 2227,
+      "storageOptionsGB": [
+        64,
+        128,
+        256
+      ]
     },
     {
       "id": "iphone12",
@@ -477,10 +1802,26 @@
       "cpuCores": 6,
       "gpuCores": 4,
       "PhysicalMemoryMB": 4096,
-      "display": { "NativeWidth": 1170, "NativeHeight": 2532, "ScreenScale": 3, "Pitch": 460 },
+      "display": {
+        "NativeWidth": 1170,
+        "NativeHeight": 2532,
+        "ScreenScale": 3,
+        "Pitch": 460,
+        "LogicalWidth": 390,
+        "LogicalHeight": 844,
+        "DiagonalInches": 6.1,
+        "MaxRefreshHz": 60
+      },
       "defaultIOS": "18.5",
       "minIOS": "15.0",
-      "maxIOS": "26.0"
+      "maxIOS": "26.6",
+      "year": 2020,
+      "batteryMah": 2815,
+      "storageOptionsGB": [
+        64,
+        128,
+        256
+      ]
     },
     {
       "id": "iphone12-pro",
@@ -495,10 +1836,26 @@
       "cpuCores": 6,
       "gpuCores": 4,
       "PhysicalMemoryMB": 6144,
-      "display": { "NativeWidth": 1170, "NativeHeight": 2532, "ScreenScale": 3, "Pitch": 460 },
+      "display": {
+        "NativeWidth": 1170,
+        "NativeHeight": 2532,
+        "ScreenScale": 3,
+        "Pitch": 460,
+        "LogicalWidth": 390,
+        "LogicalHeight": 844,
+        "DiagonalInches": 6.1,
+        "MaxRefreshHz": 60
+      },
       "defaultIOS": "18.5",
       "minIOS": "15.0",
-      "maxIOS": "26.0"
+      "maxIOS": "26.6",
+      "year": 2020,
+      "batteryMah": 2815,
+      "storageOptionsGB": [
+        128,
+        256,
+        512
+      ]
     },
     {
       "id": "iphone12-pro-max",
@@ -513,10 +1870,26 @@
       "cpuCores": 6,
       "gpuCores": 4,
       "PhysicalMemoryMB": 6144,
-      "display": { "NativeWidth": 1284, "NativeHeight": 2778, "ScreenScale": 3, "Pitch": 458 },
+      "display": {
+        "NativeWidth": 1284,
+        "NativeHeight": 2778,
+        "ScreenScale": 3,
+        "Pitch": 458,
+        "LogicalWidth": 428,
+        "LogicalHeight": 926,
+        "DiagonalInches": 6.7,
+        "MaxRefreshHz": 60
+      },
       "defaultIOS": "18.5",
       "minIOS": "15.0",
-      "maxIOS": "26.0"
+      "maxIOS": "26.6",
+      "year": 2020,
+      "batteryMah": 3687,
+      "storageOptionsGB": [
+        128,
+        256,
+        512
+      ]
     },
     {
       "id": "iphone13-mini",
@@ -531,10 +1904,26 @@
       "cpuCores": 6,
       "gpuCores": 4,
       "PhysicalMemoryMB": 4096,
-      "display": { "NativeWidth": 1080, "NativeHeight": 2340, "ScreenScale": 3, "Pitch": 476 },
+      "display": {
+        "NativeWidth": 1080,
+        "NativeHeight": 2340,
+        "ScreenScale": 3,
+        "Pitch": 476,
+        "LogicalWidth": 360,
+        "LogicalHeight": 780,
+        "DiagonalInches": 5.4,
+        "MaxRefreshHz": 60
+      },
       "defaultIOS": "18.5",
       "minIOS": "15.0",
-      "maxIOS": "26.0"
+      "maxIOS": "26.6",
+      "year": 2021,
+      "batteryMah": 2406,
+      "storageOptionsGB": [
+        128,
+        256,
+        512
+      ]
     },
     {
       "id": "iphone13",
@@ -549,10 +1938,26 @@
       "cpuCores": 6,
       "gpuCores": 4,
       "PhysicalMemoryMB": 4096,
-      "display": { "NativeWidth": 1170, "NativeHeight": 2532, "ScreenScale": 3, "Pitch": 460 },
+      "display": {
+        "NativeWidth": 1170,
+        "NativeHeight": 2532,
+        "ScreenScale": 3,
+        "Pitch": 460,
+        "LogicalWidth": 390,
+        "LogicalHeight": 844,
+        "DiagonalInches": 6.1,
+        "MaxRefreshHz": 60
+      },
       "defaultIOS": "18.5",
       "minIOS": "15.0",
-      "maxIOS": "26.0"
+      "maxIOS": "26.6",
+      "year": 2021,
+      "batteryMah": 3227,
+      "storageOptionsGB": [
+        128,
+        256,
+        512
+      ]
     },
     {
       "id": "iphone13-pro",
@@ -567,10 +1972,27 @@
       "cpuCores": 6,
       "gpuCores": 5,
       "PhysicalMemoryMB": 6144,
-      "display": { "NativeWidth": 1170, "NativeHeight": 2532, "ScreenScale": 3, "Pitch": 460 },
+      "display": {
+        "NativeWidth": 1170,
+        "NativeHeight": 2532,
+        "ScreenScale": 3,
+        "Pitch": 460,
+        "LogicalWidth": 390,
+        "LogicalHeight": 844,
+        "DiagonalInches": 6.1,
+        "MaxRefreshHz": 120
+      },
       "defaultIOS": "18.5",
       "minIOS": "15.0",
-      "maxIOS": "26.0"
+      "maxIOS": "26.6",
+      "year": 2021,
+      "batteryMah": 3095,
+      "storageOptionsGB": [
+        128,
+        256,
+        512,
+        1024
+      ]
     },
     {
       "id": "iphone13-pro-max",
@@ -585,10 +2007,27 @@
       "cpuCores": 6,
       "gpuCores": 5,
       "PhysicalMemoryMB": 6144,
-      "display": { "NativeWidth": 1284, "NativeHeight": 2778, "ScreenScale": 3, "Pitch": 458 },
+      "display": {
+        "NativeWidth": 1284,
+        "NativeHeight": 2778,
+        "ScreenScale": 3,
+        "Pitch": 458,
+        "LogicalWidth": 428,
+        "LogicalHeight": 926,
+        "DiagonalInches": 6.7,
+        "MaxRefreshHz": 120
+      },
       "defaultIOS": "18.5",
       "minIOS": "15.0",
-      "maxIOS": "26.0"
+      "maxIOS": "26.6",
+      "year": 2021,
+      "batteryMah": 4352,
+      "storageOptionsGB": [
+        128,
+        256,
+        512,
+        1024
+      ]
     },
     {
       "id": "iphone-se-3",
@@ -603,10 +2042,26 @@
       "cpuCores": 6,
       "gpuCores": 4,
       "PhysicalMemoryMB": 4096,
-      "display": { "NativeWidth": 750, "NativeHeight": 1334, "ScreenScale": 2, "Pitch": 326 },
+      "display": {
+        "NativeWidth": 750,
+        "NativeHeight": 1334,
+        "ScreenScale": 2,
+        "Pitch": 326,
+        "LogicalWidth": 375,
+        "LogicalHeight": 667,
+        "DiagonalInches": 4.7,
+        "MaxRefreshHz": 60
+      },
       "defaultIOS": "18.5",
       "minIOS": "15.4",
-      "maxIOS": "26.0"
+      "maxIOS": "26.6",
+      "year": 2022,
+      "batteryMah": 2018,
+      "storageOptionsGB": [
+        64,
+        128,
+        256
+      ]
     },
     {
       "id": "iphone14",
@@ -621,10 +2076,26 @@
       "cpuCores": 6,
       "gpuCores": 5,
       "PhysicalMemoryMB": 6144,
-      "display": { "NativeWidth": 1170, "NativeHeight": 2532, "ScreenScale": 3, "Pitch": 460 },
+      "display": {
+        "NativeWidth": 1170,
+        "NativeHeight": 2532,
+        "ScreenScale": 3,
+        "Pitch": 460,
+        "LogicalWidth": 390,
+        "LogicalHeight": 844,
+        "DiagonalInches": 6.1,
+        "MaxRefreshHz": 60
+      },
       "defaultIOS": "18.5",
       "minIOS": "16.0",
-      "maxIOS": "26.0"
+      "maxIOS": "26.6",
+      "year": 2022,
+      "batteryMah": 3279,
+      "storageOptionsGB": [
+        128,
+        256,
+        512
+      ]
     },
     {
       "id": "iphone14-plus",
@@ -639,10 +2110,26 @@
       "cpuCores": 6,
       "gpuCores": 5,
       "PhysicalMemoryMB": 6144,
-      "display": { "NativeWidth": 1284, "NativeHeight": 2778, "ScreenScale": 3, "Pitch": 458 },
+      "display": {
+        "NativeWidth": 1284,
+        "NativeHeight": 2778,
+        "ScreenScale": 3,
+        "Pitch": 458,
+        "LogicalWidth": 428,
+        "LogicalHeight": 926,
+        "DiagonalInches": 6.7,
+        "MaxRefreshHz": 60
+      },
       "defaultIOS": "18.5",
       "minIOS": "16.0",
-      "maxIOS": "26.0"
+      "maxIOS": "26.6",
+      "year": 2022,
+      "batteryMah": 4325,
+      "storageOptionsGB": [
+        128,
+        256,
+        512
+      ]
     },
     {
       "id": "iphone14-pro",
@@ -657,10 +2144,27 @@
       "cpuCores": 6,
       "gpuCores": 5,
       "PhysicalMemoryMB": 6144,
-      "display": { "NativeWidth": 1179, "NativeHeight": 2556, "ScreenScale": 3, "Pitch": 460 },
+      "display": {
+        "NativeWidth": 1179,
+        "NativeHeight": 2556,
+        "ScreenScale": 3,
+        "Pitch": 460,
+        "LogicalWidth": 393,
+        "LogicalHeight": 852,
+        "DiagonalInches": 6.1,
+        "MaxRefreshHz": 120
+      },
       "defaultIOS": "18.5",
       "minIOS": "16.0",
-      "maxIOS": "26.0"
+      "maxIOS": "26.6",
+      "year": 2022,
+      "batteryMah": 3200,
+      "storageOptionsGB": [
+        128,
+        256,
+        512,
+        1024
+      ]
     },
     {
       "id": "iphone14-pro-max",
@@ -675,10 +2179,27 @@
       "cpuCores": 6,
       "gpuCores": 5,
       "PhysicalMemoryMB": 6144,
-      "display": { "NativeWidth": 1290, "NativeHeight": 2796, "ScreenScale": 3, "Pitch": 460 },
+      "display": {
+        "NativeWidth": 1290,
+        "NativeHeight": 2796,
+        "ScreenScale": 3,
+        "Pitch": 460,
+        "LogicalWidth": 430,
+        "LogicalHeight": 932,
+        "DiagonalInches": 6.7,
+        "MaxRefreshHz": 120
+      },
       "defaultIOS": "18.5",
       "minIOS": "16.0",
-      "maxIOS": "26.0"
+      "maxIOS": "26.6",
+      "year": 2022,
+      "batteryMah": 4323,
+      "storageOptionsGB": [
+        128,
+        256,
+        512,
+        1024
+      ]
     },
     {
       "id": "iphone15",
@@ -693,10 +2214,26 @@
       "cpuCores": 6,
       "gpuCores": 5,
       "PhysicalMemoryMB": 6144,
-      "display": { "NativeWidth": 1179, "NativeHeight": 2556, "ScreenScale": 3, "Pitch": 460 },
+      "display": {
+        "NativeWidth": 1179,
+        "NativeHeight": 2556,
+        "ScreenScale": 3,
+        "Pitch": 460,
+        "LogicalWidth": 393,
+        "LogicalHeight": 852,
+        "DiagonalInches": 6.1,
+        "MaxRefreshHz": 60
+      },
       "defaultIOS": "18.5",
       "minIOS": "17.0",
-      "maxIOS": "26.0"
+      "maxIOS": "26.6",
+      "year": 2023,
+      "batteryMah": 3349,
+      "storageOptionsGB": [
+        128,
+        256,
+        512
+      ]
     },
     {
       "id": "iphone15-plus",
@@ -711,10 +2248,26 @@
       "cpuCores": 6,
       "gpuCores": 5,
       "PhysicalMemoryMB": 6144,
-      "display": { "NativeWidth": 1290, "NativeHeight": 2796, "ScreenScale": 3, "Pitch": 460 },
+      "display": {
+        "NativeWidth": 1290,
+        "NativeHeight": 2796,
+        "ScreenScale": 3,
+        "Pitch": 460,
+        "LogicalWidth": 430,
+        "LogicalHeight": 932,
+        "DiagonalInches": 6.7,
+        "MaxRefreshHz": 60
+      },
       "defaultIOS": "18.5",
       "minIOS": "17.0",
-      "maxIOS": "26.0"
+      "maxIOS": "26.6",
+      "year": 2023,
+      "batteryMah": 4383,
+      "storageOptionsGB": [
+        128,
+        256,
+        512
+      ]
     },
     {
       "id": "iphone15-pro",
@@ -729,10 +2282,27 @@
       "cpuCores": 6,
       "gpuCores": 6,
       "PhysicalMemoryMB": 8192,
-      "display": { "NativeWidth": 1179, "NativeHeight": 2556, "ScreenScale": 3, "Pitch": 460 },
-      "defaultIOS": "18.5",
+      "display": {
+        "NativeWidth": 1179,
+        "NativeHeight": 2556,
+        "ScreenScale": 3,
+        "Pitch": 460,
+        "LogicalWidth": 393,
+        "LogicalHeight": 852,
+        "DiagonalInches": 6.1,
+        "MaxRefreshHz": 120
+      },
+      "defaultIOS": "17.6.1",
       "minIOS": "17.0",
-      "maxIOS": "26.0"
+      "maxIOS": "26.6",
+      "year": 2023,
+      "batteryMah": 3274,
+      "storageOptionsGB": [
+        128,
+        256,
+        512,
+        1024
+      ]
     },
     {
       "id": "iphone15-pro-max",
@@ -747,10 +2317,26 @@
       "cpuCores": 6,
       "gpuCores": 6,
       "PhysicalMemoryMB": 8192,
-      "display": { "NativeWidth": 1290, "NativeHeight": 2796, "ScreenScale": 3, "Pitch": 460 },
+      "display": {
+        "NativeWidth": 1290,
+        "NativeHeight": 2796,
+        "ScreenScale": 3,
+        "Pitch": 460,
+        "LogicalWidth": 430,
+        "LogicalHeight": 932,
+        "DiagonalInches": 6.7,
+        "MaxRefreshHz": 120
+      },
       "defaultIOS": "18.5",
       "minIOS": "17.0",
-      "maxIOS": "26.0"
+      "maxIOS": "26.6",
+      "year": 2023,
+      "batteryMah": 4441,
+      "storageOptionsGB": [
+        256,
+        512,
+        1024
+      ]
     },
     {
       "id": "iphone16",
@@ -765,10 +2351,26 @@
       "cpuCores": 6,
       "gpuCores": 5,
       "PhysicalMemoryMB": 8192,
-      "display": { "NativeWidth": 1179, "NativeHeight": 2556, "ScreenScale": 3, "Pitch": 460 },
+      "display": {
+        "NativeWidth": 1179,
+        "NativeHeight": 2556,
+        "ScreenScale": 3,
+        "Pitch": 460,
+        "LogicalWidth": 393,
+        "LogicalHeight": 852,
+        "DiagonalInches": 6.1,
+        "MaxRefreshHz": 60
+      },
       "defaultIOS": "18.5",
       "minIOS": "18.0",
-      "maxIOS": "26.0"
+      "maxIOS": "26.6",
+      "year": 2024,
+      "batteryMah": 3561,
+      "storageOptionsGB": [
+        128,
+        256,
+        512
+      ]
     },
     {
       "id": "iphone16-plus",
@@ -783,10 +2385,26 @@
       "cpuCores": 6,
       "gpuCores": 5,
       "PhysicalMemoryMB": 8192,
-      "display": { "NativeWidth": 1290, "NativeHeight": 2796, "ScreenScale": 3, "Pitch": 460 },
+      "display": {
+        "NativeWidth": 1290,
+        "NativeHeight": 2796,
+        "ScreenScale": 3,
+        "Pitch": 460,
+        "LogicalWidth": 430,
+        "LogicalHeight": 932,
+        "DiagonalInches": 6.7,
+        "MaxRefreshHz": 60
+      },
       "defaultIOS": "18.5",
       "minIOS": "18.0",
-      "maxIOS": "26.0"
+      "maxIOS": "26.6",
+      "year": 2024,
+      "batteryMah": 4674,
+      "storageOptionsGB": [
+        128,
+        256,
+        512
+      ]
     },
     {
       "id": "iphone16-pro",
@@ -801,10 +2419,27 @@
       "cpuCores": 6,
       "gpuCores": 6,
       "PhysicalMemoryMB": 8192,
-      "display": { "NativeWidth": 1206, "NativeHeight": 2622, "ScreenScale": 3, "Pitch": 460 },
+      "display": {
+        "NativeWidth": 1206,
+        "NativeHeight": 2622,
+        "ScreenScale": 3,
+        "Pitch": 460,
+        "LogicalWidth": 402,
+        "LogicalHeight": 874,
+        "DiagonalInches": 6.3,
+        "MaxRefreshHz": 120
+      },
       "defaultIOS": "18.5",
       "minIOS": "18.0",
-      "maxIOS": "26.0"
+      "maxIOS": "26.6",
+      "year": 2024,
+      "batteryMah": 3582,
+      "storageOptionsGB": [
+        128,
+        256,
+        512,
+        1024
+      ]
     },
     {
       "id": "iphone16-pro-max",
@@ -819,10 +2454,26 @@
       "cpuCores": 6,
       "gpuCores": 6,
       "PhysicalMemoryMB": 8192,
-      "display": { "NativeWidth": 1320, "NativeHeight": 2868, "ScreenScale": 3, "Pitch": 460 },
+      "display": {
+        "NativeWidth": 1320,
+        "NativeHeight": 2868,
+        "ScreenScale": 3,
+        "Pitch": 460,
+        "LogicalWidth": 440,
+        "LogicalHeight": 956,
+        "DiagonalInches": 6.9,
+        "MaxRefreshHz": 120
+      },
       "defaultIOS": "18.5",
       "minIOS": "18.0",
-      "maxIOS": "26.0"
+      "maxIOS": "26.6",
+      "year": 2024,
+      "batteryMah": 4685,
+      "storageOptionsGB": [
+        256,
+        512,
+        1024
+      ]
     },
     {
       "id": "iphone16e",
@@ -837,10 +2488,26 @@
       "cpuCores": 6,
       "gpuCores": 4,
       "PhysicalMemoryMB": 8192,
-      "display": { "NativeWidth": 1170, "NativeHeight": 2532, "ScreenScale": 3, "Pitch": 460 },
+      "display": {
+        "NativeWidth": 1170,
+        "NativeHeight": 2532,
+        "ScreenScale": 3,
+        "Pitch": 460,
+        "LogicalWidth": 390,
+        "LogicalHeight": 844,
+        "DiagonalInches": 6.1,
+        "MaxRefreshHz": 60
+      },
       "defaultIOS": "18.5",
       "minIOS": "18.3",
-      "maxIOS": "26.0"
+      "maxIOS": "26.6",
+      "year": 2025,
+      "batteryMah": 3960,
+      "storageOptionsGB": [
+        128,
+        256,
+        512
+      ]
     },
     {
       "id": "iphone17",
@@ -855,10 +2522,26 @@
       "cpuCores": 6,
       "gpuCores": 5,
       "PhysicalMemoryMB": 8192,
-      "display": { "NativeWidth": 1206, "NativeHeight": 2622, "ScreenScale": 3, "Pitch": 460 },
+      "display": {
+        "NativeWidth": 1206,
+        "NativeHeight": 2622,
+        "ScreenScale": 3,
+        "Pitch": 460,
+        "LogicalWidth": 402,
+        "LogicalHeight": 874,
+        "DiagonalInches": 6.3,
+        "MaxRefreshHz": 120
+      },
       "defaultIOS": "19.0",
       "minIOS": "19.0",
-      "maxIOS": "26.0",
+      "maxIOS": "26.6",
+      "year": 2025,
+      "batteryMah": 3700,
+      "storageOptionsGB": [
+        128,
+        256,
+        512
+      ],
       "lab": true
     },
     {
@@ -874,10 +2557,26 @@
       "cpuCores": 6,
       "gpuCores": 5,
       "PhysicalMemoryMB": 8192,
-      "display": { "NativeWidth": 1260, "NativeHeight": 2736, "ScreenScale": 3, "Pitch": 460 },
+      "display": {
+        "NativeWidth": 1260,
+        "NativeHeight": 2736,
+        "ScreenScale": 3,
+        "Pitch": 460,
+        "LogicalWidth": 420,
+        "LogicalHeight": 912,
+        "DiagonalInches": 6.6,
+        "MaxRefreshHz": 120
+      },
       "defaultIOS": "19.0",
       "minIOS": "19.0",
-      "maxIOS": "26.0",
+      "maxIOS": "26.6",
+      "year": 2025,
+      "batteryMah": 3100,
+      "storageOptionsGB": [
+        256,
+        512,
+        1024
+      ],
       "lab": true
     },
     {
@@ -893,10 +2592,26 @@
       "cpuCores": 6,
       "gpuCores": 6,
       "PhysicalMemoryMB": 12288,
-      "display": { "NativeWidth": 1206, "NativeHeight": 2622, "ScreenScale": 3, "Pitch": 460 },
+      "display": {
+        "NativeWidth": 1206,
+        "NativeHeight": 2622,
+        "ScreenScale": 3,
+        "Pitch": 460,
+        "LogicalWidth": 402,
+        "LogicalHeight": 874,
+        "DiagonalInches": 6.3,
+        "MaxRefreshHz": 120
+      },
       "defaultIOS": "19.0",
       "minIOS": "19.0",
-      "maxIOS": "26.0",
+      "maxIOS": "26.6",
+      "year": 2025,
+      "batteryMah": 3800,
+      "storageOptionsGB": [
+        256,
+        512,
+        1024
+      ],
       "lab": true
     },
     {
@@ -912,10 +2627,26 @@
       "cpuCores": 6,
       "gpuCores": 6,
       "PhysicalMemoryMB": 12288,
-      "display": { "NativeWidth": 1320, "NativeHeight": 2868, "ScreenScale": 3, "Pitch": 460 },
+      "display": {
+        "NativeWidth": 1320,
+        "NativeHeight": 2868,
+        "ScreenScale": 3,
+        "Pitch": 460,
+        "LogicalWidth": 440,
+        "LogicalHeight": 956,
+        "DiagonalInches": 6.9,
+        "MaxRefreshHz": 120
+      },
       "defaultIOS": "19.0",
       "minIOS": "19.0",
-      "maxIOS": "26.0",
+      "maxIOS": "26.6",
+      "year": 2025,
+      "batteryMah": 4800,
+      "storageOptionsGB": [
+        256,
+        512,
+        1024
+      ],
       "lab": true
     }
   ]
