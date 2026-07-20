@@ -34,9 +34,10 @@
     [self.view addSubview:header];
 
     UILabel *sub = [[UILabel alloc] init];
-    sub.text = @"Dòng trên: Chọn đời máy  ·  Dòng dưới: Chọn iOS";
+    sub.text = @"Multi-select · ✓ = đã chọn · Kill Zalo = random cặp máy+iOS hợp lệ";
     sub.font = AppTheme.captionFont;
     sub.textColor = AppTheme.textSecondary;
+    sub.numberOfLines = 2;
     sub.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:sub];
 
@@ -52,8 +53,7 @@
 
     self.card = [AppTheme roundedCardIn:self.view];
 
-    // —— Row 1: Chọn đời máy ——
-    UIControl *deviceRow = [self makeRowTitle:@"Chọn đời máy"
+    UIControl *deviceRow = [self makeRowTitle:@"Chọn đời máy (nhiều)"
                                  detailOut:&_deviceDetailLabel
                                     action:@selector(pickDevice)];
 
@@ -61,8 +61,7 @@
     sep.backgroundColor = AppTheme.separator;
     sep.translatesAutoresizingMaskIntoConstraints = NO;
 
-    // —— Row 2: Chọn iOS ——
-    UIControl *iosRow = [self makeRowTitle:@"Chọn iOS"
+    UIControl *iosRow = [self makeRowTitle:@"Chọn iOS (nhiều · theo matrix)"
                                detailOut:&_iosDetailLabel
                                   action:@selector(pickIOS)];
 
@@ -73,13 +72,19 @@
     [self.card addSubview:stack];
     [sep.heightAnchor constraintEqualToConstant:1.0 / UIScreen.mainScreen.scale].active = YES;
 
-    UIButton *applyBtn = [AppTheme primaryButtonWithTitle:@"Apply Profile"
+    UIButton *applyBtn = [AppTheme primaryButtonWithTitle:@"Apply (random trong pool)"
                                                    target:self
                                                    action:@selector(applyTapped)];
     [self.view addSubview:applyBtn];
 
+    UIButton *killBtn = [AppTheme primaryButtonWithTitle:@"Kill Zalo + Random full"
+                                                  target:self
+                                                  action:@selector(killRandomTapped)];
+    killBtn.backgroundColor = [UIColor colorWithRed:0.85 green:0.35 blue:0.1 alpha:1.0];
+    [self.view addSubview:killBtn];
+
     UIButton *reseedBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    [reseedBtn setTitle:@"Reseed Identity (giữ model/iOS)" forState:UIControlStateNormal];
+    [reseedBtn setTitle:@"Apply primary (máy/iOS đang active)" forState:UIControlStateNormal];
     [reseedBtn setTitleColor:AppTheme.accent forState:UIControlStateNormal];
     reseedBtn.titleLabel.font = AppTheme.bodyFont;
     reseedBtn.translatesAutoresizingMaskIntoConstraints = NO;
@@ -103,7 +108,7 @@
         [sub.leadingAnchor constraintEqualToAnchor:header.leadingAnchor],
         [sub.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-pad],
 
-        [self.card.topAnchor constraintEqualToAnchor:sub.bottomAnchor constant:20],
+        [self.card.topAnchor constraintEqualToAnchor:sub.bottomAnchor constant:16],
         [self.card.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:pad],
         [self.card.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-pad],
 
@@ -112,15 +117,20 @@
         [stack.trailingAnchor constraintEqualToAnchor:self.card.trailingAnchor],
         [stack.bottomAnchor constraintEqualToAnchor:self.card.bottomAnchor],
 
-        [applyBtn.topAnchor constraintEqualToAnchor:self.card.bottomAnchor constant:20],
+        [applyBtn.topAnchor constraintEqualToAnchor:self.card.bottomAnchor constant:16],
         [applyBtn.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:pad],
         [applyBtn.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-pad],
-        [applyBtn.heightAnchor constraintEqualToConstant:54],
+        [applyBtn.heightAnchor constraintEqualToConstant:50],
 
-        [reseedBtn.topAnchor constraintEqualToAnchor:applyBtn.bottomAnchor constant:12],
+        [killBtn.topAnchor constraintEqualToAnchor:applyBtn.bottomAnchor constant:10],
+        [killBtn.leadingAnchor constraintEqualToAnchor:applyBtn.leadingAnchor],
+        [killBtn.trailingAnchor constraintEqualToAnchor:applyBtn.trailingAnchor],
+        [killBtn.heightAnchor constraintEqualToConstant:50],
+
+        [reseedBtn.topAnchor constraintEqualToAnchor:killBtn.bottomAnchor constant:10],
         [reseedBtn.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
 
-        [self.hintLabel.topAnchor constraintEqualToAnchor:reseedBtn.bottomAnchor constant:20],
+        [self.hintLabel.topAnchor constraintEqualToAnchor:reseedBtn.bottomAnchor constant:16],
         [self.hintLabel.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:pad],
         [self.hintLabel.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-pad],
 
@@ -131,7 +141,6 @@
     [self refreshUI];
 }
 
-/// One picker row: bold title + secondary detail + chevron. detailOut receives the detail label.
 - (UIControl *)makeRowTitle:(NSString *)title
                   detailOut:(UILabel * __strong *)detailOut
                      action:(SEL)action {
@@ -148,7 +157,7 @@
     UILabel *detail = [[UILabel alloc] init];
     detail.font = AppTheme.captionFont;
     detail.textColor = AppTheme.textSecondary;
-    detail.numberOfLines = 2;
+    detail.numberOfLines = 3;
     detail.translatesAutoresizingMaskIntoConstraints = NO;
 
     UILabel *chev = [[UILabel alloc] init];
@@ -162,14 +171,14 @@
     [row addSubview:chev];
 
     [NSLayoutConstraint activateConstraints:@[
-        [row.heightAnchor constraintGreaterThanOrEqualToConstant:76],
-        [titleLab.topAnchor constraintEqualToAnchor:row.topAnchor constant:16],
+        [row.heightAnchor constraintGreaterThanOrEqualToConstant:84],
+        [titleLab.topAnchor constraintEqualToAnchor:row.topAnchor constant:14],
         [titleLab.leadingAnchor constraintEqualToAnchor:row.leadingAnchor constant:16],
         [titleLab.trailingAnchor constraintLessThanOrEqualToAnchor:chev.leadingAnchor constant:-8],
         [detail.topAnchor constraintEqualToAnchor:titleLab.bottomAnchor constant:6],
         [detail.leadingAnchor constraintEqualToAnchor:titleLab.leadingAnchor],
         [detail.trailingAnchor constraintLessThanOrEqualToAnchor:chev.leadingAnchor constant:-8],
-        [detail.bottomAnchor constraintEqualToAnchor:row.bottomAnchor constant:-16],
+        [detail.bottomAnchor constraintEqualToAnchor:row.bottomAnchor constant:-14],
         [chev.centerYAnchor constraintEqualToAnchor:row.centerYAnchor],
         [chev.trailingAnchor constraintEqualToAnchor:row.trailingAnchor constant:-16],
     ]];
@@ -185,6 +194,7 @@
 
 - (void)refreshUI {
     AppState *st = AppState.shared;
+    [st ensureDefaults];
     BOOL empty = Catalog.shared.devices.count == 0;
     if (empty) {
         [self.spinner startAnimating];
@@ -197,45 +207,44 @@
     NSDictionary *dev = [st currentDevice] ?: @{};
     NSDictionary *disp = dev[@"display"] ?: @{};
 
-    self.deviceDetailLabel.text = [NSString stringWithFormat:@"%@ · %@ · %@ · RAM %@ MB",
-                                   dev[@"MarketingName"] ?: @"Chạm để chọn đời máy",
-                                   dev[@"ProductType"] ?: @"—",
-                                   dev[@"chip"] ?: @"—",
-                                   dev[@"PhysicalMemoryMB"] ?: @"?"];
+    self.deviceDetailLabel.text = [NSString stringWithFormat:@"%@\nActive: %@ · %@",
+                                   [st devicePoolSummary],
+                                   dev[@"MarketingName"] ?: @"—",
+                                   dev[@"ProductType"] ?: @"—"];
 
     NSDictionary *meta = [st currentIOSMeta] ?: @{};
-    BOOL lab = [meta[@"lab"] boolValue];
-    self.iosDetailLabel.text = [NSString stringWithFormat:@"iOS %@ · Build %@%@",
+    self.iosDetailLabel.text = [NSString stringWithFormat:@"%@\nActive: iOS %@ · Build %@",
+                                [st iosPoolSummary],
                                 st.selectedIOS ?: @"—",
-                                meta[@"BuildVersion"] ?: @"?",
-                                lab ? @" · lab" : @""];
+                                meta[@"BuildVersion"] ?: @"?"];
 
-    NSArray *sup = [Catalog.shared supportedIOSForDevice:dev];
+    NSUInteger nCompat = [st compatibleIOSForSelectedDevices].count;
+    NSUInteger nPairs = 0;
+    for (NSString *did in st.selectedDeviceIds) {
+        NSDictionary *d = [Catalog.shared deviceWithId:did];
+        nPairs += [st selectedIOSCompatibleWithDevice:d ?: @{}].count;
+    }
+
     self.hintLabel.text = [NSString stringWithFormat:
-        @"Matrix: min %@ · max %@ · default %@ · %lu bản iOS hợp lệ\n"
-        @"Màn: %@×%@ @%@ · id: %@\n%@",
-        dev[@"minIOS"] ?: @"?",
-        dev[@"maxIOS"] ?: @"?",
-        dev[@"defaultIOS"] ?: @"?",
-        (unsigned long)sup.count,
+        @"Pool: %lu máy × iOS đã chọn → %lu cặp matrix hợp lệ (random khi Kill Zalo).\n"
+        @"Matrix union: %lu bản iOS · Active id: %@\n"
+        @"Màn active: %@×%@ @%@\n"
+        @"Kill Zalo = random model/iOS + serial/IDFA/IDFV/IMEI/MAC/UA… theo catalog máy.\n%@",
+        (unsigned long)st.selectedDeviceIds.count,
+        (unsigned long)nPairs,
+        (unsigned long)nCompat,
+        dev[@"id"] ?: @"",
         disp[@"NativeWidth"] ?: @"?",
         disp[@"NativeHeight"] ?: @"?",
         disp[@"ScreenScale"] ?: @"?",
-        dev[@"id"] ?: @"",
         st.statusText ?: @""];
 }
 
 - (void)pickDevice {
     DeviceListController *vc = [[DeviceListController alloc] initWithStyle:UITableViewStyleInsetGrouped];
-    vc.selectedId = AppState.shared.selectedDeviceId;
+    vc.selectedIds = AppState.shared.selectedDeviceIds;
     __weak typeof(self) weakSelf = self;
-    vc.onSelect = ^(NSDictionary *device) {
-        AppState.shared.selectedDeviceId = device[@"id"];
-        NSString *cur = AppState.shared.selectedIOS;
-        if (!cur.length || ![Catalog.shared device:device supportsIOS:cur]) {
-            AppState.shared.selectedIOS = device[@"defaultIOS"] ?: cur;
-        }
-        [AppState.shared postDidChange];
+    vc.onChange = ^{
         [weakSelf refreshUI];
     };
     [self.navigationController pushViewController:vc animated:YES];
@@ -243,25 +252,26 @@
 
 - (void)pickIOS {
     IOSListController *vc = [[IOSListController alloc] initWithStyle:UITableViewStyleInsetGrouped];
-    vc.selectedIOS = AppState.shared.selectedIOS;
-    vc.device = [AppState.shared currentDevice];
     __weak typeof(self) weakSelf = self;
-    vc.onSelect = ^(NSString *ver) {
-        AppState.shared.selectedIOS = ver;
-        [AppState.shared postDidChange];
+    vc.onChange = ^{
         [weakSelf refreshUI];
     };
     [self.navigationController pushViewController:vc animated:YES];
 }
 
 - (void)applyTapped {
-    NSString *msg = [AppState.shared applyReseedOnly:NO];
-    [self alert:@"Apply Profile" msg:msg];
+    NSString *msg = [AppState.shared applyRandomFromPool];
+    [self alert:@"Apply (random pool)" msg:msg];
+}
+
+- (void)killRandomTapped {
+    NSString *msg = [AppState.shared killZaloAndRandomizeFromPool];
+    [self alert:@"Kill Zalo + Random" msg:msg];
 }
 
 - (void)reseedTapped {
     NSString *msg = [AppState.shared applyReseedOnly:YES];
-    [self alert:@"Reseed Identity" msg:msg];
+    [self alert:@"Apply primary" msg:msg];
 }
 
 - (void)alert:(NSString *)title msg:(NSString *)msg {
@@ -269,9 +279,6 @@
                                                                message:msg
                                                         preferredStyle:UIAlertControllerStyleAlert];
     [a addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
-    [a addAction:[UIAlertAction actionWithTitle:@"Kill Zalo" style:UIAlertActionStyleDestructive handler:^(__unused UIAlertAction *_) {
-        [AppState.shared killZalo];
-    }]];
     [self presentViewController:a animated:YES completion:nil];
 }
 

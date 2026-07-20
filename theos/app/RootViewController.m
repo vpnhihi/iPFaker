@@ -4,6 +4,7 @@
 #import "DeviceListController.h"
 #import "IOSListController.h"
 #import "AboutLabController.h"
+#import "AppState.h"
 
 @interface RootViewController ()
 @property (nonatomic, copy) NSString *selectedDeviceId;
@@ -177,23 +178,19 @@
     if (indexPath.section == 0) {
         if (indexPath.row == 0) {
             DeviceListController *vc = [[DeviceListController alloc] initWithStyle:UITableViewStyleInsetGrouped];
-            vc.selectedId = self.selectedDeviceId;
             __weak typeof(self) weakSelf = self;
-            vc.onSelect = ^(NSDictionary *device) {
-                weakSelf.selectedDeviceId = device[@"id"];
-                // snap iOS to device default if missing
-                if (!weakSelf.selectedIOS.length)
-                    weakSelf.selectedIOS = device[@"defaultIOS"];
+            vc.onChange = ^{
+                weakSelf.selectedDeviceId = AppState.shared.selectedDeviceId;
+                weakSelf.selectedIOS = AppState.shared.selectedIOS;
                 [weakSelf.tableView reloadData];
             };
             [self.navigationController pushViewController:vc animated:YES];
         } else if (indexPath.row == 1) {
             IOSListController *vc = [[IOSListController alloc] initWithStyle:UITableViewStyleInsetGrouped];
-            vc.selectedIOS = self.selectedIOS;
-            vc.device = [self currentDevice];
             __weak typeof(self) weakSelf = self;
-            vc.onSelect = ^(NSString *ver) {
-                weakSelf.selectedIOS = ver;
+            vc.onChange = ^{
+                weakSelf.selectedDeviceId = AppState.shared.selectedDeviceId;
+                weakSelf.selectedIOS = AppState.shared.selectedIOS;
                 [weakSelf.tableView reloadData];
             };
             [self.navigationController pushViewController:vc animated:YES];

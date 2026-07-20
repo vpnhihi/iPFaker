@@ -1,7 +1,6 @@
 #import <UIKit/UIKit.h>
 
+/// Multi-select iOS list filtered by matrix of selected devices. Tap toggle, ✓ = selected.
 @interface IOSListController : UITableViewController
-@property (nonatomic, copy) NSString *selectedIOS;
-@property (nonatomic, strong) NSDictionary *device;
-@property (nonatomic, copy) void (^onSelect)(NSString *version);
+@property (nonatomic, copy) void (^onChange)(void);
 @end

@@ -18,17 +18,17 @@
     [self.view addSubview:header];
 
     UILabel *note = [[UILabel alloc] init];
-    note.text = @"Lab tools cho Zalo. Wipe container đầy đủ an toàn hơn từ PC (scripts/wipe_and_ready.py).";
+    note.text = @"Kill Zalo = random đời máy + iOS trong pool (matrix) + full identity theo catalog máy. Wipe container đầy đủ: PC scripts/wipe_and_ready.py.";
     note.font = AppTheme.bodyFont;
     note.textColor = AppTheme.textSecondary;
     note.numberOfLines = 0;
     note.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:note];
 
-    UIButton *kill = [AppTheme primaryButtonWithTitle:@"Kill Zalo"
+    UIButton *kill = [AppTheme primaryButtonWithTitle:@"Kill Zalo + Random pool"
                                                target:self
                                                action:@selector(killTapped)];
-    UIButton *reseed = [AppTheme primaryButtonWithTitle:@"Reseed Identity"
+    UIButton *reseed = [AppTheme primaryButtonWithTitle:@"Apply primary (active)"
                                                  target:self
                                                  action:@selector(reseedTapped)];
     reseed.backgroundColor = AppTheme.accentDark;

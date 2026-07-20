@@ -157,7 +157,7 @@
 
     // Secondary actions
     UIButton *killBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    [killBtn setTitle:@"Kill Zalo" forState:UIControlStateNormal];
+    [killBtn setTitle:@"Kill Zalo + Random pool" forState:UIControlStateNormal];
     [killBtn setTitleColor:UIColor.orangeColor forState:UIControlStateNormal];
     killBtn.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
     killBtn.backgroundColor = AppTheme.cardAlt;
@@ -324,8 +324,9 @@
 }
 
 - (void)killTapped {
-    [AppState.shared killZalo];
-    [self toast:AppState.shared.statusText];
+    // Random pair from multi-select pool + full identity (catalog-synced) + kill Zalo
+    NSString *msg = [AppState.shared killZaloAndRandomizeFromPool];
+    [self showAlertTitle:@"Kill Zalo + Random" message:msg];
 }
 
 - (void)openAbout {
@@ -343,8 +344,9 @@
                                                                message:msg
                                                         preferredStyle:UIAlertControllerStyleAlert];
     [a addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
-    [a addAction:[UIAlertAction actionWithTitle:@"Kill Zalo" style:UIAlertActionStyleDestructive handler:^(__unused UIAlertAction *_) {
-        [AppState.shared killZalo];
+    [a addAction:[UIAlertAction actionWithTitle:@"Kill Zalo + Random" style:UIAlertActionStyleDestructive handler:^(__unused UIAlertAction *_) {
+        [AppState.shared killZaloAndRandomizeFromPool];
+        [self refreshUI];
     }]];
     [self presentViewController:a animated:YES completion:nil];
 }
