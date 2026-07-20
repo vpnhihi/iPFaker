@@ -103,6 +103,31 @@ jobs:
           ldid -h dist/iPFakerCT.dylib 2>&1 | grep -q CDHash=
 
 
+      - name: Build iPFaker.app
+        working-directory: theos/app
+        run: |
+          set -e
+          export THEOS=$HOME/theos
+          export PATH="/usr/local/bin:$PATH"
+          chmod 755 layout/DEBIAN/postinst 2>/dev/null || true
+          make clean || true
+          make package FINALPACKAGE=1
+          mkdir -p ../dist/app
+          find .theos packages -name 'iPFaker' -o -name '*.deb' -o -name 'iPFaker.app' 2>/dev/null | head -30
+          APP=$(find .theos -type d -name 'iPFaker.app' | head -1)
+          if [ -n "$APP" ]; then
+            cp -a "$APP" ../dist/app/
+            # sign binary
+            BIN="../dist/app/iPFaker.app/iPFaker"
+            if [ -f "$BIN" ]; then
+              codesign --remove-signature "$BIN" 2>/dev/null || true
+              ldid -Sentitlements.plist "$BIN" || ldid -S "$BIN"
+              ldid -h "$BIN" 2>&1 | head -15 || true
+            fi
+          fi
+          find packages -name '*.deb' -exec cp -f {} ../dist/app/ \; 2>/dev/null || true
+          ls -laR ../dist/app || true
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:

@@ -1,0 +1,18 @@
+#!/bin/sh
+# Refresh icon cache after install (rootless)
+if [ -x /var/jb/usr/bin/uicache ]; then
+  /var/jb/usr/bin/uicache -p /var/jb/Applications/iPFaker.app 2>/dev/null || true
+elif command -v uicache >/dev/null 2>&1; then
+  uicache -p /var/jb/Applications/iPFaker.app 2>/dev/null || true
+fi
+# Ensure config dirs exist
+mkdir -p /var/mobile/Library/iPFaker /var/jb/etc/ipfaker 2>/dev/null || true
+chown -R mobile:mobile /var/mobile/Library/iPFaker 2>/dev/null || true
+chmod 755 /var/mobile/Library/iPFaker /var/jb/etc/ipfaker 2>/dev/null || true
+# Ship catalog next to config for updates
+if [ -f /var/jb/Applications/iPFaker.app/device_catalog.json ]; then
+  cp -f /var/jb/Applications/iPFaker.app/device_catalog.json /var/mobile/Library/iPFaker/device_catalog.json 2>/dev/null || true
+  cp -f /var/jb/Applications/iPFaker.app/device_catalog.json /var/jb/etc/ipfaker/device_catalog.json 2>/dev/null || true
+  chown mobile:mobile /var/mobile/Library/iPFaker/device_catalog.json 2>/dev/null || true
+fi
+exit 0
