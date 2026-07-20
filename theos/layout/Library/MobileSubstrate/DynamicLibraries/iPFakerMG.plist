@@ -4,11 +4,10 @@
 <dict>
 	<key>Filter</key>
 	<dict>
-		<!-- Lab default: Zalo only. Expand later if needed (HIOS injects many apps). -->
 		<key>Bundles</key>
 		<array>
-			<string>com.zing.zalo</string>
 			<string>vn.com.vng.zingalo</string>
+			<string>com.zing.zalo</string>
 		</array>
 		<key>Mode</key>
 		<string>Any</string>

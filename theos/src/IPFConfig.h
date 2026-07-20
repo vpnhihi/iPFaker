@@ -1,4 +1,4 @@
-// IPFConfig.h — load active_profile.json (no hardcoded identity)
+// IPFConfig — HIOS-compatible: prefer config.plist flat keys at /var/jb/etc/ipfaker/config.plist
 
 #import <Foundation/Foundation.h>
 
@@ -26,7 +26,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (BOOL)reload;
 - (nullable id)mgValueForKey:(NSString *)key;
 - (nullable id)sysctlValueForName:(NSString *)name;
-- (nullable NSString *)stringForPath:(NSString *)dotPath;
+- (nullable NSString *)stringForKey:(NSString *)key;
 
 @end
 
