@@ -41,6 +41,21 @@ Cấu hình được lưu tại: `%APPDATA%\iPFakerPC\settings.json`
 | **Đặt lại + Lưu dữ liệu** | Đặt lại + Lưu | Backup config+data → random spoof → wipe → **restore login** |
 | **Chỉ xóa data app** | Wipe tab | Xóa data app đã tick |
 | **Mở Zalo** | — | `uiopen` Zalo |
+| **Reg tự động → tới OTP** | Lab Frida | Spoof/wipe (tuỳ chọn) → mở Zalo → inject Gadget → chạm Đăng ký → điền SĐT |
+| **Gửi OTP / Tiếp reg** | Lab Frida | Điền OTP (nếu gõ trên PC) + tên + bấm Tiếp tục |
+| **Dừng Frida reg** | — | Gỡ session Frida |
+
+### Reg tự động — cách dùng
+
+1. Kết nối SSH, chọn pool máy/iOS  
+2. Nhập **SĐT** (+ tên hiển thị)  
+3. Tick *Random spoof* / *Xóa data Zalo* nếu muốn profile sạch  
+4. **Mở khóa màn hình** iPhone  
+5. Bấm **Reg tự động → tới OTP**  
+6. Khi Zalo hỏi OTP: nhập SMS trên máy **hoặc** gõ vào ô OTP → **Gửi OTP / Tiếp reg**  
+7. Captcha / chọn ảnh (nếu có) làm tay trên máy  
+
+Cần: `pip install frida`, file `frida/zalo_ui_auto.bundle.js`, `opainject` trên máy (Dopamine), FridaGadget trên máy hoặc `downloads/FridaGadget.dylib`.
 
 ## App mục tiêu
 

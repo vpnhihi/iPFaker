@@ -21,5 +21,11 @@ if errorlevel 1 (
   python -m pip install paramiko -q
 )
 
+python -c "import frida" 2>nul
+if errorlevel 1 (
+  echo [*] Cai frida (Reg tu dong)...
+  python -m pip install frida -q
+)
+
 python pc_app\app.py
 if errorlevel 1 pause

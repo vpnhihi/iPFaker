@@ -22,6 +22,7 @@ sys.path.insert(0, str(SCRIPTS))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from device_client import DeviceClient, DeviceStatus  # noqa: E402
+from auto_reg import AutoRegError, AutoRegRunner  # noqa: E402
 
 # Reuse profile builder from repo
 import select_device_profile as sdp  # noqa: E402
@@ -52,10 +53,11 @@ class IPfakerPC(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
         self.title("iPFaker PC — Điều khiển máy")
-        self.geometry("1100x720")
-        self.minsize(960, 640)
+        self.geometry("1100x820")
+        self.minsize(960, 700)
         self.configure(bg=BG)
         self.client: DeviceClient | None = None
+        self.reg_runner: AutoRegRunner | None = None
         self.catalog = sdp.load_catalog()
         self.devices = list(self.catalog.get("devices") or [])
         self._busy = False
@@ -234,13 +236,69 @@ class IPfakerPC(tk.Tk):
         self._btn("Chỉ xóa data app", self._wipe_only, row, ORANGE)
         self._btn("Mở Zalo", self._open_zalo, row, None)
 
+        # ── Reg tự động ───────────────────────────────────
+        reg = ttk.Frame(self, style="Card.TFrame")
+        reg.pack(fill="x", padx=14, pady=6)
+        reg_in = ttk.Frame(reg, style="Card.TFrame")
+        reg_in.pack(fill="x", padx=10, pady=10)
+
+        ttk.Label(
+            reg_in,
+            text="Reg Zalo tự động (Frida UI)",
+            style="Card.TLabel",
+            font=("Segoe UI Semibold", 11),
+        ).pack(anchor="w")
+        ttk.Label(
+            reg_in,
+            text="Mở khóa màn hình · Zalo sạch · spoof đã áp dụng · PC cùng Wi‑Fi (port 27042 cho Gadget)",
+            style="Muted.TLabel",
+        ).pack(anchor="w", pady=(2, 8))
+
+        form = ttk.Frame(reg_in, style="Card.TFrame")
+        form.pack(fill="x")
+
+        self.var_phone = tk.StringVar(value="")
+        self.var_name = tk.StringVar(value="Lab User")
+        self.var_otp = tk.StringVar(value="")
+        self.var_reg_wipe = tk.BooleanVar(value=True)
+        self.var_reg_spoof = tk.BooleanVar(value=True)
+
+        def _field(parent, label, var, w=18, show=None):
+            f = ttk.Frame(parent, style="Card.TFrame")
+            f.pack(side="left", padx=(0, 12))
+            ttk.Label(f, text=label, style="Muted.TLabel").pack(anchor="w")
+            ttk.Entry(f, textvariable=var, width=w, show=show).pack()
+
+        _field(form, "Số điện thoại", self.var_phone, 16)
+        _field(form, "Tên hiển thị", self.var_name, 16)
+        _field(form, "OTP (sau khi nhận SMS)", self.var_otp, 12)
+
+        opts = ttk.Frame(reg_in, style="Card.TFrame")
+        opts.pack(fill="x", pady=(8, 4))
+        ttk.Checkbutton(
+            opts,
+            text="Random spoof trước (pool máy+iOS)",
+            variable=self.var_reg_spoof,
+        ).pack(side="left", padx=(0, 12))
+        ttk.Checkbutton(
+            opts,
+            text="Xóa data Zalo trước (mất login cũ)",
+            variable=self.var_reg_wipe,
+        ).pack(side="left")
+
+        reg_btns = ttk.Frame(reg_in, style="Card.TFrame")
+        reg_btns.pack(fill="x", pady=(8, 0))
+        self._btn("Reg tự động → tới OTP", self._auto_reg_start, reg_btns, "#a855f7")
+        self._btn("Gửi OTP / Tiếp reg", self._auto_reg_otp, reg_btns, GREEN)
+        self._btn("Dừng Frida reg", self._auto_reg_stop, reg_btns, None)
+
         # Log
         logf = ttk.Frame(self)
         logf.pack(fill="both", expand=True, padx=14, pady=(0, 12))
         ttk.Label(logf, text="Nhật ký", foreground=MUTED, background=BG).pack(anchor="w")
         self.log_box = scrolledtext.ScrolledText(
             logf,
-            height=10,
+            height=8,
             bg=ENTRY_BG,
             fg=FG,
             insertbackground=FG,
@@ -330,6 +388,10 @@ class IPfakerPC(tk.Tk):
                 # password optional remember
                 if data.get("remember_pass") and data.get("password"):
                     self.var_pass.set(data["password"])
+                if data.get("phone"):
+                    self.var_phone.set(data["phone"])
+                if data.get("reg_name"):
+                    self.var_name.set(data["reg_name"])
                 for did in data.get("devices") or []:
                     if did in self._device_vars:
                         self._device_vars[did].set(True)
@@ -348,6 +410,8 @@ class IPfakerPC(tk.Tk):
                 "port": int(self.var_port.get() or 22),
                 "remember_pass": True,
                 "password": self.var_pass.get(),
+                "phone": self.var_phone.get().strip(),
+                "reg_name": self.var_name.get().strip(),
                 "devices": [k for k, v in self._device_vars.items() if v.get()],
                 "ios": [k for k, v in self._ios_vars.items() if v.get()],
             }
@@ -599,8 +663,91 @@ class IPfakerPC(tk.Tk):
 
         self._run_bg("Mở Zalo", job)
 
+    # ── Reg tự động ────────────────────────────────────────
+    def _auto_reg_start(self) -> None:
+        phone = self.var_phone.get().strip()
+        if not phone:
+            messagebox.showwarning("Reg tự động", "Nhập số điện thoại trước.")
+            return
+        self._save_settings()
+
+        def job():
+            client = self._need_client()
+            # 1) optional spoof
+            if self.var_reg_spoof.get():
+                pairs = self._valid_pairs()
+                if not pairs:
+                    raise RuntimeError("Bật «Random spoof» nhưng pool máy/iOS không có cặp hợp lệ.")
+                dev, ios, meta = random.choice(pairs)
+                self.log(f"Reg: spoof {dev.get('MarketingName')} / iOS {ios}")
+                self._build_and_deploy(dev, ios, meta)
+            # 2) optional wipe
+            if self.var_reg_wipe.get():
+                self.log("Reg: xóa data Zalo trước…")
+                client.wipe_apps(
+                    ["vn.com.vng.zingalo", "com.zing.zalo"],
+                    skip_keychain=False,
+                )
+            # 3) Frida UI → phone
+            if self.reg_runner:
+                try:
+                    self.reg_runner.close()
+                except Exception:
+                    pass
+            self.reg_runner = AutoRegRunner(client, log=self.log)
+            self.reg_runner.run_full_until_otp(phone)
+            self.after(
+                0,
+                lambda: messagebox.showinfo(
+                    "Reg tự động",
+                    f"Đã điền SĐT {phone}.\n\n"
+                    "1) Nhập mã OTP trên iPhone (SMS)\n"
+                    "   hoặc gõ OTP vào ô rồi bấm «Gửi OTP / Tiếp reg»\n"
+                    "2) Captcha / ảnh (nếu có) làm tay trên máy",
+                ),
+            )
+
+        self._run_bg("Reg tự động", job)
+
+    def _auto_reg_otp(self) -> None:
+        def job():
+            if not self.reg_runner or not self.reg_runner._script:
+                raise RuntimeError(
+                    "Chưa chạy «Reg tự động → tới OTP» hoặc Frida đã đứt.\n"
+                    "Chạy lại Reg tự động trước."
+                )
+            otp = self.var_otp.get().strip()
+            name = self.var_name.get().strip() or "Lab User"
+            self.reg_runner.submit_otp_and_finish(otp=otp, name=name)
+            self.after(
+                0,
+                lambda: messagebox.showinfo(
+                    "Tiếp reg",
+                    "Đã gửi OTP/tên (nếu có) và bấm tiếp các bước UI.\n"
+                    "Kiểm tra Zalo trên máy — captcha có thể cần tay.",
+                ),
+            )
+
+        self._run_bg("Gửi OTP / Tiếp reg", job)
+
+    def _auto_reg_stop(self) -> None:
+        def job():
+            if self.reg_runner:
+                self.reg_runner.close()
+                self.reg_runner = None
+                self.log("Đã dừng session Frida reg.")
+            else:
+                self.log("Không có session reg đang mở.")
+
+        self._run_bg("Dừng Frida reg", job)
+
     def _on_close(self) -> None:
         self._save_settings()
+        if self.reg_runner:
+            try:
+                self.reg_runner.close()
+            except Exception:
+                pass
         if self.client:
             self.client.close()
         self.destroy()
