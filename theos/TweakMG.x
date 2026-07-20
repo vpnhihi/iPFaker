@@ -7,15 +7,34 @@
 #import "IPFHooksMG.h"
 
 static void IPFMark(const char *msg) {
-    // Prefer mobile-writable path (always visible); also try /var/jb
-    NSArray *paths = @[
-        @"/var/mobile/Library/iPFaker/v3_mg_loaded.txt",
-        @"/var/jb/etc/ipfaker/v3_mg_loaded.txt",
-    ];
+    // Sandbox-safe first (Zalo Documents/tmp), then jailbreak paths
     NSString *bid = [[NSBundle mainBundle] bundleIdentifier] ?: @"(nil)";
     NSString *body = [NSString stringWithFormat:@"%s bid=%@\n", msg, bid];
+    NSMutableArray *paths = [NSMutableArray array];
+    NSString *home = NSHomeDirectory();
+    NSString *tmp = NSTemporaryDirectory();
+    if (home.length) {
+        [paths addObject:[home stringByAppendingPathComponent:@"Documents/v3_mg_loaded.txt"]];
+        [paths addObject:[home stringByAppendingPathComponent:@"Library/v3_mg_loaded.txt"]];
+        [paths addObject:[home stringByAppendingPathComponent:@"tmp/v3_mg_loaded.txt"]];
+    }
+    if (tmp.length)
+        [paths addObject:[tmp stringByAppendingPathComponent:@"v3_mg_loaded.txt"]];
+    [paths addObjectsFromArray:@[
+        @"/var/mobile/Library/iPFaker/v3_mg_loaded.txt",
+        @"/var/jb/etc/ipfaker/v3_mg_loaded.txt",
+        @"/var/jb/etc/changeinfoios/v3_mg_loaded.txt",
+        @"/var/jb/tmp/v3_mg_loaded.txt",
+        @"/tmp/v3_mg_loaded.txt",
+    ]];
     for (NSString *p in paths) {
         [body writeToFile:p atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        // C fallback (sometimes works when NS fails)
+        FILE *f = fopen(p.UTF8String, "w");
+        if (f) {
+            fputs(body.UTF8String, f);
+            fclose(f);
+        }
     }
     NSLog(@"[iPFakerMG] %s bid=%@", msg, bid);
 }

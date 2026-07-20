@@ -62,30 +62,30 @@ void IPFInstallCTHooks(void) {
         return;
     }
 
-    if (!pMSHookMessageEx) {
+    if (!pMSHookMessageExCT) {
         void *h = dlopen("/var/jb/usr/lib/libellekit.dylib", RTLD_NOW);
-        if (h) pMSHookMessageEx = (MSHookMessageEx_t)dlsym(h, "MSHookMessageEx");
-        if (!pMSHookMessageEx)
-            pMSHookMessageEx = (MSHookMessageEx_t)dlsym(RTLD_DEFAULT, "MSHookMessageEx");
+        if (h) pMSHookMessageExCT = (MSHookMessageEx_t)dlsym(h, "MSHookMessageEx");
+        if (!pMSHookMessageExCT)
+            pMSHookMessageExCT = (MSHookMessageEx_t)dlsym(RTLD_DEFAULT, "MSHookMessageEx");
     }
-    if (!pMSHookMessageEx) {
+    if (!pMSHookMessageExCT) {
         NSLog(@"[iPFakerCT] MSHookMessageEx missing");
         return;
     }
 
     Class carrier = objc_getClass("CTCarrier");
     if (carrier) {
-        pMSHookMessageEx(carrier, @selector(carrierName), (IMP)stub_carrierName, (IMP *)&orig_carrierName);
-        pMSHookMessageEx(carrier, @selector(mobileCountryCode), (IMP)stub_mobileCountryCode, (IMP *)&orig_mobileCountryCode);
-        pMSHookMessageEx(carrier, @selector(mobileNetworkCode), (IMP)stub_mobileNetworkCode, (IMP *)&orig_mobileNetworkCode);
-        pMSHookMessageEx(carrier, @selector(isoCountryCode), (IMP)stub_isoCountryCode, (IMP *)&orig_isoCountryCode);
-        pMSHookMessageEx(carrier, @selector(allowsVOIP), (IMP)stub_allowsVOIP, (IMP *)&orig_allowsVOIP);
+        pMSHookMessageExCT(carrier, @selector(carrierName), (IMP)stub_carrierName, (IMP *)&orig_carrierName);
+        pMSHookMessageExCT(carrier, @selector(mobileCountryCode), (IMP)stub_mobileCountryCode, (IMP *)&orig_mobileCountryCode);
+        pMSHookMessageExCT(carrier, @selector(mobileNetworkCode), (IMP)stub_mobileNetworkCode, (IMP *)&orig_mobileNetworkCode);
+        pMSHookMessageExCT(carrier, @selector(isoCountryCode), (IMP)stub_isoCountryCode, (IMP *)&orig_isoCountryCode);
+        pMSHookMessageExCT(carrier, @selector(allowsVOIP), (IMP)stub_allowsVOIP, (IMP *)&orig_allowsVOIP);
         NSLog(@"[iPFakerCT] CTCarrier hooks OK");
     }
 
     Class info = objc_getClass("CTTelephonyNetworkInfo");
     if (info) {
-        pMSHookMessageEx(info, @selector(currentRadioAccessTechnology),
+        pMSHookMessageExCT(info, @selector(currentRadioAccessTechnology),
                         (IMP)stub_currentRadioAccessTechnology,
                         (IMP *)&orig_currentRadioAccessTechnology);
     }
