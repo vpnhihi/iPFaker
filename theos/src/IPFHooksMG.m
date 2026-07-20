@@ -296,22 +296,10 @@ void IPFInstallMGHooks(void) {
         IPFTrace(@"WARN no MSHookFunction");
     }
 
-    // --- fishhook second (GOT rebind); vm_protect inside — skip if fails ---
-    // Only rebind symbols not already hooked, to catch static imports.
-    @try {
-        struct rebinding rebs[5];
-        int nreb = 0;
-        rebs[nreb++] = (struct rebinding){ "MGCopyAnswer", (void *)stub_MGCopyAnswer, (void **)&orig_MGCopyAnswer };
-        rebs[nreb++] = (struct rebinding){ "sysctlbyname", (void *)stub_sysctlbyname, (void **)&orig_sysctlbyname };
-        rebs[nreb++] = (struct rebinding){ "uname", (void *)stub_uname, (void **)&orig_uname };
-        rebs[nreb++] = (struct rebinding){ "sysctl", (void *)stub_sysctl, (void **)&orig_sysctl };
-        frc = rebind_symbols(rebs, (size_t)nreb);
-        IPFTrace([NSString stringWithFormat:@"fishhook rc=%d origMG=%p sys=%p uname=%p sysctl=%p",
-                  frc, orig_MGCopyAnswer, orig_sysctlbyname, orig_uname, orig_sysctl]);
-    } @catch (__unused NSException *ex) {
-        IPFTrace(@"fishhook exception — MSHook only");
-        frc = -2;
-    }
+    // fishhook disabled for now — still SIGBUS/crash on Zalo DATA_CONST despite vm_protect.
+    // Rely on ElleKit MSHook absolute symbols (stable when injected).
+    frc = -3;
+    IPFTrace(@"fishhook skipped (stability)");
 
     if (pMSHookMessageEx) {
         Class uid = objc_getClass("UIDevice");

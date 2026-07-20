@@ -189,26 +189,10 @@ void IPFInstallDeepHooks(void) {
     IPFResolve();
     IPFLog(@"IPFInstallDeepHooks begin");
 
-    if (pMSHookFunction) {
-        void *c1 = dlsym(RTLD_DEFAULT, "IORegistryEntryCreateCFProperty");
-        if (!c1) {
-            void *h = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_NOW);
-            if (h) c1 = dlsym(h, "IORegistryEntryCreateCFProperty");
-        }
-        if (c1) {
-            pMSHookFunction(c1, (void *)stub_IORegCreate, (void **)&orig_IORegCreate);
-            IPFLog([NSString stringWithFormat:@"IOKit CreateCFProperty hooked %p", c1]);
-        }
-        void *c2 = dlsym(RTLD_DEFAULT, "IORegistryEntrySearchCFProperty");
-        if (!c2) {
-            void *h = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_NOW);
-            if (h) c2 = dlsym(h, "IORegistryEntrySearchCFProperty");
-        }
-        if (c2) {
-            pMSHookFunction(c2, (void *)stub_IORegSearch, (void **)&orig_IORegSearch);
-            IPFLog([NSString stringWithFormat:@"IOKit SearchCFProperty hooked %p", c2]);
-        }
-    }
+    // IOKit hooks deferred — can crash Zalo on cold path; HTTP rewrite is primary Plan B.
+    (void)pMSHookFunction;
+    (void)stub_IORegCreate;
+    (void)stub_IORegSearch;
 
     if (pMSHookMessageEx) {
         Class req = objc_getClass("NSMutableURLRequest");
