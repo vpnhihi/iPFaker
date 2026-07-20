@@ -31,7 +31,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION_DEFAULT = "2.6.0"
+VERSION_DEFAULT = "2.6.1"
 PKG = "com.ipfaker"
 ARCH = "iphoneos-arm64"
 
@@ -211,9 +211,9 @@ exit 0
 
 
 def control_text(version: str, installed_size_kb: int, has_app: bool, has_dylibs: bool) -> str:
-    desc = "Lab device spoof for Zalo (MG+CT dylibs)"
+    desc = "Lab device identity tools (MG+CT dylibs)"
     if has_app:
-        desc += " + iPFaker.app (pick model/iOS, Apply profile)"
+        desc += " + iPFaker.app (device/iOS pool, Reset Data / Save)"
     desc += ". Rootless Dopamine. Synthetic profiles only. Does not inject Settings."
     return f"""Package: {PKG}
 Name: iPFaker

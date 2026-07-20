@@ -149,8 +149,8 @@
             cell.detailTextLabel.text = @"Ghi config + serial/IDFA/IDFV mới";
             cell.textLabel.textColor = [UIColor systemBlueColor];
         } else if (indexPath.row == 1) {
-            cell.textLabel.text = @"Reseed identity";
-            cell.detailTextLabel.text = @"Giữ model/iOS, random serial & UUID";
+            cell.textLabel.text = @"Reset + Save Data";
+            cell.detailTextLabel.text = @"Random identity + ghi config";
         } else {
             cell.textLabel.text = @"Reset Data app";
             cell.detailTextLabel.text = @"Random profile + wipe data app";
@@ -209,19 +209,19 @@
         if (indexPath.row == 0 || indexPath.row == 1) {
             [self applyProfileReseedOnly:(indexPath.row == 1)];
         } else {
-            [ProfileBuilder killZalo];
-            self.statusText = @"Đã kill Zalo. Mở lại Zalo để load spoof.";
+            NSString *m = [AppState.shared killZaloAndRandomizeFromPool];
+            self.statusText = m;
             [self.tableView reloadData];
-            [self toast:self.statusText];
+            [self toast:@"Reset Data app xong"];
         }
         return;
     }
 
     if (indexPath.section == 2) {
-        NSString *m = [ProfileBuilder wipeZaloLab];
+        NSString *m = [AppState.shared wipeSelectedAppsProgress:nil];
         self.statusText = m;
         [self.tableView reloadData];
-        [self toast:m];
+        [self toast:@"Wipe data app xong"];
     }
 }
 
@@ -265,9 +265,6 @@
                                                                message:result
                                                         preferredStyle:UIAlertControllerStyleAlert];
     [a addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
-    [a addAction:[UIAlertAction actionWithTitle:@"Kill Zalo" style:UIAlertActionStyleDestructive handler:^(__unused UIAlertAction *_) {
-        [ProfileBuilder killZalo];
-    }]];
     [self presentViewController:a animated:YES completion:nil];
 }
 
