@@ -219,8 +219,8 @@
         @"Tập chọn: %lu máy × iOS → %lu cặp tương thích.\n"
         @"Hợp iOS: %lu bản · Mã máy: %@\n"
         @"Màn hình: %@×%@ @%@\n"
-        @"Đặt lại dữ liệu app = ngẫu nhiên model/iOS + full identity + xóa data.\n"
-        @"Đặt lại + Lưu = ngẫu nhiên + ghi cấu hình (không xóa data).\n%@",
+        @"Đặt lại dữ liệu app = máy mới + xóa data (mất đăng nhập).\n"
+        @"Đặt lại + Lưu = lưu data/máy → máy mới → khôi phục data (giữ đăng nhập).\n%@",
         (unsigned long)st.selectedDeviceIds.count,
         (unsigned long)nPairs,
         (unsigned long)nCompat,
