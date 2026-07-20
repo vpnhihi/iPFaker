@@ -27,10 +27,12 @@ python pc_app\app.py
 ## Kết nối
 
 1. Trên iPhone: **Cài đặt → Wi‑Fi → (i) → Địa chỉ IP** (vd `192.168.1.10`)
-2. SSH user mặc định: `mobile` (mật khẩu rootless thường là mật khẩu bạn đặt / `alpine` lab)
+2. SSH user mặc định: `mobile`
 3. Trong app PC: nhập IP + mật khẩu → **Kết nối**
 
-Cấu hình được lưu tại: `%APPDATA%\iPFakerPC\settings.json`
+**Pool máy / iOS:** chọn trên app **iPFaker iPhone** (tab Chọn máy / iOS). PC **không** chọn pool — chỉ đọc `pools.json` từ máy.
+
+Cấu hình PC: `%APPDATA%\iPFakerPC\settings.json` (tab **API SMS / Captcha**).
 
 ## Nút chức năng
 
@@ -56,6 +58,31 @@ Cấu hình được lưu tại: `%APPDATA%\iPFakerPC\settings.json`
 7. Captcha / chọn ảnh (nếu có) làm tay trên máy  
 
 Cần: `pip install frida`, file `frida/zalo_ui_auto.bundle.js`, `opainject` trên máy (Dopamine), FridaGadget trên máy hoặc `downloads/FridaGadget.dylib`.
+
+### API SMS (SĐT + OTP)
+
+Tab **API SMS / Captcha**:
+
+| Field | Ví dụ |
+|-------|--------|
+| URL thuê số | `https://PROVIDER/rent?key={api_key}&service=zalo` |
+| URL OTP | `https://PROVIDER/code?key={api_key}&id={order_id}` |
+| JSON path SĐT | `phone\|data.phone\|number` |
+| JSON path order | `id\|data.id\|order_id` |
+| JSON path OTP | `otp\|code\|data.code\|message` |
+
+Placeholder: `{api_key}`, `{order_id}`, `{id}`.
+
+### AchiCaptcha
+
+| Field | Mặc định |
+|-------|----------|
+| createTask | `https://achicaptcha.com/api/createTask` |
+| getTaskResult | `https://achicaptcha.com/api/getTaskResult` |
+| API key | clientKey |
+
+Luồng: chụp màn hình iPhone → gửi ảnh base64 (ImageToTextTask) → điền text vào Zalo qua Frida.  
+Nếu docs Achi của bạn khác URL/body — sửa 2 URL (hoặc báo để chỉnh template JSON).
 
 ## App mục tiêu
 

@@ -44,6 +44,19 @@ static NSString *const kPoolWipeApps = @"ipf.pool.wipeBundleIds";
     [NSUserDefaults.standardUserDefaults setObject:[self.selectedDeviceIds copy] forKey:kPoolDevices];
     [NSUserDefaults.standardUserDefaults setObject:[self.selectedIOSList copy] forKey:kPoolIOS];
     [NSUserDefaults.standardUserDefaults setObject:[self.selectedWipeBundleIds copy] forKey:kPoolWipeApps];
+    // PC app đọc pool từ đây (không chọn máy/iOS trên PC)
+    @try {
+        NSString *dir = @"/var/mobile/Library/iPFaker";
+        [[NSFileManager defaultManager] createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:nil];
+        NSDictionary *pools = @{
+            @"devices": [self.selectedDeviceIds copy] ?: @[],
+            @"ios": [self.selectedIOSList copy] ?: @[],
+            @"wipeApps": [self.selectedWipeBundleIds copy] ?: @[],
+            @"updated": @([[NSDate date] timeIntervalSince1970]),
+        };
+        NSData *json = [NSJSONSerialization dataWithJSONObject:pools options:NSJSONWritingPrettyPrinted error:nil];
+        if (json) [json writeToFile:[dir stringByAppendingPathComponent:@"pools.json"] atomically:YES];
+    } @catch (__unused NSException *ex) {}
 }
 
 #pragma mark - Disk / defaults
