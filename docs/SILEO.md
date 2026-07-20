@@ -2,12 +2,28 @@
 
 Gói rootless **Dopamine** / architecture `iphoneos-arm64` — giống cách cài HIOS.
 
+## Nguồn Sileo (thêm 1 lần)
+
+```
+https://vpnhihi.github.io/iPFaker/
+```
+
+1. **Sileo** → **Sources** → **+**  
+2. Dán URL trên → Add  
+3. Kéo refresh → tìm **iPFaker** → **Get** / Cài đặt  
+
+> Cần bật **GitHub Pages** cho repo (Settings → Pages → GitHub Actions).  
+> Lần đầu push `sileo-repo/` sẽ deploy tự động (workflow `Sileo repo`).
+
+Nếu Pages chưa lên, cài file trực tiếp (mục dưới).
+
 ## File gói
 
 Sau khi build:
 
 ```
-dist/sileo/com.ipfaker_2.3.0_iphoneos-arm64.deb
+dist/sileo/com.ipfaker_2.3.4_iphoneos-arm64.deb
+sileo-repo/debs/com.ipfaker_2.3.4_iphoneos-arm64.deb
 ```
 
 Trong gói:
