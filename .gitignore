@@ -30,9 +30,9 @@ logs/**
 frida/_run_full_tmp.js
 frida/*.bundle.js
 frida/FridaGadget*
-sileo-repo/*.deb
-sileo-repo/debs/*.deb
-!sileo-repo/debs/.gitkeep
+# Allow sileo-repo/debs for GitHub Pages customer source (only current packages)
+# Ignore very old bulk if needed:
+sileo-repo/debs/com.ipfaker_2.3.*
 
 # ── Generated device identity ───────────────────────────
 config/active_profile.json

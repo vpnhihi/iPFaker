@@ -1,17 +1,34 @@
 Package: com.ipfaker
 Name: iPFaker
 Depends: firmware (>= 14.0)
-Version: 2.3.5
+Version: 2.7.0
 Architecture: iphoneos-arm64
 Maintainer: iPFaker Lab
 Author: iPFaker Lab
 Section: Tweaks
 Priority: optional
 Homepage: https://github.com/vpnhihi/iPFaker
-Description: Lab device spoof for Zalo (MG+CT dylibs). Rootless Dopamine. Synthetic profiles only. Does not inject Settings.
-Installed-Size: 235
-Filename: debs/com.ipfaker_2.3.5_iphoneos-arm64.deb
-Size: 25440
-MD5sum: d5cb9a8f3a442d913c518d91993fb784
-SHA256: 0907213063a91cb1b3cfd263f04f9117e27de87007506d94acb374061a4791eb
+Description: Lab device identity + iPFaker.app (rootless Dopamine). Sheet license. No Settings inject.
+Installed-Size: 223
+Filename: debs/com.ipfaker_2.7.0_iphoneos-arm64.deb
+Size: 228594
+MD5sum: 07306da3c1d147fef91ba54bbd55d8db
+SHA256: 79dd96676d2e24db2563b8969fbcc54042fbd1260fbb25b2791a8bda54f9cc38
+
+Package: com.ipfaker
+Name: iPFaker
+Depends: firmware (>= 14.0)
+Version: 2.4.1
+Architecture: iphoneos-arm64
+Maintainer: iPFaker Lab
+Author: iPFaker Lab
+Section: Tweaks
+Priority: optional
+Homepage: https://github.com/vpnhihi/iPFaker
+Description: Lab device identity + iPFaker.app (rootless Dopamine). Sheet license. No Settings inject.
+Installed-Size: 47
+Filename: debs/com.ipfaker_2.4.1_iphoneos-arm64.deb
+Size: 48900
+MD5sum: e7896c1e9886902e6e76bb4f705859d7
+SHA256: c18b1fa60efc5348bd1f2645961a5c309fe418cf2aa3e7a73c45737b1e794c4c
 
