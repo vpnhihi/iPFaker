@@ -41,36 +41,38 @@ jobs:
             git clone --depth=1 https://github.com/theos/sdks.git "$THEOS/sdks" || true
           fi
 
-      - name: Build package
+      - name: Build dylibs
         working-directory: theos
         run: |
           set -e
           export THEOS=$HOME/theos
           export PATH="/usr/local/bin:$PATH"
+          chmod 755 layout/DEBIAN/postinst 2>/dev/null || true
           make clean || true
-          make package FINALPACKAGE=1 || make package
-          echo "=== artifacts ==="
-          find . -name 'iPFaker*.dylib' -o -name '*.deb' | head -50
+          # Build libraries (package step optional)
+          make all
+          make package FINALPACKAGE=1 || true
+          echo "=== built dylibs ==="
+          find .theos -name 'iPFaker*.dylib' | head -20
 
       - name: Collect dylibs
         working-directory: theos
         run: |
           set -e
           mkdir -p dist
-          find .theos packages . -name 'iPFakerMG.dylib' -exec cp -f {} dist/ \; 2>/dev/null || true
-          find .theos packages . -name 'iPFakerCT.dylib' -exec cp -f {} dist/ \; 2>/dev/null || true
-          find .theos packages . -name 'iPFakerMG.plist' -exec cp -f {} dist/ \; 2>/dev/null || true
-          find .theos packages . -name 'iPFakerCT.plist' -exec cp -f {} dist/ \; 2>/dev/null || true
-          # from staging
-          find .theos/obj -name '*.dylib' -exec cp -f {} dist/ \; 2>/dev/null || true
+          find .theos -name 'iPFakerMG.dylib' -exec cp -f {} dist/ \;
+          find .theos -name 'iPFakerCT.dylib' -exec cp -f {} dist/ \;
+          # prefer non-debug if multiple
           cp -f layout/Library/MobileSubstrate/DynamicLibraries/*.plist dist/ 2>/dev/null || true
-          ls -la dist || true
           find packages -name '*.deb' -exec cp -f {} dist/ \; 2>/dev/null || true
           ls -la dist
+          test -f dist/iPFakerMG.dylib
+          test -f dist/iPFakerCT.dylib
+          file dist/iPFakerMG.dylib dist/iPFakerCT.dylib || true
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ipfaker-dylibs
           path: theos/dist/*
-          if-no-files-found: warn
+          if-no-files-found: error
