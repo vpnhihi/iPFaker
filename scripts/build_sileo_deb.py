@@ -22,6 +22,7 @@ import argparse
 import gzip
 import hashlib
 import io
+import lzma
 import os
 import shutil
 import stat
@@ -30,7 +31,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION_DEFAULT = "2.3.0"
+VERSION_DEFAULT = "2.3.5"
 PKG = "com.ipfaker"
 ARCH = "iphoneos-arm64"
 
@@ -197,13 +198,10 @@ def control_text(version: str, installed_size_kb: int, has_app: bool, has_dylibs
     desc += ". Rootless Dopamine. Synthetic profiles only. Does not inject Settings."
     return f"""Package: {PKG}
 Name: iPFaker
-Depends: firmware (>= 14.0), ellekit | mobilesubstrate | com.ex.substitute
-Conflicts: com.ipfaker.tweak
-Replaces: com.ipfaker.tweak
-Provides: com.ipfaker.tweak
+Depends: firmware (>= 14.0)
 Version: {version}
 Architecture: {ARCH}
-Maintainer: iPFaker Lab <lab@local>
+Maintainer: iPFaker Lab
 Author: iPFaker Lab
 Section: Tweaks
 Priority: optional
@@ -254,6 +252,14 @@ def make_tar_gz(members_builder) -> bytes:
     with tarfile.open(fileobj=buf, mode="w:gz", format=tarfile.GNU_FORMAT) as tar:
         members_builder(tar)
     return buf.getvalue()
+
+
+def make_tar_lzma(members_builder) -> bytes:
+    """data.tar.lzma — same as classic Theos/HIOS debs (max iOS dpkg compatibility)."""
+    raw = io.BytesIO()
+    with tarfile.open(fileobj=raw, mode="w", format=tarfile.GNU_FORMAT) as tar:
+        members_builder(tar)
+    return lzma.compress(raw.getvalue(), format=lzma.FORMAT_ALONE, preset=6)
 
 
 def make_ar(members: list[tuple[str, bytes]]) -> bytes:
@@ -363,28 +369,30 @@ def build(version: str, app_path: str | None) -> Path:
                 if f.is_file():
                     size_bytes += f.stat().st_size
 
-    data_gz = make_tar_gz(data_builder)
+    data_lzma = make_tar_lzma(data_builder)
     installed_kb = max(1, size_bytes // 1024)
 
-    # --- control.tar.gz ---
-    ctrl = control_text(version, installed_kb, has_app=bool(app), has_dylibs=True)
-    postinst = postinst_script()
-    prerm = prerm_script()
+    # --- control.tar.gz (Unix LF only — CRLF breaks iOS dpkg/apt) ---
+    ctrl = control_text(version, installed_kb, has_app=bool(app), has_dylibs=True).replace("\r\n", "\n")
+    postinst = postinst_script().replace("\r\n", "\n")
+    prerm = prerm_script().replace("\r\n", "\n")
+    preinst = preinst_script().replace("\r\n", "\n")
 
     def control_builder(tar: tarfile.TarFile) -> None:
-        add_file(tar, "./control", ctrl.encode(), 0o644)
-        add_file(tar, "./preinst", preinst_script().encode(), 0o755)
-        add_file(tar, "./postinst", postinst.encode(), 0o755)
-        add_file(tar, "./prerm", prerm.encode(), 0o755)
+        add_file(tar, "./control", ctrl.encode("utf-8"), 0o644)
+        add_file(tar, "./preinst", preinst.encode("utf-8"), 0o755)
+        add_file(tar, "./postinst", postinst.encode("utf-8"), 0o755)
+        add_file(tar, "./prerm", prerm.encode("utf-8"), 0o755)
 
     control_gz = make_tar_gz(control_builder)
 
     deb_name = f"{PKG}_{version}_{ARCH}.deb"
+    # Match classic Theos layout: debian-binary + control.tar.gz + data.tar.lzma
     deb_bytes = make_ar(
         [
             ("debian-binary", b"2.0\n"),
             ("control.tar.gz", control_gz),
-            ("data.tar.gz", data_gz),
+            ("data.tar.lzma", data_lzma),
         ]
     )
 

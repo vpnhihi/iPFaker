@@ -1,20 +1,17 @@
 Package: com.ipfaker
 Name: iPFaker
-Depends: firmware (>= 14.0), ellekit | mobilesubstrate | com.ex.substitute
-Conflicts: com.ipfaker.tweak
-Replaces: com.ipfaker.tweak
-Provides: com.ipfaker.tweak
-Version: 2.3.4
+Depends: firmware (>= 14.0)
+Version: 2.3.5
 Architecture: iphoneos-arm64
-Maintainer: iPFaker Lab <lab@local>
+Maintainer: iPFaker Lab
 Author: iPFaker Lab
 Section: Tweaks
 Priority: optional
 Homepage: https://github.com/vpnhihi/iPFaker
 Description: Lab device spoof for Zalo (MG+CT dylibs). Rootless Dopamine. Synthetic profiles only. Does not inject Settings.
 Installed-Size: 235
-Filename: debs/com.ipfaker_2.3.4_iphoneos-arm64.deb
-Size: 43828
-MD5sum: 6ada0b012c3ba4a5f671b4c83530a012
-SHA256: cb2559e1456e4a3e6e8c6b4df8aad9684fcebce35d3a408f19ca2f7b7d0a6947
+Filename: debs/com.ipfaker_2.3.5_iphoneos-arm64.deb
+Size: 25440
+MD5sum: d5cb9a8f3a442d913c518d91993fb784
+SHA256: 0907213063a91cb1b3cfd263f04f9117e27de87007506d94acb374061a4791eb
 
