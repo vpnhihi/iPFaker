@@ -31,7 +31,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION_DEFAULT = "2.5.2"
+VERSION_DEFAULT = "2.5.3"
 PKG = "com.ipfaker"
 ARCH = "iphoneos-arm64"
 
@@ -110,11 +110,22 @@ def postinst_script() -> str:
 set -e
 ROOT="${JBROOT:-/var/jb}"
 
-# --- dirs ---
+# --- dirs (mobile MUST write jb config — Zalo only reads /var/jb/etc/ipfaker) ---
 mkdir -p "$ROOT/etc/ipfaker" 2>/dev/null || true
+mkdir -p /var/jb/etc/ipfaker 2>/dev/null || true
 mkdir -p /var/mobile/Library/iPFaker 2>/dev/null || true
-chown mobile:mobile /var/mobile/Library/iPFaker 2>/dev/null || true
-chmod 755 /var/mobile/Library/iPFaker "$ROOT/etc/ipfaker" 2>/dev/null || true
+chown -R mobile:mobile /var/mobile/Library/iPFaker 2>/dev/null || true
+chown -R mobile:mobile "$ROOT/etc/ipfaker" 2>/dev/null || true
+chown -R mobile:mobile /var/jb/etc/ipfaker 2>/dev/null || true
+chmod 775 /var/mobile/Library/iPFaker "$ROOT/etc/ipfaker" /var/jb/etc/ipfaker 2>/dev/null || true
+# If config.plist was root-owned from older package, reclaim for app Apply
+for f in "$ROOT/etc/ipfaker/config.plist" /var/jb/etc/ipfaker/config.plist \
+         "$ROOT/etc/ipfaker/active_profile.json" /var/jb/etc/ipfaker/active_profile.json; do
+  if [ -f "$f" ]; then
+    chown mobile:mobile "$f" 2>/dev/null || true
+    chmod 644 "$f" 2>/dev/null || true
+  fi
+done
 
 # --- dylib locations (ElleKit / Dopamine) ---
 for MS in \

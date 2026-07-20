@@ -293,19 +293,38 @@
 + (BOOL)ensureDir:(NSString *)dir error:(NSError **)err {
     NSFileManager *fm = [NSFileManager defaultManager];
     BOOL isDir = NO;
-    if ([fm fileExistsAtPath:dir isDirectory:&isDir] && isDir) return YES;
-    return [fm createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:err];
+    if ([fm fileExistsAtPath:dir isDirectory:&isDir] && isDir) {
+        // Best-effort: make mobile-writable (needed for /var/jb/etc/ipfaker after root-owned install)
+        [fm setAttributes:@{ NSFilePosixPermissions: @0775 } ofItemAtPath:dir error:nil];
+        return YES;
+    }
+    NSDictionary *attrs = @{
+        NSFilePosixPermissions: @0775,
+        NSFileOwnerAccountName: @"mobile",
+    };
+    return [fm createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:attrs error:err];
 }
 
 + (BOOL)writePlist:(NSDictionary *)flat toPath:(NSString *)path error:(NSError **)err {
-    return [flat writeToURL:[NSURL fileURLWithPath:path] error:err];
+    NSFileManager *fm = [NSFileManager defaultManager];
+    // Remove root-owned stale file if we cannot overwrite (best-effort)
+    if ([fm fileExistsAtPath:path] && ![fm isWritableFileAtPath:path]) {
+        [fm removeItemAtPath:path error:nil];
+    }
+    BOOL ok = [flat writeToURL:[NSURL fileURLWithPath:path] error:err];
+    if (ok) {
+        [fm setAttributes:@{ NSFilePosixPermissions: @0644 } ofItemAtPath:path error:nil];
+    }
+    return ok;
 }
 
 + (NSString *)applyFlatProfile:(NSDictionary *)flat deviceId:(NSString *)deviceId ios:(NSString *)ios {
     NSError *err = nil;
+    // CRITICAL: Zalo sandbox typically CANNOT read /var/mobile/Library/iPFaker —
+    // only /var/jb/etc/ipfaker is visible to the injected dylib. Write jb FIRST.
     NSArray *dirs = @[
-        @"/var/mobile/Library/iPFaker",
         @"/var/jb/etc/ipfaker",
+        @"/var/mobile/Library/iPFaker",
     ];
     NSMutableArray *okPaths = [NSMutableArray array];
     NSMutableArray *failMsgs = [NSMutableArray array];
@@ -335,31 +354,48 @@
     };
     NSData *json = [NSJSONSerialization dataWithJSONObject:active options:NSJSONWritingPrettyPrinted error:&err];
 
+    BOOL jbOk = NO;
     for (NSString *dir in dirs) {
         if (![self ensureDir:dir error:&err]) {
-            [failMsgs addObject:[NSString stringWithFormat:@"mkdir %@: %@", dir, err.localizedDescription]];
+            [failMsgs addObject:[NSString stringWithFormat:@"mkdir %@: %@", dir, err.localizedDescription ?: @"?"]];
             continue;
         }
         NSString *plistPath = [dir stringByAppendingPathComponent:@"config.plist"];
         NSString *jsonPath = [dir stringByAppendingPathComponent:@"active_profile.json"];
         if (![self writePlist:flat toPath:plistPath error:&err]) {
-            [failMsgs addObject:[NSString stringWithFormat:@"plist %@: %@", plistPath, err.localizedDescription]];
+            [failMsgs addObject:[NSString stringWithFormat:@"plist %@: %@", plistPath, err.localizedDescription ?: @"permission?"]];
             continue;
         }
         if (json && ![json writeToFile:jsonPath options:NSDataWritingAtomic error:&err]) {
-            [failMsgs addObject:[NSString stringWithFormat:@"json %@: %@", jsonPath, err.localizedDescription]];
-            continue;
+            [failMsgs addObject:[NSString stringWithFormat:@"json %@: %@", jsonPath, err.localizedDescription ?: @"?"]];
+            // still count plist as ok
         }
         [okPaths addObject:dir];
+        if ([dir containsString:@"/var/jb/"]) jbOk = YES;
     }
 
     if (okPaths.count == 0) {
-        return [NSString stringWithFormat:@"Apply failed:\n%@", [failMsgs componentsJoinedByString:@"\n"]];
+        return [NSString stringWithFormat:
+                @"Apply failed (không ghi được config):\n%@\n"
+                @"Sửa: cài lại deb (postinst chown mobile) hoặc SSH: "
+                @"sudo chown -R mobile:mobile /var/jb/etc/ipfaker",
+                [failMsgs componentsJoinedByString:@"\n"]];
     }
-    NSString *msg = [NSString stringWithFormat:@"Applied → %@", [okPaths componentsJoinedByString:@", "]];
+
+    NSString *mk = flat[@"MarketingName"] ?: @"?";
+    NSString *pt = flat[@"ProductType"] ?: @"?";
+    NSString *msg = [NSString stringWithFormat:
+                     @"Applied %@ (%@) iOS %@ → %@",
+                     mk, pt, ios ?: @"?",
+                     [okPaths componentsJoinedByString:@", "]];
+    if (!jbOk) {
+        msg = [msg stringByAppendingString:
+               @"\n⚠ CHƯA ghi /var/jb/etc/ipfaker — Zalo vẫn đọc config CŨ. "
+               @"Chạy: sudo chown -R mobile:mobile /var/jb/etc/ipfaker rồi Apply lại."];
+    }
     if (failMsgs.count)
         msg = [msg stringByAppendingFormat:@"\n(partial) %@", [failMsgs componentsJoinedByString:@"; "]];
-    return msg; // success message (nil means success in header — we return message always; controller treats as OK if starts with Applied)
+    return msg;
 }
 
 + (NSDictionary *)loadCurrentFlat {

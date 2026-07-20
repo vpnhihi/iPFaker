@@ -5,19 +5,20 @@
 #import "IPFConfig.h"
 
 static NSArray<NSString *> *IPFPlistCandidates(void) {
-    // Prefer paths readable from app sandbox (mobile Library first)
+    // Zalo sandbox: /var/jb/etc is readable; /var/mobile/Library/iPFaker often is NOT.
+    // Prefer jb first, then mobile (app UI), then legacy.
     return @[
+        @"/var/jb/etc/ipfaker/config.plist",
         @"/var/mobile/Library/iPFaker/config.plist",
         @"/var/mobile/Library/Preferences/com.ipfaker.config.plist",
-        @"/var/jb/etc/ipfaker/config.plist",
         @"/var/jb/etc/changeinfoios/config.plist",
     ];
 }
 
 static NSArray<NSString *> *IPFJSONCandidates(void) {
     return @[
-        @"/var/mobile/Library/iPFaker/active_profile.json",
         @"/var/jb/etc/ipfaker/active_profile.json",
+        @"/var/mobile/Library/iPFaker/active_profile.json",
         @"/var/mobile/Library/iPFaker/device_profile.json",
     ];
 }
@@ -258,28 +259,57 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
     self.mgMap = nil;
     self.sysctlMap = nil;
 
-    // 1) HIOS-style config.plist first
+    // Pick NEWER readable plist among candidates (avoids split-brain mobile vs jb).
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSString *bestPath = nil;
+    NSDictionary *bestPlist = nil;
+    NSDate *bestDate = [NSDate distantPast];
     for (NSString *path in IPFPlistCandidates()) {
+        if (![fm isReadableFileAtPath:path]) continue;
         NSDictionary *plist = [NSDictionary dictionaryWithContentsOfFile:path];
         if (![plist isKindOfClass:[NSDictionary class]] || plist.count == 0) continue;
-        [self applyFlatPlist:plist path:path];
-        NSLog(@"[iPFaker] HIOS-style plist config: %@ keys=%lu ProductType=%@",
-              path, (unsigned long)plist.count, plist[@"ProductType"]);
+        NSDictionary *attrs = [fm attributesOfItemAtPath:path error:nil];
+        NSDate *mod = attrs[NSFileModificationDate] ?: [NSDate distantPast];
+        // Prefer jb when mtimes equal (Zalo can always read jb)
+        BOOL prefer = [mod compare:bestDate] == NSOrderedDescending
+            || ([mod isEqualToDate:bestDate] && [path containsString:@"/var/jb/"]);
+        if (!bestPlist || prefer) {
+            bestPlist = plist;
+            bestPath = path;
+            bestDate = mod;
+        }
+    }
+    if (bestPlist) {
+        [self applyFlatPlist:bestPlist path:bestPath];
+        NSLog(@"[iPFaker] config %@ PT=%@ MK=%@ mtime=%@",
+              bestPath, bestPlist[@"ProductType"], bestPlist[@"MarketingName"], bestDate);
         return YES;
     }
 
-    // 2) JSON fallback
+    // JSON fallback (same newest logic)
+    bestPath = nil;
+    NSDictionary *bestJSON = nil;
+    bestDate = [NSDate distantPast];
     for (NSString *path in IPFJSONCandidates()) {
         NSData *data = [NSData dataWithContentsOfFile:path];
         if (!data) continue;
         id obj = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
         if (![obj isKindOfClass:[NSDictionary class]]) continue;
-        [self applyJSONRoot:obj path:path];
-        NSLog(@"[iPFaker] JSON config: %@ mg=%lu", path, (unsigned long)self.mgMap.count);
+        NSDictionary *attrs = [fm attributesOfItemAtPath:path error:nil];
+        NSDate *mod = attrs[NSFileModificationDate] ?: [NSDate distantPast];
+        if (!bestJSON || [mod compare:bestDate] == NSOrderedDescending) {
+            bestJSON = obj;
+            bestPath = path;
+            bestDate = mod;
+        }
+    }
+    if (bestJSON) {
+        [self applyJSONRoot:bestJSON path:bestPath];
+        NSLog(@"[iPFaker] JSON config: %@ mg=%lu", bestPath, (unsigned long)self.mgMap.count);
         return YES;
     }
 
-    NSLog(@"[iPFaker] config NOT found (need /var/jb/etc/ipfaker/config.plist like HIOS)");
+    NSLog(@"[iPFaker] config NOT found — need /var/jb/etc/ipfaker/config.plist");
     return NO;
 }
 

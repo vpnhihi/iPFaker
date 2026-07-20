@@ -5,14 +5,18 @@ if [ -x /var/jb/usr/bin/uicache ]; then
 elif command -v uicache >/dev/null 2>&1; then
   uicache -p /var/jb/Applications/iPFaker.app 2>/dev/null || true
 fi
-# Ensure config dirs exist
+# Ensure config dirs exist — Zalo dylib reads /var/jb/etc/ipfaker (not mobile Library)
 mkdir -p /var/mobile/Library/iPFaker /var/jb/etc/ipfaker 2>/dev/null || true
 chown -R mobile:mobile /var/mobile/Library/iPFaker 2>/dev/null || true
-chmod 755 /var/mobile/Library/iPFaker /var/jb/etc/ipfaker 2>/dev/null || true
+chown -R mobile:mobile /var/jb/etc/ipfaker 2>/dev/null || true
+chmod 775 /var/mobile/Library/iPFaker /var/jb/etc/ipfaker 2>/dev/null || true
+for f in /var/jb/etc/ipfaker/config.plist /var/jb/etc/ipfaker/active_profile.json; do
+  [ -f "$f" ] && chown mobile:mobile "$f" 2>/dev/null || true
+done
 # Ship catalog next to config for updates
 if [ -f /var/jb/Applications/iPFaker.app/device_catalog.json ]; then
   cp -f /var/jb/Applications/iPFaker.app/device_catalog.json /var/mobile/Library/iPFaker/device_catalog.json 2>/dev/null || true
   cp -f /var/jb/Applications/iPFaker.app/device_catalog.json /var/jb/etc/ipfaker/device_catalog.json 2>/dev/null || true
-  chown mobile:mobile /var/mobile/Library/iPFaker/device_catalog.json 2>/dev/null || true
+  chown mobile:mobile /var/mobile/Library/iPFaker/device_catalog.json /var/jb/etc/ipfaker/device_catalog.json 2>/dev/null || true
 fi
 exit 0
