@@ -108,6 +108,22 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
     // Marketing name for Zalo UI (critical — Zalo shows "iPhone XS Max" from real type)
     if (flat[@"MarketingName"]) mg[@"MarketingName"] = flat[@"MarketingName"];
 
+    // RAM / CPU (sysctl integer keys)
+    id mem = flat[@"hw.memsize"] ?: flat[@"PhysicalMemoryBytes"];
+    if (mem) {
+        if ([mem isKindOfClass:[NSString class]]) {
+            sys[@"hw.memsize"] = @([(NSString *)mem longLongValue]);
+        } else {
+            sys[@"hw.memsize"] = mem;
+        }
+    } else if (flat[@"PhysicalMemoryMB"]) {
+        long long mb = [flat[@"PhysicalMemoryMB"] longLongValue];
+        sys[@"hw.memsize"] = @(mb * 1024LL * 1024LL);
+    }
+    for (NSString *ck in @[ @"hw.ncpu", @"hw.physicalcpu", @"hw.logicalcpu" ]) {
+        if (flat[ck]) sys[ck] = flat[ck];
+    }
+
     self.mgMap = [mg copy];
     self.sysctlMap = [sys copy];
 

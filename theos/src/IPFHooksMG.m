@@ -167,6 +167,22 @@ static int stub_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, void
                     return 0;
                 }
             }
+            // integer sysctls: hw.memsize, hw.ncpu, ...
+            if ([fake isKindOfClass:[NSNumber class]]) {
+                if (*oldlenp >= sizeof(int64_t)) {
+                    int64_t v = [(NSNumber *)fake longLongValue];
+                    // prefer native size requested by caller
+                    if (*oldlenp >= sizeof(int64_t)) {
+                        *(int64_t *)oldp = v;
+                        *oldlenp = sizeof(int64_t);
+                    } else if (*oldlenp >= sizeof(int32_t)) {
+                        *(int32_t *)oldp = (int32_t)v;
+                        *oldlenp = sizeof(int32_t);
+                    }
+                    IPFTrace([NSString stringWithFormat:@"sysctl FAKE %s => %lld", name, (long long)v]);
+                    return 0;
+                }
+            }
             if ([n hasPrefix:@"hw."] || [n hasPrefix:@"kern.os"] || [n containsString:@"serial"]) {
                 IPFTrace([NSString stringWithFormat:@"sysctl PASS %@", n]);
             }
