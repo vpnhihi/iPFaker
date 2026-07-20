@@ -87,17 +87,28 @@ NSNotificationName const AppStateDidChangeNotification = @"AppStateDidChangeNoti
     // (flatProfile always regenerates serial/IDFA — same as full apply for lab)
     (void)reseedOnly;
     NSDictionary *flat = [ProfileBuilder flatProfileForDevice:dev ios:ios iosMeta:meta deviceName:nil];
-    // Merge Settings toggles into flat so dylibs can respect Enabled flags later
+    // Merge ALL Settings toggles so dylibs gate each surface for real
     NSMutableDictionary *mflat = [flat mutableCopy];
-    mflat[@"FakeDevice"] = @([self toggleForKey:@"FakeDevice" defaultOn:YES]);
-    mflat[@"FakeHardware"] = @([self toggleForKey:@"FakeHardware" defaultOn:YES]);
-    mflat[@"FakeAds"] = @([self toggleForKey:@"FakeAds" defaultOn:YES]);
-    mflat[@"FakeScreen"] = @([self toggleForKey:@"FakeScreen" defaultOn:YES]);
-    mflat[@"FakeBrowser"] = @([self toggleForKey:@"FakeBrowser" defaultOn:YES]);
-    mflat[@"FakeNetwork"] = @([self toggleForKey:@"FakeNetwork" defaultOn:YES]);
-    mflat[@"FakeSysctl"] = @([self toggleForKey:@"FakeSysctl" defaultOn:YES]);
-    mflat[@"FakeSysOSVersion"] = @([self toggleForKey:@"FakeSysOSVersion" defaultOn:YES]);
-    mflat[@"HideJailbreak"] = @([self toggleForKey:@"HideJailbreak" defaultOn:YES]);
+    void (^setFlag)(NSString *, BOOL) = ^(NSString *k, BOOL def) {
+        mflat[k] = @([self toggleForKey:k defaultOn:def]);
+    };
+    setFlag(@"FakeDevice", YES);
+    setFlag(@"FakeHardware", YES);
+    setFlag(@"FakeAds", YES);
+    setFlag(@"FakeScreen", YES);
+    setFlag(@"FakeRealScreen", YES); // nativeBounds — real pixel spoof
+    setFlag(@"FakeBrowser", YES);
+    setFlag(@"FakeNetwork", YES);
+    setFlag(@"FakeWifi", YES);
+    setFlag(@"FakeSysctl", YES);
+    setFlag(@"FakeSysOSVersion", YES);
+    setFlag(@"HideJailbreak", YES);
+    setFlag(@"FakeLocale", YES);
+    setFlag(@"FakeDateTime", NO);   // clock offset off by default (TLS safety)
+    setFlag(@"FakeLocation", YES);  // now real WGS84 when on
+    setFlag(@"FakeSensor", YES);
+    setFlag(@"FakeWebRTC", YES);    // rewrite ICE host IP → RFC1918
+    setFlag(@"DisableWebRTC", NO);
     flat = mflat;
 
     NSString *result = [ProfileBuilder applyFlatProfile:flat deviceId:dev[@"id"] ios:ios];

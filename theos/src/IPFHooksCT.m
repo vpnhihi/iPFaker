@@ -23,33 +23,49 @@ static NSString *(*orig_isoCountryCode)(id, SEL);
 static BOOL (*orig_allowsVOIP)(id, SEL);
 static NSString *(*orig_currentRadioAccessTechnology)(id, SEL);
 
+static BOOL IPFNetOn(void) {
+    return [[IPFConfig shared] flag:@"FakeNetwork" defaultYes:YES];
+}
+
 static NSString *stub_carrierName(id self, SEL _cmd) {
+    if (!IPFNetOn()) return orig_carrierName ? orig_carrierName(self, _cmd) : nil;
+    // ITU E.212 / CTCarrier — name display string
     NSString *v = IPFString([IPFConfig shared].telephony[@"CarrierName"]);
     return v ?: (orig_carrierName ? orig_carrierName(self, _cmd) : nil);
 }
 
 static NSString *stub_mobileCountryCode(id self, SEL _cmd) {
+    if (!IPFNetOn()) return orig_mobileCountryCode ? orig_mobileCountryCode(self, _cmd) : nil;
+    // ITU-T E.212 MCC (3 digits) — VN = 452
     NSString *v = IPFString([IPFConfig shared].telephony[@"MobileCountryCode"]);
     return v ?: (orig_mobileCountryCode ? orig_mobileCountryCode(self, _cmd) : nil);
 }
 
 static NSString *stub_mobileNetworkCode(id self, SEL _cmd) {
+    if (!IPFNetOn()) return orig_mobileNetworkCode ? orig_mobileNetworkCode(self, _cmd) : nil;
+    // ITU-T E.212 MNC — Viettel 04
     NSString *v = IPFString([IPFConfig shared].telephony[@"MobileNetworkCode"]);
     return v ?: (orig_mobileNetworkCode ? orig_mobileNetworkCode(self, _cmd) : nil);
 }
 
 static NSString *stub_isoCountryCode(id self, SEL _cmd) {
+    if (!IPFNetOn()) return orig_isoCountryCode ? orig_isoCountryCode(self, _cmd) : nil;
+    // ISO 3166-1 alpha-2 lowercase (CTCarrier convention)
     NSString *v = IPFString([IPFConfig shared].telephony[@"ISOCountryCode"]);
     return v ?: (orig_isoCountryCode ? orig_isoCountryCode(self, _cmd) : nil);
 }
 
 static BOOL stub_allowsVOIP(id self, SEL _cmd) {
+    if (!IPFNetOn()) return orig_allowsVOIP ? orig_allowsVOIP(self, _cmd) : YES;
     id v = [IPFConfig shared].telephony[@"AllowsVOIP"];
     if (v != nil) return [v boolValue];
     return orig_allowsVOIP ? orig_allowsVOIP(self, _cmd) : YES;
 }
 
 static NSString *stub_currentRadioAccessTechnology(id self, SEL _cmd) {
+    if (!IPFNetOn())
+        return orig_currentRadioAccessTechnology ? orig_currentRadioAccessTechnology(self, _cmd) : nil;
+    // CTRadioAccessTechnology* constants (Apple CoreTelephony)
     NSString *v = IPFString([IPFConfig shared].telephony[@"CurrentRadioAccessTechnology"]);
     if (!v) v = IPFString([IPFConfig shared].telephony[@"RadioAccessTechnology"]);
     return v ?: (orig_currentRadioAccessTechnology ? orig_currentRadioAccessTechnology(self, _cmd) : nil);

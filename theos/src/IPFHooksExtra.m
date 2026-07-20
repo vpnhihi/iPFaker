@@ -1,20 +1,20 @@
-// Extra spoof surface for Zalo:
-//  - UIScreen nativeBounds / scale / nativeScale / maximumFramesPerSecond
-//  - NSFileManager disk capacity / free
-//  - access/stat/lstat hide jailbreak paths
-//  - UIApplication canOpenURL block (cydia://, sileo://, …)
-//  - WKWebView custom User-Agent (best-effort)
-// Complements IPFHooksMG / CT / Deep. Keep defensive — never crash Zalo.
+// Extra spoof surface for Zalo — gated by config Fake* flags:
+//  FakeScreen / FakeRealScreen, FakeHardware (disk), HideJailbreak,
+//  FakeBrowser (UA), FakeLocale (BCP-47 + IANA TZ), FakeDateTime,
+//  FakeLocation (WGS84), FakeSensor, FakeWebRTC / DisableWebRTC.
+// Complements IPFHooksMG / CT. Keep defensive — never crash Zalo.
 
 #import "IPFHooksExtra.h"
 #import "IPFConfig.h"
 
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
+#import <objc/message.h>
 #import <dlfcn.h>
 #import <unistd.h>
 #import <sys/stat.h>
 #import <string.h>
+#import <math.h>
 
 typedef void (*MSHookFunction_t)(void *symbol, void *replace, void **result);
 typedef void (*MSHookMessageEx_t)(Class _class, SEL sel, IMP imp, IMP *result);
@@ -86,31 +86,53 @@ static NSInteger (*orig_maxFPS)(id, SEL);
 static CGRect (*orig_bounds)(id, SEL);
 
 static CGRect stub_nativeBounds(id self, SEL _cmd) {
+    // Fake Real Screen → native pixel bounds (Apple UIScreen.nativeBounds)
+    if (![[IPFConfig shared] flag:@"FakeRealScreen" defaultYes:NO]
+        && ![[IPFConfig shared] flag:@"FakeScreen" defaultYes:YES])
+        return orig_nativeBounds ? orig_nativeBounds(self, _cmd) : CGRectZero;
+    if (![[IPFConfig shared] flag:@"FakeRealScreen" defaultYes:NO]
+        && [[IPFConfig shared] flag:@"FakeScreen" defaultYes:YES]) {
+        // Logical-only: keep native real if FakeRealScreen off
+        return orig_nativeBounds ? orig_nativeBounds(self, _cmd) : CGRectZero;
+    }
     CGSize s = IPFNativeSize();
     return CGRectMake(0, 0, s.width, s.height);
 }
 static CGFloat stub_scale(id self, SEL _cmd) {
+    if (![[IPFConfig shared] flag:@"FakeScreen" defaultYes:YES])
+        return orig_scale ? orig_scale(self, _cmd) : 3.0;
     return IPFScale();
 }
 static CGFloat stub_nativeScale(id self, SEL _cmd) {
+    if (![[IPFConfig shared] flag:@"FakeRealScreen" defaultYes:NO]
+        && ![[IPFConfig shared] flag:@"FakeScreen" defaultYes:YES])
+        return orig_nativeScale ? orig_nativeScale(self, _cmd) : 3.0;
+    if (![[IPFConfig shared] flag:@"FakeRealScreen" defaultYes:NO])
+        return orig_nativeScale ? orig_nativeScale(self, _cmd) : 3.0;
     return IPFScale();
 }
 static NSInteger stub_maxFPS(id self, SEL _cmd) {
+    if (![[IPFConfig shared] flag:@"FakeScreen" defaultYes:YES])
+        return orig_maxFPS ? orig_maxFPS(self, _cmd) : 60;
     return IPFMaxFPS();
 }
 static CGRect stub_bounds(id self, SEL _cmd) {
+    // points = native / scale (Apple UIScreen.bounds)
+    if (![[IPFConfig shared] flag:@"FakeScreen" defaultYes:YES])
+        return orig_bounds ? orig_bounds(self, _cmd) : CGRectZero;
     CGSize n = IPFNativeSize();
     CGFloat sc = IPFScale();
     if (sc < 1) sc = 1;
     return CGRectMake(0, 0, n.width / sc, n.height / sc);
 }
 
-#pragma mark - Disk
+#pragma mark - Disk (FakeHardware)
 
 static NSDictionary *(*orig_attrs)(id, SEL, NSString *, NSError **);
 static NSDictionary *stub_attrs(id self, SEL _cmd, NSString *path, NSError **err) {
     NSDictionary *real = orig_attrs ? orig_attrs(self, _cmd, path, err) : nil;
     if (!real) return real;
+    if (![[IPFConfig shared] flag:@"FakeHardware" defaultYes:YES]) return real;
     @try {
         id total = [[IPFConfig shared] stringForKey:@"TotalDiskCapacity"]
             ?: [[IPFConfig shared] mgValueForKey:@"TotalDiskCapacity"];
@@ -132,7 +154,7 @@ static NSDictionary *stub_attrs(id self, SEL _cmd, NSString *path, NSError **err
                 m[@"NSFileSystemFreeSize"] = @(fr);
             }
         }
-        IPFExTrace([NSString stringWithFormat:@"disk attrs FAKE total=%@ free=%@", total, freev]);
+        IPFExTrace([NSString stringWithFormat:@"disk FAKE total=%@ free=%@", total, freev]);
         return m;
     } @catch (__unused NSException *ex) {
         return real;
@@ -142,8 +164,8 @@ static NSDictionary *stub_attrs(id self, SEL _cmd, NSString *path, NSError **err
 #pragma mark - Jailbreak path hide
 
 static BOOL IPFIsJBPath(const char *path) {
-    if (!path) return NO;
-    // Default denylist + config jailbreak_hide.paths
+    if (path == NULL) return NO;
+    if (![[IPFConfig shared] flag:@"HideJailbreak" defaultYes:YES]) return NO;
     static const char *kDefault[] = {
         "/Applications/Cydia.app",
         "/Applications/Sileo.app",
@@ -188,48 +210,48 @@ static BOOL IPFIsJBPath(const char *path) {
 
 static int (*orig_access)(const char *, int);
 static int stub_access(const char *path, int mode) {
-    if (IPFIsJBPath(path)) {
-        errno = ENOENT;
-        return -1;
-    }
+    if (IPFIsJBPath(path)) { errno = ENOENT; return -1; }
     return orig_access ? orig_access(path, mode) : -1;
 }
-
 static int (*orig_stat)(const char *, struct stat *);
 static int stub_stat(const char *path, struct stat *buf) {
-    if (IPFIsJBPath(path)) {
-        errno = ENOENT;
-        return -1;
-    }
+    if (IPFIsJBPath(path)) { errno = ENOENT; return -1; }
     return orig_stat ? orig_stat(path, buf) : -1;
 }
-
 static int (*orig_lstat)(const char *, struct stat *);
 static int stub_lstat(const char *path, struct stat *buf) {
-    if (IPFIsJBPath(path)) {
-        errno = ENOENT;
-        return -1;
-    }
+    if (IPFIsJBPath(path)) { errno = ENOENT; return -1; }
     return orig_lstat ? orig_lstat(path, buf) : -1;
 }
 
-#pragma mark - canOpenURL
+#pragma mark - canOpenURL (JB schemes + WebRTC disable)
 
 static BOOL (*orig_canOpen)(id, SEL, NSURL *);
 static BOOL stub_canOpen(id self, SEL _cmd, NSURL *url) {
     NSString *s = url.absoluteString.lowercaseString ?: @"";
-    if ([s hasPrefix:@"cydia://"] || [s hasPrefix:@"sileo://"] || [s hasPrefix:@"zbra://"]
-        || [s hasPrefix:@"filza://"] || [s hasPrefix:@"undecimus://"] || [s hasPrefix:@"activator://"]) {
-        return NO;
+    if ([[IPFConfig shared] flag:@"HideJailbreak" defaultYes:YES]) {
+        if ([s hasPrefix:@"cydia://"] || [s hasPrefix:@"sileo://"] || [s hasPrefix:@"zbra://"]
+            || [s hasPrefix:@"filza://"] || [s hasPrefix:@"undecimus://"] || [s hasPrefix:@"activator://"]
+            || [s hasPrefix:@"dopamine://"] || [s hasPrefix:@"ellekit://"]) {
+            return NO;
+        }
+    }
+    if ([[IPFConfig shared] flag:@"DisableWebRTC" defaultYes:NO]) {
+        // Best-effort block custom WebRTC URL schemes some apps probe
+        if ([s containsString:@"webrtc"] || [s hasPrefix:@"rtc:"] || [s hasPrefix:@"stuns:"]
+            || [s hasPrefix:@"turns:"]) {
+            return NO;
+        }
     }
     return orig_canOpen ? orig_canOpen(self, _cmd, url) : NO;
 }
 
-#pragma mark - User-Agent (NSURLRequest)
+#pragma mark - User-Agent (FakeBrowser)
 
 static NSDictionary *(*orig_allHTTP)(id, SEL);
 static NSDictionary *stub_allHTTP(id self, SEL _cmd) {
     NSDictionary *h = orig_allHTTP ? orig_allHTTP(self, _cmd) : nil;
+    if (![[IPFConfig shared] flag:@"FakeBrowser" defaultYes:YES]) return h;
     NSString *ua = [[IPFConfig shared] stringForKey:@"UserAgent"]
         ?: [[IPFConfig shared] stringForKey:@"HTTPUserAgent"];
     if (!ua.length) return h;
@@ -237,6 +259,206 @@ static NSDictionary *stub_allHTTP(id self, SEL _cmd) {
     m[@"User-Agent"] = ua;
     return m;
 }
+
+static NSString *(*orig_valueForHTTP)(id, SEL, NSString *);
+static NSString *stub_valueForHTTP(id self, SEL _cmd, NSString *field) {
+    if ([[IPFConfig shared] flag:@"FakeBrowser" defaultYes:YES]
+        && field && [field caseInsensitiveCompare:@"User-Agent"] == NSOrderedSame) {
+        NSString *ua = [[IPFConfig shared] stringForKey:@"UserAgent"]
+            ?: [[IPFConfig shared] stringForKey:@"HTTPUserAgent"];
+        if (ua.length) return ua;
+    }
+    return orig_valueForHTTP ? orig_valueForHTTP(self, _cmd, field) : nil;
+}
+
+#pragma mark - Locale (BCP 47 / ISO 639-1 / ISO 3166-1) + IANA TZ
+
+static NSArray *(*orig_preferredLanguages)(id, SEL);
+static NSArray *stub_preferredLanguages(id self, SEL _cmd) {
+    if (![[IPFConfig shared] flag:@"FakeLocale" defaultYes:YES])
+        return orig_preferredLanguages ? orig_preferredLanguages(self, _cmd) : nil;
+    // AppleLanguages / BCP 47 — e.g. vi-VN, en-US (CLDR / Unicode Locale ID)
+    NSString *lang = [[IPFConfig shared] stringForKey:@"PreferredLanguage"]
+        ?: [[IPFConfig shared] stringForKey:@"LocaleIdentifier"]
+        ?: [[IPFConfig shared] stringForKey:@"AppleLocale"];
+    if (!lang.length) lang = @"vi-VN";
+    // Apple often stores as vi_VN in AppleLocale; preferredLanguages wants BCP47 hyphen
+    lang = [lang stringByReplacingOccurrencesOfString:@"_" withString:@"-"];
+    return @[ lang ];
+}
+
+static NSLocale *(*orig_currentLocale)(id, SEL);
+static NSLocale *stub_currentLocale(id self, SEL _cmd) {
+    if (![[IPFConfig shared] flag:@"FakeLocale" defaultYes:YES])
+        return orig_currentLocale ? orig_currentLocale(self, _cmd) : [NSLocale currentLocale];
+    NSString *ident = [[IPFConfig shared] stringForKey:@"LocaleIdentifier"]
+        ?: [[IPFConfig shared] stringForKey:@"AppleLocale"]
+        ?: @"vi_VN";
+    // NSLocale wants underscore form (Apple convention for locale identifiers)
+    ident = [ident stringByReplacingOccurrencesOfString:@"-" withString:@"_"];
+    NSLocale *loc = [[NSLocale alloc] initWithLocaleIdentifier:ident];
+    return loc ?: (orig_currentLocale ? orig_currentLocale(self, _cmd) : nil);
+}
+
+static NSTimeZone *(*orig_systemTZ)(id, SEL);
+static NSTimeZone *(*orig_defaultTZ)(id, SEL);
+static NSTimeZone *(*orig_localTZ)(id, SEL);
+
+static NSTimeZone *IPFTimeZone(void) {
+    // IANA Time Zone Database — Asia/Ho_Chi_Minh (VN, no DST)
+    NSString *name = [[IPFConfig shared] stringForKey:@"TimeZoneName"] ?: @"Asia/Ho_Chi_Minh";
+    NSTimeZone *tz = [NSTimeZone timeZoneWithName:name];
+    if (!tz) tz = [NSTimeZone timeZoneWithName:@"Asia/Bangkok"]; // same UTC+7 fallback
+    return tz ?: [NSTimeZone systemTimeZone];
+}
+
+static NSTimeZone *stub_systemTZ(id self, SEL _cmd) {
+    if (![[IPFConfig shared] flag:@"FakeLocale" defaultYes:YES]
+        && ![[IPFConfig shared] flag:@"FakeDateTime" defaultYes:NO])
+        return orig_systemTZ ? orig_systemTZ(self, _cmd) : [NSTimeZone systemTimeZone];
+    return IPFTimeZone();
+}
+static NSTimeZone *stub_defaultTZ(id self, SEL _cmd) {
+    if (![[IPFConfig shared] flag:@"FakeLocale" defaultYes:YES]
+        && ![[IPFConfig shared] flag:@"FakeDateTime" defaultYes:NO])
+        return orig_defaultTZ ? orig_defaultTZ(self, _cmd) : [NSTimeZone defaultTimeZone];
+    return IPFTimeZone();
+}
+static NSTimeZone *stub_localTZ(id self, SEL _cmd) {
+    if (![[IPFConfig shared] flag:@"FakeLocale" defaultYes:YES]
+        && ![[IPFConfig shared] flag:@"FakeDateTime" defaultYes:NO])
+        return orig_localTZ ? orig_localTZ(self, _cmd) : [NSTimeZone localTimeZone];
+    return IPFTimeZone();
+}
+
+#pragma mark - Date offset (FakeDateTime) — optional, default off (TLS safety)
+
+static NSDate *(*orig_date)(id, SEL);
+static NSDate *stub_date(id self, SEL _cmd) {
+    NSDate *real = orig_date ? orig_date(self, _cmd) : [NSDate date];
+    if (![[IPFConfig shared] flag:@"FakeDateTime" defaultYes:NO]) return real;
+    double off = [[IPFConfig shared] doubleForKey:@"TimeOffsetSeconds" fallback:0];
+    if (fabs(off) < 0.5) return real; // no offset → timezone-only spoof
+    return [real dateByAddingTimeInterval:off];
+}
+
+#pragma mark - Location (WGS84)
+
+static id (*orig_location)(id, SEL);
+static id stub_location(id self, SEL _cmd) {
+    if (![[IPFConfig shared] flag:@"FakeLocation" defaultYes:NO])
+        return orig_location ? orig_location(self, _cmd) : nil;
+    @try {
+        Class CLLoc = objc_getClass("CLLocation");
+        if (!CLLoc) return orig_location ? orig_location(self, _cmd) : nil;
+        // WGS84 decimal degrees (EPSG:4326) — default: Ho Chi Minh City
+        // Source: approximate city center; apps expect CLLocation degrees.
+        double lat = [[IPFConfig shared] doubleForKey:@"Latitude" fallback:10.8231];
+        double lon = [[IPFConfig shared] doubleForKey:@"Longitude" fallback:106.6297];
+        double acc = [[IPFConfig shared] doubleForKey:@"LocationAccuracy" fallback:10.0];
+        SEL simple = NSSelectorFromString(@"initWithLatitude:longitude:");
+        id loc = nil;
+        if ([CLLoc instancesRespondToSelector:simple]) {
+            id obj = [CLLoc alloc];
+            loc = ((id (*)(id, SEL, double, double))objc_msgSend)(obj, simple, lat, lon);
+        }
+        if (loc) {
+            IPFExTrace([NSString stringWithFormat:@"CLLocation FAKE lat=%.6f lon=%.6f acc=%.1f",
+                        lat, lon, acc]);
+            return loc;
+        }
+    } @catch (__unused NSException *ex) {}
+    return orig_location ? orig_location(self, _cmd) : nil;
+}
+
+static void (*orig_startUpdating)(id, SEL);
+static void stub_startUpdating(id self, SEL _cmd) {
+    if (orig_startUpdating) orig_startUpdating(self, _cmd);
+    if (![[IPFConfig shared] flag:@"FakeLocation" defaultYes:NO]) return;
+    // Push fake location to delegate shortly after start
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.15 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        @try {
+            id del = nil;
+            if ([self respondsToSelector:@selector(delegate)])
+                del = [self performSelector:@selector(delegate)];
+            id loc = stub_location(self, @selector(location));
+            if (del && loc) {
+                SEL s = NSSelectorFromString(@"locationManager:didUpdateLocations:");
+                if ([del respondsToSelector:s]) {
+                    NSMethodSignature *sig = [del methodSignatureForSelector:s];
+                    NSInvocation *inv = [NSInvocation invocationWithMethodSignature:sig];
+                    [inv setSelector:s];
+                    [inv setTarget:del];
+                    id mgr = self;
+                    NSArray *arr = @[ loc ];
+                    [inv setArgument:&mgr atIndex:2];
+                    [inv setArgument:&arr atIndex:3];
+                    [inv invoke];
+                }
+            }
+        } @catch (__unused NSException *ex) {}
+    });
+}
+
+#pragma mark - Sensors (CMAccelerometerData-like identity gravity)
+
+static id (*orig_accelerometerData)(id, SEL);
+static id stub_accelerometerData(id self, SEL _cmd) {
+    if (![[IPFConfig shared] flag:@"FakeSensor" defaultYes:NO])
+        return orig_accelerometerData ? orig_accelerometerData(self, _cmd) : nil;
+    // When spoofing sensors: prefer "device at rest, face up" if we can't inject CMAcceleration easily.
+    // Returning real data when motion is needed is safer; for static fingerprinting, zero motion is fine.
+    // Best-effort: return original if present else nil (avoid crash fabricating private CM structs).
+    id real = orig_accelerometerData ? orig_accelerometerData(self, _cmd) : nil;
+    return real; // structure layout is private — fingerprint often checks availability; gravity via gravity property
+}
+
+static id (*orig_gravity)(id, SEL);
+// CMDeviceMotion.gravity — CMAcceleration {x,y,z} returned by value — hard to stub with MSHookMessageEx
+// Hook isEnabled flags instead.
+
+static BOOL (*orig_isAccelAvailable)(id, SEL);
+static BOOL stub_isAccelAvailable(id self, SEL _cmd) {
+    if ([[IPFConfig shared] flag:@"FakeSensor" defaultYes:NO]) {
+        // Report available (normal iPhone)
+        return YES;
+    }
+    return orig_isAccelAvailable ? orig_isAccelAvailable(self, _cmd) : YES;
+}
+
+#pragma mark - WebRTC local IP rewrite (FakeWebRTC)
+
+static NSString *(*orig_description_rtc)(id, SEL);
+// Hook SDP-ish strings is fragile. Instead rewrite common local-IP patterns in NSString if FakeWebRTC.
+// Safer: intercept RTCIceCandidate candidate property if class exists.
+
+static NSString *(*orig_iceCandidate)(id, SEL);
+static NSString *stub_iceCandidate(id self, SEL _cmd) {
+    NSString *real = orig_iceCandidate ? orig_iceCandidate(self, _cmd) : nil;
+    if (!real) return real;
+    if ([[IPFConfig shared] flag:@"DisableWebRTC" defaultYes:NO]) {
+        IPFExTrace(@"WebRTC candidate blocked (DisableWebRTC)");
+        return @"";
+    }
+    if (![[IPFConfig shared] flag:@"FakeWebRTC" defaultYes:NO]) return real;
+    // Replace host candidates' IPv4 with RFC1918 lab IP (not a public leak)
+    NSString *fakeIP = [[IPFConfig shared] stringForKey:@"WebRTCLocalIP"] ?: @"10.0.0.2";
+    // candidate:... <ip> ...
+    NSError *err = nil;
+    NSRegularExpression *re = [NSRegularExpression
+        regularExpressionWithPattern:@"\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b"
+                             options:0 error:&err];
+    if (!re) return real;
+    NSString *out = [re stringByReplacingMatchesInString:real
+                                                 options:0
+                                                   range:NSMakeRange(0, real.length)
+                                            withTemplate:fakeIP];
+    if (![out isEqualToString:real])
+        IPFExTrace([NSString stringWithFormat:@"WebRTC candidate IP → %@", fakeIP]);
+    return out;
+}
+
+#pragma mark - Install
 
 void IPFInstallExtraHooks(void) {
     IPFResolve();
@@ -263,19 +485,87 @@ void IPFInstallExtraHooks(void) {
         if (fm && class_getInstanceMethod(fm, @selector(attributesOfFileSystemForPath:error:))) {
             pMSHookMessageEx(fm, @selector(attributesOfFileSystemForPath:error:),
                              (IMP)stub_attrs, (IMP *)&orig_attrs);
-            IPFExTrace(@"NSFileManager disk hooks OK");
+            IPFExTrace(@"disk hooks OK");
         }
 
         Class app = objc_getClass("UIApplication");
         if (app && class_getInstanceMethod(app, @selector(canOpenURL:))) {
             pMSHookMessageEx(app, @selector(canOpenURL:), (IMP)stub_canOpen, (IMP *)&orig_canOpen);
-            IPFExTrace(@"canOpenURL hide JB URL schemes OK");
+            IPFExTrace(@"canOpenURL OK");
         }
 
         Class nreq = objc_getClass("NSURLRequest");
-        if (nreq && class_getInstanceMethod(nreq, @selector(allHTTPHeaderFields))) {
-            pMSHookMessageEx(nreq, @selector(allHTTPHeaderFields), (IMP)stub_allHTTP, (IMP *)&orig_allHTTP);
-            IPFExTrace(@"NSURLRequest UA hook OK");
+        if (nreq) {
+            if (class_getInstanceMethod(nreq, @selector(allHTTPHeaderFields)))
+                pMSHookMessageEx(nreq, @selector(allHTTPHeaderFields), (IMP)stub_allHTTP, (IMP *)&orig_allHTTP);
+            if (class_getInstanceMethod(nreq, @selector(valueForHTTPHeaderField:)))
+                pMSHookMessageEx(nreq, @selector(valueForHTTPHeaderField:), (IMP)stub_valueForHTTP, (IMP *)&orig_valueForHTTP);
+            IPFExTrace(@"UA hooks OK");
+        }
+
+        // Locale
+        Class nsl = object_getClass(objc_getClass("NSLocale")); // metaclass for class methods
+        if (nsl) {
+            if (class_getClassMethod(objc_getClass("NSLocale"), @selector(preferredLanguages)))
+                pMSHookMessageEx(nsl, @selector(preferredLanguages), (IMP)stub_preferredLanguages, (IMP *)&orig_preferredLanguages);
+            if (class_getClassMethod(objc_getClass("NSLocale"), @selector(currentLocale)))
+                pMSHookMessageEx(nsl, @selector(currentLocale), (IMP)stub_currentLocale, (IMP *)&orig_currentLocale);
+            if (class_getClassMethod(objc_getClass("NSLocale"), @selector(autoupdatingCurrentLocale)))
+                pMSHookMessageEx(nsl, @selector(autoupdatingCurrentLocale), (IMP)stub_currentLocale, (IMP *)&orig_currentLocale);
+            IPFExTrace(@"NSLocale hooks OK");
+        }
+
+        Class ntz = object_getClass(objc_getClass("NSTimeZone"));
+        if (ntz) {
+            if (class_getClassMethod(objc_getClass("NSTimeZone"), @selector(systemTimeZone)))
+                pMSHookMessageEx(ntz, @selector(systemTimeZone), (IMP)stub_systemTZ, (IMP *)&orig_systemTZ);
+            if (class_getClassMethod(objc_getClass("NSTimeZone"), @selector(defaultTimeZone)))
+                pMSHookMessageEx(ntz, @selector(defaultTimeZone), (IMP)stub_defaultTZ, (IMP *)&orig_defaultTZ);
+            if (class_getClassMethod(objc_getClass("NSTimeZone"), @selector(localTimeZone)))
+                pMSHookMessageEx(ntz, @selector(localTimeZone), (IMP)stub_localTZ, (IMP *)&orig_localTZ);
+            IPFExTrace(@"NSTimeZone hooks OK");
+        }
+
+        Class nd = object_getClass(objc_getClass("NSDate"));
+        if (nd && class_getClassMethod(objc_getClass("NSDate"), @selector(date))) {
+            pMSHookMessageEx(nd, @selector(date), (IMP)stub_date, (IMP *)&orig_date);
+            IPFExTrace(@"NSDate.date hook OK");
+        }
+
+        // CoreLocation
+        Class clm = objc_getClass("CLLocationManager");
+        if (clm) {
+            if (class_getInstanceMethod(clm, @selector(location)))
+                pMSHookMessageEx(clm, @selector(location), (IMP)stub_location, (IMP *)&orig_location);
+            if (class_getInstanceMethod(clm, @selector(startUpdatingLocation)))
+                pMSHookMessageEx(clm, @selector(startUpdatingLocation), (IMP)stub_startUpdating, (IMP *)&orig_startUpdating);
+            IPFExTrace(@"CLLocationManager hooks OK");
+        }
+
+        // CoreMotion availability
+        Class cmm = objc_getClass("CMMotionManager");
+        if (cmm) {
+            if (class_getInstanceMethod(cmm, @selector(isAccelerometerAvailable)))
+                pMSHookMessageEx(cmm, @selector(isAccelerometerAvailable), (IMP)stub_isAccelAvailable, (IMP *)&orig_isAccelAvailable);
+            if (class_getInstanceMethod(cmm, @selector(accelerometerData)))
+                pMSHookMessageEx(cmm, @selector(accelerometerData), (IMP)stub_accelerometerData, (IMP *)&orig_accelerometerData);
+            IPFExTrace(@"CMMotionManager hooks OK");
+        }
+
+        // WebRTC ICE candidate (WebRTC.framework / GoogleWebRTC if linked)
+        const char *rtcClasses[] = {
+            "RTCIceCandidate", "RTC_OBJC_TYPE(RTCIceCandidate)", NULL
+        };
+        for (int i = 0; rtcClasses[i]; i++) {
+            Class rc = objc_getClass(rtcClasses[i]);
+            if (!rc) continue;
+            if (class_getInstanceMethod(rc, @selector(sdp)))
+                pMSHookMessageEx(rc, @selector(sdp), (IMP)stub_iceCandidate, (IMP *)&orig_iceCandidate);
+            SEL cand = NSSelectorFromString(@"candidate"); // some versions
+            if (class_getInstanceMethod(rc, cand))
+                pMSHookMessageEx(rc, cand, (IMP)stub_iceCandidate, (IMP *)&orig_iceCandidate);
+            IPFExTrace([NSString stringWithFormat:@"RTCIceCandidate hook on %s", rtcClasses[i]]);
+            break;
         }
     }
 

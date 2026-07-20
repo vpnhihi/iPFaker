@@ -142,6 +142,57 @@
     NSInteger pitch = [disp[@"Pitch"] integerValue] ?: 460;
     NSInteger cores = [device[@"cpuCores"] integerValue] ?: 6;
 
+    // Storage (bytes) — catalog storageGB or typical tier; free ≈ 35–55% used
+    NSInteger storageGB = [device[@"storageGB"] integerValue];
+    if (storageGB <= 0) storageGB = 128;
+    long long totalDisk = (long long)storageGB * 1000LL * 1000LL * 1000LL; // decimal GB (iOS reports 1000-base)
+    long long freeDisk = (long long)(totalDisk * (0.35 + (arc4random_uniform(200) / 1000.0)));
+
+    // Boot time: now − [3d … 21d] (kern.boottime timeval.tv_sec, Unix epoch)
+    long long now = (long long)[[NSDate date] timeIntervalSince1970];
+    long long bootAgo = 3LL * 86400 + (long long)arc4random_uniform(18 * 86400);
+    long long bootUnix = now - bootAgo;
+
+    // Locale — BCP 47 / Unicode CLDR (preferredLanguages: vi-VN)
+    // AppleLocale / NSLocale: underscore vi_VN
+    // Language ISO 639-1, region ISO 3166-1 alpha-2, currency ISO 4217, TZ IANA
+    NSString *localeBCP = @"vi-VN";
+    NSString *localeApple = @"vi_VN";
+    NSString *langISO = @"vi";
+    NSString *countryISO = @"VN";
+    NSString *currency = @"VND";
+    NSString *tzIANA = @"Asia/Ho_Chi_Minh"; // IANA TZDB; VN UTC+7 no DST
+    NSString *calendar = @"gregorian";
+
+    // WGS84 (EPSG:4326) — HCMC approx city center
+    double lat = 10.8231;
+    double lon = 106.6297;
+    double locAcc = 8.0 + (arc4random_uniform(70) / 10.0); // 8–15 m
+    double alt = 5.0 + (arc4random_uniform(30));
+
+    // Safari/WebKit UA (Apple documented form for Mobile Safari)
+    // https://developer.apple.com — CFNetwork / WebKit UA pattern
+    NSString *pv = iosMeta[@"ProductVersion"] ?: iosVer ?: @"18.0";
+    NSArray *parts = [pv componentsSeparatedByString:@"."];
+    NSString *maj = parts.count > 0 ? parts[0] : @"18";
+    NSString *min = parts.count > 1 ? parts[1] : @"0";
+    NSString *uaOS = [NSString stringWithFormat:@"%@_%@", maj, min];
+    NSString *ua = [NSString stringWithFormat:
+        @"Mozilla/5.0 (iPhone; CPU iPhone OS %@ like Mac OS X) "
+        @"AppleWebKit/605.1.15 (KHTML, like Gecko) Version/%@.%@ "
+        @"Mobile/15E148 Safari/604.1",
+        uaOS, maj, min];
+
+    // WebRTC: RFC1918 private IPv4 (not a public IP leak)
+    NSString *webrtcIP = [NSString stringWithFormat:@"10.%u.%u.%u",
+                          1 + arc4random_uniform(254),
+                          arc4random_uniform(256),
+                          2 + arc4random_uniform(250)];
+
+    // Wi‑Fi SSID/BSSID display (BSSID = MAC-like EUI-48)
+    NSString *ssid = @"Viettel-WiFi";
+    NSString *bssid = wifi;
+
     return @{
         @"Enabled": @YES,
         @"ProductType": device[@"ProductType"] ?: @"iPhone16,1",
@@ -167,17 +218,23 @@
         @"ProductVersion": iosMeta[@"ProductVersion"] ?: iosVer,
         @"BuildVersion": iosMeta[@"BuildVersion"] ?: @"",
         @"ProductBuildVersion": iosMeta[@"BuildVersion"] ?: @"",
+        // UUID v4 uppercase (Apple IDFA / IDFV)
         @"IDFA": idfa,
         @"IDFV": idfv,
         @"identifierForVendor": idfv,
         @"advertisingIdentifier": idfa,
+        // IMEI Luhn 15-digit / MEID / EID 32-digit
         @"InternationalMobileEquipmentIdentity": imei,
         @"InternationalMobileEquipmentIdentity2": imei2,
         @"MobileEquipmentIdentifier": meid,
         @"EID": eid,
+        // IEEE 802 EUI-48 MAC
         @"WifiAddress": wifi,
         @"BluetoothAddress": bt,
         @"EthernetMacAddress": wifi,
+        @"SSID": ssid,
+        @"BSSID": bssid,
+        // ITU-T E.212 MCC/MNC — Viettel 452/04; ISO 3166-1 alpha-2
         @"carrierName": @"Viettel",
         @"carrierMCC": @"452",
         @"carrierMNC": @"04",
@@ -187,6 +244,8 @@
         @"MobileCountryCode": @"452",
         @"MobileNetworkCode": @"04",
         @"ISOCountryCode": @"vn",
+        @"AllowsVOIP": @YES,
+        // Display (native pixels + scale)
         @"main-screen-width": @(w),
         @"main-screen-height": @(h),
         @"main-screen-scale": @(scale),
@@ -202,6 +261,32 @@
         @"MaxRefreshHz": disp[@"MaxRefreshHz"] ?: @60,
         @"DeviceYear": device[@"year"] ?: @0,
         @"BatteryMah": device[@"batteryMah"] ?: @0,
+        // Disk bytes
+        @"TotalDiskCapacity": @(totalDisk),
+        @"FreeDiskSpace": @(freeDisk),
+        // Locale / TZ (BCP-47, ISO, IANA)
+        @"PreferredLanguage": localeBCP,
+        @"LocaleIdentifier": localeApple,
+        @"AppleLocale": localeApple,
+        @"AppleLanguages": @[ localeBCP ],
+        @"LanguageCode": langISO,
+        @"CountryCode": countryISO,
+        @"CurrencyCode": currency,
+        @"TimeZoneName": tzIANA,
+        @"CalendarIdentifier": calendar,
+        // Location WGS84
+        @"Latitude": @(lat),
+        @"Longitude": @(lon),
+        @"LocationAccuracy": @(locAcc),
+        @"Altitude": @(alt),
+        // Boot / time
+        @"BootTimeUnix": @(bootUnix),
+        @"kern.boottime": @(bootUnix),
+        @"TimeOffsetSeconds": @0,
+        // Browser UA + WebRTC private IP
+        @"UserAgent": ua,
+        @"HTTPUserAgent": ua,
+        @"WebRTCLocalIP": webrtcIP,
     };
 }
 

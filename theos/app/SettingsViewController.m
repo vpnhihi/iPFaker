@@ -28,7 +28,7 @@
             @{ @"t": @"Fake Hardware", @"k": @"FakeHardware", @"d": @YES },
             @{ @"t": @"Fake Ads (IDFA/IDFV)", @"k": @"FakeAds", @"d": @YES },
             @{ @"t": @"Fake Screen", @"k": @"FakeScreen", @"d": @YES },
-            @{ @"t": @"Fake Real Screen", @"k": @"FakeRealScreen", @"d": @NO },
+            @{ @"t": @"Fake Real Screen", @"k": @"FakeRealScreen", @"d": @YES },
             @{ @"t": @"Fake Browser (UA)", @"k": @"FakeBrowser", @"d": @YES },
             @{ @"t": @"Fake Network / Carrier", @"k": @"FakeNetwork", @"d": @YES },
             @{ @"t": @"Fake Wifi Info", @"k": @"FakeWifi", @"d": @YES },
@@ -37,11 +37,11 @@
             @{ @"t": @"Hide Jailbreak", @"k": @"HideJailbreak", @"d": @YES },
         ],
         @[
-            @{ @"t": @"Fake Locale", @"k": @"FakeLocale", @"d": @YES },
-            @{ @"t": @"Fake Date Time", @"k": @"FakeDateTime", @"d": @NO },
-            @{ @"t": @"Fake Location", @"k": @"FakeLocation", @"d": @NO },
-            @{ @"t": @"Fake Sensor", @"k": @"FakeSensor", @"d": @NO },
-            @{ @"t": @"Enable Fake WebRTC", @"k": @"FakeWebRTC", @"d": @NO },
+            @{ @"t": @"Fake Locale (vi-VN + TZ)", @"k": @"FakeLocale", @"d": @YES },
+            @{ @"t": @"Fake Date Time (boot + offset)", @"k": @"FakeDateTime", @"d": @NO },
+            @{ @"t": @"Fake Location (WGS84)", @"k": @"FakeLocation", @"d": @YES },
+            @{ @"t": @"Fake Sensor", @"k": @"FakeSensor", @"d": @YES },
+            @{ @"t": @"Fake WebRTC (local IP)", @"k": @"FakeWebRTC", @"d": @YES },
             @{ @"t": @"Disable WebRTC", @"k": @"DisableWebRTC", @"d": @NO },
         ],
     ];
@@ -65,7 +65,9 @@
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
     if (section == 0)
-        return @"Bật/tắt ghi vào config khi Apply. Core spoof MG/CT vẫn chạy khi Enabled=YES.";
+        return @"Mỗi switch bật/tắt hook thật trong Zalo sau Apply. Format: UUID v4, IMEI Luhn, ITU E.212, ISO/BCP-47, IANA TZ, WGS84.";
+    if (section == 1)
+        return @"Locale vi-VN · TZ Asia/Ho_Chi_Minh · GPS HCMC · WebRTC IP RFC1918. Fake Date Time mặc định TẮT (tránh lệch giờ TLS).";
     return nil;
 }
 

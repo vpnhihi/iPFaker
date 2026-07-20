@@ -129,11 +129,20 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
         id bt = flat[@"kern.boottime"] ?: flat[@"BootTimeUnix"];
         sys[@"kern.boottime"] = bt;
     }
-    // Extra MG colors / baseband / disk (Extra hooks also read stringForKey)
+    // Extra MG colors / baseband / disk / locale / location (Extra hooks also read stringForKey)
     for (NSString *ek in @[
         @"DeviceColor", @"DeviceEnclosureColor", @"BasebandVersion",
         @"TotalDiskCapacity", @"FreeDiskSpace", @"UserAgent", @"HTTPUserAgent",
         @"MaxRefreshHz", @"EID", @"PartNumber", @"ModelNumberAxxxx",
+        @"IDFA", @"IDFV", @"identifierForVendor", @"advertisingIdentifier",
+        // BCP 47 / ISO 639-1 / ISO 3166-1 / IANA tz
+        @"AppleLocale", @"AppleLanguages", @"LanguageCode", @"CountryCode",
+        @"LocaleIdentifier", @"PreferredLanguage", @"TimeZoneName",
+        @"CalendarIdentifier", @"CurrencyCode",
+        // WGS84
+        @"Latitude", @"Longitude", @"LocationAccuracy", @"Altitude",
+        @"BootTimeUnix", @"TimeOffsetSeconds",
+        @"WebRTCLocalIP", @"SSID", @"BSSID",
     ]) {
         if (flat[ek]) mg[ek] = flat[ek];
     }
@@ -344,6 +353,27 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
         if ([f isKindOfClass:[NSNumber class]]) return [f stringValue];
     }
     return nil;
+}
+
+- (BOOL)flag:(NSString *)key defaultYes:(BOOL)defaultYes {
+    if (!key.length) return defaultYes;
+    id v = self.flat[key] ?: self.root[key];
+    if (v == nil) return defaultYes;
+    if ([v isKindOfClass:[NSNumber class]]) return [v boolValue];
+    if ([v isKindOfClass:[NSString class]]) {
+        NSString *s = [(NSString *)v lowercaseString];
+        if ([s isEqualToString:@"0"] || [s isEqualToString:@"false"] || [s isEqualToString:@"no"])
+            return NO;
+        if ([s isEqualToString:@"1"] || [s isEqualToString:@"true"] || [s isEqualToString:@"yes"])
+            return YES;
+    }
+    return defaultYes;
+}
+
+- (double)doubleForKey:(NSString *)key fallback:(double)fb {
+    id v = self.flat[key] ?: self.root[key] ?: [self mgValueForKey:key];
+    if ([v respondsToSelector:@selector(doubleValue)]) return [v doubleValue];
+    return fb;
 }
 
 @end

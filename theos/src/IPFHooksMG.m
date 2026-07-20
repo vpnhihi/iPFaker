@@ -92,10 +92,41 @@ static void IPFResolveSubstrate(void) {
 static CFTypeRef (*orig_MGCopyAnswer)(CFStringRef key);
 static CFTypeRef (*orig_MGCopyAnswerWithError)(CFStringRef key, int *err);
 
+/// Gate MG key by Settings Fake* flags (written into config.plist on Apply).
+static BOOL IPFAllowMGKey(NSString *k) {
+    IPFConfig *c = [IPFConfig shared];
+    if (!c.enabled) return NO;
+    if (!k.length) return NO;
+    NSString *lk = k.lowercaseString;
+    // IDFA / IDFV — Apple advertisingIdentifier / identifierForVendor (UUID v4)
+    if ([lk containsString:@"advertising"] || [lk isEqualToString:@"idfa"]
+        || [lk containsString:@"identifierforvendor"] || [lk isEqualToString:@"idfv"])
+        return [c flag:@"FakeAds" defaultYes:YES];
+    // Wi‑Fi / BT MAC (IEEE 802 EUI-48)
+    if ([lk containsString:@"wifi"] || [lk containsString:@"bluetooth"]
+        || [lk containsString:@"ethernetmac"] || [lk isEqualToString:@"bssid"])
+        return [c flag:@"FakeWifi" defaultYes:YES];
+    // OS version / build
+    if ([lk containsString:@"productversion"] || [lk containsString:@"buildversion"]
+        || [lk containsString:@"productbuild"] || [lk isEqualToString:@"os-version"])
+        return [c flag:@"FakeSysOSVersion" defaultYes:YES];
+    // Screen MG keys
+    if ([lk containsString:@"screen"] || [lk containsString:@"display"])
+        return [c flag:@"FakeScreen" defaultYes:YES] || [c flag:@"FakeRealScreen" defaultYes:NO];
+    // Hardware identity
+    if ([lk containsString:@"serial"] || [lk containsString:@"unique"] || [lk containsString:@"chip"]
+        || [lk containsString:@"imei"] || [lk containsString:@"meid"] || [lk containsString:@"eid"]
+        || [lk containsString:@"baseband"] || [lk containsString:@"memsize"]
+        || [lk containsString:@"physicalmemory"])
+        return [c flag:@"FakeHardware" defaultYes:YES];
+    // Device model / marketing (default device surface)
+    return [c flag:@"FakeDevice" defaultYes:YES];
+}
+
 static CFTypeRef stub_MGCopyAnswer(CFStringRef key) {
     @autoreleasepool {
         NSString *k = key ? (__bridge NSString *)key : @"(null)";
-        id fake = key ? [[IPFConfig shared] mgValueForKey:k] : nil;
+        id fake = (key && IPFAllowMGKey(k)) ? [[IPFConfig shared] mgValueForKey:k] : nil;
         if (fake) {
             IPFTrace([NSString stringWithFormat:@"MG FAKE %@ => %@", k, fake]);
             CFTypeRef cf = IPFMakeCF(fake);
@@ -132,7 +163,7 @@ static CFTypeRef stub_MGCopyAnswer(CFStringRef key) {
 static CFTypeRef stub_MGCopyAnswerWithError(CFStringRef key, int *err) {
     @autoreleasepool {
         NSString *k = key ? (__bridge NSString *)key : @"(null)";
-        id fake = key ? [[IPFConfig shared] mgValueForKey:k] : nil;
+        id fake = (key && IPFAllowMGKey(k)) ? [[IPFConfig shared] mgValueForKey:k] : nil;
         if (fake) {
             if (err) *err = 0;
             IPFTrace([NSString stringWithFormat:@"MGe FAKE %@ => %@", k, fake]);
@@ -153,11 +184,32 @@ static int stub_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, void
     if (name && oldp && oldlenp && *oldlenp > 0) {
         @autoreleasepool {
             NSString *n = [NSString stringWithUTF8String:name];
-            id fake = [[IPFConfig shared] sysctlValueForName:n];
-            if (!fake && [n isEqualToString:@"hw.machine"])
-                fake = [[IPFConfig shared] mgValueForKey:@"ProductType"];
-            if (!fake && [n isEqualToString:@"hw.model"])
-                fake = [[IPFConfig shared] mgValueForKey:@"HWModelStr"];
+            IPFConfig *cfg = [IPFConfig shared];
+            BOOL allowSys = [cfg flag:@"FakeSysctl" defaultYes:YES];
+            BOOL allowOS = [cfg flag:@"FakeSysOSVersion" defaultYes:YES];
+            BOOL allowDev = [cfg flag:@"FakeDevice" defaultYes:YES];
+            BOOL allowHW = [cfg flag:@"FakeHardware" defaultYes:YES];
+            BOOL allowDT = [cfg flag:@"FakeDateTime" defaultYes:NO];
+            if ([n hasPrefix:@"kern.os"] && !allowOS) {
+                return orig_sysctlbyname ? orig_sysctlbyname(name, oldp, oldlenp, newp, newlen) : -1;
+            }
+            if ([n isEqualToString:@"kern.boottime"] && !allowDT) {
+                return orig_sysctlbyname ? orig_sysctlbyname(name, oldp, oldlenp, newp, newlen) : -1;
+            }
+            if (([n isEqualToString:@"hw.machine"] || [n isEqualToString:@"hw.model"]) && !allowDev)
+                return orig_sysctlbyname ? orig_sysctlbyname(name, oldp, oldlenp, newp, newlen) : -1;
+            if (([n hasPrefix:@"hw.mem"] || [n hasPrefix:@"hw.ncpu"] || [n hasPrefix:@"hw.physical"]
+                 || [n hasPrefix:@"hw.logical"]) && !allowHW)
+                return orig_sysctlbyname ? orig_sysctlbyname(name, oldp, oldlenp, newp, newlen) : -1;
+            if (!allowSys && ![n isEqualToString:@"kern.boottime"] && ![n hasPrefix:@"kern.os"]
+                && ![n isEqualToString:@"hw.machine"] && ![n isEqualToString:@"hw.model"])
+                return orig_sysctlbyname ? orig_sysctlbyname(name, oldp, oldlenp, newp, newlen) : -1;
+
+            id fake = [cfg sysctlValueForName:n];
+            if (!fake && [n isEqualToString:@"hw.machine"] && allowDev)
+                fake = [cfg mgValueForKey:@"ProductType"];
+            if (!fake && [n isEqualToString:@"hw.model"] && allowDev)
+                fake = [cfg mgValueForKey:@"HWModelStr"];
             if ([fake isKindOfClass:[NSString class]]) {
                 const char *s = [(NSString *)fake UTF8String];
                 size_t need = strlen(s) + 1;
@@ -214,14 +266,24 @@ static int stub_uname(struct utsname *buf) {
     int rc = orig_uname ? orig_uname(buf) : -1;
     if (rc != 0 || !buf) return rc;
     @autoreleasepool {
-        NSString *machine = [[IPFConfig shared] mgValueForKey:@"ProductType"];
-        NSString *node = [[IPFConfig shared] stringForKey:@"UserAssignedDeviceName"];
-        if ([machine isKindOfClass:[NSString class]]) {
-            strlcpy(buf->machine, machine.UTF8String, sizeof(buf->machine));
-            IPFTrace([NSString stringWithFormat:@"uname FAKE machine=%@", machine]);
+        IPFConfig *cfg = [IPFConfig shared];
+        if ([cfg flag:@"FakeDevice" defaultYes:YES]) {
+            NSString *machine = [cfg mgValueForKey:@"ProductType"];
+            NSString *node = [cfg stringForKey:@"UserAssignedDeviceName"];
+            if ([machine isKindOfClass:[NSString class]]) {
+                strlcpy(buf->machine, machine.UTF8String, sizeof(buf->machine));
+                IPFTrace([NSString stringWithFormat:@"uname FAKE machine=%@", machine]);
+            }
+            if (node)
+                strlcpy(buf->nodename, node.UTF8String, sizeof(buf->nodename));
         }
-        if (node)
-            strlcpy(buf->nodename, node.UTF8String, sizeof(buf->nodename));
+        if ([cfg flag:@"FakeSysOSVersion" defaultYes:YES]) {
+            // uname.release ≈ Darwin; keep real. version string sometimes carries build.
+            NSString *build = [cfg stringForKey:@"BuildVersion"];
+            if (build.length) {
+                // leave release; some apps parse version field loosely
+            }
+        }
     }
     return rc;
 }
@@ -262,19 +324,27 @@ static NSUUID *(*orig_idfv)(id, SEL);
 static NSUUID *(*orig_idfa)(id, SEL);
 
 static NSString *stub_name(id self, SEL _cmd) {
+    if (![[IPFConfig shared] flag:@"FakeDevice" defaultYes:YES])
+        return orig_name ? orig_name(self, _cmd) : @"iPhone";
     NSString *v = [[IPFConfig shared] stringForKey:@"UserAssignedDeviceName"];
     if (v) IPFTrace([NSString stringWithFormat:@"UIDevice.name FAKE %@", v]);
     return v ?: (orig_name ? orig_name(self, _cmd) : @"iPhone");
 }
 static NSString *stub_model(id self, SEL _cmd) {
+    if (![[IPFConfig shared] flag:@"FakeDevice" defaultYes:YES])
+        return orig_model ? orig_model(self, _cmd) : @"iPhone";
     IPFTrace(@"UIDevice.model FAKE iPhone");
     return @"iPhone";
 }
 static NSString *stub_systemVersion(id self, SEL _cmd) {
+    if (![[IPFConfig shared] flag:@"FakeSysOSVersion" defaultYes:YES])
+        return orig_systemVersion ? orig_systemVersion(self, _cmd) : @"17.0";
     NSString *v = [[IPFConfig shared] stringForKey:@"ProductVersion"];
     return v ?: (orig_systemVersion ? orig_systemVersion(self, _cmd) : @"17.0");
 }
 static NSUUID *stub_idfv(id self, SEL _cmd) {
+    if (![[IPFConfig shared] flag:@"FakeAds" defaultYes:YES])
+        return orig_idfv ? orig_idfv(self, _cmd) : nil;
     NSString *v = [[IPFConfig shared] stringForKey:@"IDFV"];
     if (v) {
         NSUUID *u = [[NSUUID alloc] initWithUUIDString:v];
@@ -283,6 +353,8 @@ static NSUUID *stub_idfv(id self, SEL _cmd) {
     return orig_idfv ? orig_idfv(self, _cmd) : nil;
 }
 static NSUUID *stub_idfa(id self, SEL _cmd) {
+    if (![[IPFConfig shared] flag:@"FakeAds" defaultYes:YES])
+        return orig_idfa ? orig_idfa(self, _cmd) : nil;
     NSString *v = [[IPFConfig shared] stringForKey:@"IDFA"];
     if (v) {
         NSUUID *u = [[NSUUID alloc] initWithUUIDString:v];

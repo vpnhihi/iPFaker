@@ -21,12 +21,17 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy, readonly, nullable) NSString *profilePath;
 @property (nonatomic, assign, readonly) BOOL loaded;
 @property (nonatomic, assign, readonly) BOOL enabled;
+/// Flat HIOS-style map (includes Fake* flags + locale/location extras).
+@property (nonatomic, strong, readonly, nullable) NSDictionary *flat;
 
 + (instancetype)shared;
 - (BOOL)reload;
 - (nullable id)mgValueForKey:(NSString *)key;
 - (nullable id)sysctlValueForName:(NSString *)name;
 - (nullable NSString *)stringForKey:(NSString *)key;
+/// Feature toggle from config.plist (FakeDevice, HideJailbreak, …). Missing → defaultYes.
+- (BOOL)flag:(NSString *)key defaultYes:(BOOL)defaultYes;
+- (double)doubleForKey:(NSString *)key fallback:(double)fb;
 
 @end
 
