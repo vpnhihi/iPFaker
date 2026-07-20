@@ -10,13 +10,13 @@ include $(THEOS)/makefiles/common.mk
 TWEAK_NAME = iPFakerMG iPFakerCT
 
 iPFakerMG_FILES = TweakMG.x src/IPFConfig.m src/IPFHooksMG.m
-iPFakerMG_CFLAGS = -fobjc-arc -Wno-unused-variable -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
+iPFakerMG_CFLAGS = -fobjc-arc -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
 iPFakerMG_FRAMEWORKS = UIKit Foundation AdSupport
 # Do not link -lsubstrate (may fail load). Resolve MSHook via dlsym at runtime.
 iPFakerMG_LDFLAGS = -Wl,-undefined,dynamic_lookup
 
 iPFakerCT_FILES = TweakCT.x src/IPFConfig.m src/IPFHooksCT.m
-iPFakerCT_CFLAGS = -fobjc-arc -Wno-unused-variable -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
+iPFakerCT_CFLAGS = -fobjc-arc -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
 iPFakerCT_FRAMEWORKS = UIKit Foundation CoreTelephony
 iPFakerCT_LDFLAGS = -Wl,-undefined,dynamic_lookup
 

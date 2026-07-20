@@ -21,12 +21,6 @@ typedef void (*MSHookMessageEx_t)(Class _class, SEL sel, IMP imp, IMP *result);
 static MSHookFunction_t pMSHookFunction = NULL;
 static MSHookMessageEx_t pMSHookMessageEx = NULL;
 
-static NSString *IPFString(id v) {
-    if ([v isKindOfClass:[NSString class]]) return (NSString *)v;
-    if ([v isKindOfClass:[NSNumber class]]) return [(NSNumber *)v stringValue];
-    return nil;
-}
-
 static CFTypeRef IPFMakeCF(id v) {
     if (!v || v == [NSNull null]) return NULL;
     if ([v isKindOfClass:[NSString class]] || [v isKindOfClass:[NSNumber class]])
