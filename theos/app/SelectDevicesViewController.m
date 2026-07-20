@@ -4,6 +4,7 @@
 #import "Catalog.h"
 #import "DeviceListController.h"
 #import "IOSListController.h"
+#import "ProgressOverlay.h"
 
 @interface SelectDevicesViewController ()
 @property (nonatomic, strong) UILabel *deviceDetailLabel;
@@ -265,8 +266,22 @@
 }
 
 - (void)killRandomTapped {
-    NSString *msg = [AppState.shared killZaloAndRandomizeFromPool];
-    [self alert:@"Kill Zalo + Random" msg:msg];
+    UIView *host = self.tabBarController.view ?: self.navigationController.view ?: self.view;
+    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Kill Zalo + Random + Wipe…"];
+    self.view.userInteractionEnabled = NO;
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        NSString *msg = [AppState.shared killZaloAndRandomizeFromPoolProgress:^(NSString *step) {
+            [ov appendStep:step];
+        }];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.view.userInteractionEnabled = YES;
+            [ov finishWithTitle:@"Hoàn tất" detail:msg];
+            [self refreshUI];
+            [ov dismissAfter:1.6 completion:^{
+                [self alert:@"Kill Zalo + Random + Wipe" msg:msg];
+            }];
+        });
+    });
 }
 
 - (void)reseedTapped {

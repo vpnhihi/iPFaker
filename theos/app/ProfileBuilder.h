@@ -2,6 +2,8 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+typedef void (^IPFWipeProgress)(NSString *step);
+
 @interface ProfileBuilder : NSObject
 /// Build flat HIOS-style config dict for MG/CT dylibs.
 + (NSDictionary *)flatProfileForDevice:(NSDictionary *)device
@@ -15,10 +17,15 @@ NS_ASSUME_NONNULL_BEGIN
 + (nullable NSDictionary *)loadCurrentFlat;
 /// Force-quit Zalo processes only (no data wipe).
 + (void)killZalo;
-/// Full wipe: kill + 100% data container + App Group + prefs + splash + keychain best-effort.
-/// Returns status message (never nil on completion attempt).
+/// Kill process(es) for a bundle id (best-effort by name / executable).
++ (void)killAppBundleId:(NSString *)bundleId executable:(nullable NSString *)exe;
+
+/// Full wipe for one or many apps. progress may be called off-main (caller dispatches UI).
++ (NSString *)wipeApps:(NSArray<NSString *> *)bundleIds
+              progress:(nullable IPFWipeProgress)progress;
+
+/// Full wipe Zalo only.
 + (NSString *)wipeZaloFull;
-/// Alias used by Wipe tab — same as wipeZaloFull.
 + (NSString *)wipeZaloLab;
 @end
 

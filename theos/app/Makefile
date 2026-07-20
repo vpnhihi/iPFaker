@@ -13,13 +13,16 @@ iPFaker_FILES = \
 	AppTheme.m \
 	AppState.m \
 	Catalog.m \
+	AppCatalog.m \
 	ProfileBuilder.m \
+	ProgressOverlay.m \
 	MainViewController.m \
 	SelectDevicesViewController.m \
 	WipeViewController.m \
 	SettingsViewController.m \
 	DeviceListController.m \
 	IOSListController.m \
+	AppListController.m \
 	AboutLabController.m \
 	RootViewController.m
 

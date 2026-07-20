@@ -10,6 +10,8 @@ NS_ASSUME_NONNULL_BEGIN
 /// Multi-select pools (persisted). At least one device + one iOS after ensureDefaults.
 @property (nonatomic, strong) NSMutableArray<NSString *> *selectedDeviceIds;
 @property (nonatomic, strong) NSMutableArray<NSString *> *selectedIOSList;
+/// Wipe tab multi-select (default: Maps + Weather).
+@property (nonatomic, strong) NSMutableArray<NSString *> *selectedWipeBundleIds;
 
 /// Active pair last applied / current primary (synced with pools).
 @property (nonatomic, copy, nullable) NSString *selectedDeviceId;
@@ -23,38 +25,37 @@ NS_ASSUME_NONNULL_BEGIN
 - (nullable NSDictionary *)currentIOSMeta;
 - (void)ensureDefaults;
 
-/// Persist multi-select pools to NSUserDefaults.
 - (void)savePools;
 - (void)loadPools;
 
-/// Toggle device id in pool. Returns YES if now selected.
 - (BOOL)toggleDeviceId:(NSString *)deviceId;
-/// Toggle iOS version in pool (only if compatible with ≥1 selected device).
 - (BOOL)toggleIOS:(NSString *)ios;
 - (BOOL)isDeviceSelected:(NSString *)deviceId;
 - (BOOL)isIOSSelected:(NSString *)ios;
 
-/// iOS versions allowed for current multi-device selection (union of supportedIOS, newest last).
+- (BOOL)toggleWipeBundleId:(NSString *)bundleId;
+- (BOOL)isWipeAppSelected:(NSString *)bundleId;
+- (NSString *)wipeAppsSummary;
+
 - (NSArray<NSString *> *)compatibleIOSForSelectedDevices;
-/// iOS subset that is both in pool and valid for a given device.
 - (NSArray<NSString *> *)selectedIOSCompatibleWithDevice:(NSDictionary *)device;
 
-/// Apply: if randomFromPool, pick random valid (device,iOS) from pools then full identity.
-/// reseedOnly ignored when randomFromPool (always full regen of identity fields).
 - (NSString *)applyReseedOnly:(BOOL)reseedOnly;
 - (NSString *)applyRandomFromPool;
-/// Random from pool + write config + kill Zalo (user-requested flow).
+/// Random spoof + wipe Zalo with optional progress (step strings).
 - (NSString *)killZaloAndRandomizeFromPool;
+- (NSString *)killZaloAndRandomizeFromPoolProgress:(nullable void (^)(NSString *step))progress;
 
 - (void)killZalo;
 - (NSString *)wipeZaloLab;
+/// Wipe all selected Wipe-tab apps with progress.
+- (NSString *)wipeSelectedAppsProgress:(nullable void (^)(NSString *step))progress;
 
 - (BOOL)toggleForKey:(NSString *)key defaultOn:(BOOL)on;
 - (void)setToggle:(BOOL)on forKey:(NSString *)key;
 
 - (void)postDidChange;
 
-/// Human-readable pool summary for UI.
 - (NSString *)devicePoolSummary;
 - (NSString *)iosPoolSummary;
 @end

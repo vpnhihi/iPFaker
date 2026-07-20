@@ -3,6 +3,7 @@
 #import "AppState.h"
 #import "Catalog.h"
 #import "AboutLabController.h"
+#import "ProgressOverlay.h"
 
 @interface MainViewController ()
 @property (nonatomic, strong) UIScrollView *scroll;
@@ -324,9 +325,22 @@
 }
 
 - (void)killTapped {
-    // Random pair from multi-select pool + full identity (catalog-synced) + kill Zalo
-    NSString *msg = [AppState.shared killZaloAndRandomizeFromPool];
-    [self showAlertTitle:@"Kill Zalo + Random" message:msg];
+    UIView *host = self.tabBarController.view ?: self.navigationController.view ?: self.view;
+    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Kill Zalo + Random + Wipe…"];
+    self.view.userInteractionEnabled = NO;
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        NSString *msg = [AppState.shared killZaloAndRandomizeFromPoolProgress:^(NSString *step) {
+            [ov appendStep:step];
+        }];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.view.userInteractionEnabled = YES;
+            [ov finishWithTitle:@"Hoàn tất" detail:msg];
+            [self refreshUI];
+            [ov dismissAfter:1.6 completion:^{
+                [self showAlertTitle:@"Kill Zalo + Random + Wipe" message:msg];
+            }];
+        });
+    });
 }
 
 - (void)openAbout {
@@ -344,9 +358,8 @@
                                                                message:msg
                                                         preferredStyle:UIAlertControllerStyleAlert];
     [a addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
-    [a addAction:[UIAlertAction actionWithTitle:@"Kill Zalo + Random" style:UIAlertActionStyleDestructive handler:^(__unused UIAlertAction *_) {
-        [AppState.shared killZaloAndRandomizeFromPool];
-        [self refreshUI];
+    [a addAction:[UIAlertAction actionWithTitle:@"Kill Zalo + Wipe" style:UIAlertActionStyleDestructive handler:^(__unused UIAlertAction *_) {
+        [self killTapped];
     }]];
     [self presentViewController:a animated:YES completion:nil];
 }

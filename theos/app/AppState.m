@@ -6,6 +6,7 @@ NSNotificationName const AppStateDidChangeNotification = @"AppStateDidChangeNoti
 
 static NSString *const kPoolDevices = @"ipf.pool.deviceIds";
 static NSString *const kPoolIOS = @"ipf.pool.iosList";
+static NSString *const kPoolWipeApps = @"ipf.pool.wipeBundleIds";
 
 @implementation AppState
 
@@ -16,6 +17,7 @@ static NSString *const kPoolIOS = @"ipf.pool.iosList";
         s = [[AppState alloc] init];
         s.selectedDeviceIds = [NSMutableArray array];
         s.selectedIOSList = [NSMutableArray array];
+        s.selectedWipeBundleIds = [NSMutableArray array];
         [[Catalog shared] reload];
         [s loadPools];
         [s reloadFromDisk];
@@ -29,15 +31,19 @@ static NSString *const kPoolIOS = @"ipf.pool.iosList";
 - (void)loadPools {
     NSArray *d = [NSUserDefaults.standardUserDefaults arrayForKey:kPoolDevices];
     NSArray *i = [NSUserDefaults.standardUserDefaults arrayForKey:kPoolIOS];
+    NSArray *w = [NSUserDefaults.standardUserDefaults arrayForKey:kPoolWipeApps];
     if ([d isKindOfClass:[NSArray class]] && d.count)
         self.selectedDeviceIds = [d mutableCopy];
     if ([i isKindOfClass:[NSArray class]] && i.count)
         self.selectedIOSList = [i mutableCopy];
+    if ([w isKindOfClass:[NSArray class]] && w.count)
+        self.selectedWipeBundleIds = [w mutableCopy];
 }
 
 - (void)savePools {
     [NSUserDefaults.standardUserDefaults setObject:[self.selectedDeviceIds copy] forKey:kPoolDevices];
     [NSUserDefaults.standardUserDefaults setObject:[self.selectedIOSList copy] forKey:kPoolIOS];
+    [NSUserDefaults.standardUserDefaults setObject:[self.selectedWipeBundleIds copy] forKey:kPoolWipeApps];
 }
 
 #pragma mark - Disk / defaults
@@ -110,6 +116,11 @@ static NSString *const kPoolIOS = @"ipf.pool.iosList";
             ?: @"18.5";
         if (self.selectedIOS.length && ![self.selectedIOSList containsObject:self.selectedIOS])
             [self.selectedIOSList addObject:self.selectedIOS];
+    }
+    // Default wipe apps: Maps + Weather (Bản đồ, Thời tiết)
+    if (self.selectedWipeBundleIds.count == 0) {
+        [self.selectedWipeBundleIds addObject:@"com.apple.Maps"];
+        [self.selectedWipeBundleIds addObject:@"com.apple.weather"];
     }
     [self savePools];
 }
@@ -266,6 +277,42 @@ static NSString *const kPoolIOS = @"ipf.pool.iosList";
     return [NSString stringWithFormat:@"%lu bản: iOS %@", (unsigned long)n, head];
 }
 
+#pragma mark - Wipe app multi-select
+
+- (BOOL)isWipeAppSelected:(NSString *)bundleId {
+    return bundleId.length && [self.selectedWipeBundleIds containsObject:bundleId];
+}
+
+- (BOOL)toggleWipeBundleId:(NSString *)bundleId {
+    if (!bundleId.length) return NO;
+    if ([self.selectedWipeBundleIds containsObject:bundleId]) {
+        // Allow empty wipe pool? Keep at least 0 is OK for wipe tab
+        [self.selectedWipeBundleIds removeObject:bundleId];
+    } else {
+        [self.selectedWipeBundleIds addObject:bundleId];
+    }
+    [self savePools];
+    [self postDidChange];
+    return [self.selectedWipeBundleIds containsObject:bundleId];
+}
+
+- (NSString *)wipeAppsSummary {
+    NSUInteger n = self.selectedWipeBundleIds.count;
+    if (n == 0) return @"Chưa chọn app (chạm để chọn)";
+    NSMutableArray *names = [NSMutableArray array];
+    for (NSString *bid in self.selectedWipeBundleIds) {
+        if ([bid isEqualToString:@"com.apple.Maps"]) [names addObject:@"Bản đồ"];
+        else if ([bid isEqualToString:@"com.apple.weather"]) [names addObject:@"Thời tiết"];
+        else if ([bid containsString:@"zalo"] || [bid containsString:@"zing"]) [names addObject:@"Zalo"];
+        else [names addObject:bid.pathExtension.length ? bid.pathExtension : bid];
+        if (names.count >= 4) break;
+    }
+    NSString *head = [names componentsJoinedByString:@", "];
+    if (n > names.count)
+        return [NSString stringWithFormat:@"%lu app: %@…", (unsigned long)n, head];
+    return [NSString stringWithFormat:@"%lu app: %@", (unsigned long)n, head];
+}
+
 #pragma mark - Apply / random pool
 
 /// Pick random device from pool + random iOS from pool that matrix allows for that device.
@@ -391,10 +438,15 @@ static NSString *const kPoolIOS = @"ipf.pool.iosList";
 }
 
 - (NSString *)killZaloAndRandomizeFromPool {
-    // 1) Random full profile FIRST (spoof ready before next open)
+    return [self killZaloAndRandomizeFromPoolProgress:nil];
+}
+
+- (NSString *)killZaloAndRandomizeFromPoolProgress:(void (^)(NSString *))progress {
+    if (progress) progress(@"Random máy + iOS trong pool…");
     NSString *applyMsg = [self applyRandomFromPool];
-    // 2) Full 100% wipe Zalo data (account gone) + kill
-    NSString *wipeMsg = [ProfileBuilder wipeZaloFull];
+    if (progress) progress(@"Đã apply spoof — bắt đầu wipe data Zalo…");
+    NSString *wipeMsg = [ProfileBuilder wipeApps:@[ @"vn.com.vng.zingalo", @"com.zing.zalo" ]
+                                        progress:progress];
     self.statusText = [NSString stringWithFormat:
                        @"%@\n\n%@\n\n→ Mở Zalo = máy mới + form login trống.",
                        applyMsg, wipeMsg];
@@ -403,16 +455,26 @@ static NSString *const kPoolIOS = @"ipf.pool.iosList";
 }
 
 - (void)killZalo {
-    // Kill button = random identity from pool + wipe 100% Zalo data
     (void)[self killZaloAndRandomizeFromPool];
 }
 
 - (NSString *)wipeZaloLab {
-    // Wipe tab: full wipe only (keep current spoof profile)
-    NSString *m = [ProfileBuilder wipeZaloFull];
-    self.statusText = m ?: @"Wipe done";
+    return [self wipeSelectedAppsProgress:nil];
+}
+
+- (NSString *)wipeSelectedAppsProgress:(void (^)(NSString *))progress {
+    [self ensureDefaults];
+    NSArray *bids = [self.selectedWipeBundleIds copy];
+    if (bids.count == 0) {
+        NSString *m = @"Chưa chọn app nào để wipe.";
+        self.statusText = m;
+        return m;
+    }
+    if (progress) progress([NSString stringWithFormat:@"Wipe %lu app đã chọn…", (unsigned long)bids.count]);
+    NSString *m = [ProfileBuilder wipeApps:bids progress:progress];
+    self.statusText = m;
     [self postDidChange];
-    return self.statusText;
+    return m;
 }
 
 #pragma mark - Toggles
