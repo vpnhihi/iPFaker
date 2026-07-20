@@ -2,6 +2,8 @@
 #include "fishhook.h"
 
 #include <dlfcn.h>
+#include <mach/mach.h>
+#include <mach/vm_map.h>
 #include <mach-o/dyld.h>
 #include <mach-o/loader.h>
 #include <mach-o/nlist.h>
@@ -9,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <sys/mman.h>
 
 #ifdef __LP64__
 typedef struct mach_header_64 mach_header_t;
@@ -27,30 +30,44 @@ typedef struct nlist nlist_t;
 static struct rebinding *g_rebindings = NULL;
 static size_t g_rebindings_nel = 0;
 
+static bool ipf_make_writable(void *addr, size_t len) {
+  // __DATA_CONST is r-- on modern iOS; must elevate before GOT rewrite
+  vm_address_t page = (vm_address_t)addr & ~(vm_address_t)(vm_page_size - 1);
+  vm_size_t size = (vm_size_t)(((uintptr_t)addr + len + vm_page_size - 1) & ~(vm_page_size - 1)) - page;
+  kern_return_t kr = vm_protect(mach_task_self(), page, size, FALSE,
+                                VM_PROT_READ | VM_PROT_WRITE | VM_PROT_COPY);
+  return kr == KERN_SUCCESS;
+}
+
 static void perform_rebinding_with_section(section_t *sect, intptr_t slide, nlist_t *symtab,
                                            char *strtab, uint32_t *indirect) {
   uint32_t *indirect_sym = indirect + sect->reserved1;
   void **indirect_bindings = (void **)((uintptr_t)slide + sect->addr);
-  for (uint32_t i = 0; i < sect->size / sizeof(void *); i++) {
+  size_t n = sect->size / sizeof(void *);
+  if (n == 0) return;
+  // Elevate whole section once (DATA_CONST is read-only)
+  if (!ipf_make_writable(indirect_bindings, sect->size)) {
+    // Skip rather than SIGBUS
+    return;
+  }
+  for (uint32_t i = 0; i < n; i++) {
     uint32_t symtab_index = indirect_sym[i];
     if (symtab_index == INDIRECT_SYMBOL_ABS || symtab_index == INDIRECT_SYMBOL_LOCAL ||
         symtab_index == (INDIRECT_SYMBOL_LOCAL | INDIRECT_SYMBOL_ABS))
       continue;
     uint32_t strtab_offset = symtab[symtab_index].n_un.n_strx;
     char *symbol_name = strtab + strtab_offset;
-    bool seen = false;
     // symbol_name starts with '_'
     if (symbol_name[0] != '_') continue;
     for (size_t j = 0; j < g_rebindings_nel; j++) {
       if (strcmp(&symbol_name[1], g_rebindings[j].name) != 0) continue;
-      if (g_rebindings[j].replaced != NULL && indirect_bindings[i] != g_rebindings[j].replacement) {
+      if (g_rebindings[j].replaced != NULL &&
+          indirect_bindings[i] != g_rebindings[j].replacement) {
         *(g_rebindings[j].replaced) = indirect_bindings[i];
       }
       indirect_bindings[i] = g_rebindings[j].replacement;
-      seen = true;
       break;
     }
-    (void)seen;
   }
 }
 

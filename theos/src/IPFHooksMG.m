@@ -269,32 +269,13 @@ void IPFInstallMGHooks(void) {
     IPFTrace(@"IPFInstallMGHooks begin");
     IPFResolveSubstrate();
 
-    // --- fishhook first (HIOS path for apps that bind imports) ---
-    struct rebinding rebs[5];
-    int nreb = 0;
-    rebs[nreb++] = (struct rebinding){ "MGCopyAnswer", (void *)stub_MGCopyAnswer, (void **)&orig_MGCopyAnswer };
-    rebs[nreb++] = (struct rebinding){ "sysctlbyname", (void *)stub_sysctlbyname, (void **)&orig_sysctlbyname };
-    rebs[nreb++] = (struct rebinding){ "uname", (void *)stub_uname, (void **)&orig_uname };
-    rebs[nreb++] = (struct rebinding){ "sysctl", (void *)stub_sysctl, (void **)&orig_sysctl };
-    int frc = rebind_symbols(rebs, nreb);
-    IPFTrace([NSString stringWithFormat:@"fishhook rc=%d origMG=%p origSys=%p origUname=%p origSysctl=%p",
-              frc, orig_MGCopyAnswer, orig_sysctlbyname, orig_uname, orig_sysctl]);
-
-    // --- MSHook absolute (ElleKit) ---
+    // --- MSHook absolute FIRST (ElleKit) — safe, was stable before fishhook ---
+    int frc = -1;
     if (pMSHookFunction) {
         void *mg = IPFFindMG("MGCopyAnswer");
         if (mg) {
-            // Only MSHook if fishhook didn't capture orig yet, or always reinforce
-            if (!orig_MGCopyAnswer) {
-                pMSHookFunction(mg, (void *)stub_MGCopyAnswer, (void **)&orig_MGCopyAnswer);
-                IPFTrace([NSString stringWithFormat:@"MSHook MGCopyAnswer %p orig=%p", mg, orig_MGCopyAnswer]);
-            } else {
-                // Still patch absolute for direct calls
-                void *tmp = NULL;
-                pMSHookFunction(mg, (void *)stub_MGCopyAnswer, &tmp);
-                if (!orig_MGCopyAnswer && tmp) orig_MGCopyAnswer = tmp;
-                IPFTrace([NSString stringWithFormat:@"MSHook reinforce MG %p tmp=%p", mg, tmp]);
-            }
+            pMSHookFunction(mg, (void *)stub_MGCopyAnswer, (void **)&orig_MGCopyAnswer);
+            IPFTrace([NSString stringWithFormat:@"MSHook MGCopyAnswer %p orig=%p", mg, orig_MGCopyAnswer]);
         } else {
             IPFTrace(@"WARN no MGCopyAnswer symbol");
         }
@@ -303,16 +284,33 @@ void IPFInstallMGHooks(void) {
             pMSHookFunction(mge, (void *)stub_MGCopyAnswerWithError, (void **)&orig_MGCopyAnswerWithError);
 
         void *sys = dlsym(RTLD_DEFAULT, "sysctlbyname");
-        if (sys && !orig_sysctlbyname)
+        if (sys)
             pMSHookFunction(sys, (void *)stub_sysctlbyname, (void **)&orig_sysctlbyname);
         void *un = dlsym(RTLD_DEFAULT, "uname");
-        if (un && !orig_uname)
+        if (un)
             pMSHookFunction(un, (void *)stub_uname, (void **)&orig_uname);
         void *sc = dlsym(RTLD_DEFAULT, "sysctl");
-        if (sc && !orig_sysctl)
+        if (sc)
             pMSHookFunction(sc, (void *)stub_sysctl, (void **)&orig_sysctl);
     } else {
-        IPFTrace(@"WARN no MSHookFunction — fishhook only");
+        IPFTrace(@"WARN no MSHookFunction");
+    }
+
+    // --- fishhook second (GOT rebind); vm_protect inside — skip if fails ---
+    // Only rebind symbols not already hooked, to catch static imports.
+    @try {
+        struct rebinding rebs[5];
+        int nreb = 0;
+        rebs[nreb++] = (struct rebinding){ "MGCopyAnswer", (void *)stub_MGCopyAnswer, (void **)&orig_MGCopyAnswer };
+        rebs[nreb++] = (struct rebinding){ "sysctlbyname", (void *)stub_sysctlbyname, (void **)&orig_sysctlbyname };
+        rebs[nreb++] = (struct rebinding){ "uname", (void *)stub_uname, (void **)&orig_uname };
+        rebs[nreb++] = (struct rebinding){ "sysctl", (void *)stub_sysctl, (void **)&orig_sysctl };
+        frc = rebind_symbols(rebs, (size_t)nreb);
+        IPFTrace([NSString stringWithFormat:@"fishhook rc=%d origMG=%p sys=%p uname=%p sysctl=%p",
+                  frc, orig_MGCopyAnswer, orig_sysctlbyname, orig_uname, orig_sysctl]);
+    } @catch (__unused NSException *ex) {
+        IPFTrace(@"fishhook exception — MSHook only");
+        frc = -2;
     }
 
     if (pMSHookMessageEx) {
