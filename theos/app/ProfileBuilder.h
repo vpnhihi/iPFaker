@@ -24,6 +24,27 @@ typedef void (^IPFWipeProgress)(NSString *step);
 + (NSString *)wipeApps:(NSArray<NSString *> *)bundleIds
               progress:(nullable IPFWipeProgress)progress;
 
+/// Wipe with options: skipKeychain / skipScript (BOOL in options).
++ (NSString *)wipeApps:(NSArray<NSString *> *)bundleIds
+              progress:(nullable IPFWipeProgress)progress
+               options:(nullable NSDictionary *)options;
+
+/// Backup app data containers (+ app groups) for selected bundles. Returns backup root path or error prefix "ERR:".
++ (NSString *)backupApps:(NSArray<NSString *> *)bundleIds
+              backupRoot:(nullable NSString *)backupRoot
+                progress:(nullable IPFWipeProgress)progress;
+
+/// Restore app data from a previous backup root (keeps login session files).
++ (NSString *)restoreApps:(NSArray<NSString *> *)bundleIds
+             fromBackupRoot:(NSString *)backupRoot
+                  progress:(nullable IPFWipeProgress)progress;
+
+/// Copy current device config.plist + active_profile.json into backupRoot/device/
++ (BOOL)backupCurrentDeviceProfileTo:(NSString *)backupRoot error:(NSString * _Nullable * _Nullable)errOut;
+
+/// Default backup base: /var/mobile/Library/iPFaker/backups
++ (NSString *)defaultBackupBase;
+
 /// Full wipe Zalo only.
 + (NSString *)wipeZaloFull;
 + (NSString *)wipeZaloLab;

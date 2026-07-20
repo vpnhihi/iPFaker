@@ -46,9 +46,12 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (NSString *)applyReseedOnly:(BOOL)reseedOnly;
 - (NSString *)applyRandomFromPool;
-/// Random spoof + wipe Zalo with optional progress (step strings).
+/// Random spoof + wipe data (không giữ đăng nhập).
 - (NSString *)killZaloAndRandomizeFromPool;
 - (NSString *)killZaloAndRandomizeFromPoolProgress:(nullable void (^)(NSString *step))progress;
+
+/// Đặt lại + Lưu: lưu 100% thông số máy + data app (giữ phiên đăng nhập) → random máy → xóa → khôi phục data.
+- (NSString *)saveDataThenResetProgress:(nullable void (^)(NSString *step))progress;
 
 - (void)killZalo;
 - (NSString *)wipeZaloLab;

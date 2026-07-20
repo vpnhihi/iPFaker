@@ -167,9 +167,9 @@
                                  [AppState.shared wipeAppsSummary],
                                  (unsigned long)AppCatalog.shared.apps.count];
     self.hintLabel.text = [NSString stringWithFormat:
-        @"• Xóa dữ liệu app đã chọn: xóa container/tuỳ chọn của tập chọn.\n"
-        @"• Đặt lại dữ liệu app: ngẫu nhiên hồ sơ + xóa data.\n"
-        @"• Đặt lại + Lưu: ngẫu nhiên + ghi cấu hình (không xóa data).\n"
+        @"• Xóa dữ liệu app đã chọn: xóa container (mất đăng nhập).\n"
+        @"• Đặt lại dữ liệu app: máy mới + xóa data (mất đăng nhập).\n"
+        @"• Đặt lại + Lưu: lưu data+máy → máy mới → xóa → khôi phục (giữ đăng nhập).\n"
         @"%@\n%@",
         [AppState.shared wipeAppsSummary],
         AppState.shared.statusText ?: @""];
@@ -223,11 +223,8 @@
 }
 
 - (void)saveDataTapped {
-    [self runWithProgressTitle:@"Đang đặt lại + lưu…" work:^NSString *(void (^step)(NSString *)) {
-        step(@"Đang chọn ngẫu nhiên máy + iOS…");
-        NSString *msg = [AppState.shared applyRandomFromPool];
-        step(@"Đã ghi cấu hình");
-        return msg;
+    [self runWithProgressTitle:@"Đang đặt lại + lưu dữ liệu…" work:^NSString *(void (^step)(NSString *)) {
+        return [AppState.shared saveDataThenResetProgress:step];
     }];
 }
 

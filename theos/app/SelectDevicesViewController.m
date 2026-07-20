@@ -252,17 +252,17 @@
 
 - (void)applyTapped {
     UIView *host = self.tabBarController.view ?: self.navigationController.view ?: self.view;
-    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Đang đặt lại + lưu…"];
+    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Đang đặt lại + lưu dữ liệu…"];
     self.view.userInteractionEnabled = NO;
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-        [ov appendStep:@"Đang chọn ngẫu nhiên máy + iOS…"];
-        NSString *msg = [AppState.shared applyRandomFromPool];
-        [ov appendStep:@"Đã ghi cấu hình"];
+        NSString *msg = [AppState.shared saveDataThenResetProgress:^(NSString *step) {
+            [ov appendStep:step];
+        }];
         dispatch_async(dispatch_get_main_queue(), ^{
             self.view.userInteractionEnabled = YES;
-            [ov finishWithTitle:@"Đã lưu" detail:msg];
+            [ov finishWithTitle:@"Hoàn tất" detail:msg];
             [self refreshUI];
-            [ov dismissAfter:1.2 completion:^{
+            [ov dismissAfter:1.8 completion:^{
                 [self alert:@"Đặt lại + Lưu dữ liệu" msg:msg];
             }];
         });

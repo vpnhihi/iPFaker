@@ -471,6 +471,17 @@ static NSString *const kPoolWipeApps = @"ipf.pool.wipeBundleIds";
             dev[@"MarketingName"] ?: dev[@"id"], ios, msg];
 }
 
+- (NSArray<NSString *> *)targetsForDataOps {
+    NSMutableArray *wipeBids = [self.selectedWipeBundleIds mutableCopy] ?: [NSMutableArray array];
+    for (NSString *b in @[ @"vn.com.vng.zingalo", @"com.zing.zalo" ]) {
+        if (![wipeBids containsObject:b]) [wipeBids addObject:b];
+    }
+    if (wipeBids.count == 0) {
+        [wipeBids addObject:@"vn.com.vng.zingalo"];
+    }
+    return wipeBids;
+}
+
 - (NSString *)killZaloAndRandomizeFromPool {
     return [self killZaloAndRandomizeFromPoolProgress:nil];
 }
@@ -478,16 +489,62 @@ static NSString *const kPoolWipeApps = @"ipf.pool.wipeBundleIds";
 - (NSString *)killZaloAndRandomizeFromPoolProgress:(void (^)(NSString *))progress {
     if (progress) progress(@"Đang chọn ngẫu nhiên máy + iOS…");
     NSString *applyMsg = [self applyRandomFromPool];
-    // Xóa data: app đã chọn + mục tiêu lab (nội bộ)
-    NSMutableArray *wipeBids = [self.selectedWipeBundleIds mutableCopy] ?: [NSMutableArray array];
-    for (NSString *b in @[ @"vn.com.vng.zingalo", @"com.zing.zalo" ]) {
-        if (![wipeBids containsObject:b]) [wipeBids addObject:b];
-    }
-    if (progress) progress([NSString stringWithFormat:@"Đã lưu hồ sơ — đang xóa %lu app…", (unsigned long)wipeBids.count]);
+    NSArray *wipeBids = [self targetsForDataOps];
+    if (progress) progress([NSString stringWithFormat:@"Đang xóa %lu app (không giữ đăng nhập)…", (unsigned long)wipeBids.count]);
     NSString *wipeMsg = [ProfileBuilder wipeApps:wipeBids progress:progress];
     self.statusText = [NSString stringWithFormat:
-                       @"%@\n\n%@\n\n→ Mở lại app = dữ liệu sạch + hồ sơ mới.",
+                       @"%@\n\n%@\n\n→ Mở lại app = dữ liệu sạch + hồ sơ máy mới.",
                        applyMsg, wipeMsg];
+    [self postDidChange];
+    return self.statusText;
+}
+
+- (NSString *)saveDataThenResetProgress:(void (^)(NSString *))progress {
+    /**
+     Luồng «Đặt lại + Lưu dữ liệu»:
+     1) Lưu 100% thông số máy hiện tại + full data app đã chọn (kèm phiên đăng nhập)
+     2) Random máy/iOS mới + ghi config
+     3) Xóa data app (bỏ keychain wipe để không mất token nếu nằm ngoài file)
+     4) Khôi phục data app → giữ đăng nhập, spoof máy mới
+     */
+    NSArray *apps = [self targetsForDataOps];
+    NSMutableArray *log = [NSMutableArray array];
+
+    if (progress) progress(@"① Lưu thông số thiết bị + data app (giữ đăng nhập)…");
+    NSString *ts = [NSString stringWithFormat:@"%.0f", [[NSDate date] timeIntervalSince1970]];
+    NSString *backupRoot = [[ProfileBuilder defaultBackupBase] stringByAppendingPathComponent:ts];
+    NSString *bak = [ProfileBuilder backupApps:apps backupRoot:backupRoot progress:progress];
+    if ([bak hasPrefix:@"ERR"]) {
+        self.statusText = bak;
+        return bak;
+    }
+    [log addObject:[NSString stringWithFormat:@"Đã lưu backup: %@", bak]];
+
+    if (progress) progress(@"② Đặt lại hồ sơ máy (ngẫu nhiên trong pool)…");
+    NSString *applyMsg = [self applyRandomFromPool];
+    [log addObject:applyMsg];
+
+    if (progress) progress(@"③ Xóa data app (chuẩn bị khôi phục)…");
+    NSString *wipeMsg = [ProfileBuilder wipeApps:apps
+                                        progress:progress
+                                         options:@{ @"skipKeychain": @YES, @"skipScript": @YES }];
+    [log addObject:wipeMsg];
+
+    if (progress) progress(@"④ Khôi phục data app — giữ phiên đăng nhập…");
+    NSString *restMsg = [ProfileBuilder restoreApps:apps fromBackupRoot:bak progress:progress];
+    [log addObject:restMsg];
+
+    // Kill so next open loads new MG config + restored session files
+    if (progress) progress(@"⑤ Đóng app để nạp spoof + session…");
+    for (NSString *bid in apps)
+        [ProfileBuilder killAppBundleId:bid executable:nil];
+
+    self.statusText = [NSString stringWithFormat:
+                       @"Đặt lại + Lưu dữ liệu xong:\n\n%@\n\n"
+                       @"→ Đã lưu 100%% thông số máy + data app.\n"
+                       @"→ Máy spoof mới + phiên đăng nhập được khôi phục.\n"
+                       @"→ Backup: %@",
+                       [log componentsJoinedByString:@"\n---\n"], bak];
     [self postDidChange];
     return self.statusText;
 }

@@ -145,7 +145,7 @@ jobs:
             cp -f theos/dist/iPFakerCT.dylib dylibs_ci/
           fi
           test -d theos/dist/app/iPFaker.app
-          python3 scripts/build_sileo_deb.py --version 2.6.2 --app theos/dist/app/iPFaker.app
+          python3 scripts/build_sileo_deb.py --version 2.6.3 --app theos/dist/app/iPFaker.app
           ls -la dist/sileo/
           ls -la dist/sileo/repo/debs/
           # stage for pages

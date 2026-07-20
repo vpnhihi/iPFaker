@@ -556,16 +556,7 @@
     return n;
 }
 
-+ (NSString *)wipeApps:(NSArray<NSString *> *)bundleIds progress:(IPFWipeProgress)progress {
-    void (^step)(NSString *) = ^(NSString *s) {
-        if (progress) progress(s);
-    };
-
-    NSMutableArray *log = [NSMutableArray array];
-    NSFileManager *fm = [NSFileManager defaultManager];
-    NSArray<NSString *> *bundles = bundleIds.count ? bundleIds : @[ @"vn.com.vng.zingalo" ];
-
-    // Build needles for metadata match (bundle id + short tokens)
++ (NSArray<NSString *> *)needlesForBundles:(NSArray<NSString *> *)bundles {
     NSMutableArray *needles = [NSMutableArray array];
     for (NSString *bid in bundles) {
         if (!bid.length) continue;
@@ -573,11 +564,273 @@
         NSArray *parts = [bid componentsSeparatedByString:@"."];
         if (parts.count) [needles addObject:parts.lastObject];
     }
+    return needles;
+}
+
++ (NSArray<NSString *> *)containerPathsUnder:(NSString *)base matchingNeedles:(NSArray *)needles {
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSMutableArray *out = [NSMutableArray array];
+    for (NSString *uuid in [fm contentsOfDirectoryAtPath:base error:nil] ?: @[]) {
+        NSString *root = [base stringByAppendingPathComponent:uuid];
+        NSString *meta = [root stringByAppendingPathComponent:@".com.apple.mobile_container_manager.metadata.plist"];
+        if ([self metadataAtPath:meta matchesAny:needles])
+            [out addObject:root];
+    }
+    return out;
+}
+
++ (BOOL)copyTreeFrom:(NSString *)src to:(NSString *)dst fm:(NSFileManager *)fm {
+    [fm removeItemAtPath:dst error:nil];
+    NSString *parent = [dst stringByDeletingLastPathComponent];
+    [fm createDirectoryAtPath:parent withIntermediateDirectories:YES attributes:nil error:nil];
+    return [fm copyItemAtPath:src toPath:dst error:nil];
+}
+
+/// Copy container children except Apple metadata shells.
++ (NSUInteger)copyContainerContentsFrom:(NSString *)src to:(NSString *)dst fm:(NSFileManager *)fm {
+    [fm createDirectoryAtPath:dst withIntermediateDirectories:YES attributes:nil error:nil];
+    NSUInteger n = 0;
+    for (NSString *name in [fm contentsOfDirectoryAtPath:src error:nil] ?: @[]) {
+        if ([name isEqualToString:@".com.apple.mobile_container_manager.metadata.plist"]
+            || [name isEqualToString:@"iTunesMetadata.plist"]) continue;
+        NSString *s = [src stringByAppendingPathComponent:name];
+        NSString *d = [dst stringByAppendingPathComponent:name];
+        [fm removeItemAtPath:d error:nil];
+        if ([fm copyItemAtPath:s toPath:d error:nil]) n++;
+    }
+    return n;
+}
+
++ (NSString *)defaultBackupBase {
+    return @"/var/mobile/Library/iPFaker/backups";
+}
+
++ (BOOL)backupCurrentDeviceProfileTo:(NSString *)backupRoot error:(NSString **)errOut {
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSString *devDir = [backupRoot stringByAppendingPathComponent:@"device"];
+    [fm createDirectoryAtPath:devDir withIntermediateDirectories:YES attributes:nil error:nil];
+    NSArray *srcs = @[
+        @"/var/jb/etc/ipfaker/config.plist",
+        @"/var/mobile/Library/iPFaker/config.plist",
+        @"/var/jb/etc/ipfaker/active_profile.json",
+        @"/var/mobile/Library/iPFaker/active_profile.json",
+    ];
+    BOOL any = NO;
+    for (NSString *s in srcs) {
+        if (![fm fileExistsAtPath:s]) continue;
+        NSString *name = s.lastPathComponent;
+        // Prefer jb config if both exist — write once per name, jb first in list
+        NSString *dst = [devDir stringByAppendingPathComponent:name];
+        if ([name isEqualToString:@"config.plist"] && [fm fileExistsAtPath:dst] && [s containsString:@"/var/mobile/"])
+            continue; // already have jb
+        if ([name isEqualToString:@"active_profile.json"] && [fm fileExistsAtPath:dst] && [s containsString:@"/var/mobile/"])
+            continue;
+        [fm removeItemAtPath:dst error:nil];
+        if ([fm copyItemAtPath:s toPath:dst error:nil]) any = YES;
+    }
+    // Manifest of saved device keys
+    NSDictionary *flat = [self loadCurrentFlat] ?: @{};
+    NSDictionary *manifest = @{
+        @"savedAt": @([[NSDate date] timeIntervalSince1970]),
+        @"MarketingName": flat[@"MarketingName"] ?: @"",
+        @"ProductType": flat[@"ProductType"] ?: @"",
+        @"ProductVersion": flat[@"ProductVersion"] ?: @"",
+        @"SerialNumber": flat[@"SerialNumber"] ?: @"",
+        @"IDFA": flat[@"IDFA"] ?: @"",
+        @"IDFV": flat[@"IDFV"] ?: @"",
+        @"DeviceCatalogId": flat[@"DeviceCatalogId"] ?: @"",
+    };
+    NSData *json = [NSJSONSerialization dataWithJSONObject:manifest options:NSJSONWritingPrettyPrinted error:nil];
+    [json writeToFile:[devDir stringByAppendingPathComponent:@"manifest.json"] atomically:YES];
+    if (!any && errOut) *errOut = @"Không tìm thấy config.plist để lưu";
+    return any || json != nil;
+}
+
++ (NSString *)backupApps:(NSArray<NSString *> *)bundleIds
+              backupRoot:(NSString *)backupRoot
+                progress:(IPFWipeProgress)progress {
+    void (^step)(NSString *) = ^(NSString *s) { if (progress) progress(s); };
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSArray *bundles = bundleIds.count ? bundleIds : @[];
+    if (!backupRoot.length) {
+        NSString *ts = [NSString stringWithFormat:@"%.0f", [[NSDate date] timeIntervalSince1970]];
+        backupRoot = [[self defaultBackupBase] stringByAppendingPathComponent:ts];
+    }
+    [fm createDirectoryAtPath:backupRoot withIntermediateDirectories:YES attributes:nil error:nil];
+    // also update "latest" symlink-like folder
+    NSString *latest = [[self defaultBackupBase] stringByAppendingPathComponent:@"latest"];
+    [fm removeItemAtPath:latest error:nil];
+    [fm createDirectoryAtPath:latest withIntermediateDirectories:YES attributes:nil error:nil];
+
+    step(@"Đóng app trước khi sao lưu…");
+    for (NSString *bid in bundles) [self killAppBundleId:bid executable:nil];
+    usleep(300000);
+
+    NSString *err = nil;
+    step(@"Lưu 100% thông số thiết bị…");
+    [self backupCurrentDeviceProfileTo:backupRoot error:&err];
+    [self backupCurrentDeviceProfileTo:latest error:nil];
+
+    NSArray *needles = [self needlesForBundles:bundles];
+    NSUInteger nData = 0, nGroup = 0;
+    NSString *appsDir = [backupRoot stringByAppendingPathComponent:@"apps"];
+    [fm createDirectoryAtPath:appsDir withIntermediateDirectories:YES attributes:nil error:nil];
+
+    for (NSString *bid in bundles) {
+        step([NSString stringWithFormat:@"Sao lưu data: %@", bid]);
+        NSString *bidDir = [appsDir stringByAppendingPathComponent:bid];
+        NSString *dataBak = [bidDir stringByAppendingPathComponent:@"data"];
+        NSString *groupBak = [bidDir stringByAppendingPathComponent:@"groups"];
+        [fm createDirectoryAtPath:dataBak withIntermediateDirectories:YES attributes:nil error:nil];
+        [fm createDirectoryAtPath:groupBak withIntermediateDirectories:YES attributes:nil error:nil];
+
+        NSArray *datas = [self containerPathsUnder:@"/var/mobile/Containers/Data/Application"
+                                  matchingNeedles:@[ bid, bid.pathExtension ?: @"" ]];
+        // also match needles list for this bid only
+        NSMutableArray *bidNeedles = [NSMutableArray arrayWithObject:bid];
+        if (bid.pathExtension.length) [bidNeedles addObject:bid.pathExtension];
+        datas = [self containerPathsUnder:@"/var/mobile/Containers/Data/Application" matchingNeedles:bidNeedles];
+        int i = 0;
+        for (NSString *root in datas) {
+            NSString *dst = [dataBak stringByAppendingPathComponent:[NSString stringWithFormat:@"c%d", i++]];
+            nData += [self copyContainerContentsFrom:root to:dst fm:fm];
+        }
+        NSArray *groups = [self containerPathsUnder:@"/var/mobile/Containers/Shared/AppGroup" matchingNeedles:needles];
+        // Filter groups that mention this bid
+        int g = 0;
+        for (NSString *root in groups) {
+            NSString *meta = [root stringByAppendingPathComponent:@".com.apple.mobile_container_manager.metadata.plist"];
+            if (![self metadataAtPath:meta matchesAny:bidNeedles] && bundles.count > 1) {
+                // still allow zalo group match via needles if single token
+                if (![self metadataAtPath:meta matchesAny:needles]) continue;
+            }
+            NSString *dst = [groupBak stringByAppendingPathComponent:[NSString stringWithFormat:@"g%d", g++]];
+            nGroup += [self copyContainerContentsFrom:root to:dst fm:fm];
+        }
+        // Shared prefs crumbs
+        NSString *crumbs = [bidDir stringByAppendingPathComponent:@"crumbs"];
+        [fm createDirectoryAtPath:crumbs withIntermediateDirectories:YES attributes:nil error:nil];
+        for (NSString *p in @[
+            [NSString stringWithFormat:@"/var/mobile/Library/Preferences/%@.plist", bid],
+            [NSString stringWithFormat:@"/var/mobile/Library/Cookies/%@.binarycookies", bid],
+        ]) {
+            if ([fm fileExistsAtPath:p]) {
+                [fm copyItemAtPath:p toPath:[crumbs stringByAppendingPathComponent:p.lastPathComponent] error:nil];
+            }
+        }
+    }
+
+    // Mirror to latest
+    [fm removeItemAtPath:[latest stringByAppendingPathComponent:@"apps"] error:nil];
+    [self copyTreeFrom:appsDir to:[latest stringByAppendingPathComponent:@"apps"] fm:fm];
+
+    NSString *msg = [NSString stringWithFormat:
+                     @"Đã lưu backup:\n%@\nData~%lu · Groups~%lu · App: %lu",
+                     backupRoot, (unsigned long)nData, (unsigned long)nGroup, (unsigned long)bundles.count];
+    step(msg);
+    // Write marker path for restore
+    [[backupRoot dataUsingEncoding:NSUTF8StringEncoding]
+        writeToFile:[[self defaultBackupBase] stringByAppendingPathComponent:@"LAST_BACKUP_PATH.txt"]
+         atomically:YES];
+    return backupRoot;
+}
+
++ (NSString *)restoreApps:(NSArray<NSString *> *)bundleIds
+           fromBackupRoot:(NSString *)backupRoot
+                 progress:(IPFWipeProgress)progress {
+    void (^step)(NSString *) = ^(NSString *s) { if (progress) progress(s); };
+    NSFileManager *fm = [NSFileManager defaultManager];
+    if (!backupRoot.length || ![fm fileExistsAtPath:backupRoot])
+        return @"ERR: không có thư mục backup";
+
+    step(@"Đóng app trước khi khôi phục…");
+    for (NSString *bid in bundleIds) [self killAppBundleId:bid executable:nil];
+    usleep(250000);
+
+    NSUInteger restored = 0;
+    for (NSString *bid in bundleIds) {
+        step([NSString stringWithFormat:@"Khôi phục data (giữ đăng nhập): %@", bid]);
+        NSString *bidDir = [[backupRoot stringByAppendingPathComponent:@"apps"] stringByAppendingPathComponent:bid];
+        if (![fm fileExistsAtPath:bidDir]) {
+            step([NSString stringWithFormat:@"Không có backup cho %@", bid]);
+            continue;
+        }
+        NSMutableArray *bidNeedles = [NSMutableArray arrayWithObject:bid];
+        if (bid.pathExtension.length) [bidNeedles addObject:bid.pathExtension];
+
+        // Restore data containers — map backup c0,c1… onto live containers for bid
+        NSArray *liveData = [self containerPathsUnder:@"/var/mobile/Containers/Data/Application" matchingNeedles:bidNeedles];
+        NSString *dataBak = [bidDir stringByAppendingPathComponent:@"data"];
+        NSArray *bakSlots = [[fm contentsOfDirectoryAtPath:dataBak error:nil] sortedArrayUsingSelector:@selector(compare:)] ?: @[];
+        for (NSUInteger i = 0; i < liveData.count; i++) {
+            NSString *live = liveData[i];
+            // Clear then copy
+            [self wipeContainerRoot:live fm:fm];
+            if (i < bakSlots.count) {
+                NSString *slot = [dataBak stringByAppendingPathComponent:bakSlots[i]];
+                restored += [self copyContainerContentsFrom:slot to:live fm:fm];
+            }
+        }
+        // If no live container yet but we have backup — cannot create UUID container easily; log
+        if (liveData.count == 0 && bakSlots.count > 0)
+            step([NSString stringWithFormat:@"%@: chưa có container sống — mở app 1 lần rồi khôi phục lại", bid]);
+
+        // Groups
+        NSString *groupBak = [bidDir stringByAppendingPathComponent:@"groups"];
+        NSArray *bakG = [[fm contentsOfDirectoryAtPath:groupBak error:nil] sortedArrayUsingSelector:@selector(compare:)] ?: @[];
+        NSArray *liveG = [self containerPathsUnder:@"/var/mobile/Containers/Shared/AppGroup" matchingNeedles:bidNeedles];
+        if (liveG.count == 0)
+            liveG = [self containerPathsUnder:@"/var/mobile/Containers/Shared/AppGroup" matchingNeedles:[self needlesForBundles:bundleIds]];
+        for (NSUInteger i = 0; i < liveG.count && i < bakG.count; i++) {
+            [self wipeContainerRoot:liveG[i] fm:fm];
+            restored += [self copyContainerContentsFrom:[groupBak stringByAppendingPathComponent:bakG[i]] to:liveG[i] fm:fm];
+        }
+
+        // Crumbs
+        NSString *crumbs = [bidDir stringByAppendingPathComponent:@"crumbs"];
+        for (NSString *name in [fm contentsOfDirectoryAtPath:crumbs error:nil] ?: @[]) {
+            NSString *src = [crumbs stringByAppendingPathComponent:name];
+            NSString *dst = nil;
+            if ([name hasSuffix:@".plist"])
+                dst = [NSString stringWithFormat:@"/var/mobile/Library/Preferences/%@", name];
+            else if ([name hasSuffix:@".binarycookies"])
+                dst = [NSString stringWithFormat:@"/var/mobile/Library/Cookies/%@", name];
+            if (dst) {
+                [[dst stringByDeletingLastPathComponent] length];
+                [fm createDirectoryAtPath:[dst stringByDeletingLastPathComponent] withIntermediateDirectories:YES attributes:nil error:nil];
+                [fm removeItemAtPath:dst error:nil];
+                if ([fm copyItemAtPath:src toPath:dst error:nil]) restored++;
+            }
+        }
+    }
+
+    step(@"Đóng app sau khôi phục…");
+    for (NSString *bid in bundleIds) [self killAppBundleId:bid executable:nil];
+
+    return [NSString stringWithFormat:@"Đã khôi phục data app (giữ phiên đăng nhập). Mục~%lu", (unsigned long)restored];
+}
+
++ (NSString *)wipeApps:(NSArray<NSString *> *)bundleIds progress:(IPFWipeProgress)progress {
+    return [self wipeApps:bundleIds progress:progress options:nil];
+}
+
++ (NSString *)wipeApps:(NSArray<NSString *> *)bundleIds
+              progress:(IPFWipeProgress)progress
+               options:(NSDictionary *)options {
+    void (^step)(NSString *) = ^(NSString *s) {
+        if (progress) progress(s);
+    };
+    BOOL skipKeychain = [options[@"skipKeychain"] boolValue];
+    BOOL skipScript = [options[@"skipScript"] boolValue];
+
+    NSMutableArray *log = [NSMutableArray array];
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSArray<NSString *> *bundles = bundleIds.count ? bundleIds : @[ @"vn.com.vng.zingalo" ];
+    NSArray *needles = [self needlesForBundles:bundles];
 
     step([NSString stringWithFormat:@"Bắt đầu xóa dữ liệu %lu app…", (unsigned long)bundles.count]);
     [log addObject:[NSString stringWithFormat:@"Mục tiêu: %@", [bundles componentsJoinedByString:@", "]]];
 
-    // 1) Kill each app
     for (NSString *bid in bundles) {
         step([NSString stringWithFormat:@"Đóng tiến trình: %@", bid]);
         [self killAppBundleId:bid executable:nil];
@@ -585,14 +838,13 @@
     usleep(350000);
     [log addObject:@"① Đã đóng tiến trình"];
 
-    // 2) Zalo-specific privileged script when wiping Zalo
     BOOL wipingZalo = NO;
     for (NSString *b in bundles) {
         if ([b.lowercaseString containsString:@"zalo"] || [b.lowercaseString containsString:@"zing"]) {
             wipingZalo = YES; break;
         }
     }
-    if (wipingZalo) {
+    if (wipingZalo && !skipScript) {
         step(@"Chạy script xóa sâu (libexec)…");
         NSArray *scripts = @[
             @"/var/jb/usr/libexec/ipfaker-wipe-zalo",
@@ -615,75 +867,48 @@
             [log addObject:@"② Script: bỏ qua — xóa trực tiếp"];
             step(@"Script không chạy — xóa trực tiếp");
         }
+    } else if (skipScript) {
+        step(@"Bỏ script xóa sâu (chế độ giữ đăng nhập)");
     }
 
-    // 3) Data containers
     step(@"Quét / xóa thư mục dữ liệu app…");
     NSUInteger dataWiped = 0;
-    NSString *dataRoot = @"/var/mobile/Containers/Data/Application";
-    for (NSString *uuid in [fm contentsOfDirectoryAtPath:dataRoot error:nil] ?: @[]) {
-        NSString *root = [dataRoot stringByAppendingPathComponent:uuid];
-        NSString *meta = [root stringByAppendingPathComponent:@".com.apple.mobile_container_manager.metadata.plist"];
-        if (![self metadataAtPath:meta matchesAny:needles]) continue;
-        step([NSString stringWithFormat:@"Xóa dữ liệu %@", [uuid substringToIndex:MIN((NSUInteger)8, uuid.length)]]);
-        NSUInteger n = [self wipeContainerRoot:root fm:fm];
-        dataWiped += n;
-        [log addObject:[NSString stringWithFormat:@"③ Dữ liệu %@ mục~%lu",
-                        [uuid substringToIndex:MIN((NSUInteger)8, uuid.length)], (unsigned long)n]];
+    for (NSString *root in [self containerPathsUnder:@"/var/mobile/Containers/Data/Application" matchingNeedles:needles]) {
+        step([NSString stringWithFormat:@"Xóa dữ liệu %@", root.lastPathComponent]);
+        dataWiped += [self wipeContainerRoot:root fm:fm];
     }
     if (dataWiped == 0) {
         [log addObject:@"③ Dữ liệu: không tìm thấy / đã trống"];
         step(@"Thư mục dữ liệu: trống hoặc không khớp");
+    } else {
+        [log addObject:[NSString stringWithFormat:@"③ Dữ liệu mục~%lu", (unsigned long)dataWiped]];
     }
 
-    // 4) App Groups
     step(@"Quét / xóa nhóm chia sẻ app…");
     NSUInteger groupWiped = 0;
-    NSString *groupRoot = @"/var/mobile/Containers/Shared/AppGroup";
-    for (NSString *uuid in [fm contentsOfDirectoryAtPath:groupRoot error:nil] ?: @[]) {
-        NSString *root = [groupRoot stringByAppendingPathComponent:uuid];
-        NSString *meta = [root stringByAppendingPathComponent:@".com.apple.mobile_container_manager.metadata.plist"];
-        if (![self metadataAtPath:meta matchesAny:needles]) continue;
-        step([NSString stringWithFormat:@"Xóa nhóm chia sẻ %@", [uuid substringToIndex:MIN((NSUInteger)8, uuid.length)]]);
+    for (NSString *root in [self containerPathsUnder:@"/var/mobile/Containers/Shared/AppGroup" matchingNeedles:needles]) {
+        step([NSString stringWithFormat:@"Xóa nhóm chia sẻ %@", [root.lastPathComponent substringToIndex:MIN((NSUInteger)8, root.lastPathComponent.length)]]);
         groupWiped += [self wipeContainerRoot:root fm:fm];
-        [log addObject:[NSString stringWithFormat:@"④ Nhóm chia sẻ %@", [uuid substringToIndex:MIN((NSUInteger)8, uuid.length)]]];
     }
-    if (groupWiped == 0) {
-        [log addObject:@"④ Nhóm chia sẻ: trống"];
-        step(@"Nhóm chia sẻ: trống");
-    }
+    [log addObject:groupWiped ? [NSString stringWithFormat:@"④ Nhóm chia sẻ ~%lu", (unsigned long)groupWiped] : @"④ Nhóm chia sẻ: trống"];
 
-    // 5) Prefs / cookies / caches / splash
-    step(@"Xóa tuỳ chọn / cookie / bộ nhớ đệm / ảnh chụp…");
+    step(@"Xóa tuỳ chọn / cookie / bộ nhớ đệm…");
     NSUInteger crumb = 0;
     for (NSString *bid in bundles) {
-        NSArray *paths = @[
+        for (NSString *p in @[
             [NSString stringWithFormat:@"/var/mobile/Library/Preferences/%@.plist", bid],
             [NSString stringWithFormat:@"/var/mobile/Library/Cookies/%@.binarycookies", bid],
             [NSString stringWithFormat:@"/var/mobile/Library/HTTPStorages/%@", bid],
             [NSString stringWithFormat:@"/var/mobile/Library/Caches/%@", bid],
-            [NSString stringWithFormat:@"/var/mobile/Library/WebKit/WebsiteData/Default/%@", bid],
-        ];
-        for (NSString *p in paths) {
+        ]) {
             if ([fm fileExistsAtPath:p] && [fm removeItemAtPath:p error:nil]) crumb++;
         }
     }
-    NSString *snapRoot = @"/var/mobile/Library/SplashBoard/Snapshots";
-    for (NSString *name in [fm contentsOfDirectoryAtPath:snapRoot error:nil] ?: @[]) {
-        NSString *low = name.lowercaseString;
-        BOOL hit = NO;
-        for (NSString *bid in bundles) {
-            NSString *tok = bid.pathExtension.length ? bid.pathExtension.lowercaseString : bid.lowercaseString;
-            if ([low containsString:tok] || [low containsString:bid.lowercaseString]) { hit = YES; break; }
-        }
-        if (hit && [fm removeItemAtPath:[snapRoot stringByAppendingPathComponent:name] error:nil]) crumb++;
-    }
-    NSString *m5 = [NSString stringWithFormat:@"⑤ Tuỳ chọn/bộ nhớ đệm ~%lu", (unsigned long)crumb];
-    [log addObject:m5]; step(m5);
+    [log addObject:[NSString stringWithFormat:@"⑤ Tuỳ chọn/bộ nhớ đệm ~%lu", (unsigned long)crumb]];
 
-    // 6) Keychain for zalo-ish only (safe subset)
-    if (wipingZalo) {
+    if (wipingZalo && !skipKeychain) {
         step(@"Xóa keychain (cố gắng hết sức)…");
+        // same as before
         NSString *sqlite = nil;
         for (NSString *c in @[ @"/var/jb/usr/bin/sqlite3", @"/usr/bin/sqlite3" ]) {
             if ([fm isExecutableFileAtPath:c]) { sqlite = c; break; }
@@ -693,8 +918,6 @@
             if ([fm isReadableFileAtPath:p]) { kcDB = p; break; }
         }
         if (sqlite && kcDB) {
-            NSString *bak = [kcDB stringByAppendingFormat:@".ipfaker_bak_%ld", (long)time(NULL)];
-            [fm copyItemAtPath:kcDB toPath:bak error:nil];
             for (NSString *pat in @[ @"zalo", @"Zalo", @"zing.zalo", @"vng.zalo" ]) {
                 NSString *sql = [NSString stringWithFormat:
                     @"DELETE FROM genp WHERE svce LIKE '%%%@%%' OR acct LIKE '%%%@%%' OR agrp LIKE '%%%@%%';",
@@ -705,23 +928,22 @@
                     int st = 0; waitpid(pid, &st, 0);
                 }
             }
-            [log addObject:@"⑥ Keychain đã dọn (SQL)"];
+            [log addObject:@"⑥ Keychain đã dọn"];
             step(@"Keychain: đã dọn");
         } else {
-            [log addObject:@"⑥ Keychain: bỏ qua (không có sqlite/db)"];
             step(@"Keychain: bỏ qua");
         }
+    } else if (skipKeychain) {
+        step(@"Giữ keychain (để phiên đăng nhập)");
+        [log addObject:@"⑥ Keychain: giữ nguyên"];
     }
 
-    // 7) Kill again
     step(@"Đóng lại các tiến trình…");
-    for (NSString *bid in bundles)
-        [self killAppBundleId:bid executable:nil];
-    [log addObject:@"⑦ Đóng tiến trình lần 2"];
+    for (NSString *bid in bundles) [self killAppBundleId:bid executable:nil];
 
     step(@"Hoàn tất xóa dữ liệu");
     return [NSString stringWithFormat:
-            @"Đã xóa dữ liệu %lu app:\n%@\n\n→ Mở lại app = dữ liệu sạch (như cài mới).",
+            @"Đã xóa dữ liệu %lu app:\n%@",
             (unsigned long)bundles.count,
             [log componentsJoinedByString:@"\n"]];
 }
@@ -735,4 +957,5 @@
 }
 
 @end
+
 
