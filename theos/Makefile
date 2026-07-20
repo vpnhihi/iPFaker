@@ -10,14 +10,15 @@ include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME = iPFakerMG iPFakerCT
 
-iPFakerMG_FILES = TweakMG.x src/IPFConfig.m src/IPFHooksMG.m src/IPFHooksDeep.m src/fishhook.c
+# MG stays lean (device ldid/opainject was reliable without Deep.m bulk)
+iPFakerMG_FILES = TweakMG.x src/IPFConfig.m src/IPFHooksMG.m src/fishhook.c
 iPFakerMG_CFLAGS = -fobjc-arc -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
-iPFakerMG_FRAMEWORKS = UIKit Foundation AdSupport IOKit
-# ElleKit exposes /var/jb/usr/lib/libsubstrate.dylib — match HIOS LC_LOAD_DYLIB
+iPFakerMG_FRAMEWORKS = UIKit Foundation AdSupport
 iPFakerMG_LIBRARIES = substrate
 iPFakerMG_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerMG.dylib
 
-iPFakerCT_FILES = TweakCT.x src/IPFConfig.m src/IPFHooksCT.m
+# CT always loaded cleanly on Dopamine — carry network model rewrite here
+iPFakerCT_FILES = TweakCT.x src/IPFConfig.m src/IPFHooksCT.m src/IPFHooksDeep.m
 iPFakerCT_CFLAGS = -fobjc-arc -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
 iPFakerCT_FRAMEWORKS = UIKit Foundation CoreTelephony
 iPFakerCT_LIBRARIES = substrate

@@ -4,6 +4,7 @@
 #import <Foundation/Foundation.h>
 #import "IPFConfig.h"
 #import "IPFHooksCT.h"
+#import "IPFHooksDeep.h"
 
 %ctor {
     @autoreleasepool {
@@ -25,7 +26,16 @@
             return;
         }
         IPFInstallCTHooks();
-        NSString *path = @"/var/jb/etc/ipfaker/v3_ct_loaded.txt";
-        [@"iPFakerCT loaded\n" writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        // Network/IOKit rewrite lives in CT (loads reliably on Dopamine)
+        if (isZalo || bid.length == 0) {
+            IPFInstallDeepHooks();
+        }
+        NSString *home = NSHomeDirectory();
+        if (home.length) {
+            [@"iPFakerCT+Deep loaded\n" writeToFile:[home stringByAppendingPathComponent:@"Documents/v3_ct_loaded.txt"]
+                                         atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        }
+        [@"iPFakerCT+Deep loaded\n" writeToFile:@"/var/jb/etc/ipfaker/v3_ct_loaded.txt"
+                                      atomically:YES encoding:NSUTF8StringEncoding error:nil];
     }
 }
