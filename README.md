@@ -1,10 +1,11 @@
 # iPFaker
 
-**iPFaker** is a modular iOS jailbreak project for spoofing full device identity parameters, scoped to **Zalo** (`com.zing.zalo`).
+Jailbreak tool (Dopamine rootless) — spoof identity + app iPFaker + license Google Sheet.
 
-> Target: jailbroken iOS devices only.  
-> Scope: device fingerprint / identity spoofing for the Zalo process.  
-> Platform workspace: Windows (`C:\Users\Pem\Desktop\iPFaker\`) — build/deploy artifacts and configs are prepared here; runtime hooks execute on-device.
+## Khách hàng cài ngay
+Xem **[INSTALL_KHACH.md](INSTALL_KHACH.md)** — tải .deb từ GitHub Actions / Releases, cài Sileo, kích key.
+
+License Sheet: [docs/LICENSE_SHEET.md](docs/LICENSE_SHEET.md)
 
 ---
 

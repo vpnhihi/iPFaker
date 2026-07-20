@@ -34,6 +34,7 @@ iPFaker_CFLAGS = -fobjc-arc -Wno-unused-variable -Wno-deprecated-declarations
 iPFaker_CODESIGN_FLAGS = -Sentitlements.plist
 iPFaker_INSTALL_PATH = /Applications
 iPFaker_RESOURCE_FILES = Resources/Info.plist Resources/device_catalog.json \
+	Resources/ios_device_compat.json \
 	Resources/AppIcon60x60@2x.png Resources/AppIcon60x60@3x.png \
 	Resources/AppIcon-Small@2x.png Resources/AppIcon-Small@3x.png \
 	Resources/AppIcon-Small-40@2x.png Resources/AppIcon-Small-40@3x.png
