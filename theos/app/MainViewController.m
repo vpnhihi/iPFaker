@@ -4,6 +4,8 @@
 #import "Catalog.h"
 #import "AboutLabController.h"
 #import "ProgressOverlay.h"
+#import "IPFLicenseManager.h"
+#import "AppDelegate.h"
 
 @interface MainViewController ()
 @property (nonatomic, strong) UIScrollView *scroll;
@@ -60,7 +62,7 @@
     title.translatesAutoresizingMaskIntoConstraints = NO;
 
     UILabel *ver = [[UILabel alloc] init];
-    ver.text = @"Phiên bản: 2.6.2 · Công cụ lab thiết bị";
+    ver.text = @"Phiên bản: 2.7.0 · Công cụ lab thiết bị";
     ver.font = AppTheme.captionFont;
     ver.textColor = AppTheme.textSecondary;
     ver.translatesAutoresizingMaskIntoConstraints = NO;
@@ -75,9 +77,17 @@
     aboutBtn.translatesAutoresizingMaskIntoConstraints = NO;
     [aboutBtn addTarget:self action:@selector(openAbout) forControlEvents:UIControlEventTouchUpInside];
 
+    UIButton *logoutBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    [logoutBtn setTitle:@"Đăng xuất" forState:UIControlStateNormal];
+    logoutBtn.titleLabel.font = AppTheme.captionFont;
+    logoutBtn.tintColor = [UIColor colorWithRed:0.95 green:0.4 blue:0.35 alpha:1];
+    logoutBtn.translatesAutoresizingMaskIntoConstraints = NO;
+    [logoutBtn addTarget:self action:@selector(logoutTapped) forControlEvents:UIControlEventTouchUpInside];
+
     [content addSubview:title];
     [content addSubview:ver];
     [content addSubview:aboutBtn];
+    [content addSubview:logoutBtn];
 
     // Info card
     UIView *card = [AppTheme roundedCardIn:content];
@@ -197,6 +207,9 @@
         [aboutBtn.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-pad],
         [aboutBtn.widthAnchor constraintEqualToConstant:36],
         [aboutBtn.heightAnchor constraintEqualToConstant:36],
+
+        [logoutBtn.centerYAnchor constraintEqualToAnchor:ver.centerYAnchor],
+        [logoutBtn.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-pad],
 
         [card.topAnchor constraintEqualToAnchor:ver.bottomAnchor constant:18],
         [card.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:pad],
@@ -329,9 +342,26 @@
 
     NSUInteger nDev = Catalog.shared.devices.count;
     NSUInteger nIOS = Catalog.shared.iosReleases.count;
-    self.statusFooter.text = [NSString stringWithFormat:@"%@\nDanh mục: %lu máy · %lu iOS",
+    NSString *lic = [IPFLicenseManager.shared statusSummary];
+    self.statusFooter.text = [NSString stringWithFormat:@"%@\n%@\nDanh mục: %lu máy · %lu iOS",
                               st.statusText ?: @"",
+                              lic ?: @"",
                               (unsigned long)nDev, (unsigned long)nIOS];
+}
+
+- (void)logoutTapped {
+    UIAlertController *ac = [UIAlertController alertControllerWithTitle:@"Đăng xuất key"
+                                                                message:@"Xóa phiên key trên máy này? (Sheet: đặt E=Out nếu muốn vô hiệu hẳn)"
+                                                         preferredStyle:UIAlertControllerStyleAlert];
+    [ac addAction:[UIAlertAction actionWithTitle:@"Hủy" style:UIAlertActionStyleCancel handler:nil]];
+    [ac addAction:[UIAlertAction actionWithTitle:@"Đăng xuất" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *a) {
+        [IPFLicenseManager.shared logout];
+        AppDelegate *del = (AppDelegate *)UIApplication.sharedApplication.delegate;
+        if ([del respondsToSelector:@selector(showLogin)]) {
+            [del showLogin];
+        }
+    }]];
+    [self presentViewController:ac animated:YES completion:nil];
 }
 
 - (void)applyTapped {

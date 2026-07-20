@@ -16,6 +16,9 @@ iPFaker_FILES = \
 	AppCatalog.m \
 	ProfileBuilder.m \
 	ProgressOverlay.m \
+	IPFCrypto.m \
+	IPFLicenseManager.m \
+	LoginViewController.m \
 	MainViewController.m \
 	SelectDevicesViewController.m \
 	WipeViewController.m \

@@ -5,6 +5,8 @@
 #import "SelectDevicesViewController.h"
 #import "WipeViewController.h"
 #import "SettingsViewController.h"
+#import "LoginViewController.h"
+#import "IPFLicenseManager.h"
 
 @implementation AppDelegate
 
@@ -15,9 +17,38 @@
     }
     self.window.backgroundColor = AppTheme.bg;
 
-    // Warm catalog + selection
     (void)AppState.shared;
+    (void)IPFLicenseManager.shared.deviceId;
 
+    // Gate: show login until licensed
+    if ([IPFLicenseManager.shared isSessionActive]) {
+        // revalidate in background; if fail → login
+        __weak typeof(self) weakSelf = self;
+        [IPFLicenseManager.shared revalidateWithCompletion:^(BOOL ok, NSString *message) {
+            __strong typeof(weakSelf) self = weakSelf;
+            if (!ok) [self showLogin];
+        }];
+        [self showMainTabs];
+    } else {
+        [self showLogin];
+    }
+    [self.window makeKeyAndVisible];
+    return YES;
+}
+
+- (void)showLogin {
+    LoginViewController *login = [[LoginViewController alloc] init];
+    __weak typeof(self) weakSelf = self;
+    login.onSuccess = ^{
+        __strong typeof(weakSelf) self = weakSelf;
+        [self showMainTabs];
+    };
+    UINavigationController *nav = [[UINavigationController alloc] initWithRootViewController:login];
+    [AppTheme styleNavigationBar:nav.navigationBar];
+    self.window.rootViewController = nav;
+}
+
+- (void)showMainTabs {
     UITabBarController *tabs = [[UITabBarController alloc] init];
     [AppTheme styleTabBar:tabs.tabBar];
 
@@ -43,10 +74,7 @@
 
     tabs.viewControllers = @[ mainNav, selectNav, wipeNav, settingsNav ];
     tabs.selectedIndex = 0;
-
     self.window.rootViewController = tabs;
-    [self.window makeKeyAndVisible];
-    return YES;
 }
 
 - (UITabBarItem *)itemTitle:(NSString *)title systemImage:(NSString *)name tag:(NSInteger)tag {
@@ -54,8 +82,7 @@
     if (@available(iOS 13.0, *)) {
         img = [UIImage systemImageNamed:name];
     }
-    UITabBarItem *item = [[UITabBarItem alloc] initWithTitle:title image:img tag:tag];
-    return item;
+    return [[UITabBarItem alloc] initWithTitle:title image:img tag:tag];
 }
 
 @end
