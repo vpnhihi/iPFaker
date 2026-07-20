@@ -69,6 +69,29 @@ jobs:
           test -f dist/iPFakerMG.dylib
           test -f dist/iPFakerCT.dylib
           file dist/iPFakerMG.dylib dist/iPFakerCT.dylib || true
+          # Rewrite bad CydiaSubstrate.framework load → ElleKit libsubstrate (Dopamine)
+          for d in dist/iPFakerMG.dylib dist/iPFakerCT.dylib; do
+            echo "=== otool before $d ==="
+            otool -L "$d" || true
+            install_name_tool -change \
+              @rpath/CydiaSubstrate.framework/CydiaSubstrate \
+              /var/jb/usr/lib/libsubstrate.dylib "$d" 2>/dev/null || true
+            install_name_tool -change \
+              /Library/Frameworks/CydiaSubstrate.framework/CydiaSubstrate \
+              /var/jb/usr/lib/libsubstrate.dylib "$d" 2>/dev/null || true
+            install_name_tool -change \
+              @rpath/libsubstrate.dylib \
+              /var/jb/usr/lib/libsubstrate.dylib "$d" 2>/dev/null || true
+            # re-sign after install_name_tool
+            ldid -S "$d" || true
+            echo "=== otool after $d ==="
+            otool -L "$d" || true
+          done
+          # fail if still depends on missing framework path
+          if otool -L dist/iPFakerMG.dylib | grep -q 'CydiaSubstrate.framework'; then
+            echo "FATAL: still links CydiaSubstrate.framework"
+            exit 1
+          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
