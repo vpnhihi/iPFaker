@@ -3,7 +3,7 @@
 iPFaker PC — điều khiển iPFaker trên iPhone qua Wi‑Fi SSH (không cần USB).
 
   python pc_app/app.py
-  hoặc:  pc_app\\run_ipfaker_pc.bat
+  hoặc:  pc_app\\CHAY_APP.bat
 """
 from __future__ import annotations
 
@@ -12,24 +12,61 @@ import os
 import random
 import sys
 import threading
-import tkinter as tk
+import traceback
 from pathlib import Path
-from tkinter import messagebox, scrolledtext, ttk
 
+# ── path bootstrap (must be first) ─────────────────────────
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
+PC_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS))
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(PC_DIR))
 
-from device_client import DeviceClient, DeviceStatus  # noqa: E402
-from auto_reg import AutoRegError, AutoRegRunner  # noqa: E402
-
-# Reuse profile builder from repo
-import select_device_profile as sdp  # noqa: E402
-
+ERR_LOG = PC_DIR / "last_error.txt"
+START_LOG = PC_DIR / "startup.log"
 SETTINGS_PATH = Path(os.environ.get("APPDATA", str(Path.home()))) / "iPFakerPC" / "settings.json"
 
-# Dark theme colors
+# Force UTF-8 on Windows consoles
+os.environ.setdefault("PYTHONUTF8", "1")
+os.environ.setdefault("PYTHONIOENCODING", "utf-8")
+
+
+def _log_start(msg: str) -> None:
+    try:
+        with START_LOG.open("a", encoding="utf-8") as f:
+            f.write(msg.rstrip() + "\n")
+    except Exception:
+        pass
+
+
+def _write_err(tb: str) -> None:
+    try:
+        ERR_LOG.write_text(tb, encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _safe_import_tk():
+    import tkinter as tk
+    from tkinter import messagebox, scrolledtext, ttk
+
+    return tk, messagebox, scrolledtext, ttk
+
+
+# Defer heavy imports until after tk is ok
+_sdp = None
+
+
+def sdp():
+    global _sdp
+    if _sdp is None:
+        import select_device_profile as mod
+
+        _sdp = mod
+    return _sdp
+
+
+# Theme
 BG = "#0f1115"
 PANEL = "#171a21"
 FG = "#e8eaed"
@@ -39,40 +76,74 @@ GREEN = "#22c55e"
 ORANGE = "#f59e0b"
 RED = "#ef4444"
 ENTRY_BG = "#1f2430"
-SEL = "#2563eb"
+PURPLE = "#a855f7"
 
 DEFAULT_APPS = [
     ("Zalo (VN)", "vn.com.vng.zingalo"),
     ("Zalo (alt)", "com.zing.zalo"),
-    ("Bản đồ", "com.apple.Maps"),
-    ("Thời tiết", "com.apple.weather"),
+    ("Ban do", "com.apple.Maps"),
+    ("Thoi tiet", "com.apple.weather"),
 ]
 
+DEFAULT_DEVICE_IDS = [
+    "iphone13-mini",
+    "iphone14-pro",
+    "iphone15-pro",
+    "iphone16-pro",
+    "iphone16-pro-max",
+]
+DEFAULT_IOS = {"18.5", "18.6", "18.6.1", "18.6.2", "17.6.1", "17.0", "16.7.10", "15.8.3"}
 
-class IPfakerPC(tk.Tk):
-    def __init__(self) -> None:
-        super().__init__()
-        self.title("iPFaker PC — Điều khiển máy")
-        self.geometry("1100x820")
-        self.minsize(960, 700)
-        self.configure(bg=BG)
-        self.client: DeviceClient | None = None
-        self.reg_runner: AutoRegRunner | None = None
-        self.catalog = sdp.load_catalog()
-        self.devices = list(self.catalog.get("devices") or [])
+
+class IPfakerPC:
+    def __init__(self, tk, ttk, messagebox, scrolledtext):
+        self.tk = tk
+        self.ttk = ttk
+        self.messagebox = messagebox
+        self.root = tk.Tk()
+        self.root.title("iPFaker PC")
+        self.root.geometry("1040x780")
+        self.root.minsize(900, 620)
+        self.root.configure(bg=BG)
+
+        self.client = None
+        self.reg_runner = None
         self._busy = False
-        self._device_vars: dict[str, tk.BooleanVar] = {}
-        self._ios_vars: dict[str, tk.BooleanVar] = {}
-        self._app_vars: dict[str, tk.BooleanVar] = {}
+        self._app_vars = {}
+        self.catalog = {"devices": [], "ios_releases": {}}
+        self.devices = []
+        self._device_ids = []  # parallel to listbox lines
+        self._ios_vers = []
+
+        try:
+            self.catalog = sdp().load_catalog()
+            self.devices = list(self.catalog.get("devices") or [])
+        except Exception as e:
+            _log_start(f"catalog load fail: {e}")
+            self.messagebox.showwarning(
+                "Catalog",
+                f"Khong doc duoc device_catalog.json:\n{e}\n\nVan mo app (chi thieu pool may).",
+            )
 
         self._style()
-        self._build_ui()
+        self._build_ui(scrolledtext)
         self._load_settings()
-        self.protocol("WM_DELETE_WINDOW", self._on_close)
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
-    # ── style ──────────────────────────────────────────────
-    def _style(self) -> None:
-        st = ttk.Style(self)
+        # Catch Tk callback crashes (button handlers, after())
+        self.root.report_callback_exception = self._tk_exception
+
+    def _tk_exception(self, exc, val, tb):
+        text = "".join(traceback.format_exception(exc, val, tb))
+        _write_err(text)
+        self.log(f"LOI UI:\n{text[-800:]}")
+        try:
+            self.messagebox.showerror("Loi", f"Loi giao dien (app van mo):\n\n{val}\n\nXem: {ERR_LOG}")
+        except Exception:
+            pass
+
+    def _style(self):
+        st = self.ttk.Style(self.root)
         try:
             st.theme_use("clam")
         except Exception:
@@ -84,178 +155,188 @@ class IPfakerPC(tk.Tk):
         st.configure("Card.TLabel", background=PANEL, foreground=FG)
         st.configure("Muted.TLabel", background=PANEL, foreground=MUTED, font=("Segoe UI", 9))
         st.configure("Title.TLabel", background=BG, foreground=FG, font=("Segoe UI Semibold", 14))
-        st.configure("Status.TLabel", background=PANEL, foreground=GREEN, font=("Consolas", 10))
-        st.configure("TButton", font=("Segoe UI", 10), padding=6)
-        st.configure("Accent.TButton", font=("Segoe UI Semibold", 10))
         st.configure("TCheckbutton", background=PANEL, foreground=FG)
+        st.configure("TButton", font=("Segoe UI", 10), padding=5)
         st.configure("TEntry", fieldbackground=ENTRY_BG, foreground=FG)
-        st.configure("TNotebook", background=BG, borderwidth=0)
-        st.configure("TNotebook.Tab", background=PANEL, foreground=FG, padding=[12, 6])
-        st.map("TNotebook.Tab", background=[("selected", ACCENT)], foreground=[("selected", "#fff")])
 
-    # ── UI ─────────────────────────────────────────────────
-    def _build_ui(self) -> None:
-        head = ttk.Frame(self)
-        head.pack(fill="x", padx=14, pady=(12, 6))
+    def _build_ui(self, scrolledtext):
+        tk, ttk = self.tk, self.ttk
+
+        head = ttk.Frame(self.root)
+        head.pack(fill="x", padx=12, pady=(10, 4))
         ttk.Label(head, text="iPFaker PC", style="Title.TLabel").pack(side="left")
-        ttk.Label(
-            head,
-            text="  Wi‑Fi SSH · không cần USB · điều khiển spoof / wipe / lưu data",
-            foreground=MUTED,
-            background=BG,
-        ).pack(side="left", padx=8)
+        ttk.Label(head, text="  Wi-Fi SSH  |  spoof / wipe / reg", foreground=MUTED, background=BG).pack(
+            side="left"
+        )
 
-        # Connection bar
-        conn = ttk.Frame(self, style="Card.TFrame")
-        conn.pack(fill="x", padx=14, pady=6)
-        inner = ttk.Frame(conn, style="Card.TFrame")
-        inner.pack(fill="x", padx=10, pady=10)
+        # Connection
+        conn = ttk.Frame(self.root, style="Card.TFrame")
+        conn.pack(fill="x", padx=12, pady=4)
+        row = ttk.Frame(conn, style="Card.TFrame")
+        row.pack(fill="x", padx=8, pady=8)
 
         self.var_host = tk.StringVar(value="192.168.1.10")
         self.var_user = tk.StringVar(value="mobile")
         self.var_pass = tk.StringVar(value="")
         self.var_port = tk.StringVar(value="22")
 
-        def lab_ent(parent, text, var, show=None, w=16):
-            f = ttk.Frame(parent, style="Card.TFrame")
-            f.pack(side="left", padx=(0, 12))
-            ttk.Label(f, text=text, style="Muted.TLabel").pack(anchor="w")
-            e = ttk.Entry(f, textvariable=var, width=w, show=show)
-            e.pack()
-            return e
+        for label, var, w, show in (
+            ("IP may", self.var_host, 14, None),
+            ("User", self.var_user, 8, None),
+            ("Mat khau SSH", self.var_pass, 12, "*"),
+            ("Port", self.var_port, 5, None),
+        ):
+            f = ttk.Frame(row, style="Card.TFrame")
+            f.pack(side="left", padx=(0, 10))
+            ttk.Label(f, text=label, style="Muted.TLabel").pack(anchor="w")
+            ttk.Entry(f, textvariable=var, width=w, show=show or "").pack()
 
-        lab_ent(inner, "IP máy (Wi‑Fi)", self.var_host, w=16)
-        lab_ent(inner, "User", self.var_user, w=10)
-        lab_ent(inner, "Mật khẩu SSH", self.var_pass, show="•", w=14)
-        lab_ent(inner, "Port", self.var_port, w=6)
+        bf = ttk.Frame(row, style="Card.TFrame")
+        bf.pack(side="left", padx=6)
+        ttk.Label(bf, text=" ", style="Muted.TLabel").pack()
+        ttk.Button(bf, text="Ket noi", command=self._connect).pack(side="left", padx=2)
+        ttk.Button(bf, text="Lam moi", command=self._refresh_status).pack(side="left", padx=2)
+        ttk.Button(bf, text="Ngat", command=self._disconnect).pack(side="left", padx=2)
 
-        btns = ttk.Frame(inner, style="Card.TFrame")
-        btns.pack(side="left", padx=8)
-        ttk.Label(btns, text=" ", style="Muted.TLabel").pack()
-        ttk.Button(btns, text="Kết nối", command=self._connect).pack(side="left", padx=2)
-        ttk.Button(btns, text="Làm mới", command=self._refresh_status).pack(side="left", padx=2)
-        ttk.Button(btns, text="Ngắt", command=self._disconnect).pack(side="left", padx=2)
-
-        self.lbl_link = ttk.Label(inner, text="● Chưa kết nối", style="Status.TLabel", foreground=ORANGE)
+        self.lbl_link = tk.Label(row, text="● Chua ket noi", bg=PANEL, fg=ORANGE, font=("Segoe UI", 10))
         self.lbl_link.pack(side="right", padx=8)
 
-        # Status card
-        stf = ttk.Frame(self, style="Card.TFrame")
-        stf.pack(fill="x", padx=14, pady=6)
-        st_in = ttk.Frame(stf, style="Card.TFrame")
-        st_in.pack(fill="x", padx=10, pady=8)
-        ttk.Label(st_in, text="Trạng thái máy", style="Card.TLabel", font=("Segoe UI Semibold", 11)).pack(anchor="w")
-        self.lbl_status = ttk.Label(
-            st_in,
-            text="Chưa có dữ liệu — kết nối SSH rồi bấm Làm mới.",
-            style="Muted.TLabel",
-            justify="left",
+        # Status
+        stf = ttk.Frame(self.root, style="Card.TFrame")
+        stf.pack(fill="x", padx=12, pady=4)
+        ttk.Label(stf, text="Trang thai may", style="Card.TLabel", font=("Segoe UI Semibold", 10)).pack(
+            anchor="w", padx=8, pady=(6, 0)
         )
-        self.lbl_status.pack(anchor="w", pady=(4, 0))
+        self.lbl_status = tk.Label(
+            stf,
+            text="Chua co du lieu — ket noi SSH roi bam Lam moi.",
+            bg=PANEL,
+            fg=MUTED,
+            justify="left",
+            font=("Consolas", 9),
+            anchor="w",
+        )
+        self.lbl_status.pack(fill="x", padx=8, pady=(2, 8))
 
-        # Main split
-        body = ttk.Frame(self)
-        body.pack(fill="both", expand=True, padx=14, pady=6)
+        # Body: devices | ios+apps
+        body = ttk.Frame(self.root)
+        body.pack(fill="both", expand=True, padx=12, pady=4)
 
         left = ttk.Frame(body, style="Card.TFrame")
-        left.pack(side="left", fill="both", expand=True, padx=(0, 6))
+        left.pack(side="left", fill="both", expand=True, padx=(0, 4))
         right = ttk.Frame(body, style="Card.TFrame")
-        right.pack(side="right", fill="both", expand=True, padx=(6, 0))
+        right.pack(side="right", fill="both", expand=True, padx=(4, 0))
 
-        # Device pool
-        ttk.Label(left, text="Pool đời máy (chọn nhiều)", style="Card.TLabel", font=("Segoe UI Semibold", 11)).pack(
-            anchor="w", padx=10, pady=(10, 4)
+        ttk.Label(left, text="Pool doi may (Ctrl+click chon nhieu)", style="Card.TLabel").pack(
+            anchor="w", padx=8, pady=(8, 2)
         )
-        dev_tools = ttk.Frame(left, style="Card.TFrame")
-        dev_tools.pack(fill="x", padx=10)
-        ttk.Button(dev_tools, text="Chọn tất cả", command=lambda: self._set_all_devices(True)).pack(side="left", padx=2)
-        ttk.Button(dev_tools, text="Bỏ chọn", command=lambda: self._set_all_devices(False)).pack(side="left", padx=2)
-
-        dev_wrap = ttk.Frame(left, style="Card.TFrame")
-        dev_wrap.pack(fill="both", expand=True, padx=8, pady=4)
-        self.dev_canvas = tk.Canvas(dev_wrap, bg=PANEL, highlightthickness=0)
-        dev_scroll = ttk.Scrollbar(dev_wrap, orient="vertical", command=self.dev_canvas.yview)
-        self.dev_inner = ttk.Frame(self.dev_canvas, style="Card.TFrame")
-        self.dev_inner.bind(
-            "<Configure>", lambda e: self.dev_canvas.configure(scrollregion=self.dev_canvas.bbox("all"))
+        dt = ttk.Frame(left, style="Card.TFrame")
+        dt.pack(fill="x", padx=8)
+        ttk.Button(dt, text="Chon tat ca", command=lambda: self._list_select_all(self.lst_dev)).pack(
+            side="left", padx=2
         )
-        self.dev_canvas.create_window((0, 0), window=self.dev_inner, anchor="nw")
-        self.dev_canvas.configure(yscrollcommand=dev_scroll.set)
-        self.dev_canvas.pack(side="left", fill="both", expand=True)
-        dev_scroll.pack(side="right", fill="y")
-        self._fill_devices()
-
-        # iOS pool
-        ttk.Label(right, text="Pool iOS (chọn nhiều)", style="Card.TLabel", font=("Segoe UI Semibold", 11)).pack(
-            anchor="w", padx=10, pady=(10, 4)
+        ttk.Button(dt, text="Bo chon", command=lambda: self.lst_dev.selection_clear(0, "end")).pack(
+            side="left", padx=2
         )
-        ios_tools = ttk.Frame(right, style="Card.TFrame")
-        ios_tools.pack(fill="x", padx=10)
-        ttk.Button(ios_tools, text="Chọn phổ biến", command=self._select_popular_ios).pack(side="left", padx=2)
-        ttk.Button(ios_tools, text="Bỏ chọn", command=lambda: self._set_all_ios(False)).pack(side="left", padx=2)
+        ttk.Button(dt, text="Mac dinh", command=self._select_default_devices).pack(side="left", padx=2)
 
+        self.lst_dev = tk.Listbox(
+            left,
+            selectmode="extended",
+            bg=ENTRY_BG,
+            fg=FG,
+            selectbackground=ACCENT,
+            font=("Segoe UI", 9),
+            highlightthickness=0,
+            borderwidth=0,
+            activestyle="none",
+        )
+        sb1 = ttk.Scrollbar(left, orient="vertical", command=self.lst_dev.yview)
+        self.lst_dev.configure(yscrollcommand=sb1.set)
+        self.lst_dev.pack(side="left", fill="both", expand=True, padx=(8, 0), pady=6)
+        sb1.pack(side="right", fill="y", pady=6, padx=(0, 8))
+
+        self._device_ids = []
+        for d in self.devices:
+            did = d.get("id") or ""
+            name = d.get("MarketingName") or did
+            pt = d.get("ProductType") or ""
+            self._device_ids.append(did)
+            self.lst_dev.insert("end", f"{name}  ·  {pt}")
+
+        ttk.Label(right, text="Pool iOS (Ctrl+click)", style="Card.TLabel").pack(anchor="w", padx=8, pady=(8, 2))
+        it = ttk.Frame(right, style="Card.TFrame")
+        it.pack(fill="x", padx=8)
+        ttk.Button(it, text="Pho bien", command=self._select_popular_ios).pack(side="left", padx=2)
+        ttk.Button(it, text="Bo chon", command=lambda: self.lst_ios.selection_clear(0, "end")).pack(
+            side="left", padx=2
+        )
+
+        self.lst_ios = tk.Listbox(
+            right,
+            selectmode="extended",
+            bg=ENTRY_BG,
+            fg=FG,
+            selectbackground=ACCENT,
+            font=("Segoe UI", 9),
+            height=12,
+            highlightthickness=0,
+            borderwidth=0,
+            activestyle="none",
+        )
+        sb2 = ttk.Scrollbar(right, orient="vertical", command=self.lst_ios.yview)
+        self.lst_ios.configure(yscrollcommand=sb2.set)
         ios_wrap = ttk.Frame(right, style="Card.TFrame")
         ios_wrap.pack(fill="both", expand=True, padx=8, pady=4)
-        self.ios_canvas = tk.Canvas(ios_wrap, bg=PANEL, highlightthickness=0, height=180)
-        ios_scroll = ttk.Scrollbar(ios_wrap, orient="vertical", command=self.ios_canvas.yview)
-        self.ios_inner = ttk.Frame(self.ios_canvas, style="Card.TFrame")
-        self.ios_inner.bind(
-            "<Configure>", lambda e: self.ios_canvas.configure(scrollregion=self.ios_canvas.bbox("all"))
-        )
-        self.ios_canvas.create_window((0, 0), window=self.ios_inner, anchor="nw")
-        self.ios_canvas.configure(yscrollcommand=ios_scroll.set)
-        self.ios_canvas.pack(side="left", fill="both", expand=True)
-        ios_scroll.pack(side="right", fill="y")
-        self._fill_ios()
+        self.lst_ios.pack(in_=ios_wrap, side="left", fill="both", expand=True)
+        sb2.pack(in_=ios_wrap, side="right", fill="y")
 
-        # Apps
-        ttk.Label(right, text="App mục tiêu (lưu / xóa / reset)", style="Card.TLabel", font=("Segoe UI Semibold", 11)).pack(
-            anchor="w", padx=10, pady=(8, 4)
-        )
+        self._ios_vers = []
+        releases = list((self.catalog.get("ios_releases") or {}).keys())
+
+        def vkey(v: str):
+            out = []
+            for p in v.split("."):
+                try:
+                    out.append(int(p))
+                except ValueError:
+                    out.append(0)
+            return out
+
+        for ver in sorted(releases, key=vkey, reverse=True):
+            maj = ver.split(".")[0]
+            if maj not in ("15", "16", "17", "18", "26"):
+                continue
+            self._ios_vers.append(ver)
+            self.lst_ios.insert("end", f"iOS {ver}")
+
+        ttk.Label(right, text="App muc tieu", style="Card.TLabel").pack(anchor="w", padx=8, pady=(4, 2))
         apps_f = ttk.Frame(right, style="Card.TFrame")
-        apps_f.pack(fill="x", padx=10, pady=4)
+        apps_f.pack(fill="x", padx=8, pady=4)
         for name, bid in DEFAULT_APPS:
-            v = tk.BooleanVar(value=("zalo" in bid.lower() or bid.endswith("Maps") or bid.endswith("weather")))
-            # default: zalo on, maps/weather on for wipe pool parity with phone
-            if "zalo" in bid.lower():
-                v.set(True)
-            elif bid in ("com.apple.Maps", "com.apple.weather"):
-                v.set(False)
+            v = tk.BooleanVar(value="zalo" in bid.lower())
             self._app_vars[bid] = v
-            ttk.Checkbutton(apps_f, text=f"{name}  ({bid})", variable=v).pack(anchor="w")
+            ttk.Checkbutton(apps_f, text=f"{name}", variable=v).pack(anchor="w")
 
-        # Action buttons
-        act = ttk.Frame(self, style="Card.TFrame")
-        act.pack(fill="x", padx=14, pady=6)
-        row = ttk.Frame(act, style="Card.TFrame")
-        row.pack(fill="x", padx=10, pady=10)
+        # Actions
+        act = ttk.Frame(self.root, style="Card.TFrame")
+        act.pack(fill="x", padx=12, pady=4)
+        ar = ttk.Frame(act, style="Card.TFrame")
+        ar.pack(fill="x", padx=6, pady=8)
+        self._mkbtn(ar, "Ap dung may", self._apply_selected, ACCENT)
+        self._mkbtn(ar, "Dat lai du lieu app", self._reset_data, RED)
+        self._mkbtn(ar, "Dat lai + Luu du lieu", self._save_then_reset, GREEN)
+        self._mkbtn(ar, "Chi xoa data", self._wipe_only, ORANGE)
+        self._mkbtn(ar, "Mo Zalo", self._open_zalo, PANEL)
 
-        self._btn("Áp dụng máy đã chọn", self._apply_selected, row, ACCENT)
-        self._btn("Đặt lại dữ liệu app", self._reset_data, row, RED)
-        self._btn("Đặt lại + Lưu dữ liệu", self._save_then_reset, row, GREEN)
-        self._btn("Chỉ xóa data app", self._wipe_only, row, ORANGE)
-        self._btn("Mở Zalo", self._open_zalo, row, None)
-
-        # ── Reg tự động ───────────────────────────────────
-        reg = ttk.Frame(self, style="Card.TFrame")
-        reg.pack(fill="x", padx=14, pady=6)
-        reg_in = ttk.Frame(reg, style="Card.TFrame")
-        reg_in.pack(fill="x", padx=10, pady=10)
-
-        ttk.Label(
-            reg_in,
-            text="Reg Zalo tự động (Frida UI)",
-            style="Card.TLabel",
-            font=("Segoe UI Semibold", 11),
-        ).pack(anchor="w")
-        ttk.Label(
-            reg_in,
-            text="Mở khóa màn hình · Zalo sạch · spoof đã áp dụng · PC cùng Wi‑Fi (port 27042 cho Gadget)",
-            style="Muted.TLabel",
-        ).pack(anchor="w", pady=(2, 8))
-
-        form = ttk.Frame(reg_in, style="Card.TFrame")
-        form.pack(fill="x")
+        # Reg panel
+        reg = ttk.Frame(self.root, style="Card.TFrame")
+        reg.pack(fill="x", padx=12, pady=4)
+        ri = ttk.Frame(reg, style="Card.TFrame")
+        ri.pack(fill="x", padx=8, pady=8)
+        ttk.Label(ri, text="Reg Zalo tu dong (Frida)", style="Card.TLabel", font=("Segoe UI Semibold", 10)).pack(
+            anchor="w"
+        )
 
         self.var_phone = tk.StringVar(value="")
         self.var_name = tk.StringVar(value="Lab User")
@@ -263,42 +344,36 @@ class IPfakerPC(tk.Tk):
         self.var_reg_wipe = tk.BooleanVar(value=True)
         self.var_reg_spoof = tk.BooleanVar(value=True)
 
-        def _field(parent, label, var, w=18, show=None):
-            f = ttk.Frame(parent, style="Card.TFrame")
-            f.pack(side="left", padx=(0, 12))
-            ttk.Label(f, text=label, style="Muted.TLabel").pack(anchor="w")
-            ttk.Entry(f, textvariable=var, width=w, show=show).pack()
+        form = ttk.Frame(ri, style="Card.TFrame")
+        form.pack(fill="x", pady=4)
+        for lab, var, w in (
+            ("So dien thoai", self.var_phone, 14),
+            ("Ten hien thi", self.var_name, 14),
+            ("OTP", self.var_otp, 10),
+        ):
+            f = ttk.Frame(form, style="Card.TFrame")
+            f.pack(side="left", padx=(0, 10))
+            ttk.Label(f, text=lab, style="Muted.TLabel").pack(anchor="w")
+            ttk.Entry(f, textvariable=var, width=w).pack()
 
-        _field(form, "Số điện thoại", self.var_phone, 16)
-        _field(form, "Tên hiển thị", self.var_name, 16)
-        _field(form, "OTP (sau khi nhận SMS)", self.var_otp, 12)
+        opts = ttk.Frame(ri, style="Card.TFrame")
+        opts.pack(fill="x")
+        ttk.Checkbutton(opts, text="Random spoof truoc", variable=self.var_reg_spoof).pack(side="left", padx=(0, 10))
+        ttk.Checkbutton(opts, text="Xoa data Zalo truoc", variable=self.var_reg_wipe).pack(side="left")
 
-        opts = ttk.Frame(reg_in, style="Card.TFrame")
-        opts.pack(fill="x", pady=(8, 4))
-        ttk.Checkbutton(
-            opts,
-            text="Random spoof trước (pool máy+iOS)",
-            variable=self.var_reg_spoof,
-        ).pack(side="left", padx=(0, 12))
-        ttk.Checkbutton(
-            opts,
-            text="Xóa data Zalo trước (mất login cũ)",
-            variable=self.var_reg_wipe,
-        ).pack(side="left")
-
-        reg_btns = ttk.Frame(reg_in, style="Card.TFrame")
-        reg_btns.pack(fill="x", pady=(8, 0))
-        self._btn("Reg tự động → tới OTP", self._auto_reg_start, reg_btns, "#a855f7")
-        self._btn("Gửi OTP / Tiếp reg", self._auto_reg_otp, reg_btns, GREEN)
-        self._btn("Dừng Frida reg", self._auto_reg_stop, reg_btns, None)
+        rb = ttk.Frame(ri, style="Card.TFrame")
+        rb.pack(fill="x", pady=(6, 0))
+        self._mkbtn(rb, "Reg tu dong -> OTP", self._auto_reg_start, PURPLE)
+        self._mkbtn(rb, "Gui OTP / Tiep reg", self._auto_reg_otp, GREEN)
+        self._mkbtn(rb, "Dung Frida reg", self._auto_reg_stop, PANEL)
 
         # Log
-        logf = ttk.Frame(self)
-        logf.pack(fill="both", expand=True, padx=14, pady=(0, 12))
-        ttk.Label(logf, text="Nhật ký", foreground=MUTED, background=BG).pack(anchor="w")
+        logf = ttk.Frame(self.root)
+        logf.pack(fill="both", expand=True, padx=12, pady=(2, 10))
+        ttk.Label(logf, text="Nhat ky", foreground=MUTED, background=BG).pack(anchor="w")
         self.log_box = scrolledtext.ScrolledText(
             logf,
-            height=8,
+            height=7,
             bg=ENTRY_BG,
             fg=FG,
             insertbackground=FG,
@@ -306,102 +381,80 @@ class IPfakerPC(tk.Tk):
             relief="flat",
             borderwidth=0,
         )
-        self.log_box.pack(fill="both", expand=True, pady=4)
+        self.log_box.pack(fill="both", expand=True)
 
-    def _btn(self, text, cmd, parent, color):
-        b = tk.Button(
+        self._select_default_devices()
+        self._select_popular_ios()
+        self.log("San sang. Nhap IP + mat khau SSH roi bam Ket noi.")
+
+    def _mkbtn(self, parent, text, cmd, color):
+        b = self.tk.Button(
             parent,
             text=text,
             command=cmd,
-            bg=color or PANEL,
-            fg="#fff" if color else FG,
-            activebackground=SEL,
+            bg=color if color != PANEL else "#2a2f3a",
+            fg="#ffffff",
+            activebackground=ACCENT,
             activeforeground="#fff",
             relief="flat",
-            padx=12,
-            pady=8,
-            font=("Segoe UI Semibold", 10),
+            padx=10,
+            pady=6,
+            font=("Segoe UI Semibold", 9),
             cursor="hand2",
         )
-        b.pack(side="left", padx=4)
+        b.pack(side="left", padx=3)
 
-    def _fill_devices(self) -> None:
-        for w in self.dev_inner.winfo_children():
-            w.destroy()
-        self._device_vars.clear()
-        # default: select a few modern models
-        defaults = {"iphone13-mini", "iphone14-pro", "iphone15-pro", "iphone16-pro", "iphone16-pro-max"}
-        for d in self.devices:
-            did = d.get("id") or ""
-            label = f"{d.get('MarketingName', did)}  ·  {d.get('ProductType', '')}"
-            v = tk.BooleanVar(value=did in defaults)
-            self._device_vars[did] = v
-            ttk.Checkbutton(self.dev_inner, text=label, variable=v).pack(anchor="w", padx=4, pady=1)
+    def _list_select_all(self, lb):
+        lb.selection_set(0, "end")
 
-    def _fill_ios(self) -> None:
-        for w in self.ios_inner.winfo_children():
-            w.destroy()
-        self._ios_vars.clear()
-        releases = list((self.catalog.get("ios_releases") or {}).keys())
-        # sort version-like
-        def key(v: str):
-            parts = []
-            for p in v.split("."):
-                try:
-                    parts.append(int(p))
-                except ValueError:
-                    parts.append(0)
-            return parts
+    def _select_default_devices(self):
+        self.lst_dev.selection_clear(0, "end")
+        for i, did in enumerate(self._device_ids):
+            if did in DEFAULT_DEVICE_IDS:
+                self.lst_dev.selection_set(i)
 
-        releases = sorted(releases, key=key, reverse=True)
-        popular = {"18.5", "18.6", "17.6.1", "16.7.10", "15.8.3", "18.0", "17.0"}
-        for ver in releases:
-            v = tk.BooleanVar(value=ver in popular or ver.startswith("18.") and ver.count(".") <= 1)
-            # keep list manageable: only show major recent + popular unless all
-            maj = ver.split(".")[0]
-            if maj not in ("15", "16", "17", "18", "26") and ver not in popular:
-                continue
-            self._ios_vars[ver] = v
-            ttk.Checkbutton(self.ios_inner, text=f"iOS {ver}", variable=v).pack(anchor="w", padx=4, pady=1)
-
-    def _set_all_devices(self, on: bool) -> None:
-        for v in self._device_vars.values():
-            v.set(on)
-
-    def _set_all_ios(self, on: bool) -> None:
-        for v in self._ios_vars.values():
-            v.set(on)
-
-    def _select_popular_ios(self) -> None:
-        pop = {"18.5", "18.6", "18.0", "17.6.1", "17.0", "16.7.10", "15.8.3"}
-        for ver, var in self._ios_vars.items():
-            var.set(ver in pop or ver.startswith("18.5") or ver.startswith("18.6"))
+    def _select_popular_ios(self):
+        self.lst_ios.selection_clear(0, "end")
+        for i, ver in enumerate(self._ios_vers):
+            if ver in DEFAULT_IOS or ver.startswith("18.5") or ver.startswith("18.6"):
+                self.lst_ios.selection_set(i)
 
     # ── settings ───────────────────────────────────────────
-    def _load_settings(self) -> None:
+    def _load_settings(self):
         try:
-            if SETTINGS_PATH.exists():
-                data = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
-                self.var_host.set(data.get("host") or self.var_host.get())
-                self.var_user.set(data.get("user") or "mobile")
-                self.var_port.set(str(data.get("port") or 22))
-                # password optional remember
-                if data.get("remember_pass") and data.get("password"):
-                    self.var_pass.set(data["password"])
-                if data.get("phone"):
-                    self.var_phone.set(data["phone"])
-                if data.get("reg_name"):
-                    self.var_name.set(data["reg_name"])
-                for did in data.get("devices") or []:
-                    if did in self._device_vars:
-                        self._device_vars[did].set(True)
-                for ios in data.get("ios") or []:
-                    if ios in self._ios_vars:
-                        self._ios_vars[ios].set(True)
-        except Exception as e:
-            self.log(f"Không đọc settings: {e}")
+            if not SETTINGS_PATH.exists():
+                return
+            data = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
+            if data.get("host"):
+                self.var_host.set(data["host"])
+            if data.get("user"):
+                self.var_user.set(data["user"])
+            if data.get("port"):
+                self.var_port.set(str(data["port"]))
+            if data.get("remember_pass") and data.get("password"):
+                self.var_pass.set(data["password"])
+            if data.get("phone"):
+                self.var_phone.set(data["phone"])
+            if data.get("reg_name"):
+                self.var_name.set(data["reg_name"])
 
-    def _save_settings(self) -> None:
+            # Restore selection — but NEVER select all 50 (was causing lag/crash feel)
+            saved_dev = data.get("devices") or []
+            if saved_dev and len(saved_dev) <= 20:
+                self.lst_dev.selection_clear(0, "end")
+                for i, did in enumerate(self._device_ids):
+                    if did in saved_dev:
+                        self.lst_dev.selection_set(i)
+            saved_ios = data.get("ios") or []
+            if saved_ios and len(saved_ios) <= 30:
+                self.lst_ios.selection_clear(0, "end")
+                for i, ver in enumerate(self._ios_vers):
+                    if ver in saved_ios:
+                        self.lst_ios.selection_set(i)
+        except Exception as e:
+            self.log(f"Khong doc settings: {e}")
+
+    def _save_settings(self):
         try:
             SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
             data = {
@@ -412,45 +465,42 @@ class IPfakerPC(tk.Tk):
                 "password": self.var_pass.get(),
                 "phone": self.var_phone.get().strip(),
                 "reg_name": self.var_name.get().strip(),
-                "devices": [k for k, v in self._device_vars.items() if v.get()],
-                "ios": [k for k, v in self._ios_vars.items() if v.get()],
+                "devices": self._selected_device_ids(),
+                "ios": self._selected_ios(),
             }
             SETTINGS_PATH.write_text(json.dumps(data, indent=2), encoding="utf-8")
         except Exception as e:
-            self.log(f"Lưu settings lỗi: {e}")
+            self.log(f"Luu settings loi: {e}")
 
-    # ── helpers ────────────────────────────────────────────
-    def log(self, msg: str) -> None:
+    # ── log / status ───────────────────────────────────────
+    def log(self, msg: str):
         def _do():
-            self.log_box.insert("end", msg.rstrip() + "\n")
-            self.log_box.see("end")
+            try:
+                self.log_box.insert("end", str(msg).rstrip() + "\n")
+                self.log_box.see("end")
+            except Exception:
+                pass
 
-        self.after(0, _do)
+        try:
+            self.root.after(0, _do)
+        except Exception:
+            pass
 
-    def _set_link(self, ok: bool, text: str) -> None:
+    def _set_link(self, ok: bool, text: str):
         def _do():
-            self.lbl_link.configure(text=text, foreground=GREEN if ok else ORANGE)
+            self.lbl_link.configure(text=text, fg=GREEN if ok else ORANGE)
 
-        self.after(0, _do)
+        self.root.after(0, _do)
 
-    def _set_status_label(self, st: DeviceStatus) -> None:
-        if not st.ok:
-            txt = f"Lỗi: {st.message}"
-        else:
-            txt = (
-                f"Gói: {st.package}\n"
-                f"Máy spoof: {st.marketing or '?'}  ({st.product_type or '?'})  ·  iOS {st.ios or '?'} ({st.build or '?'})\n"
-                f"Serial: {st.serial or '?'}  ·  Model: {st.model or '?'}  ·  IMEI: {st.imei or '?'}  ·  IDFV: {(st.idfv or '?')[:13]}…"
-            )
-
+    def _set_status_text(self, txt: str, ok: bool = True):
         def _do():
-            self.lbl_status.configure(text=txt, foreground=FG if st.ok else RED)
+            self.lbl_status.configure(text=txt, fg=FG if ok else RED)
 
-        self.after(0, _do)
+        self.root.after(0, _do)
 
-    def _run_bg(self, title: str, fn) -> None:
+    def _run_bg(self, title: str, fn):
         if self._busy:
-            messagebox.showinfo("Đang chạy", "Đợi thao tác hiện tại xong.")
+            self.messagebox.showinfo("Dang chay", "Doi thao tac hien tai xong.")
             return
 
         def wrap():
@@ -459,236 +509,231 @@ class IPfakerPC(tk.Tk):
             try:
                 fn()
             except Exception as e:
-                self.log(f"LỖI: {e}")
-                self.after(0, lambda: messagebox.showerror(title, str(e)))
+                tb = traceback.format_exc()
+                _write_err(tb)
+                self.log(f"LOI: {e}")
+                self.root.after(0, lambda: self.messagebox.showerror(title, f"{e}\n\nChi tiet: {ERR_LOG}"))
             finally:
                 self._busy = False
                 self.log(f"—— xong: {title} ——\n")
 
         threading.Thread(target=wrap, daemon=True).start()
 
-    def _need_client(self) -> DeviceClient:
+    def _need_client(self):
+        from device_client import DeviceClient  # noqa: F401
+
         if not self.client or not self.client.connected:
-            raise RuntimeError("Chưa kết nối. Nhập IP + mật khẩu SSH rồi bấm Kết nối.")
+            raise RuntimeError("Chua ket noi. Nhap IP + mat khau SSH roi bam Ket noi.")
         return self.client
 
-    def _selected_device_ids(self) -> list[str]:
-        return [k for k, v in self._device_vars.items() if v.get()]
+    def _selected_device_ids(self):
+        ids = []
+        for i in self.lst_dev.curselection():
+            if 0 <= i < len(self._device_ids):
+                ids.append(self._device_ids[i])
+        return ids
 
-    def _selected_ios(self) -> list[str]:
-        return [k for k, v in self._ios_vars.items() if v.get()]
+    def _selected_ios(self):
+        vers = []
+        for i in self.lst_ios.curselection():
+            if 0 <= i < len(self._ios_vers):
+                vers.append(self._ios_vers[i])
+        return vers
 
-    def _selected_apps(self) -> list[str]:
+    def _selected_apps(self):
         apps = [k for k, v in self._app_vars.items() if v.get()]
-        if not apps:
-            apps = ["vn.com.vng.zingalo"]
-        return apps
+        return apps or ["vn.com.vng.zingalo"]
 
-    def _valid_pairs(self) -> list[tuple[dict, str, dict]]:
-        """List of (device, ios_ver, ios_meta) allowed by matrix ∩ pools."""
+    def _valid_pairs(self):
         cat = self.catalog
-        d_ids = self._selected_device_ids()
-        i_list = self._selected_ios()
         pairs = []
-        for did in d_ids:
+        mod = sdp()
+        for did in self._selected_device_ids():
             dev = next((d for d in self.devices if d.get("id") == did), None)
             if not dev:
                 continue
-            supported = set(sdp.device_supported_ios(dev, cat))
-            for ios in i_list:
-                if ios not in cat["ios_releases"]:
+            supported = set(mod.device_supported_ios(dev, cat))
+            for ios in self._selected_ios():
+                if ios not in (cat.get("ios_releases") or {}):
                     continue
                 if supported and ios not in supported:
                     continue
                 pairs.append((dev, ios, cat["ios_releases"][ios]))
         return pairs
 
-    def _build_and_deploy(self, device: dict, ios: str, ios_meta: dict) -> dict:
+    def _build_and_deploy(self, device, ios, ios_meta):
         client = self._need_client()
-        built = sdp.build_profile(device, ios, ios_meta, None)
+        mod = sdp()
+        built = mod.build_profile(device, ios, ios_meta, None)
         flat = built["flat"]
-        # write local copy for debug
-        sdp.write_plist(flat, sdp.OUT_PLIST)
-        sdp.OUT_ACTIVE.write_text(json.dumps(built["active"], indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-        plist_text = sdp.OUT_PLIST.read_text(encoding="utf-8")
-        client.deploy_config(plist_text, built["active"])
+        mod.write_plist(flat, mod.OUT_PLIST)
+        mod.OUT_ACTIVE.write_text(
+            json.dumps(built["active"], indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        client.deploy_config(mod.OUT_PLIST.read_text(encoding="utf-8"), built["active"])
         return flat
 
     # ── actions ────────────────────────────────────────────
-    def _connect(self) -> None:
+    def _connect(self):
         self._save_settings()
 
         def job():
+            from device_client import DeviceClient
+
             host = self.var_host.get().strip()
             user = self.var_user.get().strip() or "mobile"
             password = self.var_pass.get()
             port = int(self.var_port.get() or 22)
             if not host or not password:
-                raise RuntimeError("Cần IP và mật khẩu SSH (cùng Wi‑Fi với máy).")
+                raise RuntimeError("Can IP va mat khau SSH.")
             if self.client:
-                self.client.close()
+                try:
+                    self.client.close()
+                except Exception:
+                    pass
             self.client = DeviceClient(host, password, user=user, port=port, log=self.log)
             self.client.connect()
             self._set_link(True, f"● Online {host}")
             st = self.client.fetch_status()
-            self._set_status_label(st)
-            self.log(json.dumps({
-                "package": st.package,
-                "device": st.marketing,
-                "ios": st.ios,
-            }, ensure_ascii=False))
+            self._apply_status(st)
 
-        self._run_bg("Kết nối", job)
+        self._run_bg("Ket noi", job)
 
-    def _disconnect(self) -> None:
+    def _apply_status(self, st):
+        if not st.ok:
+            self._set_status_text(f"Loi: {st.message}", ok=False)
+            return
+        txt = (
+            f"Goi: {st.package}\n"
+            f"Spoof: {st.marketing or '?'} ({st.product_type or '?'})  iOS {st.ios or '?'} ({st.build or '?'})\n"
+            f"Serial: {st.serial or '?'}  Model: {st.model or '?'}  IMEI: {st.imei or '?'}"
+        )
+        self._set_status_text(txt, ok=True)
+
+    def _disconnect(self):
         if self.client:
-            self.client.close()
+            try:
+                self.client.close()
+            except Exception:
+                pass
             self.client = None
-        self._set_link(False, "● Đã ngắt")
-        self.log("Đã ngắt kết nối.")
+        self._set_link(False, "● Da ngat")
+        self.log("Da ngat ket noi.")
 
-    def _refresh_status(self) -> None:
+    def _refresh_status(self):
         def job():
             st = self._need_client().fetch_status()
-            self._set_status_label(st)
+            self._apply_status(st)
             self.log(f"Refresh: {st.marketing} / iOS {st.ios}")
 
-        self._run_bg("Làm mới", job)
+        self._run_bg("Lam moi", job)
 
-    def _apply_selected(self) -> None:
+    def _apply_selected(self):
         def job():
             pairs = self._valid_pairs()
             if not pairs:
-                # if only one device toggled intent — use first selected device + first ios even if matrix empty
-                raise RuntimeError(
-                    "Không có cặp máy+iOS hợp lệ trong pool.\n"
-                    "Chọn đời máy + iOS (matrix Apple) rồi thử lại."
-                )
-            # Prefer currently checked single if only one device selected
-            dev, ios, meta = pairs[0]
-            if len(self._selected_device_ids()) == 1 and len(self._selected_ios()) >= 1:
-                # pick random valid among selected
-                dev, ios, meta = random.choice(pairs)
-            else:
-                dev, ios, meta = random.choice(pairs)
-            self.log(f"Áp dụng: {dev.get('MarketingName')} + iOS {ios}")
+                raise RuntimeError("Khong co cap may+iOS hop le. Chon pool (Ctrl+click).")
+            dev, ios, meta = random.choice(pairs)
+            self.log(f"Ap dung: {dev.get('MarketingName')} + iOS {ios}")
             flat = self._build_and_deploy(dev, ios, meta)
             self._need_client().kill_apps()
             st = self._need_client().fetch_status()
-            self._set_status_label(st)
-            self.after(
+            self._apply_status(st)
+            self.root.after(
                 0,
-                lambda: messagebox.showinfo(
-                    "Áp dụng",
-                    f"Đã ghi spoof:\n{flat.get('MarketingName')} · iOS {flat.get('ProductVersion')}\n"
-                    f"Serial {flat.get('SerialNumber')}\n\nMở lại Zalo để nạp spoof.",
+                lambda: self.messagebox.showinfo(
+                    "Ap dung",
+                    f"{flat.get('MarketingName')} · iOS {flat.get('ProductVersion')}\n"
+                    f"Serial {flat.get('SerialNumber')}\nMo lai Zalo.",
                 ),
             )
 
-        self._run_bg("Áp dụng máy", job)
+        self._run_bg("Ap dung may", job)
 
-    def _reset_data(self) -> None:
-        """Như «Đặt lại dữ liệu app»: random pool + wipe sạch (mất login)."""
-
+    def _reset_data(self):
         def job():
             pairs = self._valid_pairs()
             if not pairs:
-                raise RuntimeError("Pool máy/iOS trống hoặc không có cặp hợp lệ.")
+                raise RuntimeError("Pool may/iOS trong.")
             apps = self._selected_apps()
             dev, ios, meta = random.choice(pairs)
-            self.log(f"Đặt lại: {dev.get('MarketingName')} / {ios} + wipe {apps}")
             flat = self._build_and_deploy(dev, ios, meta)
-            wipe_msg = self._need_client().wipe_apps(apps, skip_keychain=False)
-            self.log(wipe_msg[-800:] if wipe_msg else "wipe done")
+            self._need_client().wipe_apps(apps, skip_keychain=False)
             st = self._need_client().fetch_status()
-            self._set_status_label(st)
-            self.after(
+            self._apply_status(st)
+            self.root.after(
                 0,
-                lambda: messagebox.showinfo(
-                    "Đặt lại dữ liệu app",
-                    f"Máy mới: {flat.get('MarketingName')} · iOS {flat.get('ProductVersion')}\n"
-                    f"Đã xóa data app — phiên đăng nhập MẤT.\nMở lại app để vào màn hình sạch.",
+                lambda: self.messagebox.showinfo(
+                    "Dat lai",
+                    f"May moi: {flat.get('MarketingName')} · iOS {flat.get('ProductVersion')}\nLogin MAT.",
                 ),
             )
 
-        self._run_bg("Đặt lại dữ liệu app", job)
+        self._run_bg("Dat lai du lieu app", job)
 
-    def _save_then_reset(self) -> None:
-        """Backup 100% params + app data (login) → random → wipe soft → restore."""
-
+    def _save_then_reset(self):
         def job():
             pairs = self._valid_pairs()
             if not pairs:
-                raise RuntimeError("Pool máy/iOS trống hoặc không có cặp hợp lệ.")
+                raise RuntimeError("Pool may/iOS trong.")
             apps = self._selected_apps()
             client = self._need_client()
-            self.log("① Lưu thông số máy + data app…")
             bak = client.backup_apps(apps)
             self.log(f"Backup: {bak}")
             dev, ios, meta = random.choice(pairs)
-            self.log(f"② Đặt lại hồ sơ: {dev.get('MarketingName')} / {ios}")
             flat = self._build_and_deploy(dev, ios, meta)
-            self.log("③ Xóa data (giữ keychain)…")
             client.wipe_apps(apps, skip_keychain=True)
-            self.log("④ Khôi phục data — giữ đăng nhập…")
-            rest = client.restore_apps(bak, apps)
-            self.log(rest[-600:] if rest else "restore ok")
+            client.restore_apps(bak, apps)
             client.kill_apps()
             st = client.fetch_status()
-            self._set_status_label(st)
-            self.after(
+            self._apply_status(st)
+            self.root.after(
                 0,
-                lambda: messagebox.showinfo(
-                    "Đặt lại + Lưu dữ liệu",
-                    f"Đã lưu + spoof mới:\n{flat.get('MarketingName')} · iOS {flat.get('ProductVersion')}\n"
-                    f"Phiên đăng nhập được khôi phục từ backup.\n\nBackup:\n{bak}",
+                lambda: self.messagebox.showinfo(
+                    "Dat lai + Luu",
+                    f"{flat.get('MarketingName')} · iOS {flat.get('ProductVersion')}\n"
+                    f"Login duoc khoi phuc.\n{bak}",
                 ),
             )
 
-        self._run_bg("Đặt lại + Lưu dữ liệu", job)
+        self._run_bg("Dat lai + Luu du lieu", job)
 
-    def _wipe_only(self) -> None:
+    def _wipe_only(self):
         def job():
             apps = self._selected_apps()
-            msg = self._need_client().wipe_apps(apps, skip_keychain=False)
-            self.log(msg[-800:] if msg else "wipe only done")
-            self.after(0, lambda: messagebox.showinfo("Xóa data", f"Đã xóa data:\n" + "\n".join(apps)))
+            self._need_client().wipe_apps(apps, skip_keychain=False)
+            self.root.after(0, lambda: self.messagebox.showinfo("Xoa data", "Da xoa:\n" + "\n".join(apps)))
 
-        self._run_bg("Xóa data app", job)
+        self._run_bg("Xoa data", job)
 
-    def _open_zalo(self) -> None:
+    def _open_zalo(self):
         def job():
             self._need_client().open_zalo()
-            self.log("Đã gửi lệnh mở Zalo.")
+            self.log("Mo Zalo.")
 
-        self._run_bg("Mở Zalo", job)
+        self._run_bg("Mo Zalo", job)
 
-    # ── Reg tự động ────────────────────────────────────────
-    def _auto_reg_start(self) -> None:
+    def _auto_reg_start(self):
         phone = self.var_phone.get().strip()
         if not phone:
-            messagebox.showwarning("Reg tự động", "Nhập số điện thoại trước.")
+            self.messagebox.showwarning("Reg", "Nhap so dien thoai.")
             return
         self._save_settings()
 
         def job():
+            from auto_reg import AutoRegRunner
+
             client = self._need_client()
-            # 1) optional spoof
             if self.var_reg_spoof.get():
                 pairs = self._valid_pairs()
                 if not pairs:
-                    raise RuntimeError("Bật «Random spoof» nhưng pool máy/iOS không có cặp hợp lệ.")
+                    raise RuntimeError("Random spoof bat nhung pool khong hop le.")
                 dev, ios, meta = random.choice(pairs)
-                self.log(f"Reg: spoof {dev.get('MarketingName')} / iOS {ios}")
+                self.log(f"Reg spoof {dev.get('MarketingName')} / {ios}")
                 self._build_and_deploy(dev, ios, meta)
-            # 2) optional wipe
             if self.var_reg_wipe.get():
-                self.log("Reg: xóa data Zalo trước…")
-                client.wipe_apps(
-                    ["vn.com.vng.zingalo", "com.zing.zalo"],
-                    skip_keychain=False,
-                )
-            # 3) Frida UI → phone
+                self.log("Wipe Zalo…")
+                client.wipe_apps(["vn.com.vng.zingalo", "com.zing.zalo"], skip_keychain=False)
             if self.reg_runner:
                 try:
                     self.reg_runner.close()
@@ -696,67 +741,116 @@ class IPfakerPC(tk.Tk):
                     pass
             self.reg_runner = AutoRegRunner(client, log=self.log)
             self.reg_runner.run_full_until_otp(phone)
-            self.after(
+            self.root.after(
                 0,
-                lambda: messagebox.showinfo(
-                    "Reg tự động",
-                    f"Đã điền SĐT {phone}.\n\n"
-                    "1) Nhập mã OTP trên iPhone (SMS)\n"
-                    "   hoặc gõ OTP vào ô rồi bấm «Gửi OTP / Tiếp reg»\n"
-                    "2) Captcha / ảnh (nếu có) làm tay trên máy",
+                lambda: self.messagebox.showinfo(
+                    "Reg",
+                    f"Da dien SDT {phone}.\nNhap OTP tren may hoac o OTP + Gui OTP.",
                 ),
             )
 
-        self._run_bg("Reg tự động", job)
+        self._run_bg("Reg tu dong", job)
 
-    def _auto_reg_otp(self) -> None:
+    def _auto_reg_otp(self):
         def job():
-            if not self.reg_runner or not self.reg_runner._script:
-                raise RuntimeError(
-                    "Chưa chạy «Reg tự động → tới OTP» hoặc Frida đã đứt.\n"
-                    "Chạy lại Reg tự động trước."
-                )
-            otp = self.var_otp.get().strip()
-            name = self.var_name.get().strip() or "Lab User"
-            self.reg_runner.submit_otp_and_finish(otp=otp, name=name)
-            self.after(
-                0,
-                lambda: messagebox.showinfo(
-                    "Tiếp reg",
-                    "Đã gửi OTP/tên (nếu có) và bấm tiếp các bước UI.\n"
-                    "Kiểm tra Zalo trên máy — captcha có thể cần tay.",
-                ),
+            if not self.reg_runner or not getattr(self.reg_runner, "_script", None):
+                raise RuntimeError("Chua chay Reg tu dong hoac Frida da dut.")
+            self.reg_runner.submit_otp_and_finish(
+                otp=self.var_otp.get().strip(),
+                name=self.var_name.get().strip() or "Lab User",
             )
+            self.root.after(0, lambda: self.messagebox.showinfo("OTP", "Da gui buoc tiep. Kiem tra Zalo."))
 
-        self._run_bg("Gửi OTP / Tiếp reg", job)
+        self._run_bg("Gui OTP", job)
 
-    def _auto_reg_stop(self) -> None:
+    def _auto_reg_stop(self):
         def job():
             if self.reg_runner:
                 self.reg_runner.close()
                 self.reg_runner = None
-                self.log("Đã dừng session Frida reg.")
+                self.log("Da dung Frida reg.")
             else:
-                self.log("Không có session reg đang mở.")
+                self.log("Khong co session reg.")
 
-        self._run_bg("Dừng Frida reg", job)
+        self._run_bg("Dung reg", job)
 
-    def _on_close(self) -> None:
-        self._save_settings()
+    def _on_close(self):
+        try:
+            self._save_settings()
+        except Exception:
+            pass
         if self.reg_runner:
             try:
                 self.reg_runner.close()
             except Exception:
                 pass
         if self.client:
-            self.client.close()
-        self.destroy()
+            try:
+                self.client.close()
+            except Exception:
+                pass
+        self.root.destroy()
+
+    def run(self):
+        self.root.mainloop()
 
 
 def main() -> int:
-    app = IPfakerPC()
-    app.mainloop()
-    return 0
+    _log_start(f"--- start pid={os.getpid()} py={sys.version} ---")
+    try:
+        tk, messagebox, scrolledtext, ttk = _safe_import_tk()
+    except Exception:
+        tb = traceback.format_exc()
+        _write_err(tb)
+        print(tb)
+        print("Thieu tkinter. Cai lai Python (tick tcl/tk).")
+        try:
+            input("Enter de dong...")
+        except EOFError:
+            pass
+        return 1
+
+    # Global hooks
+    def excepthook(etype, val, tb):
+        text = "".join(traceback.format_exception(etype, val, tb))
+        _write_err(text)
+        _log_start(text)
+        try:
+            r = tk.Tk()
+            r.withdraw()
+            messagebox.showerror("iPFaker PC crash", f"{val}\n\n{ERR_LOG}")
+            r.destroy()
+        except Exception:
+            print(text)
+        try:
+            input("Enter de dong...")
+        except EOFError:
+            pass
+
+    sys.excepthook = excepthook
+
+    try:
+        app = IPfakerPC(tk, ttk, messagebox, scrolledtext)
+        _log_start("UI created OK")
+        app.run()
+        _log_start("mainloop exit OK")
+        return 0
+    except Exception:
+        tb = traceback.format_exc()
+        _write_err(tb)
+        _log_start(tb)
+        try:
+            r = tk.Tk()
+            r.withdraw()
+            messagebox.showerror("iPFaker PC", f"Loi khoi dong:\n{tb[-1200:]}\n\n{ERR_LOG}")
+            r.destroy()
+        except Exception:
+            print(tb)
+        try:
+            input("Enter de dong...")
+        except EOFError:
+            pass
+        return 1
 
 
 if __name__ == "__main__":
