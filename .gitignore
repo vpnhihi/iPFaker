@@ -61,3 +61,8 @@ sileo-repo/com.ipfaker_2.4.0*
 docs/SESSION_MEMORY.md
 docs/E2E_FULL_EXTRA_REPORT.*
 docs/IDENTITY_AUDIT_REPORT.*
+
+pc_app/last_error.txt
+pc_app/startup.log
+pc_app/_stderr.txt
+pc_app/last_captcha.png
