@@ -6,10 +6,9 @@
 	<dict>
 		<key>Bundles</key>
 		<array>
-			<string>com.zing.zalo</string>
 			<string>vn.com.vng.zingalo</string>
+			<string>com.zing.zalo</string>
 		</array>
-		<!-- Carrier deep: inject telephony daemons (same idea as ChangeInfo CT) -->
 		<key>Executables</key>
 		<array>
 			<string>CommCenter</string>

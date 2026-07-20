@@ -5,19 +5,20 @@
 #import "IPFConfig.h"
 
 static NSArray<NSString *> *IPFPlistCandidates(void) {
+    // Prefer paths readable from app sandbox (mobile Library first)
     return @[
-        @"/var/jb/etc/ipfaker/config.plist",
         @"/var/mobile/Library/iPFaker/config.plist",
-        // HIOS path if user shares profile (optional)
+        @"/var/mobile/Library/Preferences/com.ipfaker.config.plist",
+        @"/var/jb/etc/ipfaker/config.plist",
         @"/var/jb/etc/changeinfoios/config.plist",
     ];
 }
 
 static NSArray<NSString *> *IPFJSONCandidates(void) {
     return @[
-        @"/var/jb/etc/ipfaker/active_profile.json",
         @"/var/mobile/Library/iPFaker/active_profile.json",
-        @"/var/jb/etc/ipfaker/device_profile.json",
+        @"/var/jb/etc/ipfaker/active_profile.json",
+        @"/var/mobile/Library/iPFaker/device_profile.json",
     ];
 }
 

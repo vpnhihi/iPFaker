@@ -1,49 +1,58 @@
-// iPFakerMG — entry (HIOS ChangeInfoIosMG style)
-// Filter plist limits inject; do NOT skip when bundle id is still empty at %ctor.
+// iPFakerMG — HIOS ChangeInfoIosMG style entry
+// Marker written FIRST so we can detect load vs config failure.
 
 #import <Foundation/Foundation.h>
 #import <stdio.h>
 #import "IPFConfig.h"
 #import "IPFHooksMG.h"
 
-static void IPFWriteLoadedMarker(void) {
-    // HIOS writes /var/jb/etc/changeinfoios/v3_mg_loaded.txt
-    NSString *path = @"/var/jb/etc/ipfaker/v3_mg_loaded.txt";
-    NSString *body = [NSString stringWithFormat:@"iPFakerMG loaded bid=%@ path=%@\n",
-                      [[NSBundle mainBundle] bundleIdentifier] ?: @"(nil)",
-                      [IPFConfig shared].profilePath ?: @"(none)"];
-    [body writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:nil];
+static void IPFMark(const char *msg) {
+    // Prefer mobile-writable path (always visible); also try /var/jb
+    NSArray *paths = @[
+        @"/var/mobile/Library/iPFaker/v3_mg_loaded.txt",
+        @"/var/jb/etc/ipfaker/v3_mg_loaded.txt",
+    ];
+    NSString *bid = [[NSBundle mainBundle] bundleIdentifier] ?: @"(nil)";
+    NSString *body = [NSString stringWithFormat:@"%s bid=%@\n", msg, bid];
+    for (NSString *p in paths) {
+        [body writeToFile:p atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    }
+    NSLog(@"[iPFakerMG] %s bid=%@", msg, bid);
 }
 
 %ctor {
     @autoreleasepool {
+        IPFMark("CTOR_ENTER");
+
         NSString *bid = [[NSBundle mainBundle] bundleIdentifier] ?: @"";
-        // Only skip if we KNOW we are in a non-Zalo process.
-        // Empty bid at early ctor is common — HIOS filter already scopes inject.
+        // Filter already scopes inject. Only refuse known non-targets.
         if (bid.length > 0) {
-            BOOL ok = [bid isEqualToString:@"vn.com.vng.zingalo"]
-                   || [bid isEqualToString:@"com.zing.zalo"];
-            if (!ok) {
-                NSLog(@"[iPFakerMG] skip non-zalo bid=%@", bid);
+            BOOL zalo = [bid isEqualToString:@"vn.com.vng.zingalo"]
+                     || [bid isEqualToString:@"com.zing.zalo"];
+            if (!zalo) {
+                IPFMark("CTOR_SKIP_BID");
                 return;
             }
         }
 
-        NSLog(@"[iPFakerMG] ctor start bid=%@", bid.length ? bid : @"(empty-early)");
-        BOOL loaded = [[IPFConfig shared] reload];
-        NSLog(@"[iPFakerMG] config loaded=%d path=%@ mg=%lu",
-              loaded,
-              [IPFConfig shared].profilePath,
-              (unsigned long)[IPFConfig shared].mgMap.count);
+        BOOL ok = [[IPFConfig shared] reload];
+        NSString *dbg = [NSString stringWithFormat:
+            @"reload=%d path=%@ ProductType=%@ enabled=%d\n",
+            ok,
+            [IPFConfig shared].profilePath ?: @"(none)",
+            [[IPFConfig shared] mgValueForKey:@"ProductType"] ?: @"(nil)",
+            [IPFConfig shared].enabled];
+        [dbg writeToFile:@"/var/mobile/Library/iPFaker/v3_mg_debug.log"
+              atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        [dbg writeToFile:@"/var/jb/etc/ipfaker/v3_mg_debug.log"
+              atomically:YES encoding:NSUTF8StringEncoding error:nil];
 
-        if (!loaded || ![IPFConfig shared].enabled) {
-            NSLog(@"[iPFakerMG] abort hooks — no config (expected /var/jb/etc/ipfaker/config.plist)");
-            return;
+        if (!ok) {
+            // HIOS always has config.plist; still install embedded fallback hooks
+            IPFMark("CTOR_NO_FILE_CONFIG_USE_EMBED");
         }
 
         IPFInstallMGHooks();
-        IPFWriteLoadedMarker();
-        NSLog(@"[iPFakerMG] hooks installed ProductType=%@",
-              [[IPFConfig shared] mgValueForKey:@"ProductType"] ?: @"(nil)");
+        IPFMark("CTOR_HOOKS_DONE");
     }
 }
