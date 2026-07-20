@@ -117,7 +117,6 @@ jobs:
           APP=$(find .theos -type d -name 'iPFaker.app' | head -1)
           if [ -n "$APP" ]; then
             cp -a "$APP" ../dist/app/
-            # sign binary
             BIN="../dist/app/iPFaker.app/iPFaker"
             if [ -f "$BIN" ]; then
               codesign --remove-signature "$BIN" 2>/dev/null || true
@@ -126,11 +125,36 @@ jobs:
             fi
           fi
           find packages -name '*.deb' -exec cp -f {} ../dist/app/ \; 2>/dev/null || true
+          # also copy release dylibs for deb packager
+          mkdir -p ../dist
+          MG=$(find ../.theos .theos ../obj -name 'iPFakerMG.dylib' 2>/dev/null | head -1)
+          CT=$(find ../.theos .theos ../obj -name 'iPFakerCT.dylib' 2>/dev/null | head -1)
+          # prefer parent theos dist from earlier step
+          [ -f ../dist/iPFakerMG.dylib ] || { [ -n "$MG" ] && cp -f "$MG" ../dist/iPFakerMG.dylib; }
+          [ -f ../dist/iPFakerCT.dylib ] || { [ -n "$CT" ] && cp -f "$CT" ../dist/iPFakerCT.dylib; }
           ls -laR ../dist/app || true
+
+      - name: Build Sileo .deb
+        working-directory: .
+        run: |
+          set -e
+          # Prefer freshly built CI dylibs
+          mkdir -p dylibs_ci theos/dist/app
+          if [ -f theos/dist/iPFakerMG.dylib ]; then
+            cp -f theos/dist/iPFakerMG.dylib dylibs_ci/
+            cp -f theos/dist/iPFakerCT.dylib dylibs_ci/
+          fi
+          python3 scripts/build_sileo_deb.py --version 2.3.0 \
+            --app theos/dist/app/iPFaker.app 2>/dev/null \
+            || python3 scripts/build_sileo_deb.py --version 2.3.0
+          ls -la dist/sileo/
+          ls -la dist/sileo/repo/debs/ || true
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ipfaker-dylibs
-          path: theos/dist/*
+          name: ipfaker-sileo
+          path: |
+            dist/sileo/**
+            theos/dist/**
           if-no-files-found: error
