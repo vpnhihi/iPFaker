@@ -18,25 +18,25 @@
     [self.view addSubview:header];
 
     UILabel *note = [[UILabel alloc] init];
-    note.text = @"Kill Zalo = random đời máy + iOS trong pool (matrix) + full identity theo catalog máy. Wipe container đầy đủ: PC scripts/wipe_and_ready.py.";
+    note.text = @"Kill Zalo = random máy+iOS + XÓA SẠCH 100% data Zalo (container, App Group, prefs, keychain best-effort). Mở lại = màn login mới.";
     note.font = AppTheme.bodyFont;
     note.textColor = AppTheme.textSecondary;
     note.numberOfLines = 0;
     note.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:note];
 
-    UIButton *kill = [AppTheme primaryButtonWithTitle:@"Kill Zalo + Random pool"
+    UIButton *kill = [AppTheme primaryButtonWithTitle:@"Kill Zalo + Random + Wipe 100%"
                                                target:self
                                                action:@selector(killTapped)];
-    UIButton *reseed = [AppTheme primaryButtonWithTitle:@"Apply primary (active)"
+    UIButton *reseed = [AppTheme primaryButtonWithTitle:@"Apply primary (giữ data Zalo)"
                                                  target:self
                                                  action:@selector(reseedTapped)];
     reseed.backgroundColor = AppTheme.accentDark;
 
     UIButton *wipe = [UIButton buttonWithType:UIButtonTypeSystem];
-    [wipe setTitle:@"Wipe Zalo (lab note)" forState:UIControlStateNormal];
+    [wipe setTitle:@"Chỉ xóa sạch data Zalo (không random)" forState:UIControlStateNormal];
     [wipe setTitleColor:UIColor.systemOrangeColor forState:UIControlStateNormal];
-    wipe.titleLabel.font = [UIFont systemFontOfSize:16 weight:UIFontWeightSemibold];
+    wipe.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
     wipe.backgroundColor = AppTheme.card;
     wipe.layer.cornerRadius = 14;
     wipe.translatesAutoresizingMaskIntoConstraints = NO;

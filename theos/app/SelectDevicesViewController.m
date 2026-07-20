@@ -77,7 +77,7 @@
                                                    action:@selector(applyTapped)];
     [self.view addSubview:applyBtn];
 
-    UIButton *killBtn = [AppTheme primaryButtonWithTitle:@"Kill Zalo + Random full"
+    UIButton *killBtn = [AppTheme primaryButtonWithTitle:@"Kill Zalo + Random + Wipe 100%"
                                                   target:self
                                                   action:@selector(killRandomTapped)];
     killBtn.backgroundColor = [UIColor colorWithRed:0.85 green:0.35 blue:0.1 alpha:1.0];

@@ -157,7 +157,7 @@
 
     // Secondary actions
     UIButton *killBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    [killBtn setTitle:@"Kill Zalo + Random pool" forState:UIControlStateNormal];
+    [killBtn setTitle:@"Kill Zalo + Random + Wipe 100%" forState:UIControlStateNormal];
     [killBtn setTitleColor:UIColor.orangeColor forState:UIControlStateNormal];
     killBtn.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
     killBtn.backgroundColor = AppTheme.cardAlt;

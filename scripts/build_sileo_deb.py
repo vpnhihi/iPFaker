@@ -31,7 +31,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION_DEFAULT = "2.5.3"
+VERSION_DEFAULT = "2.5.4"
 PKG = "com.ipfaker"
 ARCH = "iphoneos-arm64"
 
@@ -124,6 +124,14 @@ for f in "$ROOT/etc/ipfaker/config.plist" /var/jb/etc/ipfaker/config.plist \
   if [ -f "$f" ]; then
     chown mobile:mobile "$f" 2>/dev/null || true
     chmod 644 "$f" 2>/dev/null || true
+  fi
+done
+# Wipe helper executable
+for w in /var/jb/usr/libexec/ipfaker-wipe-zalo /var/jb/etc/ipfaker/wipe_zalo.sh \
+         /var/mobile/Library/iPFaker/wipe_zalo.sh; do
+  if [ -f "$w" ]; then
+    chmod 755 "$w" 2>/dev/null || true
+    chown root:wheel "$w" 2>/dev/null || true
   fi
 done
 
@@ -392,6 +400,14 @@ def build(version: str, app_path: str | None) -> Path:
 
         readme = b"iPFaker lab config dir. Apply profile from iPFaker.app or PC scripts.\n"
         add_file(tar, "var/jb/etc/ipfaker/README.txt", track(readme), 0o644)
+
+        # Full wipe helper used by app Kill Zalo
+        wipe_src = ROOT / "injector" / "wipe_zalo.sh"
+        if wipe_src.is_file():
+            wdata = track(wipe_src.read_bytes())
+            add_file(tar, "var/jb/usr/libexec/ipfaker-wipe-zalo", wdata, 0o755)
+            add_file(tar, "var/jb/etc/ipfaker/wipe_zalo.sh", wdata, 0o755)
+            add_file(tar, "var/mobile/Library/iPFaker/wipe_zalo.sh", wdata, 0o755)
 
         if app:
             add_tree(tar, app, "var/jb/Applications/iPFaker.app")

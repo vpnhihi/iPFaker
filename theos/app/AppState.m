@@ -391,23 +391,26 @@ static NSString *const kPoolIOS = @"ipf.pool.iosList";
 }
 
 - (NSString *)killZaloAndRandomizeFromPool {
-    // 1) Random full profile from multi-select pools (matrix-synced)
+    // 1) Random full profile FIRST (spoof ready before next open)
     NSString *applyMsg = [self applyRandomFromPool];
-    // 2) Kill Zalo so next launch loads new config
-    [ProfileBuilder killZalo];
-    self.statusText = [NSString stringWithFormat:@"%@\n→ Đã Kill Zalo. Mở lại Zalo để load spoof mới.", applyMsg];
+    // 2) Full 100% wipe Zalo data (account gone) + kill
+    NSString *wipeMsg = [ProfileBuilder wipeZaloFull];
+    self.statusText = [NSString stringWithFormat:
+                       @"%@\n\n%@\n\n→ Mở Zalo = máy mới + form login trống.",
+                       applyMsg, wipeMsg];
     [self postDidChange];
     return self.statusText;
 }
 
 - (void)killZalo {
-    // Default Kill = randomize from pool + kill (user requirement)
+    // Kill button = random identity from pool + wipe 100% Zalo data
     (void)[self killZaloAndRandomizeFromPool];
 }
 
 - (NSString *)wipeZaloLab {
-    NSString *m = [ProfileBuilder wipeZaloLab];
-    self.statusText = m ?: @"Wipe note";
+    // Wipe tab: full wipe only (keep current spoof profile)
+    NSString *m = [ProfileBuilder wipeZaloFull];
+    self.statusText = m ?: @"Wipe done";
     [self postDidChange];
     return self.statusText;
 }

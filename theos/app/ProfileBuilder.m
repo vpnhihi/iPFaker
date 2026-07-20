@@ -2,6 +2,9 @@
 #import <UIKit/UIKit.h>
 #import <spawn.h>
 #import <sys/wait.h>
+#import <unistd.h>
+#import <time.h>
+#import <stdlib.h>
 
 @implementation ProfileBuilder
 
@@ -417,7 +420,12 @@
         @"/usr/bin/killall",
         @"/var/jb/bin/killall",
     ];
-    NSArray<NSString *> *names = @[ @"Zalo", @"vn.com.vng.zingalo" ];
+    // Process names + common extension hosts
+    NSArray<NSString *> *names = @[
+        @"Zalo", @"zalo", @"vn.com.vng.zingalo",
+        @"ZaloShare", @"NotificationService",
+        @"NotificationServiceExtension",
+    ];
     for (NSString *bin in bins) {
         if (![[NSFileManager defaultManager] isExecutableFileAtPath:bin]) continue;
         for (NSString *name in names) {
@@ -433,14 +441,251 @@
     }
 }
 
-+ (NSString *)wipeZaloLab {
-    [self killZalo];
-    // Soft wipe of common prefs only — full wipe stays on PC scripts
-    NSArray *hints = @[
-        @"/var/mobile/Containers/Data/Application",
+/// Run external shell script (wipe helper). Returns exit code, -1 if not found.
++ (int)runShellScript:(NSString *)scriptPath args:(NSArray<NSString *> *)args {
+    if (![[NSFileManager defaultManager] isExecutableFileAtPath:scriptPath]
+        && ![[NSFileManager defaultManager] fileExistsAtPath:scriptPath]) {
+        return -1;
+    }
+    NSString *sh = nil;
+    for (NSString *c in @[ @"/var/jb/bin/sh", @"/var/jb/usr/bin/sh", @"/bin/sh", @"/var/jb/usr/bin/bash" ]) {
+        if ([[NSFileManager defaultManager] isExecutableFileAtPath:c]) { sh = c; break; }
+    }
+    if (!sh) sh = @"/bin/sh";
+
+    NSMutableArray<NSString *> *argvStr = [NSMutableArray arrayWithObjects:sh, scriptPath, nil];
+    if (args.count) [argvStr addObjectsFromArray:args];
+
+    // Build C argv
+    char **argv = calloc(argvStr.count + 1, sizeof(char *));
+    if (!argv) return -1;
+    for (NSUInteger i = 0; i < argvStr.count; i++)
+        argv[i] = (char *)[argvStr[i] UTF8String];
+    argv[argvStr.count] = NULL;
+
+    pid_t pid = 0;
+    int rc = posix_spawn(&pid, sh.UTF8String, NULL, NULL, argv, NULL);
+    free(argv);
+    if (rc != 0 || pid <= 0) return -1;
+    int st = 0;
+    waitpid(pid, &st, 0);
+    if (WIFEXITED(st)) return WEXITSTATUS(st);
+    return -1;
+}
+
+/// True if metadata plist text contains any of the bundle markers.
++ (BOOL)metadataAtPath:(NSString *)metaPath matchesAny:(NSArray<NSString *> *)needles {
+    NSData *data = [NSData dataWithContentsOfFile:metaPath];
+    if (!data.length) return NO;
+    NSString *s = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+    if (!s) {
+        // binary plist
+        id obj = [NSPropertyListSerialization propertyListWithData:data options:0 format:NULL error:nil];
+        s = [obj description];
+    }
+    if (!s.length) return NO;
+    NSString *low = s.lowercaseString;
+    for (NSString *n in needles) {
+        if (n.length && [low rangeOfString:n.lowercaseString].location != NSNotFound)
+            return YES;
+    }
+    return NO;
+}
+
+/// Wipe everything inside container root except Apple metadata shells.
++ (NSUInteger)wipeContainerRoot:(NSString *)root fm:(NSFileManager *)fm {
+    if (!root.length || ![fm fileExistsAtPath:root]) return 0;
+    NSUInteger n = 0;
+    NSError *err = nil;
+    NSArray *kids = [fm contentsOfDirectoryAtPath:root error:&err];
+    for (NSString *name in kids) {
+        if ([name isEqualToString:@".com.apple.mobile_container_manager.metadata.plist"]
+            || [name isEqualToString:@"iTunesMetadata.plist"]
+            || [name isEqualToString:@".com.apple.mobile_container_manager.metadata.plist.bak"]) {
+            continue;
+        }
+        NSString *p = [root stringByAppendingPathComponent:name];
+        if ([fm removeItemAtPath:p error:&err]) n++;
+        else {
+            // force contents if remove failed
+            NSArray *deep = [fm contentsOfDirectoryAtPath:p error:nil];
+            for (NSString *c in deep) {
+                if ([fm removeItemAtPath:[p stringByAppendingPathComponent:c] error:nil]) n++;
+            }
+            [fm removeItemAtPath:p error:nil];
+            n++;
+        }
+    }
+    // Recreate empty sandbox dirs so first-launch works
+    for (NSString *sub in @[ @"Documents", @"Library", @"tmp", @"Library/Caches", @"Library/Preferences" ]) {
+        NSString *p = [root stringByAppendingPathComponent:sub];
+        [fm createDirectoryAtPath:p withIntermediateDirectories:YES attributes:nil error:nil];
+    }
+    return n;
+}
+
++ (NSString *)wipeZaloFull {
+    NSMutableArray *log = [NSMutableArray array];
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSArray<NSString *> *bundles = @[ @"vn.com.vng.zingalo", @"com.zing.zalo" ];
+    NSArray<NSString *> *needles = @[
+        @"vn.com.vng.zingalo", @"com.zing.zalo", @"zalo", @"zing.zalo", @"vng.zalo"
     ];
-    // Don't rm -rf from app (too dangerous). Instruct user.
-    return @"Đã kill Zalo. Wipe container đầy đủ: chạy trên PC scripts/wipe_and_ready.py (an toàn hơn).";
+
+    // 1) Kill first so files unlock
+    [self killZalo];
+    usleep(400000); // 0.4s
+    [log addObject:@"① Kill Zalo processes"];
+
+    // 2) Prefer privileged wipe script (shipped in deb)
+    NSArray *scripts = @[
+        @"/var/jb/usr/libexec/ipfaker-wipe-zalo",
+        @"/var/jb/etc/ipfaker/wipe_zalo.sh",
+        @"/var/mobile/Library/iPFaker/wipe_zalo.sh",
+    ];
+    BOOL scriptRan = NO;
+    for (NSString *sp in scripts) {
+        if (![fm fileExistsAtPath:sp]) continue;
+        // ensure executable bit best-effort
+        [fm setAttributes:@{ NSFilePosixPermissions: @0755 } ofItemAtPath:sp error:nil];
+        int rc = [self runShellScript:sp args:@[]];
+        if (rc >= 0) {
+            [log addObject:[NSString stringWithFormat:@"② Script wipe: %@ (rc=%d)", sp, rc]];
+            scriptRan = YES;
+            break;
+        }
+    }
+    if (!scriptRan)
+        [log addObject:@"② Script wipe: (không có / không chạy — dùng wipe native)"];
+
+    // 3) Native wipe Data containers (always — even if script ran, ensure empty)
+    NSUInteger dataWiped = 0;
+    NSString *dataRoot = @"/var/mobile/Containers/Data/Application";
+    NSArray *apps = [fm contentsOfDirectoryAtPath:dataRoot error:nil];
+    for (NSString *uuid in apps) {
+        NSString *root = [dataRoot stringByAppendingPathComponent:uuid];
+        NSString *meta = [root stringByAppendingPathComponent:@".com.apple.mobile_container_manager.metadata.plist"];
+        if (![self metadataAtPath:meta matchesAny:needles]) continue;
+        NSUInteger n = [self wipeContainerRoot:root fm:fm];
+        dataWiped += n;
+        [log addObject:[NSString stringWithFormat:@"③ Data container %@ items~%lu",
+                        [uuid substringToIndex:MIN((NSUInteger)8, uuid.length)], (unsigned long)n]];
+    }
+    if (dataWiped == 0)
+        [log addObject:@"③ Data container: không tìm thấy (đã trống hoặc chưa cài Zalo)"];
+
+    // 4) App Group shared
+    NSUInteger groupWiped = 0;
+    NSString *groupRoot = @"/var/mobile/Containers/Shared/AppGroup";
+    NSArray *groups = [fm contentsOfDirectoryAtPath:groupRoot error:nil];
+    for (NSString *uuid in groups) {
+        NSString *root = [groupRoot stringByAppendingPathComponent:uuid];
+        NSString *meta = [root stringByAppendingPathComponent:@".com.apple.mobile_container_manager.metadata.plist"];
+        if (![self metadataAtPath:meta matchesAny:needles]) continue;
+        groupWiped += [self wipeContainerRoot:root fm:fm];
+        [log addObject:[NSString stringWithFormat:@"④ AppGroup %@ wiped",
+                        [uuid substringToIndex:MIN((NSUInteger)8, uuid.length)]]];
+    }
+    if (groupWiped == 0)
+        [log addObject:@"④ AppGroup: không có / đã trống"];
+
+    // 5) Preferences / cookies / HTTPStorages / WebKit / Splash
+    NSUInteger crumb = 0;
+    for (NSString *bid in bundles) {
+        NSArray *paths = @[
+            [NSString stringWithFormat:@"/var/mobile/Library/Preferences/%@.plist", bid],
+            [NSString stringWithFormat:@"/var/mobile/Library/Cookies/%@.binarycookies", bid],
+            [NSString stringWithFormat:@"/var/mobile/Library/HTTPStorages/%@", bid],
+            [NSString stringWithFormat:@"/var/mobile/Library/WebKit/WebsiteData/Default/%@", bid],
+        ];
+        for (NSString *p in paths) {
+            if ([fm fileExistsAtPath:p] && [fm removeItemAtPath:p error:nil]) crumb++;
+        }
+    }
+    // WebKit WebsiteData scan
+    NSString *wk = @"/var/mobile/Library/WebKit/WebsiteData";
+    for (NSString *sub in [fm contentsOfDirectoryAtPath:wk error:nil] ?: @[]) {
+        NSString *sp = [wk stringByAppendingPathComponent:sub];
+        for (NSString *name in [fm contentsOfDirectoryAtPath:sp error:nil] ?: @[]) {
+            NSString *low = name.lowercaseString;
+            if ([low containsString:@"zalo"] || [low containsString:@"zing"]) {
+                if ([fm removeItemAtPath:[sp stringByAppendingPathComponent:name] error:nil]) crumb++;
+            }
+        }
+    }
+    // SplashBoard snapshots
+    NSString *snapRoot = @"/var/mobile/Library/SplashBoard/Snapshots";
+    for (NSString *name in [fm contentsOfDirectoryAtPath:snapRoot error:nil] ?: @[]) {
+        NSString *low = name.lowercaseString;
+        if ([low containsString:@"zalo"] || [low containsString:@"zingalo"]) {
+            if ([fm removeItemAtPath:[snapRoot stringByAppendingPathComponent:name] error:nil]) crumb++;
+        }
+    }
+    // Caches
+    for (NSString *c in @[
+        @"/var/mobile/Library/Caches/vn.com.vng.zingalo",
+        @"/var/mobile/Library/Caches/com.zing.zalo",
+    ]) {
+        if ([fm fileExistsAtPath:c] && [fm removeItemAtPath:c error:nil]) crumb++;
+    }
+    [log addObject:[NSString stringWithFormat:@"⑤ Prefs/Cookies/Splash/Caches removed~%lu", (unsigned long)crumb]];
+
+    // 6) Keychain SQL best-effort (needs readable keychain + sqlite3)
+    NSString *kcMsg = @"⑥ Keychain: skipped";
+    NSArray *kcDBs = @[
+        @"/var/Keychains/keychain-2.db",
+        @"/private/var/Keychains/keychain-2.db",
+    ];
+    NSString *sqlite = nil;
+    for (NSString *c in @[ @"/var/jb/usr/bin/sqlite3", @"/usr/bin/sqlite3", @"/var/jb/bin/sqlite3" ]) {
+        if ([fm isExecutableFileAtPath:c]) { sqlite = c; break; }
+    }
+    NSString *kcDB = nil;
+    for (NSString *p in kcDBs) {
+        if ([fm isReadableFileAtPath:p]) { kcDB = p; break; }
+    }
+    if (sqlite && kcDB) {
+        // Backup + delete zalo-ish rows
+        NSString *bak = [kcDB stringByAppendingFormat:@".ipfaker_bak_%ld", (long)time(NULL)];
+        [fm copyItemAtPath:kcDB toPath:bak error:nil];
+        NSArray *pats = @[ @"zalo", @"Zalo", @"zing.zalo", @"vng.zalo", @"ZADevice", @"device_id", @"AppsFlyer" ];
+        int del = 0;
+        for (NSString *pat in pats) {
+            NSString *sql1 = [NSString stringWithFormat:
+                @"DELETE FROM genp WHERE svce LIKE '%%%@%%' OR acct LIKE '%%%@%%' OR agrp LIKE '%%%@%%';",
+                pat, pat, pat];
+            NSString *sql2 = [NSString stringWithFormat:
+                @"DELETE FROM inet WHERE svce LIKE '%%%@%%' OR acct LIKE '%%%@%%' OR agrp LIKE '%%%@%%';",
+                pat, pat, pat];
+            for (NSString *sql in @[ sql1, sql2 ]) {
+                pid_t pid = 0;
+                const char *argv[] = { sqlite.UTF8String, kcDB.UTF8String, sql.UTF8String, NULL };
+                if (posix_spawn(&pid, sqlite.UTF8String, NULL, NULL, (char *const *)argv, NULL) == 0 && pid > 0) {
+                    int st = 0; waitpid(pid, &st, 0);
+                    del++;
+                }
+            }
+        }
+        kcMsg = [NSString stringWithFormat:@"⑥ Keychain SQL purge attempts=%d bak=%@", del, bak.lastPathComponent];
+    } else {
+        kcMsg = @"⑥ Keychain: không đọc được DB (cần root/sqlite) — container đã xóa vẫn logout local";
+    }
+    [log addObject:kcMsg];
+
+    // 7) Kill again (extensions may relaunch)
+    [self killZalo];
+    [log addObject:@"⑦ Kill lại Zalo (đảm bảo)"];
+
+    NSString *summary = [NSString stringWithFormat:
+        @"Đã XÓA SẠCH data Zalo (lab):\n%@\n\n"
+        @"→ Mở lại Zalo = như cài mới (màn đăng nhập/tạo TK).\n"
+        @"→ Spoof profile đã Apply vẫn còn — login sẽ gắn model mới.",
+        [log componentsJoinedByString:@"\n"]];
+    return summary;
+}
+
++ (NSString *)wipeZaloLab {
+    return [self wipeZaloFull];
 }
 
 @end
