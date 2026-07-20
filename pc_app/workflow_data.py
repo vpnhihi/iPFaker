@@ -143,7 +143,10 @@ def load_config() -> dict:
         "sms_shortcodes": "7539|8500",
         "privacy_mode": "first_only",  # first_only | first_two | all_three
         "contacts_action": "skip",  # skip | continue
-        "appmanager_bundle": "",
+        "appmanager_bundle": "com.tigisoftware.appdatamanager",
+        "captcha_provider": "auto",  # auto | 2captcha | capsolver | achi
+        "twocaptcha_key": "",
+        "capsolver_key": "",
         "shadowrocket_on_url": "shadowrocket://connect",
         "shadowrocket_off_url": "shadowrocket://disconnect",
     }

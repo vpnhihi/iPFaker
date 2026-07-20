@@ -277,9 +277,12 @@ class IPfakerPC:
         self.var_rota_key = tk.StringVar(value="")
         self.var_rota_app = tk.StringVar(value="")
         self.var_achi_key = tk.StringVar(value="")
+        self.var_2cap_key = tk.StringVar(value="")
+        self.var_capsolver_key = tk.StringVar(value="")
+        self.var_cap_provider = tk.StringVar(value="auto")
         self.var_privacy = tk.StringVar(value="first_only")
         self.var_contacts = tk.StringVar(value="skip")
-        self.var_appmgr = tk.StringVar(value="")
+        self.var_appmgr = tk.StringVar(value="com.tigisoftware.appdatamanager")
 
         ttk.Label(api_in, text="BossOTP.net", style="Card.TLabel", font=("Segoe UI Semibold", 11)).pack(anchor="w")
         self._api_field(api_in, "API token (sk_...)", self.var_boss_token, 64, show="*")
@@ -292,10 +295,21 @@ class IPfakerPC:
         self._api_field(api_in, "package_api_key", self.var_rota_key, 64, show="*")
         self._api_field(api_in, "app_id (optional)", self.var_rota_app, 20)
 
-        ttk.Label(api_in, text="AchiCaptcha (ShopeeCaptchaTask slider)", style="Card.TLabel", font=("Segoe UI Semibold", 11)).pack(
-            anchor="w", pady=(10, 0)
+        ttk.Label(
+            api_in,
+            text="Captcha (Achi loi → dung 2captcha / CapSolver)",
+            style="Card.TLabel",
+            font=("Segoe UI Semibold", 11),
+        ).pack(anchor="w", pady=(10, 0))
+        self._api_field(
+            api_in,
+            "Provider: auto | 2captcha | capsolver | achi",
+            self.var_cap_provider,
+            16,
         )
-        self._api_field(api_in, "clientKey", self.var_achi_key, 64, show="*")
+        self._api_field(api_in, "2captcha.com API key (khuyen nghi khi Achi die)", self.var_2cap_key, 64, show="*")
+        self._api_field(api_in, "CapSolver.com API key (optional)", self.var_capsolver_key, 64, show="*")
+        self._api_field(api_in, "AchiCaptcha clientKey (khi web song lai)", self.var_achi_key, 64, show="*")
 
         ttk.Label(api_in, text="Tuy chon reg", style="Card.TLabel", font=("Segoe UI Semibold", 11)).pack(
             anchor="w", pady=(10, 0)
@@ -307,7 +321,7 @@ class IPfakerPC:
             20,
         )
         self._api_field(api_in, "Contacts: skip | continue", self.var_contacts, 16)
-        self._api_field(api_in, "AppManager bundle id (neu co)", self.var_appmgr, 40)
+        self._api_field(api_in, "AppManager bundle", self.var_appmgr, 40)
 
         ttk.Button(api_in, text="Luu API + tuy chon", command=self._save_settings).pack(anchor="w", pady=12)
         ttk.Label(
@@ -425,6 +439,9 @@ class IPfakerPC:
                 ("rotaproxy_key", self.var_rota_key),
                 ("rotaproxy_app_id", self.var_rota_app),
                 ("achicaptcha_key", self.var_achi_key),
+                ("twocaptcha_key", self.var_2cap_key),
+                ("capsolver_key", self.var_capsolver_key),
+                ("captcha_provider", self.var_cap_provider),
                 ("privacy_mode", self.var_privacy),
                 ("contacts_action", self.var_contacts),
                 ("appmanager_bundle", self.var_appmgr),
@@ -452,29 +469,20 @@ class IPfakerPC:
                 "rotaproxy_key": self.var_rota_key.get().strip(),
                 "rotaproxy_app_id": self.var_rota_app.get().strip(),
                 "achicaptcha_key": self.var_achi_key.get().strip(),
+                "twocaptcha_key": self.var_2cap_key.get().strip(),
+                "capsolver_key": self.var_capsolver_key.get().strip(),
+                "captcha_provider": self.var_cap_provider.get().strip() or "auto",
                 "privacy_mode": self.var_privacy.get().strip() or "first_only",
                 "contacts_action": self.var_contacts.get().strip() or "skip",
-                "appmanager_bundle": self.var_appmgr.get().strip(),
+                "appmanager_bundle": self.var_appmgr.get().strip()
+                or "com.tigisoftware.appdatamanager",
             }
             SETTINGS_PATH.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
             self._settings = data
-            # also sync workflow_data/config.json (non-secret optional)
             try:
                 from workflow_data import save_config
 
-                save_config(
-                    {
-                        "bossotp_token": data["bossotp_token"],
-                        "bossotp_network": data["bossotp_network"],
-                        "bossotp_prefixs": data["bossotp_prefixs"],
-                        "rotaproxy_key": data["rotaproxy_key"],
-                        "rotaproxy_app_id": data["rotaproxy_app_id"],
-                        "achicaptcha_key": data["achicaptcha_key"],
-                        "privacy_mode": data["privacy_mode"],
-                        "contacts_action": data["contacts_action"],
-                        "appmanager_bundle": data["appmanager_bundle"],
-                    }
-                )
+                save_config({k: data[k] for k in data if k not in ("password", "host", "user", "port", "remember_pass")})
             except Exception as e:
                 self.log(f"sync workflow config: {e}")
             self.log(f"Da luu settings → {SETTINGS_PATH}")
@@ -737,9 +745,13 @@ class IPfakerPC:
             "rotaproxy_key": self.var_rota_key.get().strip(),
             "rotaproxy_app_id": self.var_rota_app.get().strip(),
             "achicaptcha_key": self.var_achi_key.get().strip(),
+            "twocaptcha_key": self.var_2cap_key.get().strip(),
+            "capsolver_key": self.var_capsolver_key.get().strip(),
+            "captcha_provider": self.var_cap_provider.get().strip() or "auto",
             "privacy_mode": self.var_privacy.get().strip() or "first_only",
             "contacts_action": self.var_contacts.get().strip() or "skip",
-            "appmanager_bundle": self.var_appmgr.get().strip(),
+            "appmanager_bundle": self.var_appmgr.get().strip()
+            or "com.tigisoftware.appdatamanager",
         }
 
     def _run_pipeline(self):
