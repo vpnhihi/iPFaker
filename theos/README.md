@@ -76,3 +76,6 @@ CT còn inject: `CommCenter`, `CoreTelephonyHelper`.
 
 - Không copy binary / logic proprietary từ ChangeInfo deb  
 - Chỉ bắt chước **kiến trúc package + split MG/CT**
+
+# CI build target
+

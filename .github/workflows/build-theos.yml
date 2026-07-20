@@ -7,9 +7,7 @@ name: Build Theos rootless
 on:
   workflow_dispatch:
   push:
-    paths:
-      - "theos/**"
-      - ".github/workflows/build-theos.yml"
+    branches: [master, main]
 
 jobs:
   build:
