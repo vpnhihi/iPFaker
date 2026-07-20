@@ -643,11 +643,12 @@ def deploy_to_device() -> None:
     except ImportError:
         print("paramiko required for --deploy", file=sys.stderr)
         raise SystemExit(2)
-import sys as _sys
-from pathlib import Path as _Path
-_sys.path.insert(0, str(_Path(__file__).resolve().parent))
+    _sys_path = str(Path(__file__).resolve().parent)
+    if _sys_path not in sys.path:
+        sys.path.insert(0, _sys_path)
     from _device_env import require as _dev_require
-host, user, password = _dev_require()
+
+    host, user, password = _dev_require()
     c = paramiko.SSHClient()
     c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     c.connect(host, username=user, password=password, timeout=20, allow_agent=False, look_for_keys=False)
@@ -668,7 +669,11 @@ host, user, password = _dev_require()
     sudo(f"cp -f {stage}/config.plist {etc}/config.plist")
     sudo(f"cp -f {stage}/active_profile.json {etc}/active_profile.json")
     sudo(f"chmod 644 {etc}/config.plist {etc}/active_profile.json")
-    sudo(f"grep -A1 ProductType {etc}/config.plist; grep -A1 MarketingName {etc}/config.plist; grep -A1 ProductVersion {etc}/config.plist")
+    sudo(
+        f"grep -A1 ProductType {etc}/config.plist; "
+        f"grep -A1 MarketingName {etc}/config.plist; "
+        f"grep -A1 ProductVersion {etc}/config.plist"
+    )
     # soft restart Zalo so next open reloads config (if auto-inject)
     sudo("killall -9 Zalo 2>/dev/null || true")
     c.close()
