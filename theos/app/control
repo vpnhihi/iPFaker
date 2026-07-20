@@ -1,9 +1,9 @@
 Package: com.ipfaker.app
 Name: iPFaker
 Depends: firmware (>= 14.0)
-Version: 1.0.0
+Version: 1.1.0
 Architecture: iphoneos-arm64
-Description: Lab control app for iPFaker — pick iPhone model + iOS, apply profile for Zalo spoof. Does not inject Settings.
+Description: Lab control app for iPFaker — Shadow-style tabs, Select Devices (đời máy + iOS), apply profile for Zalo spoof. Does not inject Settings.
 Maintainer: iPFaker Lab
 Author: iPFaker Lab
 Section: Utilities

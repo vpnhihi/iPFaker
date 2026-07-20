@@ -31,7 +31,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION_DEFAULT = "2.3.5"
+VERSION_DEFAULT = "2.5.0"
 PKG = "com.ipfaker"
 ARCH = "iphoneos-arm64"
 
@@ -230,19 +230,38 @@ def add_path(tar: tarfile.TarFile, src: Path, arcname: str, mode: int | None = N
     add_file(tar, arcname, data, mode)
 
 
+def add_dir_parents(tar: tarfile.TarFile, arc_path: str, seen: set[str]) -> None:
+    """Ensure every parent directory exists in the tar (dpkg needs them)."""
+    parts = arc_path.strip("/").split("/")
+    cur = ""
+    for p in parts:
+        cur = f"{cur}/{p}" if cur else p
+        dname = cur.rstrip("/") + "/"
+        if dname in seen:
+            continue
+        seen.add(dname)
+        info = tarfile.TarInfo(name=dname)
+        info.type = tarfile.DIRTYPE
+        info.mode = 0o755
+        info.mtime = int(time.time())
+        info.uid = 0
+        info.gid = 0
+        tar.addfile(info)
+
+
 def add_tree(tar: tarfile.TarFile, src_dir: Path, arc_prefix: str) -> None:
+    seen: set[str] = set()
+    add_dir_parents(tar, arc_prefix, seen)
     for path in sorted(src_dir.rglob("*")):
         rel = path.relative_to(src_dir).as_posix()
         arc = f"{arc_prefix}/{rel}"
         if path.is_dir():
-            info = tarfile.TarInfo(name=arc.rstrip("/") + "/")
-            info.type = tarfile.DIRTYPE
-            info.mode = 0o755
-            info.mtime = int(time.time())
-            info.uid = 0
-            info.gid = 0
-            tar.addfile(info)
+            add_dir_parents(tar, arc, seen)
         elif path.is_file():
+            # parent dirs for file
+            parent = "/".join(arc.split("/")[:-1])
+            if parent:
+                add_dir_parents(tar, parent, seen)
             mode = 0o755 if path.name == "iPFaker" or path.suffix == ".dylib" else 0o644
             add_path(tar, path, arc, mode)
 

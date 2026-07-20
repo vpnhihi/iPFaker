@@ -5,30 +5,101 @@
 
 @implementation ProfileBuilder
 
-+ (NSString *)randomSerial {
+// Apple identity formats (match scripts/select_device_profile.py):
+// SerialNumber: 12-char, no I/O/0/1; ModelNumber: MPN/A; IDFA/IDFV: UUID v4 upper; IMEI: Luhn
+
++ (NSString *)randomSerialForYear:(NSInteger)year {
+    // <2021: 12 chars; >=2021: 10-14 random. No I/O.
     static NSString *alpha = @"ABCDEFGHJKLMNPQRSTUVWXYZ0123456789";
-    NSMutableString *s = [NSMutableString stringWithCapacity:12];
-    for (int i = 0; i < 12; i++) {
+    static NSString *plants = @"CDFGHJKLMNPQRSTUVWXYZ";
+    int len = (year > 0 && year < 2021) ? 12 : (10 + (int)arc4random_uniform(5));
+    unichar plant = [plants characterAtIndex:arc4random_uniform((u_int32_t)plants.length)];
+    NSMutableString *s = [NSMutableString stringWithFormat:@"%C", plant];
+    for (int i = 1; i < len; i++) {
         u_int32_t r = arc4random_uniform((u_int32_t)alpha.length);
         [s appendFormat:@"%C", [alpha characterAtIndex:r]];
     }
     return s;
 }
 
++ (NSDictionary *)randomPartNumberFromDevice:(NSDictionary *)device {
+    // Part Number: MU783KH/A style — Settings "Số máy" default
+    static NSString *alpha = @"ABCDEFGHJKLMNPQRSTUVWXYZ0123456789";
+    static NSArray *regions = @[ @"LL", @"J", @"CH", @"KH", @"ZA", @"ZP", @"B", @"D", @"F", @"T", @"X", @"Y", @"C", @"HN", @"PP", @"TH", @"TU", @"RU" ];
+    static NSArray *pfx = @[ @"M", @"N", @"F", @"P" ];
+    NSString *prefix = pfx[arc4random_uniform((u_int32_t)pfx.count)];
+    NSMutableString *body = [NSMutableString string];
+    int blen = (arc4random_uniform(4) == 0) ? 5 : 4;
+    for (int i = 0; i < blen; i++)
+        [body appendFormat:@"%C", [alpha characterAtIndex:arc4random_uniform((u_int32_t)alpha.length)]];
+    NSString *region = regions[arc4random_uniform((u_int32_t)regions.count)];
+    NSString *part = [NSString stringWithFormat:@"%@%@%@/A", prefix, body, region];
+    return @{ @"part": part, @"region": region };
+}
+
++ (NSString *)randomAxxxxFromDevice:(NSDictionary *)device {
+    // Axxxx — Settings after tap; random from modelNumbers when available
+    NSArray *nums = device[@"modelNumbers"];
+    if ([nums isKindOfClass:[NSArray class]] && nums.count) {
+        NSMutableArray *ax = [NSMutableArray array];
+        for (id n in nums) {
+            NSString *s = [n description].uppercaseString;
+            if (s.length == 5 && [s hasPrefix:@"A"]) [ax addObject:s];
+        }
+        if (ax.count) return ax[arc4random_uniform((u_int32_t)ax.count)];
+    }
+    NSString *reg = device[@"RegulatoryModelNumber"] ?: device[@"ModelNumber"] ?: @"";
+    NSRegularExpression *re = [NSRegularExpression regularExpressionWithPattern:@"A\\d{4}" options:0 error:nil];
+    NSTextCheckingResult *m = [re firstMatchInString:reg.uppercaseString ?: @"" options:0 range:NSMakeRange(0, reg.length)];
+    if (m) return [reg.uppercaseString substringWithRange:m.range];
+    return @"A0000";
+}
+
++ (NSString *)randomEID {
+    NSMutableString *s = [NSMutableString stringWithCapacity:32];
+    for (int i = 0; i < 32; i++) [s appendFormat:@"%u", arc4random_uniform(10)];
+    return s;
+}
+
 + (NSString *)randomMAC {
-    return [NSString stringWithFormat:@"F0:18:98:%02X:%02X:%02X",
+    // Locally administered unicast MAC
+    u_int32_t b0 = (arc4random_uniform(256) | 0x02) & 0xFE;
+    return [NSString stringWithFormat:@"%02X:%02X:%02X:%02X:%02X:%02X",
+            b0, arc4random_uniform(256), arc4random_uniform(256),
             arc4random_uniform(256), arc4random_uniform(256), arc4random_uniform(256)];
 }
 
++ (NSString *)luhnCheckDigitFor14:(NSString *)digits14 {
+    NSInteger total = 0;
+    for (NSUInteger i = 0; i < digits14.length && i < 14; i++) {
+        NSInteger n = [digits14 characterAtIndex:i] - '0';
+        if (i % 2 == 1) {
+            n *= 2;
+            if (n > 9) n -= 9;
+        }
+        total += n;
+    }
+    return [NSString stringWithFormat:@"%ld", (long)((10 - (total % 10)) % 10)];
+}
+
 + (NSString *)randomIMEI {
-    NSMutableString *s = [NSMutableString stringWithString:@"35"];
-    for (int i = 0; i < 13; i++)
-        [s appendFormat:@"%u", arc4random_uniform(10)];
-    return [s substringToIndex:15];
+    // 15-digit IMEI with valid Luhn check digit
+    NSMutableString *body = [NSMutableString stringWithString:@"35"];
+    for (int i = 0; i < 12; i++)
+        [body appendFormat:@"%u", arc4random_uniform(10)];
+    return [body stringByAppendingString:[self luhnCheckDigitFor14:body]];
 }
 
 + (NSString *)uuidUpper {
+    // IDFA / IDFV — RFC 4122 UUID v4, uppercase with hyphens (NSUUID style)
     return [[[NSUUID UUID] UUIDString] uppercaseString];
+}
+
++ (NSString *)randomUDID {
+    // UniqueDeviceID — 40 hex (legacy Apple UDID length)
+    NSString *a = [[[NSUUID UUID] UUIDString] stringByReplacingOccurrencesOfString:@"-" withString:@""];
+    NSString *b = [[[NSUUID UUID] UUIDString] stringByReplacingOccurrencesOfString:@"-" withString:@""];
+    return [[a stringByAppendingString:[b substringToIndex:8]] uppercaseString];
 }
 
 + (NSDictionary *)flatProfileForDevice:(NSDictionary *)device
@@ -49,12 +120,21 @@
     NSString *bt = [btp componentsJoinedByString:@":"];
     NSString *idfv = [self uuidUpper];
     NSString *idfa = [self uuidUpper];
-    NSString *udid = [[[[NSUUID UUID] UUIDString] stringByReplacingOccurrencesOfString:@"-" withString:@""]
-                      stringByAppendingString:[[[[NSUUID UUID] UUIDString] stringByReplacingOccurrencesOfString:@"-" withString:@""] substringToIndex:8]];
-    NSString *serial = [self randomSerial];
+    NSString *udid = [self randomUDID];
+    NSInteger year = [device[@"year"] integerValue];
+    NSString *serial = [self randomSerialForYear:year];
+    NSDictionary *partInfo = [self randomPartNumberFromDevice:device];
+    NSString *partNumber = partInfo[@"part"]; // Settings default MU783KH/A
+    NSString *axxxx = [self randomAxxxxFromDevice:device]; // tap → Axxxx
     NSString *imei = [self randomIMEI];
-    NSString *imei2 = [[imei substringToIndex:14] stringByAppendingFormat:@"%d", (int)(([imei characterAtIndex:14] - '0') + 1) % 10];
+    NSString *imei2 = [self randomIMEI];
+    while ([imei2 isEqualToString:imei]) imei2 = [self randomIMEI];
+    NSString *meid = [imei substringToIndex:MIN((NSUInteger)14, imei.length)];
+    NSString *eid = [self randomEID];
     NSString *devName = name.length ? name : [NSString stringWithFormat:@"iPhone Lab %@", device[@"id"] ?: @"dev"];
+    NSString *regLetters = partInfo[@"region"] ?: @"ZA";
+    NSString *regionCode = @{ @"LL":@"US", @"J":@"JP", @"CH":@"CN", @"KH":@"KR", @"ZA":@"SG", @"ZP":@"HK",
+                              @"B":@"GB", @"D":@"DE", @"F":@"FR", @"T":@"IT", @"X":@"AU", @"C":@"CA" }[regLetters] ?: @"VN";
 
     NSInteger w = [disp[@"NativeWidth"] integerValue] ?: 1170;
     NSInteger h = [disp[@"NativeHeight"] integerValue] ?: 2532;
@@ -70,10 +150,14 @@
         @"UserAssignedDeviceName": devName,
         @"HWModelStr": device[@"HWModelStr"] ?: @"",
         @"HardwareModel": device[@"HWModelStr"] ?: @"",
-        @"ModelNumber": device[@"ModelNumber"] ?: @"",
-        @"RegionInfo": @"VN/A",
-        @"RegionCode": @"VN",
-        @"RegulatoryModelNumber": device[@"RegulatoryModelNumber"] ?: @"",
+        // BOTH: Settings default Part Number + Axxxx after tap
+        @"ModelNumber": partNumber,
+        @"PartNumber": partNumber,
+        @"RegulatoryModelNumber": axxxx,
+        @"ModelNumberAxxxx": axxxx,
+        @"PartNumberRegion": regLetters,
+        @"RegionInfo": [NSString stringWithFormat:@"%@/A", regionCode],
+        @"RegionCode": regionCode,
         @"HardwarePlatform": device[@"HardwarePlatform"] ?: @"",
         @"CPUArchitecture": device[@"CPUArchitecture"] ?: @"arm64e",
         @"DeviceClass": @"iPhone",
@@ -86,9 +170,11 @@
         @"IDFA": idfa,
         @"IDFV": idfv,
         @"identifierForVendor": idfv,
+        @"advertisingIdentifier": idfa,
         @"InternationalMobileEquipmentIdentity": imei,
         @"InternationalMobileEquipmentIdentity2": imei2,
-        @"MobileEquipmentIdentifier": [imei substringToIndex:MIN((NSUInteger)14, imei.length)],
+        @"MobileEquipmentIdentifier": meid,
+        @"EID": eid,
         @"WifiAddress": wifi,
         @"BluetoothAddress": bt,
         @"EthernetMacAddress": wifi,

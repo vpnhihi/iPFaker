@@ -19,7 +19,10 @@
     NSString *name = f[@"UserAssignedDeviceName"] ?: f[@"MarketingName"] ?: d[@"MarketingName"] ?: @"iPhone";
     NSString *modelName = f[@"MarketingName"] ?: d[@"MarketingName"] ?: @"—";
     NSString *modelNum = f[@"ModelNumber"] ?: d[@"ModelNumber"] ?: @"—";
+    NSString *partNum = f[@"PartNumber"] ?: d[@"PartNumber"] ?: @"—";
     NSString *serial = f[@"SerialNumber"] ?: @"(apply để sinh serial)";
+    NSString *idfa = f[@"IDFA"] ?: @"(apply để sinh IDFA)";
+    NSString *idfv = f[@"IDFV"] ?: f[@"identifierForVendor"] ?: @"(apply để sinh IDFV)";
     NSString *ios = f[@"ProductVersion"] ?: self.iosVer ?: @"—";
     NSString *build = f[@"BuildVersion"] ?: self.iosMeta[@"BuildVersion"] ?: @"—";
     NSString *screen = [NSString stringWithFormat:@"%@×%@ @%@ · %@\" · %@ Hz",
@@ -33,13 +36,20 @@
     NSString *ptype = f[@"ProductType"] ?: d[@"ProductType"] ?: @"—";
     NSString *hw = f[@"HWModelStr"] ?: d[@"HWModelStr"] ?: @"—";
     NSString *bat = [NSString stringWithFormat:@"%@ mAh", d[@"batteryMah"] ?: @"—"];
+    NSString *reg = f[@"RegulatoryModelNumber"] ?: d[@"RegulatoryModelNumber"] ?: @"—";
 
     return @[
         @[
             @[ @"Tên", name ],
             @[ @"Tên model", modelName ],
-            @[ @"Mã model", modelNum ],
+            @[ @"Số máy (Part)", modelNum ],
+            @[ @"Axxxx (chạm)", reg ],
+            @[ @"Part Number", partNum ],
             @[ @"Số sê-ri", serial ],
+        ],
+        @[
+            @[ @"IDFA", idfa ],
+            @[ @"IDFV", idfv ],
         ],
         @[
             @[ @"Phiên bản", [NSString stringWithFormat:@"iOS %@", ios] ],
@@ -66,13 +76,16 @@
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
     if (section == 0) return @"Giống Cài đặt → Giới thiệu (lab)";
-    if (section == 1) return @"Hệ điều hành & mã máy";
+    if (section == 1) return @"IDFA / IDFV (chuẩn UUID v4)";
+    if (section == 2) return @"Hệ điều hành & mã máy";
     return @"Phần cứng (catalog)";
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
     if (section == 0)
-        return @"Đây là màn lab trong app iPFaker — không sửa trang Giới thiệu hệ thống (tránh crash Settings).";
+        return @"Số máy Settings = Part Number (MU783KH/A). Chạm = Axxxx. Cả hai đều spoof. Serial/IDFA/IDFV/IMEI/EID random mỗi Apply.";
+    if (section == 1)
+        return @"IDFA = advertisingIdentifier, IDFV = identifierForVendor — UUID v4 hoa, có gạch ngang.";
     return nil;
 }
 

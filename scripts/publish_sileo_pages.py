@@ -110,28 +110,36 @@ def main() -> int:
         except Exception as e:
             print("FAIL", u, e)
 
-    # clear apt cache on device
+    # clear apt cache on device (optional; needs IPFAKER_HOST / IPFAKER_PASS)
     try:
         import paramiko
+        import sys
+        from pathlib import Path
 
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from _device_env import require
+
+        host, user, password = require()
         c = paramiko.SSHClient()
         c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         c.connect(
-            "[DEVICE_HOST]",
-            username="mobile",
-            password="[REDACTED]",
+            host,
+            username=user,
+            password=password,
             timeout=20,
             allow_agent=False,
             look_for_keys=False,
         )
         cmd = (
-            "echo [REDACTED] | sudo -S -p '' "
+            f"echo {password} | sudo -S -p '' "
             "rm -rf /var/jb/var/cache/apt/archives/com.ipfaker* "
             "/var/jb/var/lib/apt/lists/* 2>/dev/null; true"
         )
         _, o, _ = c.exec_command(cmd, timeout=60)
         print("device cache cleared", o.read()[:200])
         c.close()
+    except SystemExit:
+        print("device clear skip (set IPFAKER_HOST/IPFAKER_PASS to enable)")
     except Exception as e:
         print("device clear skip", e)
     return 0

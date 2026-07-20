@@ -10,6 +10,7 @@
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 #import <sys/sysctl.h>
+#import <sys/time.h>
 #import <sys/utsname.h>
 #import <dlfcn.h>
 #import <string.h>
@@ -167,6 +168,23 @@ static int stub_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, void
                     return 0;
                 }
             }
+            // kern.boottime → struct timeval { tv_sec, tv_usec }
+            if ([n isEqualToString:@"kern.boottime"]) {
+                id bt = fake ?: [[IPFConfig shared] stringForKey:@"BootTimeUnix"]
+                    ?: [[IPFConfig shared] stringForKey:@"kern.boottime"];
+                if (bt) {
+                    long long sec = [bt longLongValue];
+                    if (sec > 0 && *oldlenp >= sizeof(struct timeval)) {
+                        struct timeval tv;
+                        tv.tv_sec = (time_t)sec;
+                        tv.tv_usec = 0;
+                        memcpy(oldp, &tv, sizeof(tv));
+                        *oldlenp = sizeof(tv);
+                        IPFTrace([NSString stringWithFormat:@"sysctl FAKE kern.boottime => %lld", sec]);
+                        return 0;
+                    }
+                }
+            }
             // integer sysctls: hw.memsize, hw.ncpu, ...
             if ([fake isKindOfClass:[NSNumber class]]) {
                 if (*oldlenp >= sizeof(int64_t)) {
@@ -183,7 +201,8 @@ static int stub_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, void
                     return 0;
                 }
             }
-            if ([n hasPrefix:@"hw."] || [n hasPrefix:@"kern.os"] || [n containsString:@"serial"]) {
+            if ([n hasPrefix:@"hw."] || [n hasPrefix:@"kern.os"] || [n hasPrefix:@"kern.boot"]
+                || [n containsString:@"serial"]) {
                 IPFTrace([NSString stringWithFormat:@"sysctl PASS %@", n]);
             }
         }

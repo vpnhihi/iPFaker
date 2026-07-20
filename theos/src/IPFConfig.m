@@ -64,10 +64,12 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
         @"ProductType", @"HWModelStr", @"HardwareModel", @"DeviceName", @"UserAssignedDeviceName",
         @"MarketingName", @"SerialNumber", @"UniqueDeviceID", @"UniqueChipID",
         @"ProductVersion", @"BuildVersion", @"ProductBuildVersion",
-        @"ModelNumber", @"RegionInfo", @"RegionCode", @"RegulatoryModelNumber",
+        @"ModelNumber", @"PartNumber", @"RegionInfo", @"RegionCode", @"RegulatoryModelNumber",
+        @"ModelNumberAxxxx", @"PartNumberRegion",
         @"CPUArchitecture", @"HardwarePlatform", @"DeviceClass",
         @"InternationalMobileEquipmentIdentity", @"InternationalMobileEquipmentIdentity2",
-        @"MobileEquipmentIdentifier", @"WifiAddress", @"BluetoothAddress", @"EthernetMacAddress",
+        @"MobileEquipmentIdentifier", @"EID",
+        @"WifiAddress", @"BluetoothAddress", @"EthernetMacAddress",
         @"main-screen-width", @"main-screen-height", @"main-screen-scale", @"main-screen-pitch",
         @"DeviceColor", @"DeviceEnclosureColor", @"BasebandVersion",
     ];
@@ -123,9 +125,47 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
     for (NSString *ck in @[ @"hw.ncpu", @"hw.physicalcpu", @"hw.logicalcpu" ]) {
         if (flat[ck]) sys[ck] = flat[ck];
     }
+    if (flat[@"kern.boottime"] ?: flat[@"BootTimeUnix"]) {
+        id bt = flat[@"kern.boottime"] ?: flat[@"BootTimeUnix"];
+        sys[@"kern.boottime"] = bt;
+    }
+    // Extra MG colors / baseband / disk (Extra hooks also read stringForKey)
+    for (NSString *ek in @[
+        @"DeviceColor", @"DeviceEnclosureColor", @"BasebandVersion",
+        @"TotalDiskCapacity", @"FreeDiskSpace", @"UserAgent", @"HTTPUserAgent",
+        @"MaxRefreshHz", @"EID", @"PartNumber", @"ModelNumberAxxxx",
+    ]) {
+        if (flat[ek]) mg[ek] = flat[ek];
+    }
 
     self.mgMap = [mg copy];
     self.sysctlMap = [sys copy];
+    // storage + webview + jb for Extra hooks / JSON root
+    if (flat[@"TotalDiskCapacity"] || flat[@"FreeDiskSpace"]) {
+        self.storage = @{
+            @"TotalDiskCapacity": flat[@"TotalDiskCapacity"] ?: @0,
+            @"FreeDiskSpace": flat[@"FreeDiskSpace"] ?: @0,
+        };
+    }
+    if (flat[@"UserAgent"] ?: flat[@"HTTPUserAgent"]) {
+        self.webview = @{
+            @"UserAgent": flat[@"UserAgent"] ?: @"",
+            @"HTTPUserAgent": flat[@"HTTPUserAgent"] ?: flat[@"UserAgent"] ?: @"",
+        };
+    }
+    if (!self.jailbreakHide) {
+        self.jailbreakHide = @{
+            @"paths": @[
+                @"/Applications/Cydia.app",
+                @"/Applications/Sileo.app",
+                @"/Library/MobileSubstrate",
+                @"/usr/lib/TweakInject",
+                @"/var/jb",
+                @"/usr/lib/frida",
+                @"FridaGadget",
+            ],
+        };
+    }
 
     self.model = @{
         @"ProductType": flat[@"ProductType"] ?: @"",

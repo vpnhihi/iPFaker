@@ -10,6 +10,8 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.title = @"Chọn iOS";
+    self.view.backgroundColor = [UIColor colorWithRed:0.05 green:0.07 blue:0.12 alpha:1.0];
+    self.tableView.backgroundColor = self.view.backgroundColor;
     // Strict matrix: only iOS builds this device actually supports
     NSArray *sup = [Catalog.shared supportedIOSForDevice:self.device ?: @{}];
     if (sup.count == 0)

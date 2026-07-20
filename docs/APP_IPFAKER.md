@@ -1,18 +1,38 @@
-# iPFaker.app (kiểu HIOS)
+# iPFaker.app (Shadow Tech–style lab UI)
 
 App lab riêng trên Home Screen — **không inject Cài đặt / Settings** (tránh crash).
 
-## Chức năng
+## Tab bar
 
-| Màn | Việc |
+| Tab | Việc |
 |-----|------|
-| Hồ sơ lab | Chọn **iPhone** (catalog 49 model) + **iOS** (15→26) |
-| Giới thiệu lab | Xem model / serial / màn / RAM / chip (giống About, trong app) |
-| Apply profile | Ghi `config.plist` + `active_profile.json` |
-| Reseed | Giữ model/iOS, random serial + UUID |
-| Kill Zalo | Đóng Zalo để load config mới |
+| **Main** | Card Device Info + Profile Info, **Reseed Identity**, **Apply Profile**, Kill Zalo, quick toggles |
+| **Select Devices** | **Dòng trên: Chọn đời máy** · **Dòng dưới: Chọn iOS** → Apply / Reseed |
+| **Wipe App** | Kill Zalo, Reseed, wipe lab note |
+| **Settings** | Fake Device / Screen / Hardware / Ads / Network / Sysctl / Hide JB… |
 
-Paths ghi config (dylib đã đọc theo thứ tự):
+## Select Devices (yêu cầu UI)
+
+```
+┌─────────────────────────────┐
+│ Chọn đời máy                │  → danh sách iPhone (catalog)
+│ iPhone 15 Pro · iPhone16,1  │
+├─────────────────────────────┤
+│ Chọn iOS                    │  → chỉ iOS trong matrix máy đó
+│ iOS 18.5 · Build 22F76      │
+└─────────────────────────────┘
+        [ Apply Profile ]
+```
+
+## Luồng lab
+
+1. Mở **iPFaker** → tab **Select Devices**
+2. Chọn đời máy + iOS
+3. **Apply Profile** (ghi `config.plist` + `active_profile.json`)
+4. **Kill Zalo** → mở lại Zalo
+5. (Tuỳ chọn) tab **Main** xem Status / IDFA / Serial
+
+Paths ghi config (dylib đọc theo thứ tự):
 
 1. `/var/mobile/Library/iPFaker/config.plist`
 2. `/var/jb/etc/ipfaker/config.plist`
@@ -43,37 +63,23 @@ python scripts/deploy_app.py --app path/to/iPFaker.app
 
 Sau đó: **uicache** (script đã gọi) → icon **iPFaker** trên SpringBoard.
 
-Nếu không thấy icon:
-
-```text
-sbreload
-```
-
-## Dùng
-
-1. Mở **iPFaker**  
-2. Chọn máy (vd iPhone 17 Pro Max)  
-3. Chọn iOS  
-4. **Apply profile**  
-5. **Kill Zalo** → mở lại Zalo  
-6. (Tuỳ chọn) **Giới thiệu lab** để xem thông số vừa apply  
-
-## Không làm gì
-
-- Không hook `com.apple.Preferences`  
-- Không đổi trang Cài đặt → Giới thiệu hệ thống  
-- Wipe Zalo full vẫn khuyến nghị từ PC: `scripts/wipe_and_ready.py`
-
 ## Source
 
 ```
 theos/app/
-  Makefile
-  main.m AppDelegate.*
+  AppDelegate.m          # UITabBarController
+  AppTheme.* AppState.*  # dark theme + shared selection/apply
+  MainViewController.*
+  SelectDevicesViewController.*   # 2 rows: đời máy + iOS
+  WipeViewController.*
+  SettingsViewController.*
+  DeviceListController.* IOSListController.*
   Catalog.* ProfileBuilder.*
-  RootViewController.* DeviceListController.*
-  IOSListController.* AboutLabController.*
   Resources/device_catalog.json
-  entitlements.plist
-  control + layout/DEBIAN/postinst
 ```
+
+## Không làm gì
+
+- Không hook `com.apple.Preferences`
+- Không đổi trang Cài đặt → Giới thiệu hệ thống
+- Wipe Zalo full: `scripts/wipe_and_ready.py`

@@ -10,7 +10,7 @@ Usage:
   python scripts/select_device_profile.py --list-ios
   python scripts/select_device_profile.py --device iphone15-pro --ios 18.5
   python scripts/select_device_profile.py --device "iPhone 16 Pro Max" --ios 17.6.1
-  python scripts/select_device_profile.py --device iphone17-pro-max --ios 19.0 --name "Lab Max"
+  python scripts/select_device_profile.py --device iphone17-pro-max --ios 26.0 --name "Lab Max"
   python scripts/select_device_profile.py --random
   python scripts/select_device_profile.py --device iphone14-pro --ios 16.7.10 --deploy
 """
@@ -118,21 +118,168 @@ def list_ios(cat: dict, device: dict | None = None) -> None:
         print(f"Supported builds: {len(device_supported_ios(device, cat))}")
 
 
-def random_serial() -> str:
-    # 12-char alphanumeric serial-like
-    alphabet = string.ascii_uppercase + string.digits
-    return "".join(random.choice(alphabet) for _ in range(12))
+
+# Identity: BOTH Part Number (Settings default) + Axxxx (tap) + max random pool.
+# Hardware/catalog (ProductType, display, RAM, iOS matrix) left untouched.
+
+_SERIAL_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789"  # no I, O
+_SERIAL_PLANTS = tuple("CDFGHJKLMNPQRSTUVWXYZ")
+# Part Number region codes (Settings: MU783KH/A, MT6T2J/A, LL/A, CH/A…)
+_PART_REGIONS = (
+    "LL",  # USA
+    "J",   # Japan
+    "CH",  # China
+    "KH",  # Korea
+    "ZA",  # Singapore / Asia (often VN grey)
+    "ZP",  # HK / Macao
+    "B",   # UK
+    "D",   # Germany
+    "F",   # France
+    "T",   # Italy
+    "X",   # Australia
+    "Y",   # Spain
+    "QN",  # Denmark
+    "C",   # Canada
+    "HN",  # India
+    "PP",  # Philippines
+    "TH",  # Thailand
+    "TU",  # Turkey
+    "RU",  # Russia
+)
+_PART_REGION_TO_CODE = {
+    "LL": "US", "J": "JP", "CH": "CN", "KH": "KR", "ZA": "SG", "ZP": "HK",
+    "B": "GB", "D": "DE", "F": "FR", "T": "IT", "X": "AU", "Y": "ES",
+    "QN": "DK", "C": "CA", "HN": "IN", "PP": "PH", "TH": "TH",
+    "TU": "TR", "RU": "RU",
+}
+_IMEI_TAC = ("35", "01", "86", "91", "99", "35", "01", "86")
+_DEVICE_NAME_POOL = (
+    "iPhone", "My iPhone", "iPhone Lab", "iPhone {}", "Lab {}", "{} iPhone",
+)
+_CARRIERS = (
+    ("Viettel", "452", "04", "vn"),
+    ("Vinaphone", "452", "02", "vn"),
+    ("Mobifone", "452", "01", "vn"),
+    ("Vietnamobile", "452", "05", "vn"),
+    ("AT&T", "310", "410", "us"),
+    ("T-Mobile", "310", "260", "us"),
+    ("Verizon", "311", "480", "us"),
+    ("NTT DOCOMO", "440", "10", "jp"),
+    ("SoftBank", "440", "20", "jp"),
+    ("SKTelecom", "450", "05", "kr"),
+    ("China Mobile", "460", "00", "cn"),
+)
+
+
+def random_serial(year: int | None = None) -> str:
+    """Serial: 12 chars if year<2021; else 10-14 random (new Apple style)."""
+    if year is not None and int(year) < 2021:
+        length = 12
+    else:
+        length = random.choice((10, 11, 12, 13, 14))
+    plant = random.choice(_SERIAL_PLANTS)
+    body = "".join(random.choice(_SERIAL_ALPHABET) for _ in range(length - 1))
+    return plant + body
+
+
+def format_part_number(device: dict | None = None) -> tuple:
+    """
+    Part Number — Settings "Số máy" mặc định (vd MU783KH/A, MT6T2J/A).
+    Returns (part_number, region_letters). Always NEW random each call.
+    """
+    alnum = string.ascii_uppercase + string.digits
+    prefix = random.choice(["M", "N", "F", "P"])
+    body_len = random.choice((4, 4, 4, 5))
+    body = "".join(random.choice(alnum) for _ in range(body_len))
+    if isinstance(device, dict):
+        base = str(device.get("PartNumber") or "").split("/")[0].upper()
+        base = re.sub(r"[^A-Z0-9]", "", base)
+        if len(base) >= 5 and base[0] in "MNFP":
+            prefix = base[0]
+            body = "".join(random.choice(alnum) for _ in range(4))
+    region = random.choice(_PART_REGIONS)
+    return f"{prefix}{body}{region}/A", region
+
+
+def format_axxxx(device: dict | str | None, *, randomize: bool = True) -> str:
+    """Regulatory Axxxx — Settings after tap. Random from modelNumbers when possible."""
+    if isinstance(device, dict):
+        nums = [
+            str(x).upper()
+            for x in (device.get("modelNumbers") or [])
+            if re.match(r"^A\d{4}$", str(x).upper())
+        ]
+        default = device.get("RegulatoryModelNumber") or device.get("ModelNumber")
+        if nums:
+            if randomize:
+                return random.choice(nums)
+            d = str(default or "").upper()
+            if re.match(r"^A\d{4}$", d) and d in nums:
+                return d
+            # Prefer last (often "other countries") when present
+            return nums[-1]
+        raw = str(default or "")
+    else:
+        raw = str(device or "")
+    raw = raw.strip().upper()
+    m = re.search(r"A\d{4}", raw)
+    return m.group(0) if m else (raw if re.match(r"^A\d{4}$", raw) else "A0000")
+
+
+def format_model_number(device: dict | str | None, region: str = "other") -> str:
+    return format_axxxx(device, randomize=False)
+
+
+def apple_uuid() -> str:
+    return str(uuid.uuid4()).upper()
+
+
+def random_udid() -> str:
+    return (uuid.uuid4().hex + uuid.uuid4().hex[:8]).upper()
 
 
 def random_mac() -> str:
-    parts = [0xF0, 0x18, 0x98] + [random.randint(0, 255) for _ in range(3)]
+    b0 = (random.randint(0, 255) | 0x02) & 0xFE
+    parts = [b0] + [random.randint(0, 255) for _ in range(5)]
     return ":".join(f"{b:02X}" for b in parts)
 
 
+def random_eid() -> str:
+    """eSIM EID — 32 digits (lab)."""
+    return "".join(str(random.randint(0, 9)) for _ in range(32))
+
+
+def random_device_name(marketing: str, device_id: str) -> str:
+    tpl = random.choice(_DEVICE_NAME_POOL)
+    if "{}" in tpl:
+        return tpl.format(random.choice((marketing.split()[-1], device_id, "Lab", "Pro")))
+    return tpl
+
+
+def random_capacity_gb(device: dict):
+    opts = device.get("storageOptionsGB") or []
+    if not opts:
+        return None
+    return int(random.choice(opts))
+
+
+def _luhn_check_digit(digits14: str) -> str:
+    total = 0
+    for i, ch in enumerate(digits14):
+        n = int(ch)
+        if i % 2 == 1:
+            n *= 2
+            if n > 9:
+                n -= 9
+        total += n
+    return str((10 - (total % 10)) % 10)
+
+
 def random_imei() -> str:
-    # 15 digits, Luhn-ish lab only
-    body = "35" + "".join(str(random.randint(0, 9)) for _ in range(12))
-    return body[:15]
+    tac = random.choice(_IMEI_TAC)
+    need = 14 - len(tac)
+    body14 = tac + "".join(str(random.randint(0, 9)) for _ in range(need))
+    return body14 + _luhn_check_digit(body14)
 
 
 def clamp_ios(
@@ -189,13 +336,38 @@ def build_profile(device: dict, ios_ver: str, ios_meta: dict, name: str | None) 
     bt_parts = wifi.split(":")
     bt_parts[-1] = f"{(int(bt_parts[-1], 16) ^ 1) & 0xFF:02X}"
     bluetooth = ":".join(bt_parts)
-    idfv = str(uuid.uuid4()).upper()
-    idfa = str(uuid.uuid4()).upper()
-    udid = uuid.uuid4().hex + uuid.uuid4().hex[:8]
-    serial = random_serial()
+    # Identity — BOTH Part Number + Axxxx; max random (hardware untouched)
+    idfv = apple_uuid()
+    idfa = apple_uuid()
+    udid = random_udid()
+    year = device.get("year")
+    try:
+        year_i = int(year) if year is not None else None
+    except (TypeError, ValueError):
+        year_i = None
+    serial = random_serial(year_i)
+    # Settings "Số máy" default = Part Number (MU783KH/A); tap = Axxxx
+    part_number, part_region = format_part_number(device)
+    axxxx = format_axxxx(device, randomize=True)
     imei = random_imei()
-    imei2 = imei[:-1] + str((int(imei[-1]) + 1) % 10)
-    dev_name = name or f"iPhone Lab {device['id']}"
+    imei2 = random_imei()
+    while imei2 == imei:
+        imei2 = random_imei()
+    meid = imei[:14]
+    eid = random_eid()
+    dev_name = name or random_device_name(device.get("MarketingName") or "iPhone", device["id"])
+    capacity = random_capacity_gb(device)
+    carrier = random.choice(_CARRIERS)
+    c_name, c_mcc, c_mnc, c_iso = carrier
+    region_code = _PART_REGION_TO_CODE.get(part_region, "VN")
+    region_info = f"{region_code}/A"
+    radio = random.choice(
+        (
+            "CTRadioAccessTechnologyNR",
+            "CTRadioAccessTechnologyLTE",
+            "CTRadioAccessTechnologyNRNSA",
+        )
+    )
 
     flat = {
         "Enabled": True,
@@ -205,10 +377,14 @@ def build_profile(device: dict, ios_ver: str, ios_meta: dict, name: str | None) 
         "UserAssignedDeviceName": dev_name,
         "HWModelStr": device["HWModelStr"],
         "HardwareModel": device["HWModelStr"],
-        "ModelNumber": device.get("ModelNumber", ""),
-        "RegionInfo": "VN/A",
-        "RegionCode": "VN",
-        "RegulatoryModelNumber": device.get("RegulatoryModelNumber", ""),
+        # BOTH numbers (Settings toggles ModelNumber ↔ Regulatory):
+        "ModelNumber": part_number,              # default UI: MU783KH/A
+        "PartNumber": part_number,               # same Part Number
+        "RegulatoryModelNumber": axxxx,          # tap: A3106
+        "ModelNumberAxxxx": axxxx,               # explicit alias
+        "RegionInfo": region_info,
+        "RegionCode": region_code,
+        "PartNumberRegion": part_region,
         "HardwarePlatform": device.get("HardwarePlatform", ""),
         "CPUArchitecture": device.get("CPUArchitecture", "arm64e"),
         "DeviceClass": "iPhone",
@@ -221,21 +397,23 @@ def build_profile(device: dict, ios_ver: str, ios_meta: dict, name: str | None) 
         "IDFA": idfa,
         "IDFV": idfv,
         "identifierForVendor": idfv,
+        "advertisingIdentifier": idfa,
         "InternationalMobileEquipmentIdentity": imei,
         "InternationalMobileEquipmentIdentity2": imei2,
-        "MobileEquipmentIdentifier": imei[:14],
+        "MobileEquipmentIdentifier": meid,
+        "EID": eid,
         "WifiAddress": wifi,
         "BluetoothAddress": bluetooth,
         "EthernetMacAddress": wifi,
-        "carrierName": "Viettel",
-        "carrierMCC": "452",
-        "carrierMNC": "04",
-        "carrierISO": "vn",
-        "carrierRadioAccess": "CTRadioAccessTechnologyNR",
-        "CarrierName": "Viettel",
-        "MobileCountryCode": "452",
-        "MobileNetworkCode": "04",
-        "ISOCountryCode": "vn",
+        "carrierName": c_name,
+        "carrierMCC": c_mcc,
+        "carrierMNC": c_mnc,
+        "carrierISO": c_iso,
+        "carrierRadioAccess": radio,
+        "CarrierName": c_name,
+        "MobileCountryCode": c_mcc,
+        "MobileNetworkCode": c_mnc,
+        "ISOCountryCode": c_iso,
         "main-screen-width": int(disp["NativeWidth"]),
         "main-screen-height": int(disp["NativeHeight"]),
         "main-screen-scale": int(disp["ScreenScale"]),
@@ -255,10 +433,40 @@ def build_profile(device: dict, ios_ver: str, ios_meta: dict, name: str | None) 
         "MaxRefreshHz": int(disp.get("MaxRefreshHz", 60)),
         "BatteryMah": int(device.get("batteryMah", 0) or 0),
         "DeviceYear": int(device.get("year", 0) or 0),
+        "DiskCapacityGB": capacity if capacity is not None else "",
+        "TotalDiskCapacity": (int(capacity) * 1_000_000_000) if capacity else "",
+        # Free = 35–75% of capacity (lab)
+        "FreeDiskSpace": (
+            int(int(capacity) * 1_000_000_000 * random.uniform(0.35, 0.75))
+            if capacity
+            else ""
+        ),
+        # Colors / baseband / UA / boottime — extra Zalo surface
+        "DeviceColor": random.choice(
+            ("1", "2", "3", "4", "5", "6", "7", "8", "9", "black", "white", "blue", "natural")
+        ),
+        "DeviceEnclosureColor": random.choice(
+            ("1", "2", "3", "4", "5", "6", "7", "8", "9", "black", "white", "blue", "natural")
+        ),
+        "BasebandVersion": f"1.{random.randint(10, 90):02d}.0{random.randint(0, 9)}",
+        "UserAgent": (
+            f"Mozilla/5.0 (iPhone; CPU iPhone OS "
+            f"{ios_meta['ProductVersion'].replace('.', '_')} like Mac OS X) "
+            f"AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 "
+            f"Zalo/{random.randint(420, 480)}.0.0"
+        ),
+        "HTTPUserAgent": (
+            f"Mozilla/5.0 (iPhone; CPU iPhone OS "
+            f"{ios_meta['ProductVersion'].replace('.', '_')} like Mac OS X) "
+            f"AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
+        ),
+        # boot seconds ago → consumers convert to absolute; we store absolute unix
+        "BootTimeUnix": int(__import__("time").time()) - random.randint(3600, 14 * 86400),
+        "kern.boottime": int(__import__("time").time()) - random.randint(3600, 14 * 86400),
     }
 
     active = {
-        "schema": "ipfaker.active_profile/2",
+        "schema": "ipfaker.active_profile/3",
         "generated_from": "device_catalog.json",
         "device_id": device["id"],
         "ios": ios_ver,
@@ -267,14 +475,17 @@ def build_profile(device: dict, ios_ver: str, ios_meta: dict, name: str | None) 
             "MarketingName": device["MarketingName"],
             "HWModelStr": device["HWModelStr"],
             "HardwareModel": device["HWModelStr"],
-            "ModelNumber": device.get("ModelNumber", ""),
-            "RegulatoryModelNumber": device.get("RegulatoryModelNumber", ""),
+            "ModelNumber": part_number,
+            "PartNumber": part_number,
+            "RegulatoryModelNumber": axxxx,
+            "ModelNumberAxxxx": axxxx,
             "HardwarePlatform": device.get("HardwarePlatform", ""),
             "CPUArchitecture": device.get("CPUArchitecture", "arm64e"),
             "DeviceName": "iPhone",
             "UserAssignedDeviceName": dev_name,
             "ChipName": device.get("chip", ""),
             "PhysicalMemoryMB": ram_mb,
+            "DiskCapacityGB": capacity,
         },
         "os": {
             "ProductVersion": ios_meta["ProductVersion"],
@@ -290,6 +501,30 @@ def build_profile(device: dict, ios_ver: str, ios_meta: dict, name: str | None) 
             "DiagonalInches": disp.get("DiagonalInches"),
             "MaxRefreshHz": disp.get("MaxRefreshHz", 60),
         },
+        "storage": {
+            "TotalDiskCapacity": flat.get("TotalDiskCapacity"),
+            "FreeDiskSpace": flat.get("FreeDiskSpace"),
+            "DiskCapacityGB": capacity,
+        },
+        "webview": {
+            "UserAgent": flat.get("UserAgent"),
+            "HTTPUserAgent": flat.get("HTTPUserAgent"),
+        },
+        "jailbreak_hide": {
+            "paths": [
+                "/Applications/Cydia.app",
+                "/Applications/Sileo.app",
+                "/Applications/Zebra.app",
+                "/Library/MobileSubstrate",
+                "/usr/lib/TweakInject",
+                "/var/jb",
+                "/usr/lib/frida",
+                "FridaGadget",
+                "/.bootstrapped_electra",
+                "/bin/bash",
+                "/etc/apt",
+            ]
+        },
         "hardware": {
             "chip": device.get("chip"),
             "cpuCores": device.get("cpuCores"),
@@ -301,11 +536,28 @@ def build_profile(device: dict, ios_ver: str, ios_meta: dict, name: str | None) 
         },
         "identity": {
             "SerialNumber": serial,
+            "ModelNumber": part_number,
+            "PartNumber": part_number,
+            "RegulatoryModelNumber": axxxx,
+            "ModelNumberAxxxx": axxxx,
             "UniqueDeviceID": udid,
             "IDFA": idfa,
             "IDFV": idfv,
             "IMEI": imei,
             "IMEI2": imei2,
+            "MEID": meid,
+            "EID": eid,
+            "formats": {
+                "ModelNumber": "Part Number Settings default e.g. MU783KH/A",
+                "RegulatoryModelNumber": "Axxxx after tap e.g. A3106",
+                "SerialNumber": "10-14 modern / 12 older; no I/O",
+                "PartNumberRegion": "LL/J/CH/KH/ZA/…",
+                "IDFA": "UUID v4 uppercase",
+                "IDFV": "UUID v4 uppercase",
+                "IMEI": "15 digits Luhn",
+                "EID": "32 digits eSIM",
+            },
+            "model_number_source": "config/iPhone_Model_Lookup.xlsx + Apple 108044",
         },
         "network": {
             "WifiAddress": wifi,
@@ -391,7 +643,11 @@ def deploy_to_device() -> None:
     except ImportError:
         print("paramiko required for --deploy", file=sys.stderr)
         raise SystemExit(2)
-    host, user, password = "[DEVICE_HOST]", "mobile", "[REDACTED]"
+import sys as _sys
+from pathlib import Path as _Path
+_sys.path.insert(0, str(_Path(__file__).resolve().parent))
+    from _device_env import require as _dev_require
+host, user, password = _dev_require()
     c = paramiko.SSHClient()
     c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     c.connect(host, username=user, password=password, timeout=20, allow_agent=False, look_for_keys=False)
@@ -464,6 +720,7 @@ def main() -> int:
     built = build_profile(device, ios_ver, ios_meta, args.name)
     write_plist(built["flat"], OUT_PLIST)
     OUT_ACTIVE.write_text(json.dumps(built["active"], indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    flat = built["flat"]
     OUT_SELECTED.write_text(
         json.dumps(
             {
@@ -475,6 +732,14 @@ def main() -> int:
                 "PhysicalMemoryMB": device["PhysicalMemoryMB"],
                 "display": device["display"],
                 "chip": device.get("chip"),
+                "SerialNumber": flat.get("SerialNumber"),
+                "ModelNumber": flat.get("ModelNumber"),
+                "PartNumber": flat.get("PartNumber"),
+                "RegulatoryModelNumber": flat.get("RegulatoryModelNumber"),
+                "IDFA": flat.get("IDFA"),
+                "IDFV": flat.get("IDFV"),
+                "IMEI": flat.get("InternationalMobileEquipmentIdentity"),
+                "EID": flat.get("EID"),
             },
             indent=2,
             ensure_ascii=False,
@@ -498,6 +763,15 @@ def main() -> int:
     if device.get("batteryMah"):
         print(f"  Battery: {device['batteryMah']} mAh  year={device.get('year')}  storage={device.get('storageOptionsGB')}")
     print(f"  iOS    : {ios_ver} ({ios_meta['BuildVersion']})" + (" [lab build]" if ios_meta.get("lab") else ""))
+    print(f"  Serial : {flat.get('SerialNumber')}  ({len(flat.get('SerialNumber') or '')} chars)")
+    print(f"  So may : {flat.get('ModelNumber')}  (Part Number — Settings default)")
+    print(f"  Axxxx  : {flat.get('RegulatoryModelNumber')}  (tap So may)")
+    print(f"  IDFA   : {flat.get('IDFA')}")
+    print(f"  IDFV   : {flat.get('IDFV')}")
+    print(f"  IMEI   : {flat.get('InternationalMobileEquipmentIdentity')}")
+    print(f"  EID    : {(flat.get('EID') or '')[:16]}…")
+    if flat.get("DiskCapacityGB"):
+        print(f"  Storage: {flat.get('DiskCapacityGB')} GB")
     print(f"  Wrote  : {OUT_PLIST.relative_to(ROOT)}")
     print(f"           {OUT_ACTIVE.relative_to(ROOT)}")
     print(f"           {OUT_SELECTED.relative_to(ROOT)}")

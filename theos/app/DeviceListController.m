@@ -11,7 +11,9 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.title = @"Chọn iPhone";
+    self.title = @"Chọn đời máy";
+    self.view.backgroundColor = [UIColor colorWithRed:0.05 green:0.07 blue:0.12 alpha:1.0];
+    self.tableView.backgroundColor = self.view.backgroundColor;
     self.items = Catalog.shared.devices;
     self.filtered = self.items;
     self.search = [[UISearchController alloc] initWithSearchResultsController:nil];

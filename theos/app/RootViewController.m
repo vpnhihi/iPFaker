@@ -32,8 +32,8 @@
     [[Catalog shared] reload];
     [self restoreSelectionFromDisk];
     if (!self.selectedDeviceId.length) {
-        self.selectedDeviceId = @"iphone17-pro-max";
-        self.selectedIOS = @"19.0";
+        self.selectedDeviceId = @"iphone15-pro";
+        self.selectedIOS = @"18.5";
     }
     NSUInteger nDev = Catalog.shared.devices.count;
     NSUInteger nIOS = Catalog.shared.iosReleases.count;

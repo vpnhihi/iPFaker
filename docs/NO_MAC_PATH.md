@@ -68,7 +68,7 @@ cd C:\Users\Pem\Desktop\iPFaker
 python scripts\deploy_native_dylibs.py
 ```
 
-(Script sẽ SSH `mobile@IP` / `[REDACTED]`, copy dylib vào TweakInject, **gỡ FridaGadget**, kill Zalo.)
+(Script SSH `mobile@IP` với `IPFAKER_HOST` / `IPFAKER_PASS`, copy dylib vào TweakInject, **gỡ FridaGadget**, kill Zalo.)
 
 Rồi:
 
@@ -118,7 +118,7 @@ Chỉ khi không muốn dùng GitHub.
 ```text
 1. GitHub repo + push iPFaker
 2. Actions build → tải iPFakerMG + iPFakerCT
-3. deploy_native_dylibs.py  (SSH lên [DEVICE_HOST])
+3. set IPFAKER_HOST / IPFAKER_PASS → deploy_native_dylibs.py
 4. Gỡ FridaGadget
 5. Respring
 6. Wipe Zalo (SSH)
@@ -128,13 +128,13 @@ Chỉ khi không muốn dùng GitHub.
 
 ---
 
-## SSH máy bạn (nhắc lại)
+## SSH máy lab
 
 | | |
 |--|--|
-| IP | `[DEVICE_HOST]` (đổi nếu Wi‑Fi đổi) |
-| User | `mobile` |
-| Pass | `[REDACTED]` |
+| IP | env `IPFAKER_HOST` |
+| User | env `IPFAKER_USER` (mặc định `mobile`) |
+| Pass | env `IPFAKER_PASS` |
 | Root | `sudo -i` (cùng pass) |
 
 ---

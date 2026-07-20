@@ -11,7 +11,7 @@ include $(THEOS)/makefiles/common.mk
 TWEAK_NAME = iPFakerMG iPFakerCT
 
 # MG stays lean (device ldid/opainject was reliable without Deep.m bulk)
-iPFakerMG_FILES = TweakMG.x src/IPFConfig.m src/IPFHooksMG.m src/fishhook.c
+iPFakerMG_FILES = TweakMG.x src/IPFConfig.m src/IPFHooksMG.m src/IPFHooksExtra.m src/fishhook.c
 iPFakerMG_CFLAGS = -fobjc-arc -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
 iPFakerMG_FRAMEWORKS = UIKit Foundation AdSupport
 iPFakerMG_LIBRARIES = substrate

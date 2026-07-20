@@ -5,6 +5,7 @@
 #import <stdio.h>
 #import "IPFConfig.h"
 #import "IPFHooksMG.h"
+#import "IPFHooksExtra.h"
 
 static void IPFMark(const char *msg) {
     // Sandbox-safe first (Zalo Documents/tmp), then jailbreak paths
@@ -74,6 +75,7 @@ static void IPFMark(const char *msg) {
         }
 
         IPFInstallMGHooks();
+        IPFInstallExtraHooks();
         IPFMark("CTOR_HOOKS_DONE");
     }
 }

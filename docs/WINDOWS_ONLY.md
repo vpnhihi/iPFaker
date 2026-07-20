@@ -7,7 +7,7 @@ Windows **không build** được `iPFakerMG.dylib` / Theos (cần macOS + clang
 | Bước | Công cụ | Máy |
 |------|---------|-----|
 | Config / profile | PowerShell scripts | Windows |
-| Deploy + wipe | SSH (`mobile`/`[REDACTED]`) | Windows → iPhone |
+| Deploy + wipe | SSH (`IPFAKER_HOST` / `IPFAKER_PASS`) | Windows → iPhone |
 | Spoof runtime | **Frida Gadget** + `iPFaker.js` (ElleKit load) | iPhone |
 | Verify | Mở Zalo + log / sau này attach | — |
 
@@ -36,4 +36,4 @@ python scripts\deploy_gadget.py
 python scripts\_tmp_ssh_wipe.py
 ```
 
-SSH: `mobile@IP` / `[REDACTED]` → `sudo -i` khi cần root.
+SSH: set `IPFAKER_HOST` + `IPFAKER_PASS` → `mobile@IP` → `sudo -i` khi cần root.

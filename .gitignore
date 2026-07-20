@@ -1,19 +1,63 @@
+# Build / vendor
 downloads/
 *.dylib
 !dylibs/.gitkeep
 dylibs/*.dylib
 .theos/
 packages/
-*.deb
 __pycache__/
 *.pyc
 .DS_Store
-_ref/
-logs/*.log
-logs/e2e*
-logs/wipe*
-*.lock
-.ssh/
 .idea/
 .vscode/
+.ssh/
+*.lock
+frida/node_modules/
+node_modules/
+
+# Local lab artifacts (never publish)
+_ref/
+ci_artifact/
+dist/
+deploy_pack/
+theos/dist/
+dylibs_a/
+dylibs_ci/
+dylibs_new/
+logs/
+logs/**
+frida/_run_full_tmp.js
+frida/*.bundle.js
+
+# Generated / live device profiles (identity)
+config/active_profile.json
+config/selected_profile.json
+config/device_profile.json
+config/config.plist
+config/apply.json
+config/main.plist
+config/*.xlsx
+
+# Temp / one-off lab scripts (may contain host secrets)
 scripts/_tmp_*
+scripts/__pycache__/
+
+# Local secrets
+.env
+.env.*
+*.pem
+id_rsa*
+device_secrets*
+IPFAKER.local.*
+
+# Old Sileo debs stay local; CI publishes only current version
+sileo-repo/debs/com.ipfaker_2.3.*
+sileo-repo/com.ipfaker_2.3.*
+sileo-repo/com.ipfaker_2.4.0*
+# keep tree, ignore bulk binary clutter if re-added
+!sileo-repo/debs/.gitkeep
+
+# Session / private docs (lab notes)
+docs/SESSION_MEMORY.md
+docs/E2E_FULL_EXTRA_REPORT.*
+docs/IDENTITY_AUDIT_REPORT.*

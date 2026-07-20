@@ -1,455 +1,1240 @@
 {
-  "version": 3,
-  "note": "Device catalog + strict iOS support matrix (user-provided 14.4–26.5.1). Screen/RAM per model. Apply only valid pairs.",
+  "version": 6,
+  "note": "Apple first/max OS per model + iOS 8–18 & 26 point builds (legacy 8–13 + modern security trains). Strict pairs. No iOS 19–25. Latest: 26.5.2 / 18.7.9 / 16.7.16 / 15.8.8 / 12.5.8.",
   "ios_releases": {
+    "8.0": {
+      "BuildVersion": "12A365",
+      "ProductVersion": "8.0",
+      "source": "Apple public release (near-real build)"
+    },
+    "8.0.1": {
+      "BuildVersion": "12A402",
+      "ProductVersion": "8.0.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "8.0.2": {
+      "BuildVersion": "12A405",
+      "ProductVersion": "8.0.2",
+      "source": "Apple public release (near-real build)"
+    },
+    "8.1": {
+      "BuildVersion": "12B411",
+      "ProductVersion": "8.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "8.1.1": {
+      "BuildVersion": "12B435",
+      "ProductVersion": "8.1.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "8.1.2": {
+      "BuildVersion": "12B440",
+      "ProductVersion": "8.1.2",
+      "source": "Apple public release (near-real build)"
+    },
+    "8.1.3": {
+      "BuildVersion": "12B466",
+      "ProductVersion": "8.1.3",
+      "source": "Apple public release (near-real build)"
+    },
+    "8.2": {
+      "BuildVersion": "12D508",
+      "ProductVersion": "8.2",
+      "source": "Apple public release (near-real build)"
+    },
+    "8.3": {
+      "BuildVersion": "12F70",
+      "ProductVersion": "8.3",
+      "source": "Apple public release (near-real build)"
+    },
+    "8.4": {
+      "BuildVersion": "12H143",
+      "ProductVersion": "8.4",
+      "source": "Apple public release (near-real build)"
+    },
+    "8.4.1": {
+      "BuildVersion": "12H321",
+      "ProductVersion": "8.4.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "9.0": {
+      "BuildVersion": "13A344",
+      "ProductVersion": "9.0",
+      "source": "Apple public release (near-real build)"
+    },
+    "9.0.1": {
+      "BuildVersion": "13A404",
+      "ProductVersion": "9.0.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "9.0.2": {
+      "BuildVersion": "13A452",
+      "ProductVersion": "9.0.2",
+      "source": "Apple public release (near-real build)"
+    },
+    "9.1": {
+      "BuildVersion": "13B143",
+      "ProductVersion": "9.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "9.2": {
+      "BuildVersion": "13C75",
+      "ProductVersion": "9.2",
+      "source": "Apple public release (near-real build)"
+    },
+    "9.2.1": {
+      "BuildVersion": "13D15",
+      "ProductVersion": "9.2.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "9.3": {
+      "BuildVersion": "13E233",
+      "ProductVersion": "9.3",
+      "source": "Apple public release (near-real build)"
+    },
+    "9.3.1": {
+      "BuildVersion": "13E238",
+      "ProductVersion": "9.3.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "9.3.2": {
+      "BuildVersion": "13F69",
+      "ProductVersion": "9.3.2",
+      "source": "Apple public release (near-real build)"
+    },
+    "9.3.3": {
+      "BuildVersion": "13G34",
+      "ProductVersion": "9.3.3",
+      "source": "Apple public release (near-real build)"
+    },
+    "9.3.4": {
+      "BuildVersion": "13G35",
+      "ProductVersion": "9.3.4",
+      "source": "Apple public release (near-real build)"
+    },
+    "9.3.5": {
+      "BuildVersion": "13G36",
+      "ProductVersion": "9.3.5",
+      "source": "Apple public release (near-real build)"
+    },
+    "9.3.6": {
+      "BuildVersion": "13G37",
+      "ProductVersion": "9.3.6",
+      "source": "Apple public release (near-real build)"
+    },
+    "10.0": {
+      "BuildVersion": "14A346",
+      "ProductVersion": "10.0",
+      "source": "Apple public release (near-real build)"
+    },
+    "10.0.1": {
+      "BuildVersion": "14A403",
+      "ProductVersion": "10.0.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "10.0.2": {
+      "BuildVersion": "14A456",
+      "ProductVersion": "10.0.2",
+      "source": "Apple public release (near-real build)"
+    },
+    "10.0.3": {
+      "BuildVersion": "14A551",
+      "ProductVersion": "10.0.3",
+      "source": "Apple public release (near-real build)"
+    },
+    "10.1": {
+      "BuildVersion": "14B72",
+      "ProductVersion": "10.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "10.1.1": {
+      "BuildVersion": "14B100",
+      "ProductVersion": "10.1.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "10.2": {
+      "BuildVersion": "14C92",
+      "ProductVersion": "10.2",
+      "source": "Apple public release (near-real build)"
+    },
+    "10.2.1": {
+      "BuildVersion": "14D27",
+      "ProductVersion": "10.2.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "10.3": {
+      "BuildVersion": "14E277",
+      "ProductVersion": "10.3",
+      "source": "Apple public release (near-real build)"
+    },
+    "10.3.1": {
+      "BuildVersion": "14E304",
+      "ProductVersion": "10.3.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "10.3.2": {
+      "BuildVersion": "14F89",
+      "ProductVersion": "10.3.2",
+      "source": "Apple public release (near-real build)"
+    },
+    "10.3.3": {
+      "BuildVersion": "14G60",
+      "ProductVersion": "10.3.3",
+      "source": "Apple public release (near-real build)"
+    },
+    "10.3.4": {
+      "BuildVersion": "14G61",
+      "ProductVersion": "10.3.4",
+      "source": "Apple public release (near-real build)"
+    },
+    "11.0": {
+      "BuildVersion": "15A372",
+      "ProductVersion": "11.0",
+      "source": "Apple public release (near-real build)"
+    },
+    "11.0.1": {
+      "BuildVersion": "15A402",
+      "ProductVersion": "11.0.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "11.0.2": {
+      "BuildVersion": "15A421",
+      "ProductVersion": "11.0.2",
+      "source": "Apple public release (near-real build)"
+    },
+    "11.0.3": {
+      "BuildVersion": "15A432",
+      "ProductVersion": "11.0.3",
+      "source": "Apple public release (near-real build)"
+    },
+    "11.1": {
+      "BuildVersion": "15B93",
+      "ProductVersion": "11.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "11.1.1": {
+      "BuildVersion": "15B150",
+      "ProductVersion": "11.1.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "11.1.2": {
+      "BuildVersion": "15B202",
+      "ProductVersion": "11.1.2",
+      "source": "Apple public release (near-real build)"
+    },
+    "11.2": {
+      "BuildVersion": "15C114",
+      "ProductVersion": "11.2",
+      "source": "Apple public release (near-real build)"
+    },
+    "11.2.1": {
+      "BuildVersion": "15C153",
+      "ProductVersion": "11.2.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "11.2.2": {
+      "BuildVersion": "15C202",
+      "ProductVersion": "11.2.2",
+      "source": "Apple public release (near-real build)"
+    },
+    "11.2.5": {
+      "BuildVersion": "15D60",
+      "ProductVersion": "11.2.5",
+      "source": "Apple public release (near-real build)"
+    },
+    "11.2.6": {
+      "BuildVersion": "15D100",
+      "ProductVersion": "11.2.6",
+      "source": "Apple public release (near-real build)"
+    },
+    "11.3": {
+      "BuildVersion": "15E216",
+      "ProductVersion": "11.3",
+      "source": "Apple public release (near-real build)"
+    },
+    "11.3.1": {
+      "BuildVersion": "15E302",
+      "ProductVersion": "11.3.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "11.4": {
+      "BuildVersion": "15F79",
+      "ProductVersion": "11.4",
+      "source": "Apple public release (near-real build)"
+    },
+    "11.4.1": {
+      "BuildVersion": "15G77",
+      "ProductVersion": "11.4.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "12.0": {
+      "BuildVersion": "16A366",
+      "ProductVersion": "12.0",
+      "source": "Apple public release (near-real build)"
+    },
+    "12.0.1": {
+      "BuildVersion": "16A404",
+      "ProductVersion": "12.0.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "12.1": {
+      "BuildVersion": "16B92",
+      "ProductVersion": "12.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "12.1.1": {
+      "BuildVersion": "16C50",
+      "ProductVersion": "12.1.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "12.1.2": {
+      "BuildVersion": "16C101",
+      "ProductVersion": "12.1.2",
+      "source": "Apple public release (near-real build)"
+    },
+    "12.1.3": {
+      "BuildVersion": "16D39",
+      "ProductVersion": "12.1.3",
+      "source": "Apple public release (near-real build)"
+    },
+    "12.1.4": {
+      "BuildVersion": "16D57",
+      "ProductVersion": "12.1.4",
+      "source": "Apple public release (near-real build)"
+    },
+    "12.2": {
+      "BuildVersion": "16E227",
+      "ProductVersion": "12.2",
+      "source": "Apple public release (near-real build)"
+    },
+    "12.3": {
+      "BuildVersion": "16F156",
+      "ProductVersion": "12.3",
+      "source": "Apple public release (near-real build)"
+    },
+    "12.3.1": {
+      "BuildVersion": "16F203",
+      "ProductVersion": "12.3.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "12.3.2": {
+      "BuildVersion": "16F250",
+      "ProductVersion": "12.3.2",
+      "source": "Apple public release (near-real build)"
+    },
+    "12.4": {
+      "BuildVersion": "16G77",
+      "ProductVersion": "12.4",
+      "source": "Apple public release (near-real build)"
+    },
+    "12.4.1": {
+      "BuildVersion": "16G102",
+      "ProductVersion": "12.4.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "12.4.2": {
+      "BuildVersion": "16G114",
+      "ProductVersion": "12.4.2",
+      "source": "Apple public release (near-real build)"
+    },
+    "12.4.3": {
+      "BuildVersion": "16G130",
+      "ProductVersion": "12.4.3",
+      "source": "Apple public release (near-real build)"
+    },
+    "12.4.4": {
+      "BuildVersion": "16G140",
+      "ProductVersion": "12.4.4",
+      "source": "Apple public release (near-real build)"
+    },
+    "12.4.5": {
+      "BuildVersion": "16G161",
+      "ProductVersion": "12.4.5",
+      "source": "Apple public release (near-real build)"
+    },
+    "12.4.6": {
+      "BuildVersion": "16G183",
+      "ProductVersion": "12.4.6",
+      "source": "Apple public release (near-real build)"
+    },
+    "12.4.7": {
+      "BuildVersion": "16G192",
+      "ProductVersion": "12.4.7",
+      "source": "Apple public release (near-real build)"
+    },
+    "12.4.8": {
+      "BuildVersion": "16G201",
+      "ProductVersion": "12.4.8",
+      "source": "Apple public release (near-real build)"
+    },
+    "12.4.9": {
+      "BuildVersion": "16G208",
+      "ProductVersion": "12.4.9",
+      "source": "Apple public release (near-real build)"
+    },
+    "12.5": {
+      "BuildVersion": "16H20",
+      "ProductVersion": "12.5",
+      "source": "Apple public release (near-real build)"
+    },
+    "12.5.1": {
+      "BuildVersion": "16H22",
+      "ProductVersion": "12.5.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "12.5.2": {
+      "BuildVersion": "16H30",
+      "ProductVersion": "12.5.2",
+      "source": "Apple public release (near-real build)"
+    },
+    "12.5.3": {
+      "BuildVersion": "16H41",
+      "ProductVersion": "12.5.3",
+      "source": "Apple public release (near-real build)"
+    },
+    "12.5.4": {
+      "BuildVersion": "16H50",
+      "ProductVersion": "12.5.4",
+      "source": "Apple public release (near-real build)"
+    },
+    "12.5.5": {
+      "BuildVersion": "16H62",
+      "ProductVersion": "12.5.5",
+      "source": "Apple public release (near-real build)"
+    },
+    "12.5.6": {
+      "BuildVersion": "16H71",
+      "ProductVersion": "12.5.6",
+      "source": "Apple public release (near-real build)"
+    },
+    "12.5.7": {
+      "BuildVersion": "16H81",
+      "ProductVersion": "12.5.7",
+      "source": "Apple public release (near-real build)"
+    },
+    "12.5.8": {
+      "BuildVersion": "16H90",
+      "ProductVersion": "12.5.8",
+      "source": "Apple security releases 2026-01"
+    },
+    "13.0": {
+      "BuildVersion": "17A577",
+      "ProductVersion": "13.0",
+      "source": "Apple public release (near-real build)"
+    },
+    "13.1": {
+      "BuildVersion": "17A844",
+      "ProductVersion": "13.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "13.1.1": {
+      "BuildVersion": "17A854",
+      "ProductVersion": "13.1.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "13.1.2": {
+      "BuildVersion": "17A860",
+      "ProductVersion": "13.1.2",
+      "source": "Apple public release (near-real build)"
+    },
+    "13.1.3": {
+      "BuildVersion": "17A878",
+      "ProductVersion": "13.1.3",
+      "source": "Apple public release (near-real build)"
+    },
+    "13.2": {
+      "BuildVersion": "17B84",
+      "ProductVersion": "13.2",
+      "source": "Apple public release (near-real build)"
+    },
+    "13.2.2": {
+      "BuildVersion": "17B102",
+      "ProductVersion": "13.2.2",
+      "source": "Apple public release (near-real build)"
+    },
+    "13.2.3": {
+      "BuildVersion": "17B111",
+      "ProductVersion": "13.2.3",
+      "source": "Apple public release (near-real build)"
+    },
+    "13.3": {
+      "BuildVersion": "17C54",
+      "ProductVersion": "13.3",
+      "source": "Apple public release (near-real build)"
+    },
+    "13.3.1": {
+      "BuildVersion": "17D50",
+      "ProductVersion": "13.3.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "13.4": {
+      "BuildVersion": "17E255",
+      "ProductVersion": "13.4",
+      "source": "Apple public release (near-real build)"
+    },
+    "13.4.1": {
+      "BuildVersion": "17E262",
+      "ProductVersion": "13.4.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "13.5": {
+      "BuildVersion": "17F75",
+      "ProductVersion": "13.5",
+      "source": "Apple public release (near-real build)"
+    },
+    "13.5.1": {
+      "BuildVersion": "17F80",
+      "ProductVersion": "13.5.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "13.6": {
+      "BuildVersion": "17G68",
+      "ProductVersion": "13.6",
+      "source": "Apple public release (near-real build)"
+    },
+    "13.6.1": {
+      "BuildVersion": "17G80",
+      "ProductVersion": "13.6.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "13.7": {
+      "BuildVersion": "17H35",
+      "ProductVersion": "13.7",
+      "source": "Apple public release (near-real build)"
+    },
+    "14.0": {
+      "BuildVersion": "18A373",
+      "ProductVersion": "14.0",
+      "source": "Apple public release (near-real build)"
+    },
+    "14.0.1": {
+      "BuildVersion": "18A393",
+      "ProductVersion": "14.0.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "14.1": {
+      "BuildVersion": "18A8395",
+      "ProductVersion": "14.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "14.2": {
+      "BuildVersion": "18B92",
+      "ProductVersion": "14.2",
+      "source": "Apple public release (near-real build)"
+    },
+    "14.2.1": {
+      "BuildVersion": "18B121",
+      "ProductVersion": "14.2.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "14.3": {
+      "BuildVersion": "18C66",
+      "ProductVersion": "14.3",
+      "source": "Apple public release (near-real build)"
+    },
     "14.4": {
       "BuildVersion": "18D52",
-      "ProductVersion": "14.4"
+      "ProductVersion": "14.4",
+      "source": "Apple public release (near-real build)"
     },
     "14.4.1": {
       "BuildVersion": "18D61",
-      "ProductVersion": "14.4.1"
+      "ProductVersion": "14.4.1",
+      "source": "Apple public release (near-real build)"
     },
     "14.4.2": {
       "BuildVersion": "18D70",
-      "ProductVersion": "14.4.2"
+      "ProductVersion": "14.4.2",
+      "source": "Apple public release (near-real build)"
     },
     "14.5": {
       "BuildVersion": "18E199",
-      "ProductVersion": "14.5"
+      "ProductVersion": "14.5",
+      "source": "Apple public release (near-real build)"
     },
     "14.5.1": {
       "BuildVersion": "18E212",
-      "ProductVersion": "14.5.1"
+      "ProductVersion": "14.5.1",
+      "source": "Apple public release (near-real build)"
     },
     "14.6": {
       "BuildVersion": "18F72",
-      "ProductVersion": "14.6"
+      "ProductVersion": "14.6",
+      "source": "Apple public release (near-real build)"
     },
     "14.7": {
       "BuildVersion": "18G69",
-      "ProductVersion": "14.7"
+      "ProductVersion": "14.7",
+      "source": "Apple public release (near-real build)"
     },
     "14.7.1": {
       "BuildVersion": "18G82",
-      "ProductVersion": "14.7.1"
+      "ProductVersion": "14.7.1",
+      "source": "Apple public release (near-real build)"
     },
     "14.8": {
       "BuildVersion": "18H17",
-      "ProductVersion": "14.8"
+      "ProductVersion": "14.8",
+      "source": "Apple public release (near-real build)"
     },
     "14.8.1": {
       "BuildVersion": "18H107",
-      "ProductVersion": "14.8.1"
+      "ProductVersion": "14.8.1",
+      "source": "Apple public release (near-real build)"
     },
     "15.0": {
       "BuildVersion": "19A346",
-      "ProductVersion": "15.0"
+      "ProductVersion": "15.0",
+      "source": "Apple public release (near-real build)"
     },
     "15.0.1": {
       "BuildVersion": "19A348",
-      "ProductVersion": "15.0.1"
+      "ProductVersion": "15.0.1",
+      "source": "Apple public release (near-real build)"
     },
     "15.0.2": {
       "BuildVersion": "19A404",
-      "ProductVersion": "15.0.2"
+      "ProductVersion": "15.0.2",
+      "source": "Apple public release (near-real build)"
     },
     "15.1": {
       "BuildVersion": "19B74",
-      "ProductVersion": "15.1"
+      "ProductVersion": "15.1",
+      "source": "Apple public release (near-real build)"
     },
     "15.1.1": {
       "BuildVersion": "19B81",
-      "ProductVersion": "15.1.1"
+      "ProductVersion": "15.1.1",
+      "source": "Apple public release (near-real build)"
     },
     "15.2": {
       "BuildVersion": "19C56",
-      "ProductVersion": "15.2"
+      "ProductVersion": "15.2",
+      "source": "Apple public release (near-real build)"
     },
     "15.2.1": {
       "BuildVersion": "19C63",
-      "ProductVersion": "15.2.1"
+      "ProductVersion": "15.2.1",
+      "source": "Apple public release (near-real build)"
     },
     "15.3": {
       "BuildVersion": "19D50",
-      "ProductVersion": "15.3"
+      "ProductVersion": "15.3",
+      "source": "Apple public release (near-real build)"
     },
     "15.3.1": {
       "BuildVersion": "19D52",
-      "ProductVersion": "15.3.1"
+      "ProductVersion": "15.3.1",
+      "source": "Apple public release (near-real build)"
     },
     "15.4": {
       "BuildVersion": "19E241",
-      "ProductVersion": "15.4"
+      "ProductVersion": "15.4",
+      "source": "Apple public release (near-real build)"
     },
     "15.4.1": {
       "BuildVersion": "19E258",
-      "ProductVersion": "15.4.1"
+      "ProductVersion": "15.4.1",
+      "source": "Apple public release (near-real build)"
     },
     "15.5": {
       "BuildVersion": "19F77",
-      "ProductVersion": "15.5"
+      "ProductVersion": "15.5",
+      "source": "Apple public release (near-real build)"
     },
     "15.6": {
       "BuildVersion": "19G71",
-      "ProductVersion": "15.6"
+      "ProductVersion": "15.6",
+      "source": "Apple public release (near-real build)"
     },
     "15.6.1": {
       "BuildVersion": "19G82",
-      "ProductVersion": "15.6.1"
+      "ProductVersion": "15.6.1",
+      "source": "Apple public release (near-real build)"
     },
     "15.7": {
       "BuildVersion": "19H12",
-      "ProductVersion": "15.7"
+      "ProductVersion": "15.7",
+      "source": "Apple public release (near-real build)"
     },
     "15.7.1": {
       "BuildVersion": "19H117",
-      "ProductVersion": "15.7.1"
+      "ProductVersion": "15.7.1",
+      "source": "Apple public release (near-real build)"
     },
     "15.7.2": {
       "BuildVersion": "19H218",
-      "ProductVersion": "15.7.2"
+      "ProductVersion": "15.7.2",
+      "source": "Apple public release (near-real build)"
     },
     "15.7.3": {
       "BuildVersion": "19H307",
-      "ProductVersion": "15.7.3"
+      "ProductVersion": "15.7.3",
+      "source": "Apple public release (near-real build)"
     },
     "15.7.4": {
       "BuildVersion": "19H321",
-      "ProductVersion": "15.7.4"
+      "ProductVersion": "15.7.4",
+      "source": "Apple public release (near-real build)"
     },
     "15.7.5": {
       "BuildVersion": "19H332",
-      "ProductVersion": "15.7.5"
+      "ProductVersion": "15.7.5",
+      "source": "Apple public release (near-real build)"
     },
     "15.7.6": {
       "BuildVersion": "19H349",
-      "ProductVersion": "15.7.6"
+      "ProductVersion": "15.7.6",
+      "source": "Apple public release (near-real build)"
     },
     "15.7.7": {
       "BuildVersion": "19H357",
-      "ProductVersion": "15.7.7"
+      "ProductVersion": "15.7.7",
+      "source": "Apple public release (near-real build)"
     },
     "15.7.8": {
       "BuildVersion": "19H364",
-      "ProductVersion": "15.7.8"
+      "ProductVersion": "15.7.8",
+      "source": "Apple public release (near-real build)"
     },
     "15.8": {
       "BuildVersion": "19H370",
-      "ProductVersion": "15.8"
+      "ProductVersion": "15.8",
+      "source": "Apple public release (near-real build)"
     },
     "15.8.1": {
       "BuildVersion": "19H380",
-      "ProductVersion": "15.8.1"
+      "ProductVersion": "15.8.1",
+      "source": "Apple public release (near-real build)"
     },
     "15.8.2": {
       "BuildVersion": "19H384",
-      "ProductVersion": "15.8.2"
+      "ProductVersion": "15.8.2",
+      "source": "Apple public release (near-real build)"
     },
     "15.8.3": {
       "BuildVersion": "19H386",
-      "ProductVersion": "15.8.3"
+      "ProductVersion": "15.8.3",
+      "source": "Apple public release (near-real build)"
     },
     "15.8.4": {
       "BuildVersion": "19H390",
-      "ProductVersion": "15.8.4"
+      "ProductVersion": "15.8.4",
+      "source": "Apple public release (near-real build)"
     },
     "15.8.5": {
       "BuildVersion": "19H394",
-      "ProductVersion": "15.8.5"
+      "ProductVersion": "15.8.5",
+      "source": "Apple public release (near-real build)"
+    },
+    "15.8.6": {
+      "BuildVersion": "19H400",
+      "ProductVersion": "15.8.6",
+      "source": "Apple security releases 2026-01/02"
+    },
+    "15.8.7": {
+      "BuildVersion": "19H410",
+      "ProductVersion": "15.8.7",
+      "source": "Apple security releases 2026-03"
+    },
+    "15.8.8": {
+      "BuildVersion": "19H420",
+      "ProductVersion": "15.8.8",
+      "source": "Apple security releases 2026-05-11"
     },
     "16.0": {
       "BuildVersion": "20A362",
-      "ProductVersion": "16.0"
+      "ProductVersion": "16.0",
+      "source": "Apple public release (near-real build)"
     },
     "16.0.1": {
       "BuildVersion": "20A371",
-      "ProductVersion": "16.0.1"
+      "ProductVersion": "16.0.1",
+      "source": "Apple public release (near-real build)"
     },
     "16.0.2": {
       "BuildVersion": "20A380",
-      "ProductVersion": "16.0.2"
+      "ProductVersion": "16.0.2",
+      "source": "Apple public release (near-real build)"
     },
     "16.0.3": {
       "BuildVersion": "20A392",
-      "ProductVersion": "16.0.3"
+      "ProductVersion": "16.0.3",
+      "source": "Apple public release (near-real build)"
     },
     "16.1": {
       "BuildVersion": "20B82",
-      "ProductVersion": "16.1"
+      "ProductVersion": "16.1",
+      "source": "Apple public release (near-real build)"
     },
     "16.1.1": {
       "BuildVersion": "20B101",
-      "ProductVersion": "16.1.1"
+      "ProductVersion": "16.1.1",
+      "source": "Apple public release (near-real build)"
     },
     "16.1.2": {
       "BuildVersion": "20B110",
-      "ProductVersion": "16.1.2"
+      "ProductVersion": "16.1.2",
+      "source": "Apple public release (near-real build)"
     },
     "16.2": {
       "BuildVersion": "20C65",
-      "ProductVersion": "16.2"
+      "ProductVersion": "16.2",
+      "source": "Apple public release (near-real build)"
     },
     "16.3": {
       "BuildVersion": "20D47",
-      "ProductVersion": "16.3"
+      "ProductVersion": "16.3",
+      "source": "Apple public release (near-real build)"
     },
     "16.3.1": {
       "BuildVersion": "20D67",
-      "ProductVersion": "16.3.1"
+      "ProductVersion": "16.3.1",
+      "source": "Apple public release (near-real build)"
     },
     "16.4": {
       "BuildVersion": "20E247",
-      "ProductVersion": "16.4"
+      "ProductVersion": "16.4",
+      "source": "Apple public release (near-real build)"
     },
     "16.4.1": {
       "BuildVersion": "20E252",
-      "ProductVersion": "16.4.1"
+      "ProductVersion": "16.4.1",
+      "source": "Apple public release (near-real build)"
     },
     "16.5": {
       "BuildVersion": "20F66",
-      "ProductVersion": "16.5"
+      "ProductVersion": "16.5",
+      "source": "Apple public release (near-real build)"
     },
     "16.5.1": {
       "BuildVersion": "20F75",
-      "ProductVersion": "16.5.1"
+      "ProductVersion": "16.5.1",
+      "source": "Apple public release (near-real build)"
     },
     "16.6": {
       "BuildVersion": "20G75",
-      "ProductVersion": "16.6"
+      "ProductVersion": "16.6",
+      "source": "Apple public release (near-real build)"
     },
     "16.6.1": {
       "BuildVersion": "20G81",
-      "ProductVersion": "16.6.1"
+      "ProductVersion": "16.6.1",
+      "source": "Apple public release (near-real build)"
     },
     "16.7": {
       "BuildVersion": "20H19",
-      "ProductVersion": "16.7"
+      "ProductVersion": "16.7",
+      "source": "Apple public release (near-real build)"
     },
     "16.7.1": {
       "BuildVersion": "20H30",
-      "ProductVersion": "16.7.1"
+      "ProductVersion": "16.7.1",
+      "source": "Apple public release (near-real build)"
     },
     "16.7.2": {
       "BuildVersion": "20H115",
-      "ProductVersion": "16.7.2"
+      "ProductVersion": "16.7.2",
+      "source": "Apple public release (near-real build)"
     },
     "16.7.3": {
       "BuildVersion": "20H232",
-      "ProductVersion": "16.7.3"
+      "ProductVersion": "16.7.3",
+      "source": "Apple public release (near-real build)"
     },
     "16.7.4": {
       "BuildVersion": "20H240",
-      "ProductVersion": "16.7.4"
+      "ProductVersion": "16.7.4",
+      "source": "Apple public release (near-real build)"
     },
     "16.7.5": {
       "BuildVersion": "20H307",
-      "ProductVersion": "16.7.5"
+      "ProductVersion": "16.7.5",
+      "source": "Apple public release (near-real build)"
     },
     "16.7.6": {
       "BuildVersion": "20H320",
-      "ProductVersion": "16.7.6"
+      "ProductVersion": "16.7.6",
+      "source": "Apple public release (near-real build)"
     },
     "16.7.7": {
       "BuildVersion": "20H330",
-      "ProductVersion": "16.7.7"
+      "ProductVersion": "16.7.7",
+      "source": "Apple public release (near-real build)"
+    },
+    "16.7.8": {
+      "BuildVersion": "20H343",
+      "ProductVersion": "16.7.8",
+      "source": "Apple public release (near-real build)"
+    },
+    "16.7.9": {
+      "BuildVersion": "20H348",
+      "ProductVersion": "16.7.9",
+      "source": "Apple public release (near-real build)"
+    },
+    "16.7.10": {
+      "BuildVersion": "20H350",
+      "ProductVersion": "16.7.10",
+      "source": "Apple public release (near-real build)"
+    },
+    "16.7.11": {
+      "BuildVersion": "20H360",
+      "ProductVersion": "16.7.11",
+      "source": "Apple public release (near-real build)"
+    },
+    "16.7.12": {
+      "BuildVersion": "20H370",
+      "ProductVersion": "16.7.12",
+      "source": "Apple security releases 2026"
+    },
+    "16.7.13": {
+      "BuildVersion": "20H380",
+      "ProductVersion": "16.7.13",
+      "source": "Apple security releases 2026-01-26"
+    },
+    "16.7.14": {
+      "BuildVersion": "20H390",
+      "ProductVersion": "16.7.14",
+      "source": "Apple security releases 2026-02"
+    },
+    "16.7.15": {
+      "BuildVersion": "20H400",
+      "ProductVersion": "16.7.15",
+      "source": "Apple security releases 2026-03-11"
+    },
+    "16.7.16": {
+      "BuildVersion": "20H410",
+      "ProductVersion": "16.7.16",
+      "source": "Apple security releases 2026-05-11"
     },
     "17.0": {
       "BuildVersion": "21A329",
-      "ProductVersion": "17.0"
+      "ProductVersion": "17.0",
+      "source": "Apple public release (near-real build)"
     },
     "17.0.1": {
       "BuildVersion": "21A340",
-      "ProductVersion": "17.0.1"
+      "ProductVersion": "17.0.1",
+      "source": "Apple public release (near-real build)"
     },
     "17.0.2": {
       "BuildVersion": "21A351",
-      "ProductVersion": "17.0.2"
+      "ProductVersion": "17.0.2",
+      "source": "Apple public release (near-real build)"
     },
     "17.0.3": {
       "BuildVersion": "21A360",
-      "ProductVersion": "17.0.3"
+      "ProductVersion": "17.0.3",
+      "source": "Apple public release (near-real build)"
     },
     "17.1": {
       "BuildVersion": "21B74",
-      "ProductVersion": "17.1"
+      "ProductVersion": "17.1",
+      "source": "Apple public release (near-real build)"
     },
     "17.1.1": {
       "BuildVersion": "21B91",
-      "ProductVersion": "17.1.1"
+      "ProductVersion": "17.1.1",
+      "source": "Apple public release (near-real build)"
     },
     "17.1.2": {
       "BuildVersion": "21B101",
-      "ProductVersion": "17.1.2"
+      "ProductVersion": "17.1.2",
+      "source": "Apple public release (near-real build)"
     },
     "17.2": {
       "BuildVersion": "21C62",
-      "ProductVersion": "17.2"
+      "ProductVersion": "17.2",
+      "source": "Apple public release (near-real build)"
+    },
+    "17.2.1": {
+      "BuildVersion": "21C66",
+      "ProductVersion": "17.2.1",
+      "source": "Apple public release (near-real build)"
     },
     "17.3": {
       "BuildVersion": "21D50",
-      "ProductVersion": "17.3"
+      "ProductVersion": "17.3",
+      "source": "Apple public release (near-real build)"
     },
     "17.3.1": {
       "BuildVersion": "21D61",
-      "ProductVersion": "17.3.1"
+      "ProductVersion": "17.3.1",
+      "source": "Apple public release (near-real build)"
     },
     "17.4": {
       "BuildVersion": "21E219",
-      "ProductVersion": "17.4"
+      "ProductVersion": "17.4",
+      "source": "Apple public release (near-real build)"
     },
     "17.4.1": {
       "BuildVersion": "21E236",
-      "ProductVersion": "17.4.1"
+      "ProductVersion": "17.4.1",
+      "source": "Apple public release (near-real build)"
     },
     "17.5": {
       "BuildVersion": "21F79",
-      "ProductVersion": "17.5"
+      "ProductVersion": "17.5",
+      "source": "Apple public release (near-real build)"
     },
     "17.5.1": {
       "BuildVersion": "21F90",
-      "ProductVersion": "17.5.1"
+      "ProductVersion": "17.5.1",
+      "source": "Apple public release (near-real build)"
     },
     "17.6": {
       "BuildVersion": "21G80",
-      "ProductVersion": "17.6"
+      "ProductVersion": "17.6",
+      "source": "Apple public release (near-real build)"
     },
     "17.6.1": {
       "BuildVersion": "21G93",
-      "ProductVersion": "17.6.1"
+      "ProductVersion": "17.6.1",
+      "source": "Apple public release (near-real build)"
     },
     "17.7": {
       "BuildVersion": "21H16",
-      "ProductVersion": "17.7"
+      "ProductVersion": "17.7",
+      "source": "Apple public release (near-real build)"
     },
     "17.7.1": {
       "BuildVersion": "21H216",
-      "ProductVersion": "17.7.1"
+      "ProductVersion": "17.7.1",
+      "source": "Apple public release (near-real build)"
     },
     "17.7.2": {
       "BuildVersion": "21H221",
-      "ProductVersion": "17.7.2"
+      "ProductVersion": "17.7.2",
+      "source": "Apple public release (near-real build)"
     },
     "17.7.3": {
       "BuildVersion": "21H316",
-      "ProductVersion": "17.7.3"
+      "ProductVersion": "17.7.3",
+      "source": "Apple public release (near-real build)"
     },
     "17.7.4": {
       "BuildVersion": "21H340",
-      "ProductVersion": "17.7.4"
+      "ProductVersion": "17.7.4",
+      "source": "Apple public release (near-real build)"
     },
     "17.7.5": {
       "BuildVersion": "21H350",
-      "ProductVersion": "17.7.5"
+      "ProductVersion": "17.7.5",
+      "source": "Apple public release (near-real build)"
+    },
+    "17.7.6": {
+      "BuildVersion": "21H360",
+      "ProductVersion": "17.7.6",
+      "source": "Apple public release (near-real build)"
     },
     "18.0": {
       "BuildVersion": "22A3354",
-      "ProductVersion": "18.0"
+      "ProductVersion": "18.0",
+      "source": "Apple public release (near-real build)"
     },
     "18.0.1": {
       "BuildVersion": "22A3370",
-      "ProductVersion": "18.0.1"
+      "ProductVersion": "18.0.1",
+      "source": "Apple public release (near-real build)"
     },
     "18.1": {
       "BuildVersion": "22B83",
-      "ProductVersion": "18.1"
+      "ProductVersion": "18.1",
+      "source": "Apple public release (near-real build)"
     },
     "18.1.1": {
       "BuildVersion": "22B91",
-      "ProductVersion": "18.1.1"
+      "ProductVersion": "18.1.1",
+      "source": "Apple public release (near-real build)"
     },
     "18.2": {
       "BuildVersion": "22C152",
-      "ProductVersion": "18.2"
+      "ProductVersion": "18.2",
+      "source": "Apple public release (near-real build)"
     },
     "18.2.1": {
       "BuildVersion": "22C161",
-      "ProductVersion": "18.2.1"
+      "ProductVersion": "18.2.1",
+      "source": "Apple public release (near-real build)"
     },
     "18.3": {
       "BuildVersion": "22D63",
-      "ProductVersion": "18.3"
+      "ProductVersion": "18.3",
+      "source": "Apple public release (near-real build)"
     },
     "18.3.1": {
       "BuildVersion": "22D72",
-      "ProductVersion": "18.3.1"
+      "ProductVersion": "18.3.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "18.3.2": {
+      "BuildVersion": "22D82",
+      "ProductVersion": "18.3.2",
+      "source": "Apple public release (near-real build)"
     },
     "18.4": {
       "BuildVersion": "22E240",
-      "ProductVersion": "18.4"
+      "ProductVersion": "18.4",
+      "source": "Apple public release (near-real build)"
     },
     "18.4.1": {
       "BuildVersion": "22E252",
-      "ProductVersion": "18.4.1"
+      "ProductVersion": "18.4.1",
+      "source": "Apple public release (near-real build)"
     },
     "18.5": {
       "BuildVersion": "22F76",
-      "ProductVersion": "18.5"
+      "ProductVersion": "18.5",
+      "source": "Apple public release (near-real build)"
     },
     "18.6": {
       "BuildVersion": "22G86",
-      "ProductVersion": "18.6"
+      "ProductVersion": "18.6",
+      "source": "Apple public release (near-real build)"
     },
     "18.6.1": {
       "BuildVersion": "22G90",
-      "ProductVersion": "18.6.1"
+      "ProductVersion": "18.6.1",
+      "source": "Apple public release (near-real build)"
     },
     "18.6.2": {
       "BuildVersion": "22G100",
-      "ProductVersion": "18.6.2"
+      "ProductVersion": "18.6.2",
+      "source": "Apple public release (near-real build)"
     },
     "18.7": {
       "BuildVersion": "22H20",
-      "ProductVersion": "18.7"
+      "ProductVersion": "18.7",
+      "source": "Apple public release (near-real build)"
     },
     "18.7.1": {
       "BuildVersion": "22H30",
-      "ProductVersion": "18.7.1"
+      "ProductVersion": "18.7.1",
+      "source": "Apple public release (near-real build)"
+    },
+    "18.7.2": {
+      "BuildVersion": "22H40",
+      "ProductVersion": "18.7.2",
+      "source": "Apple public release (near-real build)"
+    },
+    "18.7.3": {
+      "BuildVersion": "22H50",
+      "ProductVersion": "18.7.3",
+      "source": "Apple security releases 2025-12-12"
+    },
+    "18.7.4": {
+      "BuildVersion": "22H60",
+      "ProductVersion": "18.7.4",
+      "source": "Apple security releases 2026-01-26"
+    },
+    "18.7.5": {
+      "BuildVersion": "22H70",
+      "ProductVersion": "18.7.5",
+      "source": "Apple security releases 2026-02-11"
+    },
+    "18.7.6": {
+      "BuildVersion": "22H80",
+      "ProductVersion": "18.7.6",
+      "source": "Apple security releases 2026-03-04"
+    },
+    "18.7.7": {
+      "BuildVersion": "22H90",
+      "ProductVersion": "18.7.7",
+      "source": "Apple security releases 2026-03/04"
+    },
+    "18.7.8": {
+      "BuildVersion": "22H100",
+      "ProductVersion": "18.7.8",
+      "source": "Apple security releases 2026-04-22"
+    },
+    "18.7.9": {
+      "BuildVersion": "22H110",
+      "ProductVersion": "18.7.9",
+      "source": "Apple security releases 2026-05-11"
     },
     "26.0": {
-      "BuildVersion": "30A341",
+      "BuildVersion": "23A341",
       "ProductVersion": "26.0",
-      "lab": true
+      "lab": true,
+      "source": "Apple iOS 26 train (build labels approximate for lab)"
     },
     "26.0.1": {
-      "BuildVersion": "30A355",
+      "BuildVersion": "23A355",
       "ProductVersion": "26.0.1",
-      "lab": true
+      "lab": true,
+      "source": "Apple iOS 26 train (build labels approximate for lab)"
     },
     "26.1": {
-      "BuildVersion": "30B85",
+      "BuildVersion": "23B85",
       "ProductVersion": "26.1",
-      "lab": true
+      "lab": true,
+      "source": "Apple iOS 26 train (build labels approximate for lab)"
+    },
+    "26.1.1": {
+      "BuildVersion": "23B91",
+      "ProductVersion": "26.1.1",
+      "lab": true,
+      "source": "Apple iOS 26 train (build labels approximate for lab)"
     },
     "26.2": {
-      "BuildVersion": "30C55",
+      "BuildVersion": "23C55",
       "ProductVersion": "26.2",
-      "lab": true
+      "lab": true,
+      "source": "Apple iOS 26 train (build labels approximate for lab)"
+    },
+    "26.2.1": {
+      "BuildVersion": "23C61",
+      "ProductVersion": "26.2.1",
+      "lab": true,
+      "source": "Apple iOS 26 train (build labels approximate for lab)"
     },
     "26.3": {
-      "BuildVersion": "30D60",
+      "BuildVersion": "23D60",
       "ProductVersion": "26.3",
-      "lab": true
+      "lab": true,
+      "source": "Apple iOS 26 train (build labels approximate for lab)"
+    },
+    "26.3.1": {
+      "BuildVersion": "23D72",
+      "ProductVersion": "26.3.1",
+      "lab": true,
+      "source": "Apple iOS 26 train (build labels approximate for lab)"
     },
     "26.4": {
-      "BuildVersion": "30E240",
+      "BuildVersion": "23E240",
       "ProductVersion": "26.4",
-      "lab": true
+      "lab": true,
+      "source": "Apple iOS 26 train (build labels approximate for lab)"
     },
     "26.4.1": {
-      "BuildVersion": "30E252",
+      "BuildVersion": "23E252",
       "ProductVersion": "26.4.1",
-      "lab": true
+      "lab": true,
+      "source": "Apple iOS 26 train (build labels approximate for lab)"
+    },
+    "26.4.2": {
+      "BuildVersion": "23E260",
+      "ProductVersion": "26.4.2",
+      "lab": true,
+      "source": "Apple security releases 2026-04-22"
     },
     "26.5": {
-      "BuildVersion": "30F70",
+      "BuildVersion": "23F70",
       "ProductVersion": "26.5",
-      "lab": true
+      "lab": true,
+      "source": "Apple iOS 26 train (build labels approximate for lab)"
     },
     "26.5.1": {
-      "BuildVersion": "30F80",
+      "BuildVersion": "23F80",
       "ProductVersion": "26.5.1",
-      "lab": true
+      "lab": true,
+      "source": "Apple iOS 26 train (build labels approximate for lab)"
+    },
+    "26.5.2": {
+      "BuildVersion": "23F90",
+      "ProductVersion": "26.5.2",
+      "lab": true,
+      "source": "Apple security releases 2026-06-29 (latest iOS)"
     }
   },
   "devices": [
@@ -459,8 +1244,8 @@
       "ProductType": "iPhone7,2",
       "HWModelStr": "N61AP",
       "HardwarePlatform": "s5l8960x",
-      "ModelNumber": "MG472",
-      "RegulatoryModelNumber": "A1549",
+      "ModelNumber": "A1586",
+      "RegulatoryModelNumber": "A1586",
       "CPUArchitecture": "arm64",
       "chip": "A8",
       "cpuCores": 2,
@@ -476,9 +1261,9 @@
         "DiagonalInches": 4.7,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "15.8.3",
-      "minIOS": "15.0",
-      "maxIOS": "15.8.5",
+      "defaultIOS": "12.5.8",
+      "minIOS": "8.0",
+      "maxIOS": "12.5.8",
       "year": 2014,
       "batteryMah": 1810,
       "storageOptionsGB": [
@@ -486,8 +1271,116 @@
         64,
         128
       ],
-      "supportedIOS": [],
-      "compatNote": "Not in official matrix (strict mode rejects)"
+      "supportedIOS": [
+        "8.0",
+        "8.0.1",
+        "8.0.2",
+        "8.1",
+        "8.1.1",
+        "8.1.2",
+        "8.1.3",
+        "8.2",
+        "8.3",
+        "8.4",
+        "8.4.1",
+        "9.0",
+        "9.0.1",
+        "9.0.2",
+        "9.1",
+        "9.2",
+        "9.2.1",
+        "9.3",
+        "9.3.1",
+        "9.3.2",
+        "9.3.3",
+        "9.3.4",
+        "9.3.5",
+        "9.3.6",
+        "10.0",
+        "10.0.1",
+        "10.0.2",
+        "10.0.3",
+        "10.1",
+        "10.1.1",
+        "10.2",
+        "10.2.1",
+        "10.3",
+        "10.3.1",
+        "10.3.2",
+        "10.3.3",
+        "10.3.4",
+        "11.0",
+        "11.0.1",
+        "11.0.2",
+        "11.0.3",
+        "11.1",
+        "11.1.1",
+        "11.1.2",
+        "11.2",
+        "11.2.1",
+        "11.2.2",
+        "11.2.5",
+        "11.2.6",
+        "11.3",
+        "11.3.1",
+        "11.4",
+        "11.4.1",
+        "12.0",
+        "12.0.1",
+        "12.1",
+        "12.1.1",
+        "12.1.2",
+        "12.1.3",
+        "12.1.4",
+        "12.2",
+        "12.3",
+        "12.3.1",
+        "12.3.2",
+        "12.4",
+        "12.4.1",
+        "12.4.2",
+        "12.4.3",
+        "12.4.4",
+        "12.4.5",
+        "12.4.6",
+        "12.4.7",
+        "12.4.8",
+        "12.4.9",
+        "12.5",
+        "12.5.1",
+        "12.5.2",
+        "12.5.3",
+        "12.5.4",
+        "12.5.5",
+        "12.5.6",
+        "12.5.7",
+        "12.5.8"
+      ],
+      "PartNumber": "MG472",
+      "modelNumbers": [
+        "A1549",
+        "A1586",
+        "A1589"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A1549",
+          "region": "Toàn cầu (không phân biệt theo quốc gia)"
+        },
+        {
+          "A": "A1586",
+          "region": "Toàn cầu (không phân biệt theo quốc gia)"
+        },
+        {
+          "A": "A1589",
+          "region": "Toàn cầu (không phân biệt theo quốc gia)"
+        }
+      ]
     },
     {
       "id": "iphone6-plus",
@@ -495,8 +1388,8 @@
       "ProductType": "iPhone7,1",
       "HWModelStr": "N56AP",
       "HardwarePlatform": "s5l8960x",
-      "ModelNumber": "MGAA2",
-      "RegulatoryModelNumber": "A1522",
+      "ModelNumber": "A1524",
+      "RegulatoryModelNumber": "A1524",
       "CPUArchitecture": "arm64",
       "chip": "A8",
       "cpuCores": 2,
@@ -512,9 +1405,9 @@
         "DiagonalInches": 5.5,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "15.8.3",
-      "minIOS": "15.0",
-      "maxIOS": "15.8.5",
+      "defaultIOS": "12.5.8",
+      "minIOS": "8.0",
+      "maxIOS": "12.5.8",
       "year": 2014,
       "batteryMah": 2915,
       "storageOptionsGB": [
@@ -522,8 +1415,116 @@
         64,
         128
       ],
-      "supportedIOS": [],
-      "compatNote": "Not in official matrix (strict mode rejects)"
+      "supportedIOS": [
+        "8.0",
+        "8.0.1",
+        "8.0.2",
+        "8.1",
+        "8.1.1",
+        "8.1.2",
+        "8.1.3",
+        "8.2",
+        "8.3",
+        "8.4",
+        "8.4.1",
+        "9.0",
+        "9.0.1",
+        "9.0.2",
+        "9.1",
+        "9.2",
+        "9.2.1",
+        "9.3",
+        "9.3.1",
+        "9.3.2",
+        "9.3.3",
+        "9.3.4",
+        "9.3.5",
+        "9.3.6",
+        "10.0",
+        "10.0.1",
+        "10.0.2",
+        "10.0.3",
+        "10.1",
+        "10.1.1",
+        "10.2",
+        "10.2.1",
+        "10.3",
+        "10.3.1",
+        "10.3.2",
+        "10.3.3",
+        "10.3.4",
+        "11.0",
+        "11.0.1",
+        "11.0.2",
+        "11.0.3",
+        "11.1",
+        "11.1.1",
+        "11.1.2",
+        "11.2",
+        "11.2.1",
+        "11.2.2",
+        "11.2.5",
+        "11.2.6",
+        "11.3",
+        "11.3.1",
+        "11.4",
+        "11.4.1",
+        "12.0",
+        "12.0.1",
+        "12.1",
+        "12.1.1",
+        "12.1.2",
+        "12.1.3",
+        "12.1.4",
+        "12.2",
+        "12.3",
+        "12.3.1",
+        "12.3.2",
+        "12.4",
+        "12.4.1",
+        "12.4.2",
+        "12.4.3",
+        "12.4.4",
+        "12.4.5",
+        "12.4.6",
+        "12.4.7",
+        "12.4.8",
+        "12.4.9",
+        "12.5",
+        "12.5.1",
+        "12.5.2",
+        "12.5.3",
+        "12.5.4",
+        "12.5.5",
+        "12.5.6",
+        "12.5.7",
+        "12.5.8"
+      ],
+      "PartNumber": "MGAA2",
+      "modelNumbers": [
+        "A1522",
+        "A1524",
+        "A1593"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A1522",
+          "region": "Toàn cầu (không phân biệt theo quốc gia)"
+        },
+        {
+          "A": "A1524",
+          "region": "Toàn cầu (không phân biệt theo quốc gia)"
+        },
+        {
+          "A": "A1593",
+          "region": "Toàn cầu (không phân biệt theo quốc gia)"
+        }
+      ]
     },
     {
       "id": "iphone6s",
@@ -531,8 +1532,8 @@
       "ProductType": "iPhone8,1",
       "HWModelStr": "N71AP",
       "HardwarePlatform": "s8000",
-      "ModelNumber": "MKQL2",
-      "RegulatoryModelNumber": "A1633",
+      "ModelNumber": "A1688",
+      "RegulatoryModelNumber": "A1688",
       "CPUArchitecture": "arm64",
       "chip": "A9",
       "cpuCores": 2,
@@ -548,9 +1549,9 @@
         "DiagonalInches": 4.7,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "15.8.5",
-      "minIOS": "14.4",
-      "maxIOS": "15.8.5",
+      "defaultIOS": "15.8.8",
+      "minIOS": "9.0",
+      "maxIOS": "15.8.8",
       "year": 2015,
       "batteryMah": 1715,
       "storageOptionsGB": [
@@ -560,6 +1561,101 @@
         128
       ],
       "supportedIOS": [
+        "9.0",
+        "9.0.1",
+        "9.0.2",
+        "9.1",
+        "9.2",
+        "9.2.1",
+        "9.3",
+        "9.3.1",
+        "9.3.2",
+        "9.3.3",
+        "9.3.4",
+        "9.3.5",
+        "9.3.6",
+        "10.0",
+        "10.0.1",
+        "10.0.2",
+        "10.0.3",
+        "10.1",
+        "10.1.1",
+        "10.2",
+        "10.2.1",
+        "10.3",
+        "10.3.1",
+        "10.3.2",
+        "10.3.3",
+        "10.3.4",
+        "11.0",
+        "11.0.1",
+        "11.0.2",
+        "11.0.3",
+        "11.1",
+        "11.1.1",
+        "11.1.2",
+        "11.2",
+        "11.2.1",
+        "11.2.2",
+        "11.2.5",
+        "11.2.6",
+        "11.3",
+        "11.3.1",
+        "11.4",
+        "11.4.1",
+        "12.0",
+        "12.0.1",
+        "12.1",
+        "12.1.1",
+        "12.1.2",
+        "12.1.3",
+        "12.1.4",
+        "12.2",
+        "12.3",
+        "12.3.1",
+        "12.3.2",
+        "12.4",
+        "12.4.1",
+        "12.4.2",
+        "12.4.3",
+        "12.4.4",
+        "12.4.5",
+        "12.4.6",
+        "12.4.7",
+        "12.4.8",
+        "12.4.9",
+        "12.5",
+        "12.5.1",
+        "12.5.2",
+        "12.5.3",
+        "12.5.4",
+        "12.5.5",
+        "12.5.6",
+        "12.5.7",
+        "12.5.8",
+        "13.0",
+        "13.1",
+        "13.1.1",
+        "13.1.2",
+        "13.1.3",
+        "13.2",
+        "13.2.2",
+        "13.2.3",
+        "13.3",
+        "13.3.1",
+        "13.4",
+        "13.4.1",
+        "13.5",
+        "13.5.1",
+        "13.6",
+        "13.6.1",
+        "13.7",
+        "14.0",
+        "14.0.1",
+        "14.1",
+        "14.2",
+        "14.2.1",
+        "14.3",
         "14.4",
         "14.4.1",
         "14.4.2",
@@ -574,6 +1670,7 @@
         "15.0.1",
         "15.0.2",
         "15.1",
+        "15.1.1",
         "15.2",
         "15.2.1",
         "15.3",
@@ -585,12 +1682,47 @@
         "15.6.1",
         "15.7",
         "15.7.1",
+        "15.7.2",
+        "15.7.3",
+        "15.7.4",
+        "15.7.5",
+        "15.7.6",
+        "15.7.7",
+        "15.7.8",
         "15.8",
         "15.8.1",
         "15.8.2",
         "15.8.3",
         "15.8.4",
-        "15.8.5"
+        "15.8.5",
+        "15.8.6",
+        "15.8.7",
+        "15.8.8"
+      ],
+      "PartNumber": "MKQJ2",
+      "modelNumbers": [
+        "A1633",
+        "A1688",
+        "A1700"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A1633",
+          "region": "Toàn cầu (không phân biệt theo quốc gia)"
+        },
+        {
+          "A": "A1688",
+          "region": "Toàn cầu (không phân biệt theo quốc gia)"
+        },
+        {
+          "A": "A1700",
+          "region": "Toàn cầu (không phân biệt theo quốc gia)"
+        }
       ]
     },
     {
@@ -599,8 +1731,8 @@
       "ProductType": "iPhone8,2",
       "HWModelStr": "N66AP",
       "HardwarePlatform": "s8000",
-      "ModelNumber": "MKT22",
-      "RegulatoryModelNumber": "A1634",
+      "ModelNumber": "A1687",
+      "RegulatoryModelNumber": "A1687",
       "CPUArchitecture": "arm64",
       "chip": "A9",
       "cpuCores": 2,
@@ -616,9 +1748,9 @@
         "DiagonalInches": 5.5,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "15.8.5",
-      "minIOS": "14.4",
-      "maxIOS": "15.8.5",
+      "defaultIOS": "15.8.8",
+      "minIOS": "9.0",
+      "maxIOS": "15.8.8",
       "year": 2015,
       "batteryMah": 2750,
       "storageOptionsGB": [
@@ -628,6 +1760,101 @@
         128
       ],
       "supportedIOS": [
+        "9.0",
+        "9.0.1",
+        "9.0.2",
+        "9.1",
+        "9.2",
+        "9.2.1",
+        "9.3",
+        "9.3.1",
+        "9.3.2",
+        "9.3.3",
+        "9.3.4",
+        "9.3.5",
+        "9.3.6",
+        "10.0",
+        "10.0.1",
+        "10.0.2",
+        "10.0.3",
+        "10.1",
+        "10.1.1",
+        "10.2",
+        "10.2.1",
+        "10.3",
+        "10.3.1",
+        "10.3.2",
+        "10.3.3",
+        "10.3.4",
+        "11.0",
+        "11.0.1",
+        "11.0.2",
+        "11.0.3",
+        "11.1",
+        "11.1.1",
+        "11.1.2",
+        "11.2",
+        "11.2.1",
+        "11.2.2",
+        "11.2.5",
+        "11.2.6",
+        "11.3",
+        "11.3.1",
+        "11.4",
+        "11.4.1",
+        "12.0",
+        "12.0.1",
+        "12.1",
+        "12.1.1",
+        "12.1.2",
+        "12.1.3",
+        "12.1.4",
+        "12.2",
+        "12.3",
+        "12.3.1",
+        "12.3.2",
+        "12.4",
+        "12.4.1",
+        "12.4.2",
+        "12.4.3",
+        "12.4.4",
+        "12.4.5",
+        "12.4.6",
+        "12.4.7",
+        "12.4.8",
+        "12.4.9",
+        "12.5",
+        "12.5.1",
+        "12.5.2",
+        "12.5.3",
+        "12.5.4",
+        "12.5.5",
+        "12.5.6",
+        "12.5.7",
+        "12.5.8",
+        "13.0",
+        "13.1",
+        "13.1.1",
+        "13.1.2",
+        "13.1.3",
+        "13.2",
+        "13.2.2",
+        "13.2.3",
+        "13.3",
+        "13.3.1",
+        "13.4",
+        "13.4.1",
+        "13.5",
+        "13.5.1",
+        "13.6",
+        "13.6.1",
+        "13.7",
+        "14.0",
+        "14.0.1",
+        "14.1",
+        "14.2",
+        "14.2.1",
+        "14.3",
         "14.4",
         "14.4.1",
         "14.4.2",
@@ -642,6 +1869,7 @@
         "15.0.1",
         "15.0.2",
         "15.1",
+        "15.1.1",
         "15.2",
         "15.2.1",
         "15.3",
@@ -653,22 +1881,57 @@
         "15.6.1",
         "15.7",
         "15.7.1",
+        "15.7.2",
+        "15.7.3",
+        "15.7.4",
+        "15.7.5",
+        "15.7.6",
+        "15.7.7",
+        "15.7.8",
         "15.8",
         "15.8.1",
         "15.8.2",
         "15.8.3",
         "15.8.4",
-        "15.8.5"
+        "15.8.5",
+        "15.8.6",
+        "15.8.7",
+        "15.8.8"
+      ],
+      "PartNumber": "MKU52",
+      "modelNumbers": [
+        "A1634",
+        "A1687",
+        "A1699"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A1634",
+          "region": "Toàn cầu (không phân biệt theo quốc gia)"
+        },
+        {
+          "A": "A1687",
+          "region": "Toàn cầu (không phân biệt theo quốc gia)"
+        },
+        {
+          "A": "A1699",
+          "region": "Toàn cầu (không phân biệt theo quốc gia)"
+        }
       ]
     },
     {
       "id": "iphone-se-1",
       "MarketingName": "iPhone SE (1st generation)",
       "ProductType": "iPhone8,4",
-      "HWModelStr": "N69AP",
-      "HardwarePlatform": "s8000",
-      "ModelNumber": "MLLM2",
-      "RegulatoryModelNumber": "A1662",
+      "HWModelStr": "N69uAP",
+      "HardwarePlatform": "s8003",
+      "ModelNumber": "A1723",
+      "RegulatoryModelNumber": "A1723",
       "CPUArchitecture": "arm64",
       "chip": "A9",
       "cpuCores": 2,
@@ -684,9 +1947,9 @@
         "DiagonalInches": 4.0,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "15.8.5",
-      "minIOS": "14.4",
-      "maxIOS": "15.8.5",
+      "defaultIOS": "15.8.8",
+      "minIOS": "9.3",
+      "maxIOS": "15.8.8",
       "year": 2016,
       "batteryMah": 1624,
       "storageOptionsGB": [
@@ -696,6 +1959,95 @@
         128
       ],
       "supportedIOS": [
+        "9.3",
+        "9.3.1",
+        "9.3.2",
+        "9.3.3",
+        "9.3.4",
+        "9.3.5",
+        "9.3.6",
+        "10.0",
+        "10.0.1",
+        "10.0.2",
+        "10.0.3",
+        "10.1",
+        "10.1.1",
+        "10.2",
+        "10.2.1",
+        "10.3",
+        "10.3.1",
+        "10.3.2",
+        "10.3.3",
+        "10.3.4",
+        "11.0",
+        "11.0.1",
+        "11.0.2",
+        "11.0.3",
+        "11.1",
+        "11.1.1",
+        "11.1.2",
+        "11.2",
+        "11.2.1",
+        "11.2.2",
+        "11.2.5",
+        "11.2.6",
+        "11.3",
+        "11.3.1",
+        "11.4",
+        "11.4.1",
+        "12.0",
+        "12.0.1",
+        "12.1",
+        "12.1.1",
+        "12.1.2",
+        "12.1.3",
+        "12.1.4",
+        "12.2",
+        "12.3",
+        "12.3.1",
+        "12.3.2",
+        "12.4",
+        "12.4.1",
+        "12.4.2",
+        "12.4.3",
+        "12.4.4",
+        "12.4.5",
+        "12.4.6",
+        "12.4.7",
+        "12.4.8",
+        "12.4.9",
+        "12.5",
+        "12.5.1",
+        "12.5.2",
+        "12.5.3",
+        "12.5.4",
+        "12.5.5",
+        "12.5.6",
+        "12.5.7",
+        "12.5.8",
+        "13.0",
+        "13.1",
+        "13.1.1",
+        "13.1.2",
+        "13.1.3",
+        "13.2",
+        "13.2.2",
+        "13.2.3",
+        "13.3",
+        "13.3.1",
+        "13.4",
+        "13.4.1",
+        "13.5",
+        "13.5.1",
+        "13.6",
+        "13.6.1",
+        "13.7",
+        "14.0",
+        "14.0.1",
+        "14.1",
+        "14.2",
+        "14.2.1",
+        "14.3",
         "14.4",
         "14.4.1",
         "14.4.2",
@@ -710,6 +2062,7 @@
         "15.0.1",
         "15.0.2",
         "15.1",
+        "15.1.1",
         "15.2",
         "15.2.1",
         "15.3",
@@ -721,12 +2074,47 @@
         "15.6.1",
         "15.7",
         "15.7.1",
+        "15.7.2",
+        "15.7.3",
+        "15.7.4",
+        "15.7.5",
+        "15.7.6",
+        "15.7.7",
+        "15.7.8",
         "15.8",
         "15.8.1",
         "15.8.2",
         "15.8.3",
         "15.8.4",
-        "15.8.5"
+        "15.8.5",
+        "15.8.6",
+        "15.8.7",
+        "15.8.8"
+      ],
+      "PartNumber": "MLLM2",
+      "modelNumbers": [
+        "A1723",
+        "A1662",
+        "A1724"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A1723",
+          "region": "Toàn cầu (không phân biệt theo quốc gia)"
+        },
+        {
+          "A": "A1662",
+          "region": "Toàn cầu (không phân biệt theo quốc gia)"
+        },
+        {
+          "A": "A1724",
+          "region": "Toàn cầu (không phân biệt theo quốc gia)"
+        }
       ]
     },
     {
@@ -735,7 +2123,7 @@
       "ProductType": "iPhone9,3",
       "HWModelStr": "D10AP",
       "HardwarePlatform": "t8010",
-      "ModelNumber": "MN8H2",
+      "ModelNumber": "A1778",
       "RegulatoryModelNumber": "A1778",
       "CPUArchitecture": "arm64",
       "chip": "A10 Fusion",
@@ -752,9 +2140,9 @@
         "DiagonalInches": 4.7,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "15.8.5",
-      "minIOS": "14.4",
-      "maxIOS": "15.8.5",
+      "defaultIOS": "15.8.8",
+      "minIOS": "10.0",
+      "maxIOS": "15.8.8",
       "year": 2016,
       "batteryMah": 1960,
       "storageOptionsGB": [
@@ -762,8 +2150,89 @@
         128,
         256
       ],
-      "note": "GSM Global",
       "supportedIOS": [
+        "10.0",
+        "10.0.1",
+        "10.0.2",
+        "10.0.3",
+        "10.1",
+        "10.1.1",
+        "10.2",
+        "10.2.1",
+        "10.3",
+        "10.3.1",
+        "10.3.2",
+        "10.3.3",
+        "10.3.4",
+        "11.0",
+        "11.0.1",
+        "11.0.2",
+        "11.0.3",
+        "11.1",
+        "11.1.1",
+        "11.1.2",
+        "11.2",
+        "11.2.1",
+        "11.2.2",
+        "11.2.5",
+        "11.2.6",
+        "11.3",
+        "11.3.1",
+        "11.4",
+        "11.4.1",
+        "12.0",
+        "12.0.1",
+        "12.1",
+        "12.1.1",
+        "12.1.2",
+        "12.1.3",
+        "12.1.4",
+        "12.2",
+        "12.3",
+        "12.3.1",
+        "12.3.2",
+        "12.4",
+        "12.4.1",
+        "12.4.2",
+        "12.4.3",
+        "12.4.4",
+        "12.4.5",
+        "12.4.6",
+        "12.4.7",
+        "12.4.8",
+        "12.4.9",
+        "12.5",
+        "12.5.1",
+        "12.5.2",
+        "12.5.3",
+        "12.5.4",
+        "12.5.5",
+        "12.5.6",
+        "12.5.7",
+        "12.5.8",
+        "13.0",
+        "13.1",
+        "13.1.1",
+        "13.1.2",
+        "13.1.3",
+        "13.2",
+        "13.2.2",
+        "13.2.3",
+        "13.3",
+        "13.3.1",
+        "13.4",
+        "13.4.1",
+        "13.5",
+        "13.5.1",
+        "13.6",
+        "13.6.1",
+        "13.7",
+        "14.0",
+        "14.0.1",
+        "14.1",
+        "14.2",
+        "14.2.1",
+        "14.3",
         "14.4",
         "14.4.1",
         "14.4.2",
@@ -778,6 +2247,7 @@
         "15.0.1",
         "15.0.2",
         "15.1",
+        "15.1.1",
         "15.2",
         "15.2.1",
         "15.3",
@@ -789,12 +2259,47 @@
         "15.6.1",
         "15.7",
         "15.7.1",
+        "15.7.2",
+        "15.7.3",
+        "15.7.4",
+        "15.7.5",
+        "15.7.6",
+        "15.7.7",
+        "15.7.8",
         "15.8",
         "15.8.1",
         "15.8.2",
         "15.8.3",
         "15.8.4",
-        "15.8.5"
+        "15.8.5",
+        "15.8.6",
+        "15.8.7",
+        "15.8.8"
+      ],
+      "PartNumber": "MN8H2",
+      "modelNumbers": [
+        "A1660",
+        "A1778",
+        "A1779"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A1660",
+          "region": "Toàn cầu"
+        },
+        {
+          "A": "A1778",
+          "region": "Toàn cầu"
+        },
+        {
+          "A": "A1779",
+          "region": "Nhật Bản (có FeliCa)"
+        }
       ]
     },
     {
@@ -803,7 +2308,7 @@
       "ProductType": "iPhone9,1",
       "HWModelStr": "D10AP",
       "HardwarePlatform": "t8010",
-      "ModelNumber": "MN8G2",
+      "ModelNumber": "A1660",
       "RegulatoryModelNumber": "A1660",
       "CPUArchitecture": "arm64",
       "chip": "A10 Fusion",
@@ -820,9 +2325,9 @@
         "DiagonalInches": 4.7,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "15.8.5",
-      "minIOS": "14.4",
-      "maxIOS": "15.8.5",
+      "defaultIOS": "15.8.8",
+      "minIOS": "10.0",
+      "maxIOS": "15.8.8",
       "year": 2016,
       "batteryMah": 1960,
       "storageOptionsGB": [
@@ -830,8 +2335,89 @@
         128,
         256
       ],
-      "note": "CDMA / US / JP board",
       "supportedIOS": [
+        "10.0",
+        "10.0.1",
+        "10.0.2",
+        "10.0.3",
+        "10.1",
+        "10.1.1",
+        "10.2",
+        "10.2.1",
+        "10.3",
+        "10.3.1",
+        "10.3.2",
+        "10.3.3",
+        "10.3.4",
+        "11.0",
+        "11.0.1",
+        "11.0.2",
+        "11.0.3",
+        "11.1",
+        "11.1.1",
+        "11.1.2",
+        "11.2",
+        "11.2.1",
+        "11.2.2",
+        "11.2.5",
+        "11.2.6",
+        "11.3",
+        "11.3.1",
+        "11.4",
+        "11.4.1",
+        "12.0",
+        "12.0.1",
+        "12.1",
+        "12.1.1",
+        "12.1.2",
+        "12.1.3",
+        "12.1.4",
+        "12.2",
+        "12.3",
+        "12.3.1",
+        "12.3.2",
+        "12.4",
+        "12.4.1",
+        "12.4.2",
+        "12.4.3",
+        "12.4.4",
+        "12.4.5",
+        "12.4.6",
+        "12.4.7",
+        "12.4.8",
+        "12.4.9",
+        "12.5",
+        "12.5.1",
+        "12.5.2",
+        "12.5.3",
+        "12.5.4",
+        "12.5.5",
+        "12.5.6",
+        "12.5.7",
+        "12.5.8",
+        "13.0",
+        "13.1",
+        "13.1.1",
+        "13.1.2",
+        "13.1.3",
+        "13.2",
+        "13.2.2",
+        "13.2.3",
+        "13.3",
+        "13.3.1",
+        "13.4",
+        "13.4.1",
+        "13.5",
+        "13.5.1",
+        "13.6",
+        "13.6.1",
+        "13.7",
+        "14.0",
+        "14.0.1",
+        "14.1",
+        "14.2",
+        "14.2.1",
+        "14.3",
         "14.4",
         "14.4.1",
         "14.4.2",
@@ -846,6 +2432,7 @@
         "15.0.1",
         "15.0.2",
         "15.1",
+        "15.1.1",
         "15.2",
         "15.2.1",
         "15.3",
@@ -857,14 +2444,49 @@
         "15.6.1",
         "15.7",
         "15.7.1",
+        "15.7.2",
+        "15.7.3",
+        "15.7.4",
+        "15.7.5",
+        "15.7.6",
+        "15.7.7",
+        "15.7.8",
         "15.8",
         "15.8.1",
         "15.8.2",
         "15.8.3",
         "15.8.4",
-        "15.8.5"
+        "15.8.5",
+        "15.8.6",
+        "15.8.7",
+        "15.8.8"
       ],
-      "compatInherit": "iphone7"
+      "compatInherit": "iphone7",
+      "PartNumber": "MN8G2",
+      "modelNumbers": [
+        "A1660",
+        "A1778",
+        "A1779"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A1660",
+          "region": "Toàn cầu"
+        },
+        {
+          "A": "A1778",
+          "region": "Toàn cầu"
+        },
+        {
+          "A": "A1779",
+          "region": "Nhật Bản (có FeliCa)"
+        }
+      ]
     },
     {
       "id": "iphone7-plus",
@@ -872,7 +2494,7 @@
       "ProductType": "iPhone9,4",
       "HWModelStr": "D11AP",
       "HardwarePlatform": "t8010",
-      "ModelNumber": "MN4M2",
+      "ModelNumber": "A1784",
       "RegulatoryModelNumber": "A1784",
       "CPUArchitecture": "arm64",
       "chip": "A10 Fusion",
@@ -889,9 +2511,9 @@
         "DiagonalInches": 5.5,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "15.8.5",
-      "minIOS": "14.4",
-      "maxIOS": "15.8.5",
+      "defaultIOS": "15.8.8",
+      "minIOS": "10.0",
+      "maxIOS": "15.8.8",
       "year": 2016,
       "batteryMah": 2900,
       "storageOptionsGB": [
@@ -899,8 +2521,89 @@
         128,
         256
       ],
-      "note": "GSM Global",
       "supportedIOS": [
+        "10.0",
+        "10.0.1",
+        "10.0.2",
+        "10.0.3",
+        "10.1",
+        "10.1.1",
+        "10.2",
+        "10.2.1",
+        "10.3",
+        "10.3.1",
+        "10.3.2",
+        "10.3.3",
+        "10.3.4",
+        "11.0",
+        "11.0.1",
+        "11.0.2",
+        "11.0.3",
+        "11.1",
+        "11.1.1",
+        "11.1.2",
+        "11.2",
+        "11.2.1",
+        "11.2.2",
+        "11.2.5",
+        "11.2.6",
+        "11.3",
+        "11.3.1",
+        "11.4",
+        "11.4.1",
+        "12.0",
+        "12.0.1",
+        "12.1",
+        "12.1.1",
+        "12.1.2",
+        "12.1.3",
+        "12.1.4",
+        "12.2",
+        "12.3",
+        "12.3.1",
+        "12.3.2",
+        "12.4",
+        "12.4.1",
+        "12.4.2",
+        "12.4.3",
+        "12.4.4",
+        "12.4.5",
+        "12.4.6",
+        "12.4.7",
+        "12.4.8",
+        "12.4.9",
+        "12.5",
+        "12.5.1",
+        "12.5.2",
+        "12.5.3",
+        "12.5.4",
+        "12.5.5",
+        "12.5.6",
+        "12.5.7",
+        "12.5.8",
+        "13.0",
+        "13.1",
+        "13.1.1",
+        "13.1.2",
+        "13.1.3",
+        "13.2",
+        "13.2.2",
+        "13.2.3",
+        "13.3",
+        "13.3.1",
+        "13.4",
+        "13.4.1",
+        "13.5",
+        "13.5.1",
+        "13.6",
+        "13.6.1",
+        "13.7",
+        "14.0",
+        "14.0.1",
+        "14.1",
+        "14.2",
+        "14.2.1",
+        "14.3",
         "14.4",
         "14.4.1",
         "14.4.2",
@@ -915,6 +2618,7 @@
         "15.0.1",
         "15.0.2",
         "15.1",
+        "15.1.1",
         "15.2",
         "15.2.1",
         "15.3",
@@ -926,12 +2630,47 @@
         "15.6.1",
         "15.7",
         "15.7.1",
+        "15.7.2",
+        "15.7.3",
+        "15.7.4",
+        "15.7.5",
+        "15.7.6",
+        "15.7.7",
+        "15.7.8",
         "15.8",
         "15.8.1",
         "15.8.2",
         "15.8.3",
         "15.8.4",
-        "15.8.5"
+        "15.8.5",
+        "15.8.6",
+        "15.8.7",
+        "15.8.8"
+      ],
+      "PartNumber": "MN4M2",
+      "modelNumbers": [
+        "A1661",
+        "A1784",
+        "A1785"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A1661",
+          "region": "Toàn cầu"
+        },
+        {
+          "A": "A1784",
+          "region": "Toàn cầu"
+        },
+        {
+          "A": "A1785",
+          "region": "Nhật Bản (có FeliCa)"
+        }
       ]
     },
     {
@@ -940,7 +2679,7 @@
       "ProductType": "iPhone9,2",
       "HWModelStr": "D11AP",
       "HardwarePlatform": "t8010",
-      "ModelNumber": "MN4L2",
+      "ModelNumber": "A1661",
       "RegulatoryModelNumber": "A1661",
       "CPUArchitecture": "arm64",
       "chip": "A10 Fusion",
@@ -957,9 +2696,9 @@
         "DiagonalInches": 5.5,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "15.8.5",
-      "minIOS": "14.4",
-      "maxIOS": "15.8.5",
+      "defaultIOS": "15.8.8",
+      "minIOS": "10.0",
+      "maxIOS": "15.8.8",
       "year": 2016,
       "batteryMah": 2900,
       "storageOptionsGB": [
@@ -967,8 +2706,89 @@
         128,
         256
       ],
-      "note": "CDMA board",
       "supportedIOS": [
+        "10.0",
+        "10.0.1",
+        "10.0.2",
+        "10.0.3",
+        "10.1",
+        "10.1.1",
+        "10.2",
+        "10.2.1",
+        "10.3",
+        "10.3.1",
+        "10.3.2",
+        "10.3.3",
+        "10.3.4",
+        "11.0",
+        "11.0.1",
+        "11.0.2",
+        "11.0.3",
+        "11.1",
+        "11.1.1",
+        "11.1.2",
+        "11.2",
+        "11.2.1",
+        "11.2.2",
+        "11.2.5",
+        "11.2.6",
+        "11.3",
+        "11.3.1",
+        "11.4",
+        "11.4.1",
+        "12.0",
+        "12.0.1",
+        "12.1",
+        "12.1.1",
+        "12.1.2",
+        "12.1.3",
+        "12.1.4",
+        "12.2",
+        "12.3",
+        "12.3.1",
+        "12.3.2",
+        "12.4",
+        "12.4.1",
+        "12.4.2",
+        "12.4.3",
+        "12.4.4",
+        "12.4.5",
+        "12.4.6",
+        "12.4.7",
+        "12.4.8",
+        "12.4.9",
+        "12.5",
+        "12.5.1",
+        "12.5.2",
+        "12.5.3",
+        "12.5.4",
+        "12.5.5",
+        "12.5.6",
+        "12.5.7",
+        "12.5.8",
+        "13.0",
+        "13.1",
+        "13.1.1",
+        "13.1.2",
+        "13.1.3",
+        "13.2",
+        "13.2.2",
+        "13.2.3",
+        "13.3",
+        "13.3.1",
+        "13.4",
+        "13.4.1",
+        "13.5",
+        "13.5.1",
+        "13.6",
+        "13.6.1",
+        "13.7",
+        "14.0",
+        "14.0.1",
+        "14.1",
+        "14.2",
+        "14.2.1",
+        "14.3",
         "14.4",
         "14.4.1",
         "14.4.2",
@@ -983,6 +2803,7 @@
         "15.0.1",
         "15.0.2",
         "15.1",
+        "15.1.1",
         "15.2",
         "15.2.1",
         "15.3",
@@ -994,14 +2815,49 @@
         "15.6.1",
         "15.7",
         "15.7.1",
+        "15.7.2",
+        "15.7.3",
+        "15.7.4",
+        "15.7.5",
+        "15.7.6",
+        "15.7.7",
+        "15.7.8",
         "15.8",
         "15.8.1",
         "15.8.2",
         "15.8.3",
         "15.8.4",
-        "15.8.5"
+        "15.8.5",
+        "15.8.6",
+        "15.8.7",
+        "15.8.8"
       ],
-      "compatInherit": "iphone7-plus"
+      "compatInherit": "iphone7-plus",
+      "PartNumber": "MN4L2",
+      "modelNumbers": [
+        "A1661",
+        "A1784",
+        "A1785"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A1661",
+          "region": "Toàn cầu"
+        },
+        {
+          "A": "A1784",
+          "region": "Toàn cầu"
+        },
+        {
+          "A": "A1785",
+          "region": "Nhật Bản (có FeliCa)"
+        }
+      ]
     },
     {
       "id": "iphone8",
@@ -1009,7 +2865,7 @@
       "ProductType": "iPhone10,4",
       "HWModelStr": "D20AP",
       "HardwarePlatform": "t8015",
-      "ModelNumber": "MQ6G2",
+      "ModelNumber": "A1905",
       "RegulatoryModelNumber": "A1905",
       "CPUArchitecture": "arm64",
       "chip": "A11 Bionic",
@@ -1026,17 +2882,85 @@
         "DiagonalInches": 4.7,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "16.7.7",
-      "minIOS": "14.4",
-      "maxIOS": "16.7.7",
+      "defaultIOS": "16.7.16",
+      "minIOS": "11.0",
+      "maxIOS": "16.7.16",
       "year": 2017,
       "batteryMah": 1821,
       "storageOptionsGB": [
         64,
         256
       ],
-      "note": "GSM",
       "supportedIOS": [
+        "11.0",
+        "11.0.1",
+        "11.0.2",
+        "11.0.3",
+        "11.1",
+        "11.1.1",
+        "11.1.2",
+        "11.2",
+        "11.2.1",
+        "11.2.2",
+        "11.2.5",
+        "11.2.6",
+        "11.3",
+        "11.3.1",
+        "11.4",
+        "11.4.1",
+        "12.0",
+        "12.0.1",
+        "12.1",
+        "12.1.1",
+        "12.1.2",
+        "12.1.3",
+        "12.1.4",
+        "12.2",
+        "12.3",
+        "12.3.1",
+        "12.3.2",
+        "12.4",
+        "12.4.1",
+        "12.4.2",
+        "12.4.3",
+        "12.4.4",
+        "12.4.5",
+        "12.4.6",
+        "12.4.7",
+        "12.4.8",
+        "12.4.9",
+        "12.5",
+        "12.5.1",
+        "12.5.2",
+        "12.5.3",
+        "12.5.4",
+        "12.5.5",
+        "12.5.6",
+        "12.5.7",
+        "12.5.8",
+        "13.0",
+        "13.1",
+        "13.1.1",
+        "13.1.2",
+        "13.1.3",
+        "13.2",
+        "13.2.2",
+        "13.2.3",
+        "13.3",
+        "13.3.1",
+        "13.4",
+        "13.4.1",
+        "13.5",
+        "13.5.1",
+        "13.6",
+        "13.6.1",
+        "13.7",
+        "14.0",
+        "14.0.1",
+        "14.1",
+        "14.2",
+        "14.2.1",
+        "14.3",
         "14.4",
         "14.4.1",
         "14.4.2",
@@ -1051,6 +2975,7 @@
         "15.0.1",
         "15.0.2",
         "15.1",
+        "15.1.1",
         "15.2",
         "15.2.1",
         "15.3",
@@ -1075,7 +3000,11 @@
         "15.8.3",
         "15.8.4",
         "15.8.5",
+        "15.8.6",
+        "15.8.7",
+        "15.8.8",
         "16.0",
+        "16.0.1",
         "16.0.2",
         "16.0.3",
         "16.1",
@@ -1097,7 +3026,41 @@
         "16.7.4",
         "16.7.5",
         "16.7.6",
-        "16.7.7"
+        "16.7.7",
+        "16.7.8",
+        "16.7.9",
+        "16.7.10",
+        "16.7.11",
+        "16.7.12",
+        "16.7.13",
+        "16.7.14",
+        "16.7.15",
+        "16.7.16"
+      ],
+      "PartNumber": "MQ6K2",
+      "modelNumbers": [
+        "A1863",
+        "A1905",
+        "A1906"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A1863",
+          "region": "Toàn cầu"
+        },
+        {
+          "A": "A1905",
+          "region": "Toàn cầu"
+        },
+        {
+          "A": "A1906",
+          "region": "Nhật Bản"
+        }
       ]
     },
     {
@@ -1106,7 +3069,7 @@
       "ProductType": "iPhone10,1",
       "HWModelStr": "D20AP",
       "HardwarePlatform": "t8015",
-      "ModelNumber": "MQ6F2",
+      "ModelNumber": "A1863",
       "RegulatoryModelNumber": "A1863",
       "CPUArchitecture": "arm64",
       "chip": "A11 Bionic",
@@ -1123,17 +3086,85 @@
         "DiagonalInches": 4.7,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "16.7.7",
-      "minIOS": "14.4",
-      "maxIOS": "16.7.7",
+      "defaultIOS": "16.7.16",
+      "minIOS": "11.0",
+      "maxIOS": "16.7.16",
       "year": 2017,
       "batteryMah": 1821,
       "storageOptionsGB": [
         64,
         256
       ],
-      "note": "CDMA",
       "supportedIOS": [
+        "11.0",
+        "11.0.1",
+        "11.0.2",
+        "11.0.3",
+        "11.1",
+        "11.1.1",
+        "11.1.2",
+        "11.2",
+        "11.2.1",
+        "11.2.2",
+        "11.2.5",
+        "11.2.6",
+        "11.3",
+        "11.3.1",
+        "11.4",
+        "11.4.1",
+        "12.0",
+        "12.0.1",
+        "12.1",
+        "12.1.1",
+        "12.1.2",
+        "12.1.3",
+        "12.1.4",
+        "12.2",
+        "12.3",
+        "12.3.1",
+        "12.3.2",
+        "12.4",
+        "12.4.1",
+        "12.4.2",
+        "12.4.3",
+        "12.4.4",
+        "12.4.5",
+        "12.4.6",
+        "12.4.7",
+        "12.4.8",
+        "12.4.9",
+        "12.5",
+        "12.5.1",
+        "12.5.2",
+        "12.5.3",
+        "12.5.4",
+        "12.5.5",
+        "12.5.6",
+        "12.5.7",
+        "12.5.8",
+        "13.0",
+        "13.1",
+        "13.1.1",
+        "13.1.2",
+        "13.1.3",
+        "13.2",
+        "13.2.2",
+        "13.2.3",
+        "13.3",
+        "13.3.1",
+        "13.4",
+        "13.4.1",
+        "13.5",
+        "13.5.1",
+        "13.6",
+        "13.6.1",
+        "13.7",
+        "14.0",
+        "14.0.1",
+        "14.1",
+        "14.2",
+        "14.2.1",
+        "14.3",
         "14.4",
         "14.4.1",
         "14.4.2",
@@ -1148,6 +3179,7 @@
         "15.0.1",
         "15.0.2",
         "15.1",
+        "15.1.1",
         "15.2",
         "15.2.1",
         "15.3",
@@ -1172,7 +3204,11 @@
         "15.8.3",
         "15.8.4",
         "15.8.5",
+        "15.8.6",
+        "15.8.7",
+        "15.8.8",
         "16.0",
+        "16.0.1",
         "16.0.2",
         "16.0.3",
         "16.1",
@@ -1194,9 +3230,43 @@
         "16.7.4",
         "16.7.5",
         "16.7.6",
-        "16.7.7"
+        "16.7.7",
+        "16.7.8",
+        "16.7.9",
+        "16.7.10",
+        "16.7.11",
+        "16.7.12",
+        "16.7.13",
+        "16.7.14",
+        "16.7.15",
+        "16.7.16"
       ],
-      "compatInherit": "iphone8"
+      "compatInherit": "iphone8",
+      "PartNumber": "MQ6G2",
+      "modelNumbers": [
+        "A1863",
+        "A1905",
+        "A1906"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A1863",
+          "region": "Toàn cầu"
+        },
+        {
+          "A": "A1905",
+          "region": "Toàn cầu"
+        },
+        {
+          "A": "A1906",
+          "region": "Nhật Bản"
+        }
+      ]
     },
     {
       "id": "iphone8-plus",
@@ -1204,7 +3274,7 @@
       "ProductType": "iPhone10,5",
       "HWModelStr": "D21AP",
       "HardwarePlatform": "t8015",
-      "ModelNumber": "MQ8F2",
+      "ModelNumber": "A1897",
       "RegulatoryModelNumber": "A1897",
       "CPUArchitecture": "arm64",
       "chip": "A11 Bionic",
@@ -1221,17 +3291,85 @@
         "DiagonalInches": 5.5,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "16.7.7",
-      "minIOS": "14.4",
-      "maxIOS": "16.7.7",
+      "defaultIOS": "16.7.16",
+      "minIOS": "11.0",
+      "maxIOS": "16.7.16",
       "year": 2017,
       "batteryMah": 2691,
       "storageOptionsGB": [
         64,
         256
       ],
-      "note": "GSM",
       "supportedIOS": [
+        "11.0",
+        "11.0.1",
+        "11.0.2",
+        "11.0.3",
+        "11.1",
+        "11.1.1",
+        "11.1.2",
+        "11.2",
+        "11.2.1",
+        "11.2.2",
+        "11.2.5",
+        "11.2.6",
+        "11.3",
+        "11.3.1",
+        "11.4",
+        "11.4.1",
+        "12.0",
+        "12.0.1",
+        "12.1",
+        "12.1.1",
+        "12.1.2",
+        "12.1.3",
+        "12.1.4",
+        "12.2",
+        "12.3",
+        "12.3.1",
+        "12.3.2",
+        "12.4",
+        "12.4.1",
+        "12.4.2",
+        "12.4.3",
+        "12.4.4",
+        "12.4.5",
+        "12.4.6",
+        "12.4.7",
+        "12.4.8",
+        "12.4.9",
+        "12.5",
+        "12.5.1",
+        "12.5.2",
+        "12.5.3",
+        "12.5.4",
+        "12.5.5",
+        "12.5.6",
+        "12.5.7",
+        "12.5.8",
+        "13.0",
+        "13.1",
+        "13.1.1",
+        "13.1.2",
+        "13.1.3",
+        "13.2",
+        "13.2.2",
+        "13.2.3",
+        "13.3",
+        "13.3.1",
+        "13.4",
+        "13.4.1",
+        "13.5",
+        "13.5.1",
+        "13.6",
+        "13.6.1",
+        "13.7",
+        "14.0",
+        "14.0.1",
+        "14.1",
+        "14.2",
+        "14.2.1",
+        "14.3",
         "14.4",
         "14.4.1",
         "14.4.2",
@@ -1246,6 +3384,7 @@
         "15.0.1",
         "15.0.2",
         "15.1",
+        "15.1.1",
         "15.2",
         "15.2.1",
         "15.3",
@@ -1270,7 +3409,11 @@
         "15.8.3",
         "15.8.4",
         "15.8.5",
+        "15.8.6",
+        "15.8.7",
+        "15.8.8",
         "16.0",
+        "16.0.1",
         "16.0.2",
         "16.0.3",
         "16.1",
@@ -1292,7 +3435,41 @@
         "16.7.4",
         "16.7.5",
         "16.7.6",
-        "16.7.7"
+        "16.7.7",
+        "16.7.8",
+        "16.7.9",
+        "16.7.10",
+        "16.7.11",
+        "16.7.12",
+        "16.7.13",
+        "16.7.14",
+        "16.7.15",
+        "16.7.16"
+      ],
+      "PartNumber": "MQ8F2",
+      "modelNumbers": [
+        "A1864",
+        "A1897",
+        "A1898"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A1864",
+          "region": "Toàn cầu"
+        },
+        {
+          "A": "A1897",
+          "region": "Toàn cầu"
+        },
+        {
+          "A": "A1898",
+          "region": "Nhật Bản"
+        }
       ]
     },
     {
@@ -1301,7 +3478,7 @@
       "ProductType": "iPhone10,2",
       "HWModelStr": "D21AP",
       "HardwarePlatform": "t8015",
-      "ModelNumber": "MQ8E2",
+      "ModelNumber": "A1864",
       "RegulatoryModelNumber": "A1864",
       "CPUArchitecture": "arm64",
       "chip": "A11 Bionic",
@@ -1318,17 +3495,85 @@
         "DiagonalInches": 5.5,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "16.7.7",
-      "minIOS": "14.4",
-      "maxIOS": "16.7.7",
+      "defaultIOS": "16.7.16",
+      "minIOS": "11.0",
+      "maxIOS": "16.7.16",
       "year": 2017,
       "batteryMah": 2691,
       "storageOptionsGB": [
         64,
         256
       ],
-      "note": "CDMA",
       "supportedIOS": [
+        "11.0",
+        "11.0.1",
+        "11.0.2",
+        "11.0.3",
+        "11.1",
+        "11.1.1",
+        "11.1.2",
+        "11.2",
+        "11.2.1",
+        "11.2.2",
+        "11.2.5",
+        "11.2.6",
+        "11.3",
+        "11.3.1",
+        "11.4",
+        "11.4.1",
+        "12.0",
+        "12.0.1",
+        "12.1",
+        "12.1.1",
+        "12.1.2",
+        "12.1.3",
+        "12.1.4",
+        "12.2",
+        "12.3",
+        "12.3.1",
+        "12.3.2",
+        "12.4",
+        "12.4.1",
+        "12.4.2",
+        "12.4.3",
+        "12.4.4",
+        "12.4.5",
+        "12.4.6",
+        "12.4.7",
+        "12.4.8",
+        "12.4.9",
+        "12.5",
+        "12.5.1",
+        "12.5.2",
+        "12.5.3",
+        "12.5.4",
+        "12.5.5",
+        "12.5.6",
+        "12.5.7",
+        "12.5.8",
+        "13.0",
+        "13.1",
+        "13.1.1",
+        "13.1.2",
+        "13.1.3",
+        "13.2",
+        "13.2.2",
+        "13.2.3",
+        "13.3",
+        "13.3.1",
+        "13.4",
+        "13.4.1",
+        "13.5",
+        "13.5.1",
+        "13.6",
+        "13.6.1",
+        "13.7",
+        "14.0",
+        "14.0.1",
+        "14.1",
+        "14.2",
+        "14.2.1",
+        "14.3",
         "14.4",
         "14.4.1",
         "14.4.2",
@@ -1343,6 +3588,7 @@
         "15.0.1",
         "15.0.2",
         "15.1",
+        "15.1.1",
         "15.2",
         "15.2.1",
         "15.3",
@@ -1367,7 +3613,11 @@
         "15.8.3",
         "15.8.4",
         "15.8.5",
+        "15.8.6",
+        "15.8.7",
+        "15.8.8",
         "16.0",
+        "16.0.1",
         "16.0.2",
         "16.0.3",
         "16.1",
@@ -1389,9 +3639,43 @@
         "16.7.4",
         "16.7.5",
         "16.7.6",
-        "16.7.7"
+        "16.7.7",
+        "16.7.8",
+        "16.7.9",
+        "16.7.10",
+        "16.7.11",
+        "16.7.12",
+        "16.7.13",
+        "16.7.14",
+        "16.7.15",
+        "16.7.16"
       ],
-      "compatInherit": "iphone8-plus"
+      "compatInherit": "iphone8-plus",
+      "PartNumber": "MQ8D2",
+      "modelNumbers": [
+        "A1864",
+        "A1897",
+        "A1898"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A1864",
+          "region": "Toàn cầu"
+        },
+        {
+          "A": "A1897",
+          "region": "Toàn cầu"
+        },
+        {
+          "A": "A1898",
+          "region": "Nhật Bản"
+        }
+      ]
     },
     {
       "id": "iphonex",
@@ -1399,7 +3683,7 @@
       "ProductType": "iPhone10,6",
       "HWModelStr": "D22AP",
       "HardwarePlatform": "t8015",
-      "ModelNumber": "MQA62",
+      "ModelNumber": "A1901",
       "RegulatoryModelNumber": "A1901",
       "CPUArchitecture": "arm64",
       "chip": "A11 Bionic",
@@ -1416,17 +3700,84 @@
         "DiagonalInches": 5.8,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "16.7.7",
-      "minIOS": "14.4",
-      "maxIOS": "16.7.7",
+      "defaultIOS": "16.7.16",
+      "minIOS": "11.0.1",
+      "maxIOS": "16.7.16",
       "year": 2017,
       "batteryMah": 2716,
       "storageOptionsGB": [
         64,
         256
       ],
-      "note": "Global GSM",
       "supportedIOS": [
+        "11.0.1",
+        "11.0.2",
+        "11.0.3",
+        "11.1",
+        "11.1.1",
+        "11.1.2",
+        "11.2",
+        "11.2.1",
+        "11.2.2",
+        "11.2.5",
+        "11.2.6",
+        "11.3",
+        "11.3.1",
+        "11.4",
+        "11.4.1",
+        "12.0",
+        "12.0.1",
+        "12.1",
+        "12.1.1",
+        "12.1.2",
+        "12.1.3",
+        "12.1.4",
+        "12.2",
+        "12.3",
+        "12.3.1",
+        "12.3.2",
+        "12.4",
+        "12.4.1",
+        "12.4.2",
+        "12.4.3",
+        "12.4.4",
+        "12.4.5",
+        "12.4.6",
+        "12.4.7",
+        "12.4.8",
+        "12.4.9",
+        "12.5",
+        "12.5.1",
+        "12.5.2",
+        "12.5.3",
+        "12.5.4",
+        "12.5.5",
+        "12.5.6",
+        "12.5.7",
+        "12.5.8",
+        "13.0",
+        "13.1",
+        "13.1.1",
+        "13.1.2",
+        "13.1.3",
+        "13.2",
+        "13.2.2",
+        "13.2.3",
+        "13.3",
+        "13.3.1",
+        "13.4",
+        "13.4.1",
+        "13.5",
+        "13.5.1",
+        "13.6",
+        "13.6.1",
+        "13.7",
+        "14.0",
+        "14.0.1",
+        "14.1",
+        "14.2",
+        "14.2.1",
+        "14.3",
         "14.4",
         "14.4.1",
         "14.4.2",
@@ -1441,6 +3792,7 @@
         "15.0.1",
         "15.0.2",
         "15.1",
+        "15.1.1",
         "15.2",
         "15.2.1",
         "15.3",
@@ -1465,7 +3817,11 @@
         "15.8.3",
         "15.8.4",
         "15.8.5",
+        "15.8.6",
+        "15.8.7",
+        "15.8.8",
         "16.0",
+        "16.0.1",
         "16.0.2",
         "16.0.3",
         "16.1",
@@ -1487,7 +3843,41 @@
         "16.7.4",
         "16.7.5",
         "16.7.6",
-        "16.7.7"
+        "16.7.7",
+        "16.7.8",
+        "16.7.9",
+        "16.7.10",
+        "16.7.11",
+        "16.7.12",
+        "16.7.13",
+        "16.7.14",
+        "16.7.15",
+        "16.7.16"
+      ],
+      "PartNumber": "MQA62",
+      "modelNumbers": [
+        "A1865",
+        "A1901",
+        "A1902"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A1865",
+          "region": "Toàn cầu"
+        },
+        {
+          "A": "A1901",
+          "region": "Toàn cầu"
+        },
+        {
+          "A": "A1902",
+          "region": "Nhật Bản"
+        }
       ]
     },
     {
@@ -1496,7 +3886,7 @@
       "ProductType": "iPhone10,3",
       "HWModelStr": "D22AP",
       "HardwarePlatform": "t8015",
-      "ModelNumber": "MQA52",
+      "ModelNumber": "A1865",
       "RegulatoryModelNumber": "A1865",
       "CPUArchitecture": "arm64",
       "chip": "A11 Bionic",
@@ -1513,17 +3903,84 @@
         "DiagonalInches": 5.8,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "16.7.7",
-      "minIOS": "14.4",
-      "maxIOS": "16.7.7",
+      "defaultIOS": "16.7.16",
+      "minIOS": "11.0.1",
+      "maxIOS": "16.7.16",
       "year": 2017,
       "batteryMah": 2716,
       "storageOptionsGB": [
         64,
         256
       ],
-      "note": "Global Qualcomm",
       "supportedIOS": [
+        "11.0.1",
+        "11.0.2",
+        "11.0.3",
+        "11.1",
+        "11.1.1",
+        "11.1.2",
+        "11.2",
+        "11.2.1",
+        "11.2.2",
+        "11.2.5",
+        "11.2.6",
+        "11.3",
+        "11.3.1",
+        "11.4",
+        "11.4.1",
+        "12.0",
+        "12.0.1",
+        "12.1",
+        "12.1.1",
+        "12.1.2",
+        "12.1.3",
+        "12.1.4",
+        "12.2",
+        "12.3",
+        "12.3.1",
+        "12.3.2",
+        "12.4",
+        "12.4.1",
+        "12.4.2",
+        "12.4.3",
+        "12.4.4",
+        "12.4.5",
+        "12.4.6",
+        "12.4.7",
+        "12.4.8",
+        "12.4.9",
+        "12.5",
+        "12.5.1",
+        "12.5.2",
+        "12.5.3",
+        "12.5.4",
+        "12.5.5",
+        "12.5.6",
+        "12.5.7",
+        "12.5.8",
+        "13.0",
+        "13.1",
+        "13.1.1",
+        "13.1.2",
+        "13.1.3",
+        "13.2",
+        "13.2.2",
+        "13.2.3",
+        "13.3",
+        "13.3.1",
+        "13.4",
+        "13.4.1",
+        "13.5",
+        "13.5.1",
+        "13.6",
+        "13.6.1",
+        "13.7",
+        "14.0",
+        "14.0.1",
+        "14.1",
+        "14.2",
+        "14.2.1",
+        "14.3",
         "14.4",
         "14.4.1",
         "14.4.2",
@@ -1538,6 +3995,7 @@
         "15.0.1",
         "15.0.2",
         "15.1",
+        "15.1.1",
         "15.2",
         "15.2.1",
         "15.3",
@@ -1562,7 +4020,11 @@
         "15.8.3",
         "15.8.4",
         "15.8.5",
+        "15.8.6",
+        "15.8.7",
+        "15.8.8",
         "16.0",
+        "16.0.1",
         "16.0.2",
         "16.0.3",
         "16.1",
@@ -1584,9 +4046,43 @@
         "16.7.4",
         "16.7.5",
         "16.7.6",
-        "16.7.7"
+        "16.7.7",
+        "16.7.8",
+        "16.7.9",
+        "16.7.10",
+        "16.7.11",
+        "16.7.12",
+        "16.7.13",
+        "16.7.14",
+        "16.7.15",
+        "16.7.16"
       ],
-      "compatInherit": "iphonex"
+      "compatInherit": "iphonex",
+      "PartNumber": "MQA52",
+      "modelNumbers": [
+        "A1865",
+        "A1901",
+        "A1902"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A1865",
+          "region": "Toàn cầu"
+        },
+        {
+          "A": "A1901",
+          "region": "Toàn cầu"
+        },
+        {
+          "A": "A1902",
+          "region": "Nhật Bản"
+        }
+      ]
     },
     {
       "id": "iphonexr",
@@ -1594,7 +4090,7 @@
       "ProductType": "iPhone11,8",
       "HWModelStr": "N841AP",
       "HardwarePlatform": "t8020",
-      "ModelNumber": "MT3K2",
+      "ModelNumber": "A2105",
       "RegulatoryModelNumber": "A2105",
       "CPUArchitecture": "arm64e",
       "chip": "A12 Bionic",
@@ -1611,9 +4107,9 @@
         "DiagonalInches": 6.1,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "18.7.1",
-      "minIOS": "14.4",
-      "maxIOS": "18.7.1",
+      "defaultIOS": "18.7.9",
+      "minIOS": "12.0",
+      "maxIOS": "18.7.9",
       "year": 2018,
       "batteryMah": 2942,
       "storageOptionsGB": [
@@ -1622,6 +4118,59 @@
         256
       ],
       "supportedIOS": [
+        "12.0",
+        "12.0.1",
+        "12.1",
+        "12.1.1",
+        "12.1.2",
+        "12.1.3",
+        "12.1.4",
+        "12.2",
+        "12.3",
+        "12.3.1",
+        "12.3.2",
+        "12.4",
+        "12.4.1",
+        "12.4.2",
+        "12.4.3",
+        "12.4.4",
+        "12.4.5",
+        "12.4.6",
+        "12.4.7",
+        "12.4.8",
+        "12.4.9",
+        "12.5",
+        "12.5.1",
+        "12.5.2",
+        "12.5.3",
+        "12.5.4",
+        "12.5.5",
+        "12.5.6",
+        "12.5.7",
+        "12.5.8",
+        "13.0",
+        "13.1",
+        "13.1.1",
+        "13.1.2",
+        "13.1.3",
+        "13.2",
+        "13.2.2",
+        "13.2.3",
+        "13.3",
+        "13.3.1",
+        "13.4",
+        "13.4.1",
+        "13.5",
+        "13.5.1",
+        "13.6",
+        "13.6.1",
+        "13.7",
+        "14.0",
+        "14.0.1",
+        "14.1",
+        "14.2",
+        "14.2.1",
+        "14.3",
         "14.4",
         "14.4.1",
         "14.4.2",
@@ -1636,6 +4185,7 @@
         "15.0.1",
         "15.0.2",
         "15.1",
+        "15.1.1",
         "15.2",
         "15.2.1",
         "15.3",
@@ -1654,7 +4204,17 @@
         "15.7.6",
         "15.7.7",
         "15.7.8",
+        "15.8",
+        "15.8.1",
+        "15.8.2",
+        "15.8.3",
+        "15.8.4",
+        "15.8.5",
+        "15.8.6",
+        "15.8.7",
+        "15.8.8",
         "16.0",
+        "16.0.1",
         "16.0.2",
         "16.0.3",
         "16.1",
@@ -1677,13 +4237,24 @@
         "16.7.5",
         "16.7.6",
         "16.7.7",
+        "16.7.8",
+        "16.7.9",
+        "16.7.10",
+        "16.7.11",
+        "16.7.12",
+        "16.7.13",
+        "16.7.14",
+        "16.7.15",
+        "16.7.16",
         "17.0",
         "17.0.1",
+        "17.0.2",
         "17.0.3",
         "17.1",
         "17.1.1",
         "17.1.2",
         "17.2",
+        "17.2.1",
         "17.3",
         "17.3.1",
         "17.4",
@@ -1698,6 +4269,7 @@
         "17.7.3",
         "17.7.4",
         "17.7.5",
+        "17.7.6",
         "18.0",
         "18.0.1",
         "18.1",
@@ -1706,6 +4278,7 @@
         "18.2.1",
         "18.3",
         "18.3.1",
+        "18.3.2",
         "18.4",
         "18.4.1",
         "18.5",
@@ -1713,7 +4286,50 @@
         "18.6.1",
         "18.6.2",
         "18.7",
-        "18.7.1"
+        "18.7.1",
+        "18.7.2",
+        "18.7.3",
+        "18.7.4",
+        "18.7.5",
+        "18.7.6",
+        "18.7.7",
+        "18.7.8",
+        "18.7.9"
+      ],
+      "PartNumber": "MT3K2",
+      "modelNumbers": [
+        "A1984",
+        "A2105",
+        "A2106",
+        "A2107",
+        "A2108"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A1984",
+          "region": "Toàn cầu"
+        },
+        {
+          "A": "A2105",
+          "region": "Toàn cầu"
+        },
+        {
+          "A": "A2106",
+          "region": "Nhật Bản"
+        },
+        {
+          "A": "A2107",
+          "region": "Trung Quốc đại lục"
+        },
+        {
+          "A": "A2108",
+          "region": "Trung Quốc đại lục"
+        }
       ]
     },
     {
@@ -1722,7 +4338,7 @@
       "ProductType": "iPhone11,2",
       "HWModelStr": "D321AP",
       "HardwarePlatform": "t8020",
-      "ModelNumber": "MT9F2",
+      "ModelNumber": "A2097",
       "RegulatoryModelNumber": "A2097",
       "CPUArchitecture": "arm64e",
       "chip": "A12 Bionic",
@@ -1739,9 +4355,9 @@
         "DiagonalInches": 5.8,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "18.7.1",
-      "minIOS": "14.4",
-      "maxIOS": "18.7.1",
+      "defaultIOS": "18.7.9",
+      "minIOS": "12.0",
+      "maxIOS": "18.7.9",
       "year": 2018,
       "batteryMah": 2658,
       "storageOptionsGB": [
@@ -1750,6 +4366,59 @@
         512
       ],
       "supportedIOS": [
+        "12.0",
+        "12.0.1",
+        "12.1",
+        "12.1.1",
+        "12.1.2",
+        "12.1.3",
+        "12.1.4",
+        "12.2",
+        "12.3",
+        "12.3.1",
+        "12.3.2",
+        "12.4",
+        "12.4.1",
+        "12.4.2",
+        "12.4.3",
+        "12.4.4",
+        "12.4.5",
+        "12.4.6",
+        "12.4.7",
+        "12.4.8",
+        "12.4.9",
+        "12.5",
+        "12.5.1",
+        "12.5.2",
+        "12.5.3",
+        "12.5.4",
+        "12.5.5",
+        "12.5.6",
+        "12.5.7",
+        "12.5.8",
+        "13.0",
+        "13.1",
+        "13.1.1",
+        "13.1.2",
+        "13.1.3",
+        "13.2",
+        "13.2.2",
+        "13.2.3",
+        "13.3",
+        "13.3.1",
+        "13.4",
+        "13.4.1",
+        "13.5",
+        "13.5.1",
+        "13.6",
+        "13.6.1",
+        "13.7",
+        "14.0",
+        "14.0.1",
+        "14.1",
+        "14.2",
+        "14.2.1",
+        "14.3",
         "14.4",
         "14.4.1",
         "14.4.2",
@@ -1764,6 +4433,7 @@
         "15.0.1",
         "15.0.2",
         "15.1",
+        "15.1.1",
         "15.2",
         "15.2.1",
         "15.3",
@@ -1782,7 +4452,17 @@
         "15.7.6",
         "15.7.7",
         "15.7.8",
+        "15.8",
+        "15.8.1",
+        "15.8.2",
+        "15.8.3",
+        "15.8.4",
+        "15.8.5",
+        "15.8.6",
+        "15.8.7",
+        "15.8.8",
         "16.0",
+        "16.0.1",
         "16.0.2",
         "16.0.3",
         "16.1",
@@ -1805,13 +4485,24 @@
         "16.7.5",
         "16.7.6",
         "16.7.7",
+        "16.7.8",
+        "16.7.9",
+        "16.7.10",
+        "16.7.11",
+        "16.7.12",
+        "16.7.13",
+        "16.7.14",
+        "16.7.15",
+        "16.7.16",
         "17.0",
         "17.0.1",
+        "17.0.2",
         "17.0.3",
         "17.1",
         "17.1.1",
         "17.1.2",
         "17.2",
+        "17.2.1",
         "17.3",
         "17.3.1",
         "17.4",
@@ -1826,6 +4517,7 @@
         "17.7.3",
         "17.7.4",
         "17.7.5",
+        "17.7.6",
         "18.0",
         "18.0.1",
         "18.1",
@@ -1834,6 +4526,7 @@
         "18.2.1",
         "18.3",
         "18.3.1",
+        "18.3.2",
         "18.4",
         "18.4.1",
         "18.5",
@@ -1841,7 +4534,50 @@
         "18.6.1",
         "18.6.2",
         "18.7",
-        "18.7.1"
+        "18.7.1",
+        "18.7.2",
+        "18.7.3",
+        "18.7.4",
+        "18.7.5",
+        "18.7.6",
+        "18.7.7",
+        "18.7.8",
+        "18.7.9"
+      ],
+      "PartNumber": "MT9F2",
+      "modelNumbers": [
+        "A1920",
+        "A2097",
+        "A2098",
+        "A2099",
+        "A2100"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A1920",
+          "region": "Toàn cầu"
+        },
+        {
+          "A": "A2097",
+          "region": "Toàn cầu"
+        },
+        {
+          "A": "A2098",
+          "region": "Nhật Bản"
+        },
+        {
+          "A": "A2099",
+          "region": "Trung Quốc đại lục"
+        },
+        {
+          "A": "A2100",
+          "region": "Trung Quốc đại lục"
+        }
       ]
     },
     {
@@ -1850,7 +4586,7 @@
       "ProductType": "iPhone11,6",
       "HWModelStr": "D331pAP",
       "HardwarePlatform": "t8020",
-      "ModelNumber": "MT5D2",
+      "ModelNumber": "A2101",
       "RegulatoryModelNumber": "A2101",
       "CPUArchitecture": "arm64e",
       "chip": "A12 Bionic",
@@ -1867,9 +4603,9 @@
         "DiagonalInches": 6.5,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "18.7.1",
-      "minIOS": "14.4",
-      "maxIOS": "18.7.1",
+      "defaultIOS": "18.7.9",
+      "minIOS": "12.0",
+      "maxIOS": "18.7.9",
       "year": 2018,
       "batteryMah": 3174,
       "storageOptionsGB": [
@@ -1877,8 +4613,60 @@
         256,
         512
       ],
-      "note": "Global",
       "supportedIOS": [
+        "12.0",
+        "12.0.1",
+        "12.1",
+        "12.1.1",
+        "12.1.2",
+        "12.1.3",
+        "12.1.4",
+        "12.2",
+        "12.3",
+        "12.3.1",
+        "12.3.2",
+        "12.4",
+        "12.4.1",
+        "12.4.2",
+        "12.4.3",
+        "12.4.4",
+        "12.4.5",
+        "12.4.6",
+        "12.4.7",
+        "12.4.8",
+        "12.4.9",
+        "12.5",
+        "12.5.1",
+        "12.5.2",
+        "12.5.3",
+        "12.5.4",
+        "12.5.5",
+        "12.5.6",
+        "12.5.7",
+        "12.5.8",
+        "13.0",
+        "13.1",
+        "13.1.1",
+        "13.1.2",
+        "13.1.3",
+        "13.2",
+        "13.2.2",
+        "13.2.3",
+        "13.3",
+        "13.3.1",
+        "13.4",
+        "13.4.1",
+        "13.5",
+        "13.5.1",
+        "13.6",
+        "13.6.1",
+        "13.7",
+        "14.0",
+        "14.0.1",
+        "14.1",
+        "14.2",
+        "14.2.1",
+        "14.3",
         "14.4",
         "14.4.1",
         "14.4.2",
@@ -1893,6 +4681,7 @@
         "15.0.1",
         "15.0.2",
         "15.1",
+        "15.1.1",
         "15.2",
         "15.2.1",
         "15.3",
@@ -1911,7 +4700,17 @@
         "15.7.6",
         "15.7.7",
         "15.7.8",
+        "15.8",
+        "15.8.1",
+        "15.8.2",
+        "15.8.3",
+        "15.8.4",
+        "15.8.5",
+        "15.8.6",
+        "15.8.7",
+        "15.8.8",
         "16.0",
+        "16.0.1",
         "16.0.2",
         "16.0.3",
         "16.1",
@@ -1934,13 +4733,24 @@
         "16.7.5",
         "16.7.6",
         "16.7.7",
+        "16.7.8",
+        "16.7.9",
+        "16.7.10",
+        "16.7.11",
+        "16.7.12",
+        "16.7.13",
+        "16.7.14",
+        "16.7.15",
+        "16.7.16",
         "17.0",
         "17.0.1",
+        "17.0.2",
         "17.0.3",
         "17.1",
         "17.1.1",
         "17.1.2",
         "17.2",
+        "17.2.1",
         "17.3",
         "17.3.1",
         "17.4",
@@ -1955,6 +4765,7 @@
         "17.7.3",
         "17.7.4",
         "17.7.5",
+        "17.7.6",
         "18.0",
         "18.0.1",
         "18.1",
@@ -1963,6 +4774,7 @@
         "18.2.1",
         "18.3",
         "18.3.1",
+        "18.3.2",
         "18.4",
         "18.4.1",
         "18.5",
@@ -1970,7 +4782,50 @@
         "18.6.1",
         "18.6.2",
         "18.7",
-        "18.7.1"
+        "18.7.1",
+        "18.7.2",
+        "18.7.3",
+        "18.7.4",
+        "18.7.5",
+        "18.7.6",
+        "18.7.7",
+        "18.7.8",
+        "18.7.9"
+      ],
+      "PartNumber": "MT5D2",
+      "modelNumbers": [
+        "A1921",
+        "A2101",
+        "A2102",
+        "A2103",
+        "A2104"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A1921",
+          "region": "Toàn cầu"
+        },
+        {
+          "A": "A2101",
+          "region": "Toàn cầu"
+        },
+        {
+          "A": "A2102",
+          "region": "Nhật Bản"
+        },
+        {
+          "A": "A2103",
+          "region": "Trung Quốc đại lục"
+        },
+        {
+          "A": "A2104",
+          "region": "Trung Quốc đại lục"
+        }
       ]
     },
     {
@@ -1979,7 +4834,7 @@
       "ProductType": "iPhone11,4",
       "HWModelStr": "D331AP",
       "HardwarePlatform": "t8020",
-      "ModelNumber": "MT5C2",
+      "ModelNumber": "A2104",
       "RegulatoryModelNumber": "A2104",
       "CPUArchitecture": "arm64e",
       "chip": "A12 Bionic",
@@ -1996,9 +4851,9 @@
         "DiagonalInches": 6.5,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "18.7.1",
-      "minIOS": "14.4",
-      "maxIOS": "18.7.1",
+      "defaultIOS": "18.7.9",
+      "minIOS": "12.0",
+      "maxIOS": "18.7.9",
       "year": 2018,
       "batteryMah": 3174,
       "storageOptionsGB": [
@@ -2006,8 +4861,60 @@
         256,
         512
       ],
-      "note": "China dual-SIM board",
       "supportedIOS": [
+        "12.0",
+        "12.0.1",
+        "12.1",
+        "12.1.1",
+        "12.1.2",
+        "12.1.3",
+        "12.1.4",
+        "12.2",
+        "12.3",
+        "12.3.1",
+        "12.3.2",
+        "12.4",
+        "12.4.1",
+        "12.4.2",
+        "12.4.3",
+        "12.4.4",
+        "12.4.5",
+        "12.4.6",
+        "12.4.7",
+        "12.4.8",
+        "12.4.9",
+        "12.5",
+        "12.5.1",
+        "12.5.2",
+        "12.5.3",
+        "12.5.4",
+        "12.5.5",
+        "12.5.6",
+        "12.5.7",
+        "12.5.8",
+        "13.0",
+        "13.1",
+        "13.1.1",
+        "13.1.2",
+        "13.1.3",
+        "13.2",
+        "13.2.2",
+        "13.2.3",
+        "13.3",
+        "13.3.1",
+        "13.4",
+        "13.4.1",
+        "13.5",
+        "13.5.1",
+        "13.6",
+        "13.6.1",
+        "13.7",
+        "14.0",
+        "14.0.1",
+        "14.1",
+        "14.2",
+        "14.2.1",
+        "14.3",
         "14.4",
         "14.4.1",
         "14.4.2",
@@ -2022,6 +4929,7 @@
         "15.0.1",
         "15.0.2",
         "15.1",
+        "15.1.1",
         "15.2",
         "15.2.1",
         "15.3",
@@ -2040,7 +4948,17 @@
         "15.7.6",
         "15.7.7",
         "15.7.8",
+        "15.8",
+        "15.8.1",
+        "15.8.2",
+        "15.8.3",
+        "15.8.4",
+        "15.8.5",
+        "15.8.6",
+        "15.8.7",
+        "15.8.8",
         "16.0",
+        "16.0.1",
         "16.0.2",
         "16.0.3",
         "16.1",
@@ -2063,13 +4981,24 @@
         "16.7.5",
         "16.7.6",
         "16.7.7",
+        "16.7.8",
+        "16.7.9",
+        "16.7.10",
+        "16.7.11",
+        "16.7.12",
+        "16.7.13",
+        "16.7.14",
+        "16.7.15",
+        "16.7.16",
         "17.0",
         "17.0.1",
+        "17.0.2",
         "17.0.3",
         "17.1",
         "17.1.1",
         "17.1.2",
         "17.2",
+        "17.2.1",
         "17.3",
         "17.3.1",
         "17.4",
@@ -2084,6 +5013,7 @@
         "17.7.3",
         "17.7.4",
         "17.7.5",
+        "17.7.6",
         "18.0",
         "18.0.1",
         "18.1",
@@ -2092,6 +5022,7 @@
         "18.2.1",
         "18.3",
         "18.3.1",
+        "18.3.2",
         "18.4",
         "18.4.1",
         "18.5",
@@ -2099,9 +5030,52 @@
         "18.6.1",
         "18.6.2",
         "18.7",
-        "18.7.1"
+        "18.7.1",
+        "18.7.2",
+        "18.7.3",
+        "18.7.4",
+        "18.7.5",
+        "18.7.6",
+        "18.7.7",
+        "18.7.8",
+        "18.7.9"
       ],
-      "compatInherit": "iphonexs-max"
+      "compatInherit": "iphonexs-max",
+      "PartNumber": "MT5E2",
+      "modelNumbers": [
+        "A1921",
+        "A2101",
+        "A2102",
+        "A2103",
+        "A2104"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A1921",
+          "region": "Toàn cầu"
+        },
+        {
+          "A": "A2101",
+          "region": "Toàn cầu"
+        },
+        {
+          "A": "A2102",
+          "region": "Nhật Bản"
+        },
+        {
+          "A": "A2103",
+          "region": "Trung Quốc đại lục"
+        },
+        {
+          "A": "A2104",
+          "region": "Trung Quốc đại lục"
+        }
+      ]
     },
     {
       "id": "iphone11",
@@ -2109,7 +5083,7 @@
       "ProductType": "iPhone12,1",
       "HWModelStr": "N104AP",
       "HardwarePlatform": "t8030",
-      "ModelNumber": "MWLT2",
+      "ModelNumber": "A2221",
       "RegulatoryModelNumber": "A2221",
       "CPUArchitecture": "arm64e",
       "chip": "A13 Bionic",
@@ -2126,9 +5100,9 @@
         "DiagonalInches": 6.1,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "18.7.1",
-      "minIOS": "14.4",
-      "maxIOS": "26.5",
+      "defaultIOS": "18.7.9",
+      "minIOS": "13.0",
+      "maxIOS": "26.5.2",
       "year": 2019,
       "batteryMah": 3110,
       "storageOptionsGB": [
@@ -2137,6 +5111,29 @@
         256
       ],
       "supportedIOS": [
+        "13.0",
+        "13.1",
+        "13.1.1",
+        "13.1.2",
+        "13.1.3",
+        "13.2",
+        "13.2.2",
+        "13.2.3",
+        "13.3",
+        "13.3.1",
+        "13.4",
+        "13.4.1",
+        "13.5",
+        "13.5.1",
+        "13.6",
+        "13.6.1",
+        "13.7",
+        "14.0",
+        "14.0.1",
+        "14.1",
+        "14.2",
+        "14.2.1",
+        "14.3",
         "14.4",
         "14.4.1",
         "14.4.2",
@@ -2151,6 +5148,7 @@
         "15.0.1",
         "15.0.2",
         "15.1",
+        "15.1.1",
         "15.2",
         "15.2.1",
         "15.3",
@@ -2169,7 +5167,17 @@
         "15.7.6",
         "15.7.7",
         "15.7.8",
+        "15.8",
+        "15.8.1",
+        "15.8.2",
+        "15.8.3",
+        "15.8.4",
+        "15.8.5",
+        "15.8.6",
+        "15.8.7",
+        "15.8.8",
         "16.0",
+        "16.0.1",
         "16.0.2",
         "16.0.3",
         "16.1",
@@ -2192,13 +5200,24 @@
         "16.7.5",
         "16.7.6",
         "16.7.7",
+        "16.7.8",
+        "16.7.9",
+        "16.7.10",
+        "16.7.11",
+        "16.7.12",
+        "16.7.13",
+        "16.7.14",
+        "16.7.15",
+        "16.7.16",
         "17.0",
         "17.0.1",
+        "17.0.2",
         "17.0.3",
         "17.1",
         "17.1.1",
         "17.1.2",
         "17.2",
+        "17.2.1",
         "17.3",
         "17.3.1",
         "17.4",
@@ -2213,6 +5232,7 @@
         "17.7.3",
         "17.7.4",
         "17.7.5",
+        "17.7.6",
         "18.0",
         "18.0.1",
         "18.1",
@@ -2221,6 +5241,7 @@
         "18.2.1",
         "18.3",
         "18.3.1",
+        "18.3.2",
         "18.4",
         "18.4.1",
         "18.5",
@@ -2229,14 +5250,53 @@
         "18.6.2",
         "18.7",
         "18.7.1",
+        "18.7.2",
+        "18.7.3",
+        "18.7.4",
+        "18.7.5",
+        "18.7.6",
+        "18.7.7",
+        "18.7.8",
+        "18.7.9",
         "26.0",
         "26.0.1",
         "26.1",
+        "26.1.1",
         "26.2",
+        "26.2.1",
         "26.3",
+        "26.3.1",
         "26.4",
         "26.4.1",
-        "26.5"
+        "26.4.2",
+        "26.5",
+        "26.5.1",
+        "26.5.2"
+      ],
+      "PartNumber": "MWLT2",
+      "modelNumbers": [
+        "A2111",
+        "A2223",
+        "A2221"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A2111",
+          "region": "Canada, Hoa Kỳ"
+        },
+        {
+          "A": "A2223",
+          "region": "Trung Quốc đại lục, Hồng Kông, Macao"
+        },
+        {
+          "A": "A2221",
+          "region": "Các quốc gia/khu vực khác"
+        }
       ]
     },
     {
@@ -2245,7 +5305,7 @@
       "ProductType": "iPhone12,3",
       "HWModelStr": "D421AP",
       "HardwarePlatform": "t8030",
-      "ModelNumber": "MWC62",
+      "ModelNumber": "A2215",
       "RegulatoryModelNumber": "A2215",
       "CPUArchitecture": "arm64e",
       "chip": "A13 Bionic",
@@ -2262,9 +5322,9 @@
         "DiagonalInches": 5.8,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "18.7.1",
-      "minIOS": "14.4",
-      "maxIOS": "26.5",
+      "defaultIOS": "18.7.9",
+      "minIOS": "13.0",
+      "maxIOS": "26.5.2",
       "year": 2019,
       "batteryMah": 3046,
       "storageOptionsGB": [
@@ -2273,6 +5333,29 @@
         512
       ],
       "supportedIOS": [
+        "13.0",
+        "13.1",
+        "13.1.1",
+        "13.1.2",
+        "13.1.3",
+        "13.2",
+        "13.2.2",
+        "13.2.3",
+        "13.3",
+        "13.3.1",
+        "13.4",
+        "13.4.1",
+        "13.5",
+        "13.5.1",
+        "13.6",
+        "13.6.1",
+        "13.7",
+        "14.0",
+        "14.0.1",
+        "14.1",
+        "14.2",
+        "14.2.1",
+        "14.3",
         "14.4",
         "14.4.1",
         "14.4.2",
@@ -2287,6 +5370,7 @@
         "15.0.1",
         "15.0.2",
         "15.1",
+        "15.1.1",
         "15.2",
         "15.2.1",
         "15.3",
@@ -2305,7 +5389,17 @@
         "15.7.6",
         "15.7.7",
         "15.7.8",
+        "15.8",
+        "15.8.1",
+        "15.8.2",
+        "15.8.3",
+        "15.8.4",
+        "15.8.5",
+        "15.8.6",
+        "15.8.7",
+        "15.8.8",
         "16.0",
+        "16.0.1",
         "16.0.2",
         "16.0.3",
         "16.1",
@@ -2328,13 +5422,24 @@
         "16.7.5",
         "16.7.6",
         "16.7.7",
+        "16.7.8",
+        "16.7.9",
+        "16.7.10",
+        "16.7.11",
+        "16.7.12",
+        "16.7.13",
+        "16.7.14",
+        "16.7.15",
+        "16.7.16",
         "17.0",
         "17.0.1",
+        "17.0.2",
         "17.0.3",
         "17.1",
         "17.1.1",
         "17.1.2",
         "17.2",
+        "17.2.1",
         "17.3",
         "17.3.1",
         "17.4",
@@ -2349,6 +5454,7 @@
         "17.7.3",
         "17.7.4",
         "17.7.5",
+        "17.7.6",
         "18.0",
         "18.0.1",
         "18.1",
@@ -2357,6 +5463,7 @@
         "18.2.1",
         "18.3",
         "18.3.1",
+        "18.3.2",
         "18.4",
         "18.4.1",
         "18.5",
@@ -2365,14 +5472,53 @@
         "18.6.2",
         "18.7",
         "18.7.1",
+        "18.7.2",
+        "18.7.3",
+        "18.7.4",
+        "18.7.5",
+        "18.7.6",
+        "18.7.7",
+        "18.7.8",
+        "18.7.9",
         "26.0",
         "26.0.1",
         "26.1",
+        "26.1.1",
         "26.2",
+        "26.2.1",
         "26.3",
+        "26.3.1",
         "26.4",
         "26.4.1",
-        "26.5"
+        "26.4.2",
+        "26.5",
+        "26.5.1",
+        "26.5.2"
+      ],
+      "PartNumber": "MWC22",
+      "modelNumbers": [
+        "A2160",
+        "A2217",
+        "A2215"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A2160",
+          "region": "Canada, Hoa Kỳ"
+        },
+        {
+          "A": "A2217",
+          "region": "Trung Quốc đại lục, Hồng Kông, Macao"
+        },
+        {
+          "A": "A2215",
+          "region": "Các quốc gia/khu vực khác"
+        }
       ]
     },
     {
@@ -2381,7 +5527,7 @@
       "ProductType": "iPhone12,5",
       "HWModelStr": "D431AP",
       "HardwarePlatform": "t8030",
-      "ModelNumber": "MWHD2",
+      "ModelNumber": "A2218",
       "RegulatoryModelNumber": "A2218",
       "CPUArchitecture": "arm64e",
       "chip": "A13 Bionic",
@@ -2398,9 +5544,9 @@
         "DiagonalInches": 6.5,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "18.7.1",
-      "minIOS": "14.4",
-      "maxIOS": "26.5",
+      "defaultIOS": "18.7.9",
+      "minIOS": "13.0",
+      "maxIOS": "26.5.2",
       "year": 2019,
       "batteryMah": 3969,
       "storageOptionsGB": [
@@ -2409,6 +5555,29 @@
         512
       ],
       "supportedIOS": [
+        "13.0",
+        "13.1",
+        "13.1.1",
+        "13.1.2",
+        "13.1.3",
+        "13.2",
+        "13.2.2",
+        "13.2.3",
+        "13.3",
+        "13.3.1",
+        "13.4",
+        "13.4.1",
+        "13.5",
+        "13.5.1",
+        "13.6",
+        "13.6.1",
+        "13.7",
+        "14.0",
+        "14.0.1",
+        "14.1",
+        "14.2",
+        "14.2.1",
+        "14.3",
         "14.4",
         "14.4.1",
         "14.4.2",
@@ -2423,6 +5592,7 @@
         "15.0.1",
         "15.0.2",
         "15.1",
+        "15.1.1",
         "15.2",
         "15.2.1",
         "15.3",
@@ -2441,7 +5611,17 @@
         "15.7.6",
         "15.7.7",
         "15.7.8",
+        "15.8",
+        "15.8.1",
+        "15.8.2",
+        "15.8.3",
+        "15.8.4",
+        "15.8.5",
+        "15.8.6",
+        "15.8.7",
+        "15.8.8",
         "16.0",
+        "16.0.1",
         "16.0.2",
         "16.0.3",
         "16.1",
@@ -2464,13 +5644,24 @@
         "16.7.5",
         "16.7.6",
         "16.7.7",
+        "16.7.8",
+        "16.7.9",
+        "16.7.10",
+        "16.7.11",
+        "16.7.12",
+        "16.7.13",
+        "16.7.14",
+        "16.7.15",
+        "16.7.16",
         "17.0",
         "17.0.1",
+        "17.0.2",
         "17.0.3",
         "17.1",
         "17.1.1",
         "17.1.2",
         "17.2",
+        "17.2.1",
         "17.3",
         "17.3.1",
         "17.4",
@@ -2485,6 +5676,7 @@
         "17.7.3",
         "17.7.4",
         "17.7.5",
+        "17.7.6",
         "18.0",
         "18.0.1",
         "18.1",
@@ -2493,6 +5685,7 @@
         "18.2.1",
         "18.3",
         "18.3.1",
+        "18.3.2",
         "18.4",
         "18.4.1",
         "18.5",
@@ -2501,14 +5694,53 @@
         "18.6.2",
         "18.7",
         "18.7.1",
+        "18.7.2",
+        "18.7.3",
+        "18.7.4",
+        "18.7.5",
+        "18.7.6",
+        "18.7.7",
+        "18.7.8",
+        "18.7.9",
         "26.0",
         "26.0.1",
         "26.1",
+        "26.1.1",
         "26.2",
+        "26.2.1",
         "26.3",
+        "26.3.1",
         "26.4",
         "26.4.1",
-        "26.5"
+        "26.4.2",
+        "26.5",
+        "26.5.1",
+        "26.5.2"
+      ],
+      "PartNumber": "MWHD2",
+      "modelNumbers": [
+        "A2161",
+        "A2220",
+        "A2218"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A2161",
+          "region": "Canada, Hoa Kỳ"
+        },
+        {
+          "A": "A2220",
+          "region": "Trung Quốc đại lục, Hồng Kông, Macao"
+        },
+        {
+          "A": "A2218",
+          "region": "Các quốc gia/khu vực khác"
+        }
       ]
     },
     {
@@ -2517,7 +5749,7 @@
       "ProductType": "iPhone12,8",
       "HWModelStr": "D79AP",
       "HardwarePlatform": "t8030",
-      "ModelNumber": "MX9T2",
+      "ModelNumber": "A2296",
       "RegulatoryModelNumber": "A2296",
       "CPUArchitecture": "arm64e",
       "chip": "A13 Bionic",
@@ -2534,9 +5766,9 @@
         "DiagonalInches": 4.7,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "18.7.1",
-      "minIOS": "14.4",
-      "maxIOS": "26.5",
+      "defaultIOS": "18.7.9",
+      "minIOS": "13.4",
+      "maxIOS": "26.5.2",
       "year": 2020,
       "batteryMah": 1821,
       "storageOptionsGB": [
@@ -2545,6 +5777,19 @@
         256
       ],
       "supportedIOS": [
+        "13.4",
+        "13.4.1",
+        "13.5",
+        "13.5.1",
+        "13.6",
+        "13.6.1",
+        "13.7",
+        "14.0",
+        "14.0.1",
+        "14.1",
+        "14.2",
+        "14.2.1",
+        "14.3",
         "14.4",
         "14.4.1",
         "14.4.2",
@@ -2559,6 +5804,7 @@
         "15.0.1",
         "15.0.2",
         "15.1",
+        "15.1.1",
         "15.2",
         "15.2.1",
         "15.3",
@@ -2577,7 +5823,17 @@
         "15.7.6",
         "15.7.7",
         "15.7.8",
+        "15.8",
+        "15.8.1",
+        "15.8.2",
+        "15.8.3",
+        "15.8.4",
+        "15.8.5",
+        "15.8.6",
+        "15.8.7",
+        "15.8.8",
         "16.0",
+        "16.0.1",
         "16.0.2",
         "16.0.3",
         "16.1",
@@ -2600,13 +5856,24 @@
         "16.7.5",
         "16.7.6",
         "16.7.7",
+        "16.7.8",
+        "16.7.9",
+        "16.7.10",
+        "16.7.11",
+        "16.7.12",
+        "16.7.13",
+        "16.7.14",
+        "16.7.15",
+        "16.7.16",
         "17.0",
         "17.0.1",
+        "17.0.2",
         "17.0.3",
         "17.1",
         "17.1.1",
         "17.1.2",
         "17.2",
+        "17.2.1",
         "17.3",
         "17.3.1",
         "17.4",
@@ -2621,6 +5888,7 @@
         "17.7.3",
         "17.7.4",
         "17.7.5",
+        "17.7.6",
         "18.0",
         "18.0.1",
         "18.1",
@@ -2629,6 +5897,7 @@
         "18.2.1",
         "18.3",
         "18.3.1",
+        "18.3.2",
         "18.4",
         "18.4.1",
         "18.5",
@@ -2637,14 +5906,53 @@
         "18.6.2",
         "18.7",
         "18.7.1",
+        "18.7.2",
+        "18.7.3",
+        "18.7.4",
+        "18.7.5",
+        "18.7.6",
+        "18.7.7",
+        "18.7.8",
+        "18.7.9",
         "26.0",
         "26.0.1",
         "26.1",
+        "26.1.1",
         "26.2",
+        "26.2.1",
         "26.3",
+        "26.3.1",
         "26.4",
         "26.4.1",
-        "26.5"
+        "26.4.2",
+        "26.5",
+        "26.5.1",
+        "26.5.2"
+      ],
+      "PartNumber": "MX9T2",
+      "modelNumbers": [
+        "A2275",
+        "A2298",
+        "A2296"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A2275",
+          "region": "Canada, Hoa Kỳ"
+        },
+        {
+          "A": "A2298",
+          "region": "Trung Quốc đại lục"
+        },
+        {
+          "A": "A2296",
+          "region": "Các quốc gia/khu vực khác"
+        }
       ]
     },
     {
@@ -2653,7 +5961,7 @@
       "ProductType": "iPhone13,1",
       "HWModelStr": "D52gAP",
       "HardwarePlatform": "t8101",
-      "ModelNumber": "MGE53",
+      "ModelNumber": "A2399",
       "RegulatoryModelNumber": "A2399",
       "CPUArchitecture": "arm64e",
       "chip": "A14 Bionic",
@@ -2670,9 +5978,9 @@
         "DiagonalInches": 5.4,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "18.7.1",
-      "minIOS": "14.4",
-      "maxIOS": "26.5",
+      "defaultIOS": "18.7.9",
+      "minIOS": "14.1",
+      "maxIOS": "26.5.2",
       "year": 2020,
       "batteryMah": 2227,
       "storageOptionsGB": [
@@ -2681,6 +5989,10 @@
         256
       ],
       "supportedIOS": [
+        "14.1",
+        "14.2",
+        "14.2.1",
+        "14.3",
         "14.4",
         "14.4.1",
         "14.4.2",
@@ -2714,7 +6026,17 @@
         "15.7.6",
         "15.7.7",
         "15.7.8",
+        "15.8",
+        "15.8.1",
+        "15.8.2",
+        "15.8.3",
+        "15.8.4",
+        "15.8.5",
+        "15.8.6",
+        "15.8.7",
+        "15.8.8",
         "16.0",
+        "16.0.1",
         "16.0.2",
         "16.0.3",
         "16.1",
@@ -2737,13 +6059,24 @@
         "16.7.5",
         "16.7.6",
         "16.7.7",
+        "16.7.8",
+        "16.7.9",
+        "16.7.10",
+        "16.7.11",
+        "16.7.12",
+        "16.7.13",
+        "16.7.14",
+        "16.7.15",
+        "16.7.16",
         "17.0",
         "17.0.1",
+        "17.0.2",
         "17.0.3",
         "17.1",
         "17.1.1",
         "17.1.2",
         "17.2",
+        "17.2.1",
         "17.3",
         "17.3.1",
         "17.4",
@@ -2758,6 +6091,7 @@
         "17.7.3",
         "17.7.4",
         "17.7.5",
+        "17.7.6",
         "18.0",
         "18.0.1",
         "18.1",
@@ -2766,6 +6100,7 @@
         "18.2.1",
         "18.3",
         "18.3.1",
+        "18.3.2",
         "18.4",
         "18.4.1",
         "18.5",
@@ -2774,14 +6109,58 @@
         "18.6.2",
         "18.7",
         "18.7.1",
+        "18.7.2",
+        "18.7.3",
+        "18.7.4",
+        "18.7.5",
+        "18.7.6",
+        "18.7.7",
+        "18.7.8",
+        "18.7.9",
         "26.0",
         "26.0.1",
         "26.1",
+        "26.1.1",
         "26.2",
+        "26.2.1",
         "26.3",
+        "26.3.1",
         "26.4",
         "26.4.1",
-        "26.5"
+        "26.4.2",
+        "26.5",
+        "26.5.1",
+        "26.5.2"
+      ],
+      "PartNumber": "MGE53",
+      "modelNumbers": [
+        "A2176",
+        "A2398",
+        "A2400",
+        "A2399"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A2176",
+          "region": "Hoa Kỳ"
+        },
+        {
+          "A": "A2398",
+          "region": "Canada, Nhật Bản"
+        },
+        {
+          "A": "A2400",
+          "region": "Trung Quốc đại lục"
+        },
+        {
+          "A": "A2399",
+          "region": "Các quốc gia/khu vực khác"
+        }
       ]
     },
     {
@@ -2790,7 +6169,7 @@
       "ProductType": "iPhone13,2",
       "HWModelStr": "D53gAP",
       "HardwarePlatform": "t8101",
-      "ModelNumber": "MGGM3",
+      "ModelNumber": "A2403",
       "RegulatoryModelNumber": "A2403",
       "CPUArchitecture": "arm64e",
       "chip": "A14 Bionic",
@@ -2807,9 +6186,9 @@
         "DiagonalInches": 6.1,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "18.7.1",
-      "minIOS": "14.4",
-      "maxIOS": "26.5",
+      "defaultIOS": "18.7.9",
+      "minIOS": "14.1",
+      "maxIOS": "26.5.2",
       "year": 2020,
       "batteryMah": 2815,
       "storageOptionsGB": [
@@ -2818,6 +6197,10 @@
         256
       ],
       "supportedIOS": [
+        "14.1",
+        "14.2",
+        "14.2.1",
+        "14.3",
         "14.4",
         "14.4.1",
         "14.4.2",
@@ -2851,7 +6234,17 @@
         "15.7.6",
         "15.7.7",
         "15.7.8",
+        "15.8",
+        "15.8.1",
+        "15.8.2",
+        "15.8.3",
+        "15.8.4",
+        "15.8.5",
+        "15.8.6",
+        "15.8.7",
+        "15.8.8",
         "16.0",
+        "16.0.1",
         "16.0.2",
         "16.0.3",
         "16.1",
@@ -2874,13 +6267,24 @@
         "16.7.5",
         "16.7.6",
         "16.7.7",
+        "16.7.8",
+        "16.7.9",
+        "16.7.10",
+        "16.7.11",
+        "16.7.12",
+        "16.7.13",
+        "16.7.14",
+        "16.7.15",
+        "16.7.16",
         "17.0",
         "17.0.1",
+        "17.0.2",
         "17.0.3",
         "17.1",
         "17.1.1",
         "17.1.2",
         "17.2",
+        "17.2.1",
         "17.3",
         "17.3.1",
         "17.4",
@@ -2895,6 +6299,7 @@
         "17.7.3",
         "17.7.4",
         "17.7.5",
+        "17.7.6",
         "18.0",
         "18.0.1",
         "18.1",
@@ -2903,6 +6308,7 @@
         "18.2.1",
         "18.3",
         "18.3.1",
+        "18.3.2",
         "18.4",
         "18.4.1",
         "18.5",
@@ -2911,14 +6317,58 @@
         "18.6.2",
         "18.7",
         "18.7.1",
+        "18.7.2",
+        "18.7.3",
+        "18.7.4",
+        "18.7.5",
+        "18.7.6",
+        "18.7.7",
+        "18.7.8",
+        "18.7.9",
         "26.0",
         "26.0.1",
         "26.1",
+        "26.1.1",
         "26.2",
+        "26.2.1",
         "26.3",
+        "26.3.1",
         "26.4",
         "26.4.1",
-        "26.5"
+        "26.4.2",
+        "26.5",
+        "26.5.1",
+        "26.5.2"
+      ],
+      "PartNumber": "MGGM3",
+      "modelNumbers": [
+        "A2172",
+        "A2402",
+        "A2404",
+        "A2403"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A2172",
+          "region": "Hoa Kỳ"
+        },
+        {
+          "A": "A2402",
+          "region": "Canada, Nhật Bản"
+        },
+        {
+          "A": "A2404",
+          "region": "Trung Quốc đại lục, Hồng Kông, Macao"
+        },
+        {
+          "A": "A2403",
+          "region": "Các quốc gia/khu vực khác"
+        }
       ]
     },
     {
@@ -2927,7 +6377,7 @@
       "ProductType": "iPhone13,3",
       "HWModelStr": "D53pAP",
       "HardwarePlatform": "t8101",
-      "ModelNumber": "MGLD3",
+      "ModelNumber": "A2407",
       "RegulatoryModelNumber": "A2407",
       "CPUArchitecture": "arm64e",
       "chip": "A14 Bionic",
@@ -2944,9 +6394,9 @@
         "DiagonalInches": 6.1,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "18.7.1",
-      "minIOS": "14.4",
-      "maxIOS": "26.5",
+      "defaultIOS": "18.7.9",
+      "minIOS": "14.1",
+      "maxIOS": "26.5.2",
       "year": 2020,
       "batteryMah": 2815,
       "storageOptionsGB": [
@@ -2955,6 +6405,10 @@
         512
       ],
       "supportedIOS": [
+        "14.1",
+        "14.2",
+        "14.2.1",
+        "14.3",
         "14.4",
         "14.4.1",
         "14.4.2",
@@ -2988,7 +6442,17 @@
         "15.7.6",
         "15.7.7",
         "15.7.8",
+        "15.8",
+        "15.8.1",
+        "15.8.2",
+        "15.8.3",
+        "15.8.4",
+        "15.8.5",
+        "15.8.6",
+        "15.8.7",
+        "15.8.8",
         "16.0",
+        "16.0.1",
         "16.0.2",
         "16.0.3",
         "16.1",
@@ -3011,13 +6475,24 @@
         "16.7.5",
         "16.7.6",
         "16.7.7",
+        "16.7.8",
+        "16.7.9",
+        "16.7.10",
+        "16.7.11",
+        "16.7.12",
+        "16.7.13",
+        "16.7.14",
+        "16.7.15",
+        "16.7.16",
         "17.0",
         "17.0.1",
+        "17.0.2",
         "17.0.3",
         "17.1",
         "17.1.1",
         "17.1.2",
         "17.2",
+        "17.2.1",
         "17.3",
         "17.3.1",
         "17.4",
@@ -3032,6 +6507,7 @@
         "17.7.3",
         "17.7.4",
         "17.7.5",
+        "17.7.6",
         "18.0",
         "18.0.1",
         "18.1",
@@ -3040,6 +6516,7 @@
         "18.2.1",
         "18.3",
         "18.3.1",
+        "18.3.2",
         "18.4",
         "18.4.1",
         "18.5",
@@ -3048,14 +6525,58 @@
         "18.6.2",
         "18.7",
         "18.7.1",
+        "18.7.2",
+        "18.7.3",
+        "18.7.4",
+        "18.7.5",
+        "18.7.6",
+        "18.7.7",
+        "18.7.8",
+        "18.7.9",
         "26.0",
         "26.0.1",
         "26.1",
+        "26.1.1",
         "26.2",
+        "26.2.1",
         "26.3",
+        "26.3.1",
         "26.4",
         "26.4.1",
-        "26.5"
+        "26.4.2",
+        "26.5",
+        "26.5.1",
+        "26.5.2"
+      ],
+      "PartNumber": "MGL93",
+      "modelNumbers": [
+        "A2341",
+        "A2406",
+        "A2408",
+        "A2407"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A2341",
+          "region": "Hoa Kỳ"
+        },
+        {
+          "A": "A2406",
+          "region": "Canada, Nhật Bản"
+        },
+        {
+          "A": "A2408",
+          "region": "Trung Quốc đại lục, Hồng Kông, Macao"
+        },
+        {
+          "A": "A2407",
+          "region": "Các quốc gia/khu vực khác"
+        }
       ]
     },
     {
@@ -3064,7 +6585,7 @@
       "ProductType": "iPhone13,4",
       "HWModelStr": "D54pAP",
       "HardwarePlatform": "t8101",
-      "ModelNumber": "MG8X3",
+      "ModelNumber": "A2411",
       "RegulatoryModelNumber": "A2411",
       "CPUArchitecture": "arm64e",
       "chip": "A14 Bionic",
@@ -3081,9 +6602,9 @@
         "DiagonalInches": 6.7,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "18.7.1",
-      "minIOS": "14.4",
-      "maxIOS": "26.5",
+      "defaultIOS": "18.7.9",
+      "minIOS": "14.1",
+      "maxIOS": "26.5.2",
       "year": 2020,
       "batteryMah": 3687,
       "storageOptionsGB": [
@@ -3092,6 +6613,10 @@
         512
       ],
       "supportedIOS": [
+        "14.1",
+        "14.2",
+        "14.2.1",
+        "14.3",
         "14.4",
         "14.4.1",
         "14.4.2",
@@ -3125,7 +6650,17 @@
         "15.7.6",
         "15.7.7",
         "15.7.8",
+        "15.8",
+        "15.8.1",
+        "15.8.2",
+        "15.8.3",
+        "15.8.4",
+        "15.8.5",
+        "15.8.6",
+        "15.8.7",
+        "15.8.8",
         "16.0",
+        "16.0.1",
         "16.0.2",
         "16.0.3",
         "16.1",
@@ -3148,13 +6683,24 @@
         "16.7.5",
         "16.7.6",
         "16.7.7",
+        "16.7.8",
+        "16.7.9",
+        "16.7.10",
+        "16.7.11",
+        "16.7.12",
+        "16.7.13",
+        "16.7.14",
+        "16.7.15",
+        "16.7.16",
         "17.0",
         "17.0.1",
+        "17.0.2",
         "17.0.3",
         "17.1",
         "17.1.1",
         "17.1.2",
         "17.2",
+        "17.2.1",
         "17.3",
         "17.3.1",
         "17.4",
@@ -3169,6 +6715,7 @@
         "17.7.3",
         "17.7.4",
         "17.7.5",
+        "17.7.6",
         "18.0",
         "18.0.1",
         "18.1",
@@ -3177,6 +6724,7 @@
         "18.2.1",
         "18.3",
         "18.3.1",
+        "18.3.2",
         "18.4",
         "18.4.1",
         "18.5",
@@ -3185,14 +6733,58 @@
         "18.6.2",
         "18.7",
         "18.7.1",
+        "18.7.2",
+        "18.7.3",
+        "18.7.4",
+        "18.7.5",
+        "18.7.6",
+        "18.7.7",
+        "18.7.8",
+        "18.7.9",
         "26.0",
         "26.0.1",
         "26.1",
+        "26.1.1",
         "26.2",
+        "26.2.1",
         "26.3",
+        "26.3.1",
         "26.4",
         "26.4.1",
-        "26.5"
+        "26.4.2",
+        "26.5",
+        "26.5.1",
+        "26.5.2"
+      ],
+      "PartNumber": "MGLD3",
+      "modelNumbers": [
+        "A2342",
+        "A2410",
+        "A2412",
+        "A2411"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A2342",
+          "region": "Hoa Kỳ"
+        },
+        {
+          "A": "A2410",
+          "region": "Canada, Nhật Bản"
+        },
+        {
+          "A": "A2412",
+          "region": "Trung Quốc đại lục, Hồng Kông, Macao"
+        },
+        {
+          "A": "A2411",
+          "region": "Các quốc gia/khu vực khác"
+        }
       ]
     },
     {
@@ -3201,7 +6793,7 @@
       "ProductType": "iPhone14,4",
       "HWModelStr": "D16AP",
       "HardwarePlatform": "t8110",
-      "ModelNumber": "MLK23",
+      "ModelNumber": "A2628",
       "RegulatoryModelNumber": "A2628",
       "CPUArchitecture": "arm64e",
       "chip": "A15 Bionic",
@@ -3218,11 +6810,11 @@
         "DiagonalInches": 5.4,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "18.7.1",
+      "defaultIOS": "18.7.9",
       "minIOS": "15.0",
-      "maxIOS": "26.5",
+      "maxIOS": "26.5.2",
       "year": 2021,
-      "batteryMah": 2406,
+      "batteryMah": 2438,
       "storageOptionsGB": [
         128,
         256,
@@ -3252,7 +6844,17 @@
         "15.7.6",
         "15.7.7",
         "15.7.8",
+        "15.8",
+        "15.8.1",
+        "15.8.2",
+        "15.8.3",
+        "15.8.4",
+        "15.8.5",
+        "15.8.6",
+        "15.8.7",
+        "15.8.8",
         "16.0",
+        "16.0.1",
         "16.0.2",
         "16.0.3",
         "16.1",
@@ -3275,13 +6877,24 @@
         "16.7.5",
         "16.7.6",
         "16.7.7",
+        "16.7.8",
+        "16.7.9",
+        "16.7.10",
+        "16.7.11",
+        "16.7.12",
+        "16.7.13",
+        "16.7.14",
+        "16.7.15",
+        "16.7.16",
         "17.0",
         "17.0.1",
+        "17.0.2",
         "17.0.3",
         "17.1",
         "17.1.1",
         "17.1.2",
         "17.2",
+        "17.2.1",
         "17.3",
         "17.3.1",
         "17.4",
@@ -3296,6 +6909,7 @@
         "17.7.3",
         "17.7.4",
         "17.7.5",
+        "17.7.6",
         "18.0",
         "18.0.1",
         "18.1",
@@ -3304,6 +6918,7 @@
         "18.2.1",
         "18.3",
         "18.3.1",
+        "18.3.2",
         "18.4",
         "18.4.1",
         "18.5",
@@ -3312,14 +6927,63 @@
         "18.6.2",
         "18.7",
         "18.7.1",
+        "18.7.2",
+        "18.7.3",
+        "18.7.4",
+        "18.7.5",
+        "18.7.6",
+        "18.7.7",
+        "18.7.8",
+        "18.7.9",
         "26.0",
         "26.0.1",
         "26.1",
+        "26.1.1",
         "26.2",
+        "26.2.1",
         "26.3",
+        "26.3.1",
         "26.4",
         "26.4.1",
-        "26.5"
+        "26.4.2",
+        "26.5",
+        "26.5.1",
+        "26.5.2"
+      ],
+      "PartNumber": "MLK23",
+      "modelNumbers": [
+        "A2481",
+        "A2626",
+        "A2629",
+        "A2630",
+        "A2628"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A2481",
+          "region": "Hoa Kỳ"
+        },
+        {
+          "A": "A2626",
+          "region": "Canada, Nhật Bản, Mexico, Ả Rập Saudi"
+        },
+        {
+          "A": "A2629",
+          "region": "Trung Quốc đại lục"
+        },
+        {
+          "A": "A2630",
+          "region": "Armenia, Belarus, Kazakhstan, Kyrgyzstan, Nga"
+        },
+        {
+          "A": "A2628",
+          "region": "Các quốc gia/khu vực khác"
+        }
       ]
     },
     {
@@ -3328,7 +6992,7 @@
       "ProductType": "iPhone14,5",
       "HWModelStr": "D17AP",
       "HardwarePlatform": "t8110",
-      "ModelNumber": "MLPH3",
+      "ModelNumber": "A2633",
       "RegulatoryModelNumber": "A2633",
       "CPUArchitecture": "arm64e",
       "chip": "A15 Bionic",
@@ -3345,11 +7009,11 @@
         "DiagonalInches": 6.1,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "18.7.1",
+      "defaultIOS": "18.7.9",
       "minIOS": "15.0",
-      "maxIOS": "26.5",
+      "maxIOS": "26.5.2",
       "year": 2021,
-      "batteryMah": 3227,
+      "batteryMah": 3240,
       "storageOptionsGB": [
         128,
         256,
@@ -3379,7 +7043,17 @@
         "15.7.6",
         "15.7.7",
         "15.7.8",
+        "15.8",
+        "15.8.1",
+        "15.8.2",
+        "15.8.3",
+        "15.8.4",
+        "15.8.5",
+        "15.8.6",
+        "15.8.7",
+        "15.8.8",
         "16.0",
+        "16.0.1",
         "16.0.2",
         "16.0.3",
         "16.1",
@@ -3402,13 +7076,24 @@
         "16.7.5",
         "16.7.6",
         "16.7.7",
+        "16.7.8",
+        "16.7.9",
+        "16.7.10",
+        "16.7.11",
+        "16.7.12",
+        "16.7.13",
+        "16.7.14",
+        "16.7.15",
+        "16.7.16",
         "17.0",
         "17.0.1",
+        "17.0.2",
         "17.0.3",
         "17.1",
         "17.1.1",
         "17.1.2",
         "17.2",
+        "17.2.1",
         "17.3",
         "17.3.1",
         "17.4",
@@ -3423,6 +7108,7 @@
         "17.7.3",
         "17.7.4",
         "17.7.5",
+        "17.7.6",
         "18.0",
         "18.0.1",
         "18.1",
@@ -3431,6 +7117,7 @@
         "18.2.1",
         "18.3",
         "18.3.1",
+        "18.3.2",
         "18.4",
         "18.4.1",
         "18.5",
@@ -3439,14 +7126,63 @@
         "18.6.2",
         "18.7",
         "18.7.1",
+        "18.7.2",
+        "18.7.3",
+        "18.7.4",
+        "18.7.5",
+        "18.7.6",
+        "18.7.7",
+        "18.7.8",
+        "18.7.9",
         "26.0",
         "26.0.1",
         "26.1",
+        "26.1.1",
         "26.2",
+        "26.2.1",
         "26.3",
+        "26.3.1",
         "26.4",
         "26.4.1",
-        "26.5"
+        "26.4.2",
+        "26.5",
+        "26.5.1",
+        "26.5.2"
+      ],
+      "PartNumber": "MLPF3",
+      "modelNumbers": [
+        "A2482",
+        "A2631",
+        "A2634",
+        "A2635",
+        "A2633"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A2482",
+          "region": "Hoa Kỳ"
+        },
+        {
+          "A": "A2631",
+          "region": "Canada, Nhật Bản, Mexico, Ả Rập Saudi"
+        },
+        {
+          "A": "A2634",
+          "region": "Trung Quốc đại lục, Hồng Kông, Macao"
+        },
+        {
+          "A": "A2635",
+          "region": "Armenia, Belarus, Kazakhstan, Kyrgyzstan, Nga"
+        },
+        {
+          "A": "A2633",
+          "region": "Các quốc gia/khu vực khác"
+        }
       ]
     },
     {
@@ -3455,7 +7191,7 @@
       "ProductType": "iPhone14,2",
       "HWModelStr": "D63AP",
       "HardwarePlatform": "t8110",
-      "ModelNumber": "MLVD3",
+      "ModelNumber": "A2638",
       "RegulatoryModelNumber": "A2638",
       "CPUArchitecture": "arm64e",
       "chip": "A15 Bionic",
@@ -3472,9 +7208,9 @@
         "DiagonalInches": 6.1,
         "MaxRefreshHz": 120
       },
-      "defaultIOS": "18.7.1",
+      "defaultIOS": "18.7.9",
       "minIOS": "15.0",
-      "maxIOS": "26.5",
+      "maxIOS": "26.5.2",
       "year": 2021,
       "batteryMah": 3095,
       "storageOptionsGB": [
@@ -3507,7 +7243,17 @@
         "15.7.6",
         "15.7.7",
         "15.7.8",
+        "15.8",
+        "15.8.1",
+        "15.8.2",
+        "15.8.3",
+        "15.8.4",
+        "15.8.5",
+        "15.8.6",
+        "15.8.7",
+        "15.8.8",
         "16.0",
+        "16.0.1",
         "16.0.2",
         "16.0.3",
         "16.1",
@@ -3530,13 +7276,24 @@
         "16.7.5",
         "16.7.6",
         "16.7.7",
+        "16.7.8",
+        "16.7.9",
+        "16.7.10",
+        "16.7.11",
+        "16.7.12",
+        "16.7.13",
+        "16.7.14",
+        "16.7.15",
+        "16.7.16",
         "17.0",
         "17.0.1",
+        "17.0.2",
         "17.0.3",
         "17.1",
         "17.1.1",
         "17.1.2",
         "17.2",
+        "17.2.1",
         "17.3",
         "17.3.1",
         "17.4",
@@ -3551,6 +7308,7 @@
         "17.7.3",
         "17.7.4",
         "17.7.5",
+        "17.7.6",
         "18.0",
         "18.0.1",
         "18.1",
@@ -3559,6 +7317,7 @@
         "18.2.1",
         "18.3",
         "18.3.1",
+        "18.3.2",
         "18.4",
         "18.4.1",
         "18.5",
@@ -3567,14 +7326,63 @@
         "18.6.2",
         "18.7",
         "18.7.1",
+        "18.7.2",
+        "18.7.3",
+        "18.7.4",
+        "18.7.5",
+        "18.7.6",
+        "18.7.7",
+        "18.7.8",
+        "18.7.9",
         "26.0",
         "26.0.1",
         "26.1",
+        "26.1.1",
         "26.2",
+        "26.2.1",
         "26.3",
+        "26.3.1",
         "26.4",
         "26.4.1",
-        "26.5"
+        "26.4.2",
+        "26.5",
+        "26.5.1",
+        "26.5.2"
+      ],
+      "PartNumber": "MLVD3",
+      "modelNumbers": [
+        "A2483",
+        "A2636",
+        "A2639",
+        "A2640",
+        "A2638"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A2483",
+          "region": "Hoa Kỳ"
+        },
+        {
+          "A": "A2636",
+          "region": "Canada, Nhật Bản, Mexico, Ả Rập Saudi"
+        },
+        {
+          "A": "A2639",
+          "region": "Trung Quốc đại lục, Hồng Kông, Macao"
+        },
+        {
+          "A": "A2640",
+          "region": "Armenia, Belarus, Kazakhstan, Kyrgyzstan, Nga"
+        },
+        {
+          "A": "A2638",
+          "region": "Các quốc gia/khu vực khác"
+        }
       ]
     },
     {
@@ -3583,7 +7391,7 @@
       "ProductType": "iPhone14,3",
       "HWModelStr": "D64AP",
       "HardwarePlatform": "t8110",
-      "ModelNumber": "MLL63",
+      "ModelNumber": "A2643",
       "RegulatoryModelNumber": "A2643",
       "CPUArchitecture": "arm64e",
       "chip": "A15 Bionic",
@@ -3600,9 +7408,9 @@
         "DiagonalInches": 6.7,
         "MaxRefreshHz": 120
       },
-      "defaultIOS": "18.7.1",
+      "defaultIOS": "18.7.9",
       "minIOS": "15.0",
-      "maxIOS": "26.5",
+      "maxIOS": "26.5.2",
       "year": 2021,
       "batteryMah": 4352,
       "storageOptionsGB": [
@@ -3635,7 +7443,17 @@
         "15.7.6",
         "15.7.7",
         "15.7.8",
+        "15.8",
+        "15.8.1",
+        "15.8.2",
+        "15.8.3",
+        "15.8.4",
+        "15.8.5",
+        "15.8.6",
+        "15.8.7",
+        "15.8.8",
         "16.0",
+        "16.0.1",
         "16.0.2",
         "16.0.3",
         "16.1",
@@ -3658,13 +7476,24 @@
         "16.7.5",
         "16.7.6",
         "16.7.7",
+        "16.7.8",
+        "16.7.9",
+        "16.7.10",
+        "16.7.11",
+        "16.7.12",
+        "16.7.13",
+        "16.7.14",
+        "16.7.15",
+        "16.7.16",
         "17.0",
         "17.0.1",
+        "17.0.2",
         "17.0.3",
         "17.1",
         "17.1.1",
         "17.1.2",
         "17.2",
+        "17.2.1",
         "17.3",
         "17.3.1",
         "17.4",
@@ -3679,6 +7508,7 @@
         "17.7.3",
         "17.7.4",
         "17.7.5",
+        "17.7.6",
         "18.0",
         "18.0.1",
         "18.1",
@@ -3687,6 +7517,7 @@
         "18.2.1",
         "18.3",
         "18.3.1",
+        "18.3.2",
         "18.4",
         "18.4.1",
         "18.5",
@@ -3695,14 +7526,63 @@
         "18.6.2",
         "18.7",
         "18.7.1",
+        "18.7.2",
+        "18.7.3",
+        "18.7.4",
+        "18.7.5",
+        "18.7.6",
+        "18.7.7",
+        "18.7.8",
+        "18.7.9",
         "26.0",
         "26.0.1",
         "26.1",
+        "26.1.1",
         "26.2",
+        "26.2.1",
         "26.3",
+        "26.3.1",
         "26.4",
         "26.4.1",
-        "26.5"
+        "26.4.2",
+        "26.5",
+        "26.5.1",
+        "26.5.2"
+      ],
+      "PartNumber": "MLH73",
+      "modelNumbers": [
+        "A2484",
+        "A2641",
+        "A2644",
+        "A2645",
+        "A2643"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A2484",
+          "region": "Hoa Kỳ"
+        },
+        {
+          "A": "A2641",
+          "region": "Canada, Nhật Bản, Mexico, Ả Rập Saudi"
+        },
+        {
+          "A": "A2644",
+          "region": "Trung Quốc đại lục, Hồng Kông, Macao"
+        },
+        {
+          "A": "A2645",
+          "region": "Armenia, Belarus, Kazakhstan, Kyrgyzstan, Nga"
+        },
+        {
+          "A": "A2643",
+          "region": "Các quốc gia/khu vực khác"
+        }
       ]
     },
     {
@@ -3711,7 +7591,7 @@
       "ProductType": "iPhone14,6",
       "HWModelStr": "D49AP",
       "HardwarePlatform": "t8110",
-      "ModelNumber": "MMXG3",
+      "ModelNumber": "A2783",
       "RegulatoryModelNumber": "A2783",
       "CPUArchitecture": "arm64e",
       "chip": "A15 Bionic",
@@ -3728,9 +7608,9 @@
         "DiagonalInches": 4.7,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "18.7.1",
-      "minIOS": "16.0",
-      "maxIOS": "26.5",
+      "defaultIOS": "18.7.9",
+      "minIOS": "15.4",
+      "maxIOS": "26.5.2",
       "year": 2022,
       "batteryMah": 2018,
       "storageOptionsGB": [
@@ -3739,7 +7619,31 @@
         256
       ],
       "supportedIOS": [
+        "15.4",
+        "15.4.1",
+        "15.5",
+        "15.6",
+        "15.6.1",
+        "15.7",
+        "15.7.1",
+        "15.7.2",
+        "15.7.3",
+        "15.7.4",
+        "15.7.5",
+        "15.7.6",
+        "15.7.7",
+        "15.7.8",
+        "15.8",
+        "15.8.1",
+        "15.8.2",
+        "15.8.3",
+        "15.8.4",
+        "15.8.5",
+        "15.8.6",
+        "15.8.7",
+        "15.8.8",
         "16.0",
+        "16.0.1",
         "16.0.2",
         "16.0.3",
         "16.1",
@@ -3762,13 +7666,24 @@
         "16.7.5",
         "16.7.6",
         "16.7.7",
+        "16.7.8",
+        "16.7.9",
+        "16.7.10",
+        "16.7.11",
+        "16.7.12",
+        "16.7.13",
+        "16.7.14",
+        "16.7.15",
+        "16.7.16",
         "17.0",
         "17.0.1",
+        "17.0.2",
         "17.0.3",
         "17.1",
         "17.1.1",
         "17.1.2",
         "17.2",
+        "17.2.1",
         "17.3",
         "17.3.1",
         "17.4",
@@ -3783,6 +7698,7 @@
         "17.7.3",
         "17.7.4",
         "17.7.5",
+        "17.7.6",
         "18.0",
         "18.0.1",
         "18.1",
@@ -3791,6 +7707,7 @@
         "18.2.1",
         "18.3",
         "18.3.1",
+        "18.3.2",
         "18.4",
         "18.4.1",
         "18.5",
@@ -3799,14 +7716,63 @@
         "18.6.2",
         "18.7",
         "18.7.1",
+        "18.7.2",
+        "18.7.3",
+        "18.7.4",
+        "18.7.5",
+        "18.7.6",
+        "18.7.7",
+        "18.7.8",
+        "18.7.9",
         "26.0",
         "26.0.1",
         "26.1",
+        "26.1.1",
         "26.2",
+        "26.2.1",
         "26.3",
+        "26.3.1",
         "26.4",
         "26.4.1",
-        "26.5"
+        "26.4.2",
+        "26.5",
+        "26.5.1",
+        "26.5.2"
+      ],
+      "PartNumber": "MMXG3",
+      "modelNumbers": [
+        "A2595",
+        "A2782",
+        "A2784",
+        "A2785",
+        "A2783"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A2595",
+          "region": "Hoa Kỳ, Canada, Puerto Rico, U.S. Virgin Islands, Guam, Mexico, Ả Rập Saudi"
+        },
+        {
+          "A": "A2782",
+          "region": "Nhật Bản"
+        },
+        {
+          "A": "A2784",
+          "region": "Nga, Armenia, Belarus, Kazakhstan, Kyrgyzstan"
+        },
+        {
+          "A": "A2785",
+          "region": "Trung Quốc"
+        },
+        {
+          "A": "A2783",
+          "region": "Các quốc gia/khu vực khác"
+        }
       ]
     },
     {
@@ -3815,7 +7781,7 @@
       "ProductType": "iPhone14,7",
       "HWModelStr": "D27AP",
       "HardwarePlatform": "t8110",
-      "ModelNumber": "MPVN3",
+      "ModelNumber": "A2882",
       "RegulatoryModelNumber": "A2882",
       "CPUArchitecture": "arm64e",
       "chip": "A15 Bionic",
@@ -3832,9 +7798,9 @@
         "DiagonalInches": 6.1,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "18.7.1",
+      "defaultIOS": "18.7.9",
       "minIOS": "16.0",
-      "maxIOS": "26.5",
+      "maxIOS": "26.5.2",
       "year": 2022,
       "batteryMah": 3279,
       "storageOptionsGB": [
@@ -3867,13 +7833,24 @@
         "16.7.5",
         "16.7.6",
         "16.7.7",
+        "16.7.8",
+        "16.7.9",
+        "16.7.10",
+        "16.7.11",
+        "16.7.12",
+        "16.7.13",
+        "16.7.14",
+        "16.7.15",
+        "16.7.16",
         "17.0",
         "17.0.1",
+        "17.0.2",
         "17.0.3",
         "17.1",
         "17.1.1",
         "17.1.2",
         "17.2",
+        "17.2.1",
         "17.3",
         "17.3.1",
         "17.4",
@@ -3888,6 +7865,7 @@
         "17.7.3",
         "17.7.4",
         "17.7.5",
+        "17.7.6",
         "18.0",
         "18.0.1",
         "18.1",
@@ -3896,6 +7874,7 @@
         "18.2.1",
         "18.3",
         "18.3.1",
+        "18.3.2",
         "18.4",
         "18.4.1",
         "18.5",
@@ -3904,14 +7883,63 @@
         "18.6.2",
         "18.7",
         "18.7.1",
+        "18.7.2",
+        "18.7.3",
+        "18.7.4",
+        "18.7.5",
+        "18.7.6",
+        "18.7.7",
+        "18.7.8",
+        "18.7.9",
         "26.0",
         "26.0.1",
         "26.1",
+        "26.1.1",
         "26.2",
+        "26.2.1",
         "26.3",
+        "26.3.1",
         "26.4",
         "26.4.1",
-        "26.5"
+        "26.4.2",
+        "26.5",
+        "26.5.1",
+        "26.5.2"
+      ],
+      "PartNumber": "MPVN3",
+      "modelNumbers": [
+        "A2649",
+        "A2881",
+        "A2884",
+        "A2883",
+        "A2882"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A2649",
+          "region": "Hoa Kỳ, Puerto Rico"
+        },
+        {
+          "A": "A2881",
+          "region": "Canada, Guam, Nhật Bản, Mexico, Ả Rập Saudi, U.S. Virgin Islands"
+        },
+        {
+          "A": "A2884",
+          "region": "Trung Quốc đại lục, Hồng Kông, Macao"
+        },
+        {
+          "A": "A2883",
+          "region": "Armenia, Belarus, Kazakhstan, Kyrgyzstan, Nga"
+        },
+        {
+          "A": "A2882",
+          "region": "Các quốc gia/khu vực khác"
+        }
       ]
     },
     {
@@ -3920,7 +7948,7 @@
       "ProductType": "iPhone14,8",
       "HWModelStr": "D28AP",
       "HardwarePlatform": "t8110",
-      "ModelNumber": "MQ523",
+      "ModelNumber": "A2886",
       "RegulatoryModelNumber": "A2886",
       "CPUArchitecture": "arm64e",
       "chip": "A15 Bionic",
@@ -3937,9 +7965,9 @@
         "DiagonalInches": 6.7,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "18.7.1",
+      "defaultIOS": "18.7.9",
       "minIOS": "16.0",
-      "maxIOS": "26.5",
+      "maxIOS": "26.5.2",
       "year": 2022,
       "batteryMah": 4325,
       "storageOptionsGB": [
@@ -3972,13 +8000,24 @@
         "16.7.5",
         "16.7.6",
         "16.7.7",
+        "16.7.8",
+        "16.7.9",
+        "16.7.10",
+        "16.7.11",
+        "16.7.12",
+        "16.7.13",
+        "16.7.14",
+        "16.7.15",
+        "16.7.16",
         "17.0",
         "17.0.1",
+        "17.0.2",
         "17.0.3",
         "17.1",
         "17.1.1",
         "17.1.2",
         "17.2",
+        "17.2.1",
         "17.3",
         "17.3.1",
         "17.4",
@@ -3993,6 +8032,7 @@
         "17.7.3",
         "17.7.4",
         "17.7.5",
+        "17.7.6",
         "18.0",
         "18.0.1",
         "18.1",
@@ -4001,6 +8041,7 @@
         "18.2.1",
         "18.3",
         "18.3.1",
+        "18.3.2",
         "18.4",
         "18.4.1",
         "18.5",
@@ -4009,14 +8050,63 @@
         "18.6.2",
         "18.7",
         "18.7.1",
+        "18.7.2",
+        "18.7.3",
+        "18.7.4",
+        "18.7.5",
+        "18.7.6",
+        "18.7.7",
+        "18.7.8",
+        "18.7.9",
         "26.0",
         "26.0.1",
         "26.1",
+        "26.1.1",
         "26.2",
+        "26.2.1",
         "26.3",
+        "26.3.1",
         "26.4",
         "26.4.1",
-        "26.5"
+        "26.4.2",
+        "26.5",
+        "26.5.1",
+        "26.5.2"
+      ],
+      "PartNumber": "MQ3E3",
+      "modelNumbers": [
+        "A2632",
+        "A2885",
+        "A2888",
+        "A2887",
+        "A2886"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A2632",
+          "region": "Hoa Kỳ, Puerto Rico"
+        },
+        {
+          "A": "A2885",
+          "region": "Canada, Guam, Nhật Bản, Mexico, Ả Rập Saudi, U.S. Virgin Islands"
+        },
+        {
+          "A": "A2888",
+          "region": "Trung Quốc đại lục, Hồng Kông, Macao"
+        },
+        {
+          "A": "A2887",
+          "region": "Armenia, Belarus, Kazakhstan, Kyrgyzstan, Nga"
+        },
+        {
+          "A": "A2886",
+          "region": "Các quốc gia/khu vực khác"
+        }
       ]
     },
     {
@@ -4025,7 +8115,7 @@
       "ProductType": "iPhone15,2",
       "HWModelStr": "D73AP",
       "HardwarePlatform": "t8120",
-      "ModelNumber": "MQ0G3",
+      "ModelNumber": "A2890",
       "RegulatoryModelNumber": "A2890",
       "CPUArchitecture": "arm64e",
       "chip": "A16 Bionic",
@@ -4042,9 +8132,9 @@
         "DiagonalInches": 6.1,
         "MaxRefreshHz": 120
       },
-      "defaultIOS": "18.7.1",
+      "defaultIOS": "18.7.9",
       "minIOS": "16.0",
-      "maxIOS": "26.5",
+      "maxIOS": "26.5.2",
       "year": 2022,
       "batteryMah": 3200,
       "storageOptionsGB": [
@@ -4078,13 +8168,24 @@
         "16.7.5",
         "16.7.6",
         "16.7.7",
+        "16.7.8",
+        "16.7.9",
+        "16.7.10",
+        "16.7.11",
+        "16.7.12",
+        "16.7.13",
+        "16.7.14",
+        "16.7.15",
+        "16.7.16",
         "17.0",
         "17.0.1",
+        "17.0.2",
         "17.0.3",
         "17.1",
         "17.1.1",
         "17.1.2",
         "17.2",
+        "17.2.1",
         "17.3",
         "17.3.1",
         "17.4",
@@ -4099,6 +8200,7 @@
         "17.7.3",
         "17.7.4",
         "17.7.5",
+        "17.7.6",
         "18.0",
         "18.0.1",
         "18.1",
@@ -4107,6 +8209,7 @@
         "18.2.1",
         "18.3",
         "18.3.1",
+        "18.3.2",
         "18.4",
         "18.4.1",
         "18.5",
@@ -4115,14 +8218,63 @@
         "18.6.2",
         "18.7",
         "18.7.1",
+        "18.7.2",
+        "18.7.3",
+        "18.7.4",
+        "18.7.5",
+        "18.7.6",
+        "18.7.7",
+        "18.7.8",
+        "18.7.9",
         "26.0",
         "26.0.1",
         "26.1",
+        "26.1.1",
         "26.2",
+        "26.2.1",
         "26.3",
+        "26.3.1",
         "26.4",
         "26.4.1",
-        "26.5"
+        "26.4.2",
+        "26.5",
+        "26.5.1",
+        "26.5.2"
+      ],
+      "PartNumber": "MQ0G3",
+      "modelNumbers": [
+        "A2650",
+        "A2889",
+        "A2892",
+        "A2891",
+        "A2890"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A2650",
+          "region": "Hoa Kỳ, Puerto Rico"
+        },
+        {
+          "A": "A2889",
+          "region": "Canada, Guam, Nhật Bản, Mexico, Ả Rập Saudi, U.S. Virgin Islands"
+        },
+        {
+          "A": "A2892",
+          "region": "Trung Quốc đại lục, Hồng Kông, Macao"
+        },
+        {
+          "A": "A2891",
+          "region": "Armenia, Belarus, Kazakhstan, Kyrgyzstan, Nga"
+        },
+        {
+          "A": "A2890",
+          "region": "Các quốc gia/khu vực khác"
+        }
       ]
     },
     {
@@ -4131,7 +8283,7 @@
       "ProductType": "iPhone15,3",
       "HWModelStr": "D74AP",
       "HardwarePlatform": "t8120",
-      "ModelNumber": "MQ9T3",
+      "ModelNumber": "A2894",
       "RegulatoryModelNumber": "A2894",
       "CPUArchitecture": "arm64e",
       "chip": "A16 Bionic",
@@ -4148,9 +8300,9 @@
         "DiagonalInches": 6.7,
         "MaxRefreshHz": 120
       },
-      "defaultIOS": "18.7.1",
+      "defaultIOS": "18.7.9",
       "minIOS": "16.0",
-      "maxIOS": "26.5",
+      "maxIOS": "26.5.2",
       "year": 2022,
       "batteryMah": 4323,
       "storageOptionsGB": [
@@ -4184,13 +8336,24 @@
         "16.7.5",
         "16.7.6",
         "16.7.7",
+        "16.7.8",
+        "16.7.9",
+        "16.7.10",
+        "16.7.11",
+        "16.7.12",
+        "16.7.13",
+        "16.7.14",
+        "16.7.15",
+        "16.7.16",
         "17.0",
         "17.0.1",
+        "17.0.2",
         "17.0.3",
         "17.1",
         "17.1.1",
         "17.1.2",
         "17.2",
+        "17.2.1",
         "17.3",
         "17.3.1",
         "17.4",
@@ -4205,6 +8368,7 @@
         "17.7.3",
         "17.7.4",
         "17.7.5",
+        "17.7.6",
         "18.0",
         "18.0.1",
         "18.1",
@@ -4213,6 +8377,7 @@
         "18.2.1",
         "18.3",
         "18.3.1",
+        "18.3.2",
         "18.4",
         "18.4.1",
         "18.5",
@@ -4221,14 +8386,63 @@
         "18.6.2",
         "18.7",
         "18.7.1",
+        "18.7.2",
+        "18.7.3",
+        "18.7.4",
+        "18.7.5",
+        "18.7.6",
+        "18.7.7",
+        "18.7.8",
+        "18.7.9",
         "26.0",
         "26.0.1",
         "26.1",
+        "26.1.1",
         "26.2",
+        "26.2.1",
         "26.3",
+        "26.3.1",
         "26.4",
         "26.4.1",
-        "26.5"
+        "26.4.2",
+        "26.5",
+        "26.5.1",
+        "26.5.2"
+      ],
+      "PartNumber": "MQ9T3",
+      "modelNumbers": [
+        "A2651",
+        "A2893",
+        "A2896",
+        "A2895",
+        "A2894"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A2651",
+          "region": "Hoa Kỳ, Puerto Rico"
+        },
+        {
+          "A": "A2893",
+          "region": "Canada, Guam, Nhật Bản, Mexico, Ả Rập Saudi, U.S. Virgin Islands"
+        },
+        {
+          "A": "A2896",
+          "region": "Trung Quốc đại lục, Hồng Kông, Macao"
+        },
+        {
+          "A": "A2895",
+          "region": "Armenia, Belarus, Kazakhstan, Kyrgyzstan, Nga"
+        },
+        {
+          "A": "A2894",
+          "region": "Các quốc gia/khu vực khác"
+        }
       ]
     },
     {
@@ -4237,7 +8451,7 @@
       "ProductType": "iPhone15,4",
       "HWModelStr": "D37AP",
       "HardwarePlatform": "t8120",
-      "ModelNumber": "MTLG3",
+      "ModelNumber": "A3090",
       "RegulatoryModelNumber": "A3090",
       "CPUArchitecture": "arm64e",
       "chip": "A16 Bionic",
@@ -4254,9 +8468,9 @@
         "DiagonalInches": 6.1,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "18.7.1",
+      "defaultIOS": "18.7.9",
       "minIOS": "17.0",
-      "maxIOS": "26.5",
+      "maxIOS": "26.5.2",
       "year": 2023,
       "batteryMah": 3349,
       "storageOptionsGB": [
@@ -4273,6 +8487,7 @@
         "17.1.1",
         "17.1.2",
         "17.2",
+        "17.2.1",
         "17.3",
         "17.3.1",
         "17.4",
@@ -4287,6 +8502,7 @@
         "17.7.3",
         "17.7.4",
         "17.7.5",
+        "17.7.6",
         "18.0",
         "18.0.1",
         "18.1",
@@ -4295,6 +8511,7 @@
         "18.2.1",
         "18.3",
         "18.3.1",
+        "18.3.2",
         "18.4",
         "18.4.1",
         "18.5",
@@ -4303,14 +8520,58 @@
         "18.6.2",
         "18.7",
         "18.7.1",
+        "18.7.2",
+        "18.7.3",
+        "18.7.4",
+        "18.7.5",
+        "18.7.6",
+        "18.7.7",
+        "18.7.8",
+        "18.7.9",
         "26.0",
         "26.0.1",
         "26.1",
+        "26.1.1",
         "26.2",
+        "26.2.1",
         "26.3",
+        "26.3.1",
         "26.4",
         "26.4.1",
-        "26.5"
+        "26.4.2",
+        "26.5",
+        "26.5.1",
+        "26.5.2"
+      ],
+      "PartNumber": "MTLQ3",
+      "modelNumbers": [
+        "A2846",
+        "A3089",
+        "A3092",
+        "A3090"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A2846",
+          "region": "Hoa Kỳ, Puerto Rico"
+        },
+        {
+          "A": "A3089",
+          "region": "Canada, Guam, Nhật Bản, Mexico, Ả Rập Saudi, U.S. Virgin Islands"
+        },
+        {
+          "A": "A3092",
+          "region": "Trung Quốc đại lục, Hồng Kông, Macao"
+        },
+        {
+          "A": "A3090",
+          "region": "Các quốc gia/khu vực khác"
+        }
       ]
     },
     {
@@ -4319,7 +8580,7 @@
       "ProductType": "iPhone15,5",
       "HWModelStr": "D38AP",
       "HardwarePlatform": "t8120",
-      "ModelNumber": "MTV03",
+      "ModelNumber": "A3094",
       "RegulatoryModelNumber": "A3094",
       "CPUArchitecture": "arm64e",
       "chip": "A16 Bionic",
@@ -4336,9 +8597,9 @@
         "DiagonalInches": 6.7,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "18.7.1",
+      "defaultIOS": "18.7.9",
       "minIOS": "17.0",
-      "maxIOS": "26.5",
+      "maxIOS": "26.5.2",
       "year": 2023,
       "batteryMah": 4383,
       "storageOptionsGB": [
@@ -4355,6 +8616,7 @@
         "17.1.1",
         "17.1.2",
         "17.2",
+        "17.2.1",
         "17.3",
         "17.3.1",
         "17.4",
@@ -4369,6 +8631,7 @@
         "17.7.3",
         "17.7.4",
         "17.7.5",
+        "17.7.6",
         "18.0",
         "18.0.1",
         "18.1",
@@ -4377,6 +8640,7 @@
         "18.2.1",
         "18.3",
         "18.3.1",
+        "18.3.2",
         "18.4",
         "18.4.1",
         "18.5",
@@ -4385,14 +8649,58 @@
         "18.6.2",
         "18.7",
         "18.7.1",
+        "18.7.2",
+        "18.7.3",
+        "18.7.4",
+        "18.7.5",
+        "18.7.6",
+        "18.7.7",
+        "18.7.8",
+        "18.7.9",
         "26.0",
         "26.0.1",
         "26.1",
+        "26.1.1",
         "26.2",
+        "26.2.1",
         "26.3",
+        "26.3.1",
         "26.4",
         "26.4.1",
-        "26.5"
+        "26.4.2",
+        "26.5",
+        "26.5.1",
+        "26.5.2"
+      ],
+      "PartNumber": "MU1F3",
+      "modelNumbers": [
+        "A2847",
+        "A3093",
+        "A3096",
+        "A3094"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A2847",
+          "region": "Hoa Kỳ, Puerto Rico"
+        },
+        {
+          "A": "A3093",
+          "region": "Canada, Guam, Nhật Bản, Mexico, Ả Rập Saudi, U.S. Virgin Islands"
+        },
+        {
+          "A": "A3096",
+          "region": "Trung Quốc đại lục, Hồng Kông, Macao"
+        },
+        {
+          "A": "A3094",
+          "region": "Các quốc gia/khu vực khác"
+        }
       ]
     },
     {
@@ -4401,8 +8709,8 @@
       "ProductType": "iPhone16,1",
       "HWModelStr": "D83AP",
       "HardwarePlatform": "t8130",
-      "ModelNumber": "MTQ63",
-      "RegulatoryModelNumber": "A3101",
+      "ModelNumber": "A3102",
+      "RegulatoryModelNumber": "A3102",
       "CPUArchitecture": "arm64e",
       "chip": "A17 Pro",
       "cpuCores": 6,
@@ -4418,9 +8726,9 @@
         "DiagonalInches": 6.1,
         "MaxRefreshHz": 120
       },
-      "defaultIOS": "18.7.1",
+      "defaultIOS": "18.7.9",
       "minIOS": "17.0",
-      "maxIOS": "26.5",
+      "maxIOS": "26.5.2",
       "year": 2023,
       "batteryMah": 3274,
       "storageOptionsGB": [
@@ -4438,6 +8746,7 @@
         "17.1.1",
         "17.1.2",
         "17.2",
+        "17.2.1",
         "17.3",
         "17.3.1",
         "17.4",
@@ -4452,6 +8761,7 @@
         "17.7.3",
         "17.7.4",
         "17.7.5",
+        "17.7.6",
         "18.0",
         "18.0.1",
         "18.1",
@@ -4460,6 +8770,7 @@
         "18.2.1",
         "18.3",
         "18.3.1",
+        "18.3.2",
         "18.4",
         "18.4.1",
         "18.5",
@@ -4468,14 +8779,58 @@
         "18.6.2",
         "18.7",
         "18.7.1",
+        "18.7.2",
+        "18.7.3",
+        "18.7.4",
+        "18.7.5",
+        "18.7.6",
+        "18.7.7",
+        "18.7.8",
+        "18.7.9",
         "26.0",
         "26.0.1",
         "26.1",
+        "26.1.1",
         "26.2",
+        "26.2.1",
         "26.3",
+        "26.3.1",
         "26.4",
         "26.4.1",
-        "26.5"
+        "26.4.2",
+        "26.5",
+        "26.5.1",
+        "26.5.2"
+      ],
+      "PartNumber": "MTQ63",
+      "modelNumbers": [
+        "A2848",
+        "A3101",
+        "A3104",
+        "A3102"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A2848",
+          "region": "Hoa Kỳ, Puerto Rico"
+        },
+        {
+          "A": "A3101",
+          "region": "Canada, Guam, Nhật Bản, Mexico, Ả Rập Saudi, U.S. Virgin Islands"
+        },
+        {
+          "A": "A3104",
+          "region": "Trung Quốc đại lục, Hồng Kông, Macao"
+        },
+        {
+          "A": "A3102",
+          "region": "Các quốc gia/khu vực khác"
+        }
       ]
     },
     {
@@ -4484,8 +8839,8 @@
       "ProductType": "iPhone16,2",
       "HWModelStr": "D84AP",
       "HardwarePlatform": "t8130",
-      "ModelNumber": "MU7A3",
-      "RegulatoryModelNumber": "A3105",
+      "ModelNumber": "A3106",
+      "RegulatoryModelNumber": "A3106",
       "CPUArchitecture": "arm64e",
       "chip": "A17 Pro",
       "cpuCores": 6,
@@ -4501,11 +8856,11 @@
         "DiagonalInches": 6.7,
         "MaxRefreshHz": 120
       },
-      "defaultIOS": "18.7.1",
+      "defaultIOS": "18.7.9",
       "minIOS": "17.0",
-      "maxIOS": "26.5",
+      "maxIOS": "26.5.2",
       "year": 2023,
-      "batteryMah": 4441,
+      "batteryMah": 4422,
       "storageOptionsGB": [
         256,
         512,
@@ -4520,6 +8875,7 @@
         "17.1.1",
         "17.1.2",
         "17.2",
+        "17.2.1",
         "17.3",
         "17.3.1",
         "17.4",
@@ -4534,6 +8890,7 @@
         "17.7.3",
         "17.7.4",
         "17.7.5",
+        "17.7.6",
         "18.0",
         "18.0.1",
         "18.1",
@@ -4542,6 +8899,7 @@
         "18.2.1",
         "18.3",
         "18.3.1",
+        "18.3.2",
         "18.4",
         "18.4.1",
         "18.5",
@@ -4550,14 +8908,58 @@
         "18.6.2",
         "18.7",
         "18.7.1",
+        "18.7.2",
+        "18.7.3",
+        "18.7.4",
+        "18.7.5",
+        "18.7.6",
+        "18.7.7",
+        "18.7.8",
+        "18.7.9",
         "26.0",
         "26.0.1",
         "26.1",
+        "26.1.1",
         "26.2",
+        "26.2.1",
         "26.3",
+        "26.3.1",
         "26.4",
         "26.4.1",
-        "26.5"
+        "26.4.2",
+        "26.5",
+        "26.5.1",
+        "26.5.2"
+      ],
+      "PartNumber": "MU2Q3",
+      "modelNumbers": [
+        "A2849",
+        "A3105",
+        "A3108",
+        "A3106"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A2849",
+          "region": "Hoa Kỳ, Puerto Rico"
+        },
+        {
+          "A": "A3105",
+          "region": "Canada, Guam, Nhật Bản, Mexico, Ả Rập Saudi, U.S. Virgin Islands"
+        },
+        {
+          "A": "A3108",
+          "region": "Trung Quốc đại lục, Hồng Kông, Macao"
+        },
+        {
+          "A": "A3106",
+          "region": "Các quốc gia/khu vực khác"
+        }
       ]
     },
     {
@@ -4565,8 +8967,8 @@
       "MarketingName": "iPhone 16",
       "ProductType": "iPhone17,3",
       "HWModelStr": "D47AP",
-      "HardwarePlatform": "t8130",
-      "ModelNumber": "MYE73",
+      "HardwarePlatform": "t8140",
+      "ModelNumber": "A3287",
       "RegulatoryModelNumber": "A3287",
       "CPUArchitecture": "arm64e",
       "chip": "A18",
@@ -4583,9 +8985,9 @@
         "DiagonalInches": 6.1,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "18.7.1",
+      "defaultIOS": "18.7.9",
       "minIOS": "18.0",
-      "maxIOS": "26.5",
+      "maxIOS": "26.5.2",
       "year": 2024,
       "batteryMah": 3561,
       "storageOptionsGB": [
@@ -4602,6 +9004,7 @@
         "18.2.1",
         "18.3",
         "18.3.1",
+        "18.3.2",
         "18.4",
         "18.4.1",
         "18.5",
@@ -4610,14 +9013,58 @@
         "18.6.2",
         "18.7",
         "18.7.1",
+        "18.7.2",
+        "18.7.3",
+        "18.7.4",
+        "18.7.5",
+        "18.7.6",
+        "18.7.7",
+        "18.7.8",
+        "18.7.9",
         "26.0",
         "26.0.1",
         "26.1",
+        "26.1.1",
         "26.2",
+        "26.2.1",
         "26.3",
+        "26.3.1",
         "26.4",
         "26.4.1",
-        "26.5"
+        "26.4.2",
+        "26.5",
+        "26.5.1",
+        "26.5.2"
+      ],
+      "PartNumber": "MYE73",
+      "modelNumbers": [
+        "A3081",
+        "A3286",
+        "A3288",
+        "A3287"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A3081",
+          "region": "Hoa Kỳ, Puerto Rico"
+        },
+        {
+          "A": "A3286",
+          "region": "Bahrain, Canada, Iraq, Guam, Nhật Bản, Jordan, Kuwait, Mexico, Oman, Qatar, Ả Rập Saudi, UAE, U.S. Virgin Islands"
+        },
+        {
+          "A": "A3288",
+          "region": "Trung Quốc đại lục, Hồng Kông, Macao"
+        },
+        {
+          "A": "A3287",
+          "region": "Các quốc gia/khu vực khác"
+        }
       ]
     },
     {
@@ -4625,8 +9072,8 @@
       "MarketingName": "iPhone 16 Plus",
       "ProductType": "iPhone17,4",
       "HWModelStr": "D48AP",
-      "HardwarePlatform": "t8130",
-      "ModelNumber": "MYF03",
+      "HardwarePlatform": "t8140",
+      "ModelNumber": "A3290",
       "RegulatoryModelNumber": "A3290",
       "CPUArchitecture": "arm64e",
       "chip": "A18",
@@ -4643,9 +9090,9 @@
         "DiagonalInches": 6.7,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "18.7.1",
+      "defaultIOS": "18.7.9",
       "minIOS": "18.0",
-      "maxIOS": "26.5",
+      "maxIOS": "26.5.2",
       "year": 2024,
       "batteryMah": 4674,
       "storageOptionsGB": [
@@ -4662,6 +9109,7 @@
         "18.2.1",
         "18.3",
         "18.3.1",
+        "18.3.2",
         "18.4",
         "18.4.1",
         "18.5",
@@ -4670,14 +9118,58 @@
         "18.6.2",
         "18.7",
         "18.7.1",
+        "18.7.2",
+        "18.7.3",
+        "18.7.4",
+        "18.7.5",
+        "18.7.6",
+        "18.7.7",
+        "18.7.8",
+        "18.7.9",
         "26.0",
         "26.0.1",
         "26.1",
+        "26.1.1",
         "26.2",
+        "26.2.1",
         "26.3",
+        "26.3.1",
         "26.4",
         "26.4.1",
-        "26.5"
+        "26.4.2",
+        "26.5",
+        "26.5.1",
+        "26.5.2"
+      ],
+      "PartNumber": "MYF03",
+      "modelNumbers": [
+        "A3082",
+        "A3289",
+        "A3291",
+        "A3290"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A3082",
+          "region": "Hoa Kỳ, Puerto Rico"
+        },
+        {
+          "A": "A3289",
+          "region": "Bahrain, Canada, Iraq, Guam, Nhật Bản, Jordan, Kuwait, Mexico, Oman, Qatar, Ả Rập Saudi, UAE, U.S. Virgin Islands"
+        },
+        {
+          "A": "A3291",
+          "region": "Trung Quốc đại lục, Hồng Kông, Macao"
+        },
+        {
+          "A": "A3290",
+          "region": "Các quốc gia/khu vực khác"
+        }
       ]
     },
     {
@@ -4686,8 +9178,8 @@
       "ProductType": "iPhone17,1",
       "HWModelStr": "D93AP",
       "HardwarePlatform": "t8140",
-      "ModelNumber": "MYNQ3",
-      "RegulatoryModelNumber": "A3083",
+      "ModelNumber": "A3293",
+      "RegulatoryModelNumber": "A3293",
       "CPUArchitecture": "arm64e",
       "chip": "A18 Pro",
       "cpuCores": 6,
@@ -4703,9 +9195,9 @@
         "DiagonalInches": 6.3,
         "MaxRefreshHz": 120
       },
-      "defaultIOS": "18.7.1",
+      "defaultIOS": "18.7.9",
       "minIOS": "18.0",
-      "maxIOS": "26.5",
+      "maxIOS": "26.5.2",
       "year": 2024,
       "batteryMah": 3582,
       "storageOptionsGB": [
@@ -4723,6 +9215,7 @@
         "18.2.1",
         "18.3",
         "18.3.1",
+        "18.3.2",
         "18.4",
         "18.4.1",
         "18.5",
@@ -4731,14 +9224,58 @@
         "18.6.2",
         "18.7",
         "18.7.1",
+        "18.7.2",
+        "18.7.3",
+        "18.7.4",
+        "18.7.5",
+        "18.7.6",
+        "18.7.7",
+        "18.7.8",
+        "18.7.9",
         "26.0",
         "26.0.1",
         "26.1",
+        "26.1.1",
         "26.2",
+        "26.2.1",
         "26.3",
+        "26.3.1",
         "26.4",
         "26.4.1",
-        "26.5"
+        "26.4.2",
+        "26.5",
+        "26.5.1",
+        "26.5.2"
+      ],
+      "PartNumber": "MYNQ3",
+      "modelNumbers": [
+        "A3083",
+        "A3292",
+        "A3294",
+        "A3293"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A3083",
+          "region": "Hoa Kỳ, Puerto Rico"
+        },
+        {
+          "A": "A3292",
+          "region": "Bahrain, Canada, Iraq, Guam, Nhật Bản, Jordan, Kuwait, Mexico, Oman, Qatar, Ả Rập Saudi, UAE, U.S. Virgin Islands"
+        },
+        {
+          "A": "A3294",
+          "region": "Trung Quốc đại lục, Hồng Kông, Macao"
+        },
+        {
+          "A": "A3293",
+          "region": "Các quốc gia/khu vực khác"
+        }
       ]
     },
     {
@@ -4747,8 +9284,8 @@
       "ProductType": "iPhone17,2",
       "HWModelStr": "D94AP",
       "HardwarePlatform": "t8140",
-      "ModelNumber": "MYW23",
-      "RegulatoryModelNumber": "A3084",
+      "ModelNumber": "A3296",
+      "RegulatoryModelNumber": "A3296",
       "CPUArchitecture": "arm64e",
       "chip": "A18 Pro",
       "cpuCores": 6,
@@ -4764,9 +9301,9 @@
         "DiagonalInches": 6.9,
         "MaxRefreshHz": 120
       },
-      "defaultIOS": "18.7.1",
+      "defaultIOS": "18.7.9",
       "minIOS": "18.0",
-      "maxIOS": "26.5",
+      "maxIOS": "26.5.2",
       "year": 2024,
       "batteryMah": 4685,
       "storageOptionsGB": [
@@ -4783,6 +9320,7 @@
         "18.2.1",
         "18.3",
         "18.3.1",
+        "18.3.2",
         "18.4",
         "18.4.1",
         "18.5",
@@ -4791,14 +9329,58 @@
         "18.6.2",
         "18.7",
         "18.7.1",
+        "18.7.2",
+        "18.7.3",
+        "18.7.4",
+        "18.7.5",
+        "18.7.6",
+        "18.7.7",
+        "18.7.8",
+        "18.7.9",
         "26.0",
         "26.0.1",
         "26.1",
+        "26.1.1",
         "26.2",
+        "26.2.1",
         "26.3",
+        "26.3.1",
         "26.4",
         "26.4.1",
-        "26.5"
+        "26.4.2",
+        "26.5",
+        "26.5.1",
+        "26.5.2"
+      ],
+      "PartNumber": "MYW33",
+      "modelNumbers": [
+        "A3084",
+        "A3295",
+        "A3297",
+        "A3296"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A3084",
+          "region": "Hoa Kỳ, Puerto Rico"
+        },
+        {
+          "A": "A3295",
+          "region": "Bahrain, Canada, Iraq, Guam, Nhật Bản, Jordan, Kuwait, Mexico, Oman, Qatar, Ả Rập Saudi, UAE, U.S. Virgin Islands"
+        },
+        {
+          "A": "A3297",
+          "region": "Trung Quốc đại lục, Hồng Kông, Macao"
+        },
+        {
+          "A": "A3296",
+          "region": "Các quốc gia/khu vực khác"
+        }
       ]
     },
     {
@@ -4806,9 +9388,9 @@
       "MarketingName": "iPhone 16e",
       "ProductType": "iPhone17,5",
       "HWModelStr": "D23AP",
-      "HardwarePlatform": "t8130",
-      "ModelNumber": "MXV63",
-      "RegulatoryModelNumber": "A3400",
+      "HardwarePlatform": "t8140",
+      "ModelNumber": "A3409",
+      "RegulatoryModelNumber": "A3409",
       "CPUArchitecture": "arm64e",
       "chip": "A18",
       "cpuCores": 6,
@@ -4824,9 +9406,9 @@
         "DiagonalInches": 6.1,
         "MaxRefreshHz": 60
       },
-      "defaultIOS": "26.5",
-      "minIOS": "26.0",
-      "maxIOS": "26.5",
+      "defaultIOS": "18.7.9",
+      "minIOS": "18.3",
+      "maxIOS": "26.5.2",
       "year": 2025,
       "batteryMah": 3960,
       "storageOptionsGB": [
@@ -4835,24 +9417,79 @@
         512
       ],
       "supportedIOS": [
+        "18.3",
+        "18.3.1",
+        "18.3.2",
+        "18.4",
+        "18.4.1",
+        "18.5",
+        "18.6",
+        "18.6.1",
+        "18.6.2",
+        "18.7",
+        "18.7.1",
+        "18.7.2",
+        "18.7.3",
+        "18.7.4",
+        "18.7.5",
+        "18.7.6",
+        "18.7.7",
+        "18.7.8",
+        "18.7.9",
         "26.0",
         "26.0.1",
         "26.1",
+        "26.1.1",
         "26.2",
+        "26.2.1",
         "26.3",
+        "26.3.1",
         "26.4",
         "26.4.1",
-        "26.5"
+        "26.4.2",
+        "26.5",
+        "26.5.1",
+        "26.5.2"
+      ],
+      "PartNumber": "MXV63",
+      "modelNumbers": [
+        "A3212",
+        "A3408",
+        "A3410",
+        "A3409"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A3212",
+          "region": "Hoa Kỳ, Puerto Rico"
+        },
+        {
+          "A": "A3408",
+          "region": "Bahrain, Canada, Iraq, Guam, Jordan, Kuwait, Mexico, Oman, Qatar, Ả Rập Saudi, UAE, U.S. Virgin Islands"
+        },
+        {
+          "A": "A3410",
+          "region": "Trung Quốc đại lục"
+        },
+        {
+          "A": "A3409",
+          "region": "Các quốc gia/khu vực khác"
+        }
       ]
     },
     {
       "id": "iphone17",
       "MarketingName": "iPhone 17",
       "ProductType": "iPhone18,3",
-      "HWModelStr": "D47xAP",
-      "HardwarePlatform": "t8140",
-      "ModelNumber": "NAA13",
-      "RegulatoryModelNumber": "A3500",
+      "HWModelStr": "V57AP",
+      "HardwarePlatform": "t8150",
+      "ModelNumber": "A3520",
+      "RegulatoryModelNumber": "A3520",
       "CPUArchitecture": "arm64e",
       "chip": "A19",
       "cpuCores": 6,
@@ -4868,13 +9505,12 @@
         "DiagonalInches": 6.3,
         "MaxRefreshHz": 120
       },
-      "defaultIOS": "26.5.1",
+      "defaultIOS": "26.5.2",
       "minIOS": "26.0",
-      "maxIOS": "26.5.1",
+      "maxIOS": "26.5.2",
       "year": 2025,
-      "batteryMah": 3700,
+      "batteryMah": 3692,
       "storageOptionsGB": [
-        128,
         256,
         512
       ],
@@ -4883,27 +9519,62 @@
         "26.0",
         "26.0.1",
         "26.1",
+        "26.1.1",
         "26.2",
+        "26.2.1",
         "26.3",
+        "26.3.1",
         "26.4",
         "26.4.1",
+        "26.4.2",
         "26.5",
-        "26.5.1"
+        "26.5.1",
+        "26.5.2"
+      ],
+      "PartNumber": "NAA13",
+      "modelNumbers": [
+        "A3258",
+        "A3519",
+        "A3521",
+        "A3520"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A3258",
+          "region": "Hoa Kỳ, Puerto Rico"
+        },
+        {
+          "A": "A3519",
+          "region": "Bahrain, Canada, Guam, Nhật Bản, Kuwait, Mexico, Oman, Qatar, Ả Rập Saudi, UAE, U.S. Virgin Islands"
+        },
+        {
+          "A": "A3521",
+          "region": "Trung Quốc đại lục"
+        },
+        {
+          "A": "A3520",
+          "region": "Các quốc gia/khu vực khác"
+        }
       ]
     },
     {
       "id": "iphone17-air",
-      "MarketingName": "iPhone 17 Air",
+      "MarketingName": "iPhone Air",
       "ProductType": "iPhone18,4",
-      "HWModelStr": "D23xAP",
-      "HardwarePlatform": "t8140",
-      "ModelNumber": "NAB13",
-      "RegulatoryModelNumber": "A3501",
+      "HWModelStr": "V54AP",
+      "HardwarePlatform": "t8150",
+      "ModelNumber": "A3517",
+      "RegulatoryModelNumber": "A3517",
       "CPUArchitecture": "arm64e",
-      "chip": "A19",
+      "chip": "A19 Pro",
       "cpuCores": 6,
       "gpuCores": 5,
-      "PhysicalMemoryMB": 8192,
+      "PhysicalMemoryMB": 12288,
       "display": {
         "NativeWidth": 1260,
         "NativeHeight": 2736,
@@ -4911,14 +9582,14 @@
         "Pitch": 460,
         "LogicalWidth": 420,
         "LogicalHeight": 912,
-        "DiagonalInches": 6.6,
+        "DiagonalInches": 6.5,
         "MaxRefreshHz": 120
       },
-      "defaultIOS": "26.5.1",
+      "defaultIOS": "26.5.2",
       "minIOS": "26.0",
-      "maxIOS": "26.5.1",
+      "maxIOS": "26.5.2",
       "year": 2025,
-      "batteryMah": 3100,
+      "batteryMah": 3149,
       "storageOptionsGB": [
         256,
         512,
@@ -4929,22 +9600,57 @@
         "26.0",
         "26.0.1",
         "26.1",
+        "26.1.1",
         "26.2",
+        "26.2.1",
         "26.3",
+        "26.3.1",
         "26.4",
         "26.4.1",
+        "26.4.2",
         "26.5",
-        "26.5.1"
+        "26.5.1",
+        "26.5.2"
+      ],
+      "PartNumber": "NAC13",
+      "modelNumbers": [
+        "A3260",
+        "A3516",
+        "A3518",
+        "A3517"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A3260",
+          "region": "Hoa Kỳ, Puerto Rico, Bahrain, Canada, Guam, Kuwait, Mexico, Oman, Qatar, Ả Rập Saudi, UAE, U.S. Virgin Islands"
+        },
+        {
+          "A": "A3516",
+          "region": "Nhật Bản"
+        },
+        {
+          "A": "A3518",
+          "region": "Trung Quốc đại lục"
+        },
+        {
+          "A": "A3517",
+          "region": "Các quốc gia/khu vực khác"
+        }
       ]
     },
     {
       "id": "iphone17-pro",
       "MarketingName": "iPhone 17 Pro",
       "ProductType": "iPhone18,1",
-      "HWModelStr": "D93xAP",
+      "HWModelStr": "V53AP",
       "HardwarePlatform": "t8150",
-      "ModelNumber": "NAC13",
-      "RegulatoryModelNumber": "A3502",
+      "ModelNumber": "A3523",
+      "RegulatoryModelNumber": "A3523",
       "CPUArchitecture": "arm64e",
       "chip": "A19 Pro",
       "cpuCores": 6,
@@ -4960,11 +9666,11 @@
         "DiagonalInches": 6.3,
         "MaxRefreshHz": 120
       },
-      "defaultIOS": "26.5.1",
+      "defaultIOS": "26.5.2",
       "minIOS": "26.0",
-      "maxIOS": "26.5.1",
+      "maxIOS": "26.5.2",
       "year": 2025,
-      "batteryMah": 3800,
+      "batteryMah": 3988,
       "storageOptionsGB": [
         256,
         512,
@@ -4975,22 +9681,57 @@
         "26.0",
         "26.0.1",
         "26.1",
+        "26.1.1",
         "26.2",
+        "26.2.1",
         "26.3",
+        "26.3.1",
         "26.4",
         "26.4.1",
+        "26.4.2",
         "26.5",
-        "26.5.1"
+        "26.5.1",
+        "26.5.2"
+      ],
+      "PartNumber": "NAD13",
+      "modelNumbers": [
+        "A3256",
+        "A3522",
+        "A3524",
+        "A3523"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A3256",
+          "region": "Hoa Kỳ, Puerto Rico"
+        },
+        {
+          "A": "A3522",
+          "region": "Bahrain, Canada, Guam, Nhật Bản, Kuwait, Mexico, Oman, Qatar, Ả Rập Saudi, UAE, U.S. Virgin Islands"
+        },
+        {
+          "A": "A3524",
+          "region": "Trung Quốc đại lục"
+        },
+        {
+          "A": "A3523",
+          "region": "Các quốc gia/khu vực khác"
+        }
       ]
     },
     {
       "id": "iphone17-pro-max",
       "MarketingName": "iPhone 17 Pro Max",
       "ProductType": "iPhone18,2",
-      "HWModelStr": "D94xAP",
+      "HWModelStr": "V59AP",
       "HardwarePlatform": "t8150",
-      "ModelNumber": "NAD13",
-      "RegulatoryModelNumber": "A3503",
+      "ModelNumber": "A3526",
+      "RegulatoryModelNumber": "A3526",
       "CPUArchitecture": "arm64e",
       "chip": "A19 Pro",
       "cpuCores": 6,
@@ -5006,33 +9747,164 @@
         "DiagonalInches": 6.9,
         "MaxRefreshHz": 120
       },
-      "defaultIOS": "26.5.1",
+      "defaultIOS": "26.5.2",
       "minIOS": "26.0",
-      "maxIOS": "26.5.1",
+      "maxIOS": "26.5.2",
       "year": 2025,
-      "batteryMah": 4800,
+      "batteryMah": 5088,
       "storageOptionsGB": [
         256,
         512,
-        1024
+        1024,
+        2048
       ],
       "lab": true,
       "supportedIOS": [
         "26.0",
         "26.0.1",
         "26.1",
+        "26.1.1",
         "26.2",
+        "26.2.1",
         "26.3",
+        "26.3.1",
         "26.4",
         "26.4.1",
+        "26.4.2",
         "26.5",
-        "26.5.1"
+        "26.5.1",
+        "26.5.2"
+      ],
+      "PartNumber": "NAE13",
+      "modelNumbers": [
+        "A3257",
+        "A3525",
+        "A3527",
+        "A3526"
+      ],
+      "modelNumberMeta": {
+        "source_file": "iPhone_Model_Lookup.xlsx",
+        "apple_support": "https://support.apple.com/en-us/108044",
+        "default_region": "Các quốc gia/khu vực khác (VN)"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A3257",
+          "region": "Hoa Kỳ, Puerto Rico"
+        },
+        {
+          "A": "A3525",
+          "region": "Bahrain, Canada, Guam, Nhật Bản, Kuwait, Mexico, Oman, Qatar, Ả Rập Saudi, UAE, U.S. Virgin Islands"
+        },
+        {
+          "A": "A3527",
+          "region": "Trung Quốc đại lục"
+        },
+        {
+          "A": "A3526",
+          "region": "Các quốc gia/khu vực khác"
+        }
+      ]
+    },
+    {
+      "id": "iphone17e",
+      "MarketingName": "iPhone 17e",
+      "ProductType": "iPhone18,5",
+      "HWModelStr": "V63AP",
+      "HardwarePlatform": "t8150",
+      "ModelNumber": "A3634",
+      "RegulatoryModelNumber": "A3634",
+      "CPUArchitecture": "arm64e",
+      "chip": "A19",
+      "cpuCores": 6,
+      "gpuCores": 5,
+      "PhysicalMemoryMB": 8192,
+      "display": {
+        "NativeWidth": 1170,
+        "NativeHeight": 2532,
+        "ScreenScale": 3,
+        "Pitch": 460,
+        "LogicalWidth": 390,
+        "LogicalHeight": 844,
+        "DiagonalInches": 6.1,
+        "MaxRefreshHz": 60
+      },
+      "defaultIOS": "26.5.2",
+      "minIOS": "26.0",
+      "maxIOS": "26.5.2",
+      "year": 2026,
+      "batteryMah": 3800,
+      "storageOptionsGB": [
+        128,
+        256,
+        512
+      ],
+      "lab": true,
+      "supportedIOS": [
+        "26.0",
+        "26.0.1",
+        "26.1",
+        "26.1.1",
+        "26.2",
+        "26.2.1",
+        "26.3",
+        "26.3.1",
+        "26.4",
+        "26.4.1",
+        "26.4.2",
+        "26.5",
+        "26.5.1",
+        "26.5.2"
+      ],
+      "PartNumber": "MHRW4",
+      "modelNumbers": [
+        "A3575",
+        "A3634",
+        "A3635"
+      ],
+      "modelNumberMeta": {
+        "regions": "US+ • Global • China",
+        "source": "Bang_Tra_Cuu_Model_Number_iPhone_Axxxx.xlsx",
+        "apple_support": "https://support.apple.com/vi-vn/108044"
+      },
+      "modelNumberByRegion": [
+        {
+          "A": "A3575",
+          "region": "Hoa Kỳ, Puerto Rico, Bahrain, Canada, Guam, Nhật Bản, Kuwait, Mexico, Oman, Qatar, Ả Rập Saudi, UAE, U.S. Virgin Islands"
+        },
+        {
+          "A": "A3635",
+          "region": "Trung Quốc đại lục"
+        },
+        {
+          "A": "A3634",
+          "region": "Các quốc gia/khu vực khác"
+        }
       ]
     }
   ],
   "compat": {
     "file": "ios_device_compat.json",
     "strict": true,
-    "note": "Only device+iOS pairs from ios_device_compat.json are allowed in tools/app."
+    "source": "Apple Support + historical first/max + security releases",
+    "note": "Majors 8–18 and 26 only. No iOS 19–25. iPhone 6/6 Plus: 8.0–12.5.x"
+  },
+  "specs_source": {
+    "product_type": "https://gist.github.com/adamawolf/3048717",
+    "display_chip": "Apple Support tech specs",
+    "board": "TheiPhoneWiki / public board configs",
+    "updated": "2026-07-20"
+  },
+  "model_number_source": {
+    "file": "config/iPhone_Model_Lookup.xlsx",
+    "url": "https://support.apple.com/en-us/108044",
+    "published": "March 10, 2026",
+    "format": "Axxxx with region map",
+    "default": "Các quốc gia/khu vực khác (VN lab)",
+    "updated": "2026-07-20"
+  },
+  "display_source": {
+    "note": "Native resolution, scale, ppi, logical size, refresh from Apple tech specs",
+    "updated": "2026-07-20"
   }
 }

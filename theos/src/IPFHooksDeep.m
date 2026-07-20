@@ -74,19 +74,58 @@ static NSData *IPFRewritePayload(NSData *data) {
         NSString *hw = IPFFakeHW();
         NSString *out = s;
         BOOL changed = NO;
-        NSArray *pairs = @[
-            @[ @"iPhone11,6", pt ],
-            @[ @"iPhone11,4", pt ],
-            @[ @"D331pAP", hw ],
-            @[ @"D331AP", hw ],
+        // Rewrite common real fingerprints → spoofed ProductType / board
+        NSArray *realPT = @[
+            @"iPhone7,1", @"iPhone7,2", @"iPhone8,1", @"iPhone8,2", @"iPhone8,4",
+            @"iPhone9,1", @"iPhone9,2", @"iPhone9,3", @"iPhone9,4",
+            @"iPhone10,1", @"iPhone10,2", @"iPhone10,3", @"iPhone10,4", @"iPhone10,5", @"iPhone10,6",
+            @"iPhone11,2", @"iPhone11,4", @"iPhone11,6", @"iPhone11,8",
+            @"iPhone12,1", @"iPhone12,3", @"iPhone12,5", @"iPhone12,8",
+            @"iPhone13,1", @"iPhone13,2", @"iPhone13,3", @"iPhone13,4",
+            @"iPhone14,2", @"iPhone14,3", @"iPhone14,4", @"iPhone14,5", @"iPhone14,6",
+            @"iPhone14,7", @"iPhone14,8", @"iPhone15,2", @"iPhone15,3",
+            @"iPhone15,4", @"iPhone15,5", @"iPhone16,1", @"iPhone16,2",
+            @"iPhone17,1", @"iPhone17,2", @"iPhone17,3", @"iPhone17,4", @"iPhone17,5",
         ];
-        for (NSArray *p in pairs) {
-            if ([out rangeOfString:p[0]].location != NSNotFound) {
-                out = [out stringByReplacingOccurrencesOfString:p[0] withString:p[1]];
+        NSArray *realHW = @[
+            @"N61AP", @"N56AP", @"N71AP", @"N66AP", @"D10AP", @"D11AP",
+            @"D20AP", @"D21AP", @"D22AP", @"N841AP", @"D321AP", @"D331pAP", @"D331AP",
+            @"N104AP", @"D421AP", @"D431AP", @"D79AP",
+            @"D52gAP", @"D53gAP", @"D53pAP", @"D54pAP",
+            @"D16AP", @"D17AP", @"D63AP", @"D64AP", @"D49AP",
+            @"D27AP", @"D28AP", @"D73AP", @"D74AP",
+            @"D37AP", @"D38AP", @"D83AP", @"D84AP",
+            @"D47AP", @"D48AP", @"D93AP", @"D94AP", @"D23AP",
+        ];
+        for (NSString *r in realPT) {
+            if ([r isEqualToString:pt]) continue;
+            if ([out rangeOfString:r].location != NSNotFound) {
+                out = [out stringByReplacingOccurrencesOfString:r withString:pt];
                 changed = YES;
             }
         }
-        // model_code / "mod" JSON style already covered by iPhone11,6 replace
+        for (NSString *r in realHW) {
+            if ([r isEqualToString:hw]) continue;
+            if ([out rangeOfString:r].location != NSNotFound) {
+                out = [out stringByReplacingOccurrencesOfString:r withString:hw];
+                changed = YES;
+            }
+        }
+        NSString *mk = [[IPFConfig shared] mgValueForKey:@"MarketingName"];
+        if (mk.length) {
+            NSArray *realNames = @[
+                @"iPhone XS Max", @"iPhone Xs Max", @"iPhone XR", @"iPhone 11 Pro Max",
+                @"iPhone 12 Pro Max", @"iPhone 13 Pro Max", @"iPhone 14 Pro Max",
+                @"iPhone 15 Pro Max", @"iPhone 16 Pro Max",
+            ];
+            for (NSString *rn in realNames) {
+                if ([rn isEqualToString:mk]) continue;
+                if ([out rangeOfString:rn].location != NSNotFound) {
+                    out = [out stringByReplacingOccurrencesOfString:rn withString:mk];
+                    changed = YES;
+                }
+            }
+        }
         if (changed) {
             IPFLog([NSString stringWithFormat:@"NET rewrite body len %lu → fakePT=%@", (unsigned long)data.length, pt]);
             return [out dataUsingEncoding:NSUTF8StringEncoding];
