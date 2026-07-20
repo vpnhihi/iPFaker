@@ -412,10 +412,12 @@ def build(version: str, app_path: str | None) -> Path:
         + f"SHA256: {sha256}\n"
         + "\n"
     )
+    # Apt on iOS requires Unix LF only (CRLF breaks package index parsing)
+    packages_lf = packages.replace("\r\n", "\n").replace("\r", "\n")
     packages_path = out_dir / "repo" / "Packages"
-    packages_path.write_text(packages, encoding="utf-8")
+    packages_path.write_bytes(packages_lf.encode("utf-8"))
     with gzip.open(str(out_dir / "repo" / "Packages.gz"), "wb") as gz:
-        gz.write(packages.encode())
+        gz.write(packages_lf.encode("utf-8"))
 
     release = f"""Origin: iPFaker Lab
 Label: iPFaker
@@ -426,11 +428,12 @@ Architectures: {ARCH}
 Components: main
 Description: iPFaker lab packages for Dopamine rootless / Sileo
 """
-    (out_dir / "repo" / "Release").write_text(release, encoding="utf-8")
+    release_lf = release.replace("\r\n", "\n").replace("\r", "\n")
+    if not release_lf.endswith("\n"):
+        release_lf += "\n"
+    (out_dir / "repo" / "Release").write_bytes(release_lf.encode("utf-8"))
 
-    # human readme
-    (out_dir / "INSTALL.txt").write_text(
-        f"""iPFaker Sileo package
+    install = f"""iPFaker Sileo package
 =====================
 File: {deb_name}
 Size: {deb_path.stat().st_size} bytes
@@ -442,15 +445,13 @@ Install on device (pick one):
 2) Filza → open .deb → Install
 3) SSH: dpkg -i {deb_name}
 
-Sileo repo (local/GitHub Pages):
-  Point Sileo to a host serving dist/sileo/repo/
-  (Packages, Packages.gz, Release, debs/)
+Sileo source:
+  https://vpnhihi.github.io/iPFaker/
 
 After install:
   Open iPFaker app (if included) → pick model → Apply → Kill Zalo → open Zalo
-""",
-        encoding="utf-8",
-    )
+"""
+    (out_dir / "INSTALL.txt").write_bytes(install.replace("\r\n", "\n").encode("utf-8"))
 
     print("Built:", deb_path)
     print("Size :", deb_path.stat().st_size)

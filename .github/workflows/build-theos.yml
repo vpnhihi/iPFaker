@@ -48,8 +48,10 @@ jobs:
           export THEOS=$HOME/theos
           export PATH="/usr/local/bin:$PATH"
           chmod 755 layout/DEBIAN/postinst 2>/dev/null || true
+          # Theos tweak stage needs filter plists next to Makefile
+          cp -f layout/Library/MobileSubstrate/DynamicLibraries/iPFakerMG.plist ./iPFakerMG.plist
+          cp -f layout/Library/MobileSubstrate/DynamicLibraries/iPFakerCT.plist ./iPFakerCT.plist
           make clean || true
-          # Release-ish: FINALPACKAGE avoids debug leftover issues
           make all FINALPACKAGE=1
           make package FINALPACKAGE=1 || true
           echo "=== built dylibs ==="
@@ -110,45 +112,51 @@ jobs:
           export THEOS=$HOME/theos
           export PATH="/usr/local/bin:$PATH"
           chmod 755 layout/DEBIAN/postinst 2>/dev/null || true
+          # Keep catalog fresh
+          cp -f ../../config/device_catalog.json Resources/device_catalog.json || true
           make clean || true
-          make package FINALPACKAGE=1
+          make all FINALPACKAGE=1
+          make package FINALPACKAGE=1 || true
           mkdir -p ../dist/app
-          find .theos packages -name 'iPFaker' -o -name '*.deb' -o -name 'iPFaker.app' 2>/dev/null | head -30
           APP=$(find .theos -type d -name 'iPFaker.app' | head -1)
-          if [ -n "$APP" ]; then
-            cp -a "$APP" ../dist/app/
-            BIN="../dist/app/iPFaker.app/iPFaker"
-            if [ -f "$BIN" ]; then
-              codesign --remove-signature "$BIN" 2>/dev/null || true
-              ldid -Sentitlements.plist "$BIN" || ldid -S "$BIN"
-              ldid -h "$BIN" 2>&1 | head -15 || true
-            fi
+          echo "APP=$APP"
+          if [ -z "$APP" ]; then
+            echo "FATAL: iPFaker.app not built"
+            find .theos -type f | head -40
+            exit 1
           fi
-          find packages -name '*.deb' -exec cp -f {} ../dist/app/ \; 2>/dev/null || true
-          # also copy release dylibs for deb packager
-          mkdir -p ../dist
-          MG=$(find ../.theos .theos ../obj -name 'iPFakerMG.dylib' 2>/dev/null | head -1)
-          CT=$(find ../.theos .theos ../obj -name 'iPFakerCT.dylib' 2>/dev/null | head -1)
-          # prefer parent theos dist from earlier step
-          [ -f ../dist/iPFakerMG.dylib ] || { [ -n "$MG" ] && cp -f "$MG" ../dist/iPFakerMG.dylib; }
-          [ -f ../dist/iPFakerCT.dylib ] || { [ -n "$CT" ] && cp -f "$CT" ../dist/iPFakerCT.dylib; }
-          ls -laR ../dist/app || true
+          cp -a "$APP" ../dist/app/
+          # ensure catalog inside bundle
+          cp -f Resources/device_catalog.json ../dist/app/iPFaker.app/device_catalog.json || true
+          BIN="../dist/app/iPFaker.app/iPFaker"
+          codesign --remove-signature "$BIN" 2>/dev/null || true
+          ldid -Sentitlements.plist "$BIN" || ldid -S "$BIN"
+          ldid -h "$BIN" 2>&1 | head -15 || true
+          file "$BIN" || true
+          ls -laR ../dist/app
 
-      - name: Build Sileo .deb
+      - name: Build Sileo .deb (dylibs + app)
         working-directory: .
         run: |
           set -e
-          # Prefer freshly built CI dylibs
-          mkdir -p dylibs_ci theos/dist/app
+          mkdir -p dylibs_ci
           if [ -f theos/dist/iPFakerMG.dylib ]; then
             cp -f theos/dist/iPFakerMG.dylib dylibs_ci/
             cp -f theos/dist/iPFakerCT.dylib dylibs_ci/
           fi
-          python3 scripts/build_sileo_deb.py --version 2.3.0 \
-            --app theos/dist/app/iPFaker.app 2>/dev/null \
-            || python3 scripts/build_sileo_deb.py --version 2.3.0
+          test -d theos/dist/app/iPFaker.app
+          python3 scripts/build_sileo_deb.py --version 2.4.0 --app theos/dist/app/iPFaker.app
           ls -la dist/sileo/
-          ls -la dist/sileo/repo/debs/ || true
+          ls -la dist/sileo/repo/debs/
+          # stage for pages
+          mkdir -p sileo-repo/debs
+          cp -f dist/sileo/repo/Packages sileo-repo/
+          cp -f dist/sileo/repo/Packages.gz sileo-repo/
+          cp -f dist/sileo/repo/Release sileo-repo/
+          cp -f dist/sileo/repo/debs/*.deb sileo-repo/debs/
+          cp -f dist/sileo/repo/debs/*.deb sileo-repo/ || true
+          printf '' > sileo-repo/.nojekyll
+          ls -laR sileo-repo
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

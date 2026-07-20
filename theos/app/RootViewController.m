@@ -19,15 +19,31 @@
     self.title = @"iPFaker";
     self.navigationItem.largeTitleDisplayMode = UINavigationItemLargeTitleDisplayModeAlways;
     self.tableView.rowHeight = UITableViewAutomaticDimension;
-    self.tableView.estimatedRowHeight = 48;
+    self.tableView.estimatedRowHeight = 52;
+    self.tableView.backgroundColor = [UIColor systemGroupedBackgroundColor];
+
+    // Quick Apply button
+    self.navigationItem.rightBarButtonItem =
+        [[UIBarButtonItem alloc] initWithTitle:@"Apply"
+                                         style:UIBarButtonItemStyleDone
+                                        target:self
+                                        action:@selector(quickApply)];
 
     [[Catalog shared] reload];
     [self restoreSelectionFromDisk];
     if (!self.selectedDeviceId.length) {
-        self.selectedDeviceId = @"iphone15-pro";
-        self.selectedIOS = @"17.6.1";
+        self.selectedDeviceId = @"iphone17-pro-max";
+        self.selectedIOS = @"19.0";
     }
-    self.statusText = @"Lab only · Zalo spoof · không inject Settings";
+    NSUInteger nDev = Catalog.shared.devices.count;
+    NSUInteger nIOS = Catalog.shared.iosReleases.count;
+    self.statusText = [NSString stringWithFormat:
+        @"Lab · %lu máy · %lu iOS · chỉ spoof Zalo (không đụng Settings)",
+        (unsigned long)nDev, (unsigned long)nIOS];
+}
+
+- (void)quickApply {
+    [self applyProfileReseedOnly:NO];
 }
 
 - (void)viewWillAppear:(BOOL)animated {

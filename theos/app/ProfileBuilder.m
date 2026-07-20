@@ -1,5 +1,7 @@
 #import "ProfileBuilder.h"
 #import <UIKit/UIKit.h>
+#import <spawn.h>
+#import <sys/wait.h>
 
 @implementation ProfileBuilder
 
@@ -202,9 +204,26 @@
 }
 
 + (void)killZalo {
-    // Best-effort; works on JB when sandbox allows
-    system("killall -9 Zalo 2>/dev/null");
-    system("killall -9 vn.com.vng.zingalo 2>/dev/null");
+    // system() is unavailable on iOS SDK — use posix_spawn(killall)
+    NSArray<NSString *> *bins = @[
+        @"/var/jb/usr/bin/killall",
+        @"/usr/bin/killall",
+        @"/var/jb/bin/killall",
+    ];
+    NSArray<NSString *> *names = @[ @"Zalo", @"vn.com.vng.zingalo" ];
+    for (NSString *bin in bins) {
+        if (![[NSFileManager defaultManager] isExecutableFileAtPath:bin]) continue;
+        for (NSString *name in names) {
+            pid_t pid = 0;
+            const char *argv[] = { bin.UTF8String, "-9", name.UTF8String, NULL };
+            posix_spawn(&pid, bin.UTF8String, NULL, NULL, (char *const *)argv, NULL);
+            if (pid > 0) {
+                int st = 0;
+                waitpid(pid, &st, 0);
+            }
+        }
+        break;
+    }
 }
 
 + (NSString *)wipeZaloLab {
