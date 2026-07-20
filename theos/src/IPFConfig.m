@@ -222,8 +222,44 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
     if (!key) return nil;
     id v = self.mgMap[key];
     if (v) return v;
-    // flat fallback
-    return self.flat[key];
+    if (self.flat[key]) return self.flat[key];
+
+    // MobileGestalt aliases Zalo/system actually query (hyphen / camel / lower)
+    static NSDictionary *aliases;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        aliases = @{
+            @"marketing-name": @"MarketingName",
+            @"Marketing-Name": @"MarketingName",
+            @"product-type": @"ProductType",
+            @"Product-Type": @"ProductType",
+            @"hw.model": @"HWModelStr",
+            @"HWModel": @"HWModelStr",
+            @"hardware-model": @"HWModelStr",
+            @"DeviceName": @"DeviceName",
+            @"device-name": @"UserAssignedDeviceName",
+            @"user-assigned-device-name": @"UserAssignedDeviceName",
+            @"SerialNumber": @"SerialNumber",
+            @"serial-number": @"SerialNumber",
+            @"UniqueDeviceID": @"UniqueDeviceID",
+            @"unique-device-id": @"UniqueDeviceID",
+            @"ProductVersion": @"ProductVersion",
+            @"product-version": @"ProductVersion",
+            @"BuildVersion": @"BuildVersion",
+            @"build-version": @"BuildVersion",
+            @"ProductBuildVersion": @"ProductBuildVersion",
+        };
+    });
+    NSString *canon = aliases[key];
+    if (canon) {
+        v = self.mgMap[canon] ?: self.flat[canon];
+        if (v) return v;
+    }
+    // case-insensitive scan of mgMap (rare keys)
+    for (NSString *k in self.mgMap) {
+        if ([k caseInsensitiveCompare:key] == NSOrderedSame) return self.mgMap[k];
+    }
+    return nil;
 }
 
 - (nullable id)sysctlValueForName:(NSString *)name {
