@@ -49,8 +49,8 @@ jobs:
           export PATH="/usr/local/bin:$PATH"
           chmod 755 layout/DEBIAN/postinst 2>/dev/null || true
           make clean || true
-          # Build libraries (package step optional)
-          make all
+          # Release-ish: FINALPACKAGE avoids debug leftover issues
+          make all FINALPACKAGE=1
           make package FINALPACKAGE=1 || true
           echo "=== built dylibs ==="
           find .theos -name 'iPFaker*.dylib' | head -20
@@ -60,18 +60,23 @@ jobs:
         run: |
           set -e
           mkdir -p dist
-          find .theos -name 'iPFakerMG.dylib' -exec cp -f {} dist/ \;
-          find .theos -name 'iPFakerCT.dylib' -exec cp -f {} dist/ \;
-          # prefer non-debug if multiple
+          # Prefer release/obj over debug if both exist
+          find .theos/obj -name 'iPFakerMG.dylib' 2>/dev/null | head -5
+          # copy largest/newest non-debug if present
+          MG=$(find .theos -path '*debug*' -prune -o -name 'iPFakerMG.dylib' -print 2>/dev/null | head -1)
+          CT=$(find .theos -path '*debug*' -prune -o -name 'iPFakerCT.dylib' -print 2>/dev/null | head -1)
+          if [ -z "$MG" ]; then MG=$(find .theos -name 'iPFakerMG.dylib' | head -1); fi
+          if [ -z "$CT" ]; then CT=$(find .theos -name 'iPFakerCT.dylib' | head -1); fi
+          cp -f "$MG" dist/iPFakerMG.dylib
+          cp -f "$CT" dist/iPFakerCT.dylib
           cp -f layout/Library/MobileSubstrate/DynamicLibraries/*.plist dist/ 2>/dev/null || true
           find packages -name '*.deb' -exec cp -f {} dist/ \; 2>/dev/null || true
           ls -la dist
-          test -f dist/iPFakerMG.dylib
-          test -f dist/iPFakerCT.dylib
           file dist/iPFakerMG.dylib dist/iPFakerCT.dylib || true
-          # Ensure LC_LOAD_DYLIB → ElleKit libsubstrate (not CydiaSubstrate.framework)
+          # Clean re-sign: REMOVE previous signature then single ldid pass
+          # (codesign+ldid double-pass caused "signature does not cover entire file" on Dopamine)
           for d in dist/iPFakerMG.dylib dist/iPFakerCT.dylib; do
-            echo "=== otool before $d ==="
+            echo "=== fixup $d ==="
             otool -L "$d" || true
             install_name_tool -change \
               @rpath/CydiaSubstrate.framework/CydiaSubstrate \
@@ -79,30 +84,23 @@ jobs:
             install_name_tool -change \
               /Library/Frameworks/CydiaSubstrate.framework/CydiaSubstrate \
               /var/jb/usr/lib/libsubstrate.dylib "$d" 2>/dev/null || true
-            install_name_tool -change \
-              @rpath/libsubstrate.dylib \
-              /var/jb/usr/lib/libsubstrate.dylib "$d" 2>/dev/null || true
-            # Hard re-sign fat binary (fixes "signature does not cover entire file")
-            rm -f "$d.signed"
-            # Prefer codesign ad-hoc; fallback ldid
-            if codesign -f -s - --timestamp=none --generate-entitlement-der "$d" 2>/tmp/cs.err; then
-              echo "codesign OK $d"
-            else
-              cat /tmp/cs.err || true
-              ldid -S "$d" || ldid -s "$d" || true
-            fi
-            # Second pass: ldid often fixes SuperBlob coverage for rootless
-            ldid -S "$d" 2>/dev/null || true
-            echo "=== otool after $d ==="
-            otool -L "$d" || true
-            codesign -dvvv "$d" 2>&1 | head -25 || true
-            # verify with codesign
+            # strip any existing code signature blob
+            codesign --remove-signature "$d" 2>/dev/null || true
+            # single ad-hoc sign with ldid (JB standard)
+            ldid -S "$d"
+            echo "size=$(stat -f%z "$d" 2>/dev/null || stat -c%s "$d")"
+            ldid -h "$d" 2>&1 | head -20 || true
+            codesign -dvvv "$d" 2>&1 | head -15 || true
             codesign --verify --verbose=4 "$d" 2>&1 || true
+            otool -l "$d" | grep -A4 LC_CODE_SIGNATURE || true
           done
           if otool -L dist/iPFakerMG.dylib | grep -q 'CydiaSubstrate.framework'; then
             echo "FATAL: still links CydiaSubstrate.framework"
             exit 1
           fi
+          # Fail CI if signature missing
+          ldid -h dist/iPFakerMG.dylib 2>&1 | grep -q CDHash=
+          ldid -h dist/iPFakerCT.dylib 2>&1 | grep -q CDHash=
 
 
       - name: Upload artifact
