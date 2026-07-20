@@ -87,6 +87,23 @@ def zalo_only_plist() -> bytes:
 """
 
 
+def preinst_script() -> str:
+    return r"""#!/bin/sh
+# Ensure extract destinations exist (rootless Dopamine)
+ROOT="${JBROOT:-/var/jb}"
+mkdir -p "$ROOT/usr/lib/TweakInject" 2>/dev/null || true
+mkdir -p "$ROOT/Library/MobileSubstrate/DynamicLibraries" 2>/dev/null || true
+mkdir -p "$ROOT/etc/ipfaker" 2>/dev/null || true
+mkdir -p "$ROOT/Applications" 2>/dev/null || true
+mkdir -p /var/jb/usr/lib/TweakInject 2>/dev/null || true
+mkdir -p /var/jb/Library/MobileSubstrate/DynamicLibraries 2>/dev/null || true
+mkdir -p /var/jb/etc/ipfaker 2>/dev/null || true
+mkdir -p /var/jb/Applications 2>/dev/null || true
+mkdir -p /var/mobile/Library/iPFaker 2>/dev/null || true
+exit 0
+"""
+
+
 def postinst_script() -> str:
     return r"""#!/bin/sh
 set -e
@@ -110,7 +127,9 @@ do
     if [ -f "$MS/$f" ]; then
       chown root:wheel "$MS/$f" 2>/dev/null || true
       chmod 755 "$MS/$f" 2>/dev/null || true
-      # trustcache (Dopamine)
+      if command -v ldid >/dev/null 2>&1; then
+        ldid -S "$MS/$f" 2>/dev/null || true
+      fi
       if [ -x /var/jb/basebin/jbctl ] && command -v ldid >/dev/null 2>&1; then
         H=$(ldid -h "$MS/$f" 2>/dev/null | sed -n 's/.*CDHash=//p' | head -1 | tr 'A-F' 'a-f' | cut -c1-40)
         if [ ${#H} -eq 40 ]; then
@@ -132,13 +151,15 @@ done
 if [ -n "$APP" ]; then
   chown -R root:wheel "$APP" 2>/dev/null || true
   [ -f "$APP/iPFaker" ] && chmod 755 "$APP/iPFaker" 2>/dev/null || true
-  if [ -f "$APP/iPFaker" ] && [ -x /var/jb/basebin/jbctl ] && command -v ldid >/dev/null 2>&1; then
-    H=$(ldid -h "$APP/iPFaker" 2>/dev/null | sed -n 's/.*CDHash=//p' | head -1 | tr 'A-F' 'a-f' | cut -c1-40)
-    if [ ${#H} -eq 40 ]; then
-      /var/jb/basebin/jbctl trustcache add "$H" 2>/dev/null || true
+  if [ -f "$APP/iPFaker" ] && command -v ldid >/dev/null 2>&1; then
+    ldid -S "$APP/iPFaker" 2>/dev/null || true
+    if [ -x /var/jb/basebin/jbctl ]; then
+      H=$(ldid -h "$APP/iPFaker" 2>/dev/null | sed -n 's/.*CDHash=//p' | head -1 | tr 'A-F' 'a-f' | cut -c1-40)
+      if [ ${#H} -eq 40 ]; then
+        /var/jb/basebin/jbctl trustcache add "$H" 2>/dev/null || true
+      fi
     fi
   fi
-  # catalog into config dirs
   if [ -f "$APP/device_catalog.json" ]; then
     cp -f "$APP/device_catalog.json" "$ROOT/etc/ipfaker/device_catalog.json" 2>/dev/null || true
     cp -f "$APP/device_catalog.json" /var/mobile/Library/iPFaker/device_catalog.json 2>/dev/null || true
@@ -151,7 +172,6 @@ if [ -n "$APP" ]; then
   fi
 fi
 
-# seed catalog from etc if app missing
 if [ -f "$ROOT/etc/ipfaker/device_catalog.json" ]; then
   cp -f "$ROOT/etc/ipfaker/device_catalog.json" /var/mobile/Library/iPFaker/device_catalog.json 2>/dev/null || true
   chown mobile:mobile /var/mobile/Library/iPFaker/device_catalog.json 2>/dev/null || true
@@ -298,29 +318,36 @@ def build(version: str, app_path: str | None) -> Path:
             size_bytes += len(data)
             return data
 
-        # dirs as empty entries (optional)
+        # Full paths under /var/jb (HIOS-style).
+        # NOTE: On Dopamine, DynamicLibraries -> symlink to TweakInject.
+        # Package ONLY TweakInject to avoid dpkg double-extract failure.
         for d in (
+            "var/",
+            "var/jb/",
+            "var/jb/usr/",
+            "var/jb/usr/lib/",
             "var/jb/usr/lib/TweakInject/",
-            "var/jb/Library/MobileSubstrate/DynamicLibraries/",
+            "var/jb/etc/",
             "var/jb/etc/ipfaker/",
             "var/jb/Applications/",
+            "var/mobile/",
+            "var/mobile/Library/",
             "var/mobile/Library/iPFaker/",
         ):
             info = tarfile.TarInfo(name=d)
             info.type = tarfile.DIRTYPE
             info.mode = 0o755
             info.mtime = int(time.time())
+            info.uid = 0
+            info.gid = 0
             tar.addfile(info)
 
         plist = zalo_only_plist()
-        for dest_root in (
-            "var/jb/usr/lib/TweakInject",
-            "var/jb/Library/MobileSubstrate/DynamicLibraries",
-        ):
-            add_file(tar, f"{dest_root}/iPFakerMG.dylib", track(mg.read_bytes()), 0o755)
-            add_file(tar, f"{dest_root}/iPFakerCT.dylib", track(ct.read_bytes()), 0o755)
-            add_file(tar, f"{dest_root}/iPFakerMG.plist", track(plist), 0o644)
-            add_file(tar, f"{dest_root}/iPFakerCT.plist", track(plist), 0o644)
+        dest = "var/jb/usr/lib/TweakInject"
+        add_file(tar, f"{dest}/iPFakerMG.dylib", track(mg.read_bytes()), 0o755)
+        add_file(tar, f"{dest}/iPFakerCT.dylib", track(ct.read_bytes()), 0o755)
+        add_file(tar, f"{dest}/iPFakerMG.plist", track(plist), 0o644)
+        add_file(tar, f"{dest}/iPFakerCT.plist", track(plist), 0o644)
 
         if catalog.exists():
             cdata = track(catalog.read_bytes())
@@ -332,7 +359,6 @@ def build(version: str, app_path: str | None) -> Path:
 
         if app:
             add_tree(tar, app, "var/jb/Applications/iPFaker.app")
-            # recount size roughly
             for f in app.rglob("*"):
                 if f.is_file():
                     size_bytes += f.stat().st_size
@@ -347,6 +373,7 @@ def build(version: str, app_path: str | None) -> Path:
 
     def control_builder(tar: tarfile.TarFile) -> None:
         add_file(tar, "./control", ctrl.encode(), 0o644)
+        add_file(tar, "./preinst", preinst_script().encode(), 0o755)
         add_file(tar, "./postinst", postinst.encode(), 0o755)
         add_file(tar, "./prerm", prerm.encode(), 0o755)
 

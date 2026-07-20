@@ -14,7 +14,7 @@ Trong gói:
 
 | Thành phần | Đường dẫn |
 |------------|-----------|
-| iPFakerMG / CT | `/var/jb/usr/lib/TweakInject/` **và** `MobileSubstrate/DynamicLibraries/` |
+| iPFakerMG / CT | `/var/jb/usr/lib/TweakInject/` (DynamicLibraries = symlink cùng chỗ) |
 | Filter | Chỉ **Zalo** (không inject Settings) |
 | App (nếu CI build được) | `/var/jb/Applications/iPFaker.app` |
 | Catalog | `/var/jb/etc/ipfaker/device_catalog.json` |
