@@ -13,7 +13,7 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.title = @"Chọn app wipe";
+    self.title = @"Chọn ứng dụng";
     self.view.backgroundColor = AppTheme.bg;
     self.tableView.backgroundColor = self.view.backgroundColor;
 
@@ -24,7 +24,7 @@
     self.search = [[UISearchController alloc] initWithSearchResultsController:nil];
     self.search.searchResultsUpdater = self;
     self.search.obscuresBackgroundDuringPresentation = NO;
-    self.search.searchBar.placeholder = @"Tên app, bundle id…";
+    self.search.searchBar.placeholder = @"Tên ứng dụng, mã gói…";
     self.navigationItem.searchController = self.search;
     self.definesPresentationContext = YES;
 
@@ -51,7 +51,7 @@
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
-    return [NSString stringWithFormat:@"Đã chọn %lu app · Tổng %lu app trên máy",
+    return [NSString stringWithFormat:@"Đã chọn %lu ứng dụng · Tổng %lu trên máy",
             (unsigned long)AppState.shared.selectedWipeBundleIds.count,
             (unsigned long)self.items.count];
 }
@@ -66,10 +66,10 @@
     cell.backgroundColor = AppTheme.cardAlt;
     cell.textLabel.textColor = AppTheme.textPrimary;
     cell.detailTextLabel.textColor = AppTheme.textSecondary;
-    cell.textLabel.text = [NSString stringWithFormat:@"%@%@", it.name, it.systemApp ? @"  · system" : @""];
+    cell.textLabel.text = [NSString stringWithFormat:@"%@%@", it.name, it.systemApp ? @"  · hệ thống" : @""];
     cell.detailTextLabel.text = [NSString stringWithFormat:@"%@%@",
                                  it.bundleId,
-                                 it.version.length ? [NSString stringWithFormat:@" · v%@", it.version] : @""];
+                                 it.version.length ? [NSString stringWithFormat:@" · phiên bản %@", it.version] : @""];
     cell.detailTextLabel.numberOfLines = 2;
     cell.accessoryType = on ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
     cell.tintColor = AppTheme.accent;

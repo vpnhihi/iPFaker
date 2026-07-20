@@ -16,7 +16,7 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.view.backgroundColor = AppTheme.bg;
-    self.title = @"Wipe App";
+    self.title = @"Xóa dữ liệu app";
     [AppTheme styleNavigationBar:self.navigationController.navigationBar];
 
     [[NSNotificationCenter defaultCenter] addObserver:self
@@ -27,14 +27,14 @@
     [AppState.shared ensureDefaults];
 
     UILabel *header = [[UILabel alloc] init];
-    header.text = @"Wipe App Data";
+    header.text = @"Xóa dữ liệu ứng dụng";
     header.font = AppTheme.titleFont;
     header.textColor = AppTheme.textPrimary;
     header.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:header];
 
     UILabel *note = [[UILabel alloc] init];
-    note.text = @"Chọn app tải ngoài (multi ✓) · Mặc định Bản đồ + Thời tiết · Có overlay tiến trình.";
+    note.text = @"Chọn app tải ngoài (chọn nhiều ✓) · Mặc định Bản đồ + Thời tiết · Hiện tiến trình giữa màn hình.";
     note.font = AppTheme.captionFont;
     note.textColor = AppTheme.textSecondary;
     note.numberOfLines = 0;
@@ -42,22 +42,22 @@
     [self.view addSubview:note];
 
     UIView *card = [AppTheme roundedCardIn:self.view];
-    UIControl *appsRow = [self makeRowTitle:@"Chọn app để wipe (nhiều)"
+    UIControl *appsRow = [self makeRowTitle:@"Chọn app để xóa dữ liệu (nhiều)"
                                 detailOut:&_appsDetailLabel
                                    action:@selector(pickApps)];
     [card addSubview:appsRow];
 
-    UIButton *wipeSel = [AppTheme primaryButtonWithTitle:@"Wipe data app đã chọn"
+    UIButton *wipeSel = [AppTheme primaryButtonWithTitle:@"Xóa dữ liệu app đã chọn"
                                                   target:self
                                                   action:@selector(wipeSelectedTapped)];
     wipeSel.backgroundColor = [UIColor colorWithRed:0.85 green:0.35 blue:0.1 alpha:1.0];
 
-    UIButton *resetData = [AppTheme primaryButtonWithTitle:@"Reset Data app"
+    UIButton *resetData = [AppTheme primaryButtonWithTitle:@"Đặt lại dữ liệu app"
                                                     target:self
                                                     action:@selector(resetDataTapped)];
 
     UIButton *saveData = [UIButton buttonWithType:UIButtonTypeSystem];
-    [saveData setTitle:@"Reset + Save Data (không wipe)" forState:UIControlStateNormal];
+    [saveData setTitle:@"Đặt lại + Lưu dữ liệu (không xóa app)" forState:UIControlStateNormal];
     [saveData setTitleColor:AppTheme.accent forState:UIControlStateNormal];
     saveData.titleLabel.font = AppTheme.bodyFont;
     saveData.translatesAutoresizingMaskIntoConstraints = NO;
@@ -167,9 +167,9 @@
                                  [AppState.shared wipeAppsSummary],
                                  (unsigned long)AppCatalog.shared.apps.count];
     self.hintLabel.text = [NSString stringWithFormat:
-        @"• Wipe data app đã chọn: xóa container/prefs pool.\n"
-        @"• Reset Data app: random profile + wipe data.\n"
-        @"• Reset + Save Data: random + ghi config (không wipe).\n"
+        @"• Xóa dữ liệu app đã chọn: xóa container/tuỳ chọn của tập chọn.\n"
+        @"• Đặt lại dữ liệu app: ngẫu nhiên hồ sơ + xóa data.\n"
+        @"• Đặt lại + Lưu: ngẫu nhiên + ghi cấu hình (không xóa data).\n"
         @"%@\n%@",
         [AppState.shared wipeAppsSummary],
         AppState.shared.statusText ?: @""];
@@ -208,25 +208,25 @@
 
 - (void)wipeSelectedTapped {
     if (AppState.shared.selectedWipeBundleIds.count == 0) {
-        [self alert:@"Wipe" msg:@"Chưa chọn app. Chạm «Chọn app để wipe» và tích ✓."];
+        [self alert:@"Xóa dữ liệu" msg:@"Chưa chọn app. Chạm «Chọn app để xóa dữ liệu» và tích ✓."];
         return;
     }
-    [self runWithProgressTitle:@"Đang wipe data app…" work:^NSString *(void (^step)(NSString *)) {
+    [self runWithProgressTitle:@"Đang xóa dữ liệu app…" work:^NSString *(void (^step)(NSString *)) {
         return [AppState.shared wipeSelectedAppsProgress:step];
     }];
 }
 
 - (void)resetDataTapped {
-    [self runWithProgressTitle:@"Reset Data app…" work:^NSString *(void (^step)(NSString *)) {
+    [self runWithProgressTitle:@"Đang đặt lại dữ liệu app…" work:^NSString *(void (^step)(NSString *)) {
         return [AppState.shared killZaloAndRandomizeFromPoolProgress:step];
     }];
 }
 
 - (void)saveDataTapped {
-    [self runWithProgressTitle:@"Reset + Save Data…" work:^NSString *(void (^step)(NSString *)) {
-        step(@"Random máy + iOS trong pool…");
+    [self runWithProgressTitle:@"Đang đặt lại + lưu…" work:^NSString *(void (^step)(NSString *)) {
+        step(@"Đang chọn ngẫu nhiên máy + iOS…");
         NSString *msg = [AppState.shared applyRandomFromPool];
-        step(@"Đã ghi config");
+        step(@"Đã ghi cấu hình");
         return msg;
     }];
 }

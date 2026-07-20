@@ -379,8 +379,8 @@
 
     if (okPaths.count == 0) {
         return [NSString stringWithFormat:
-                @"Apply failed (không ghi được config):\n%@\n"
-                @"Sửa: cài lại deb (postinst chown mobile) hoặc SSH: "
+                @"Lưu thất bại (không ghi được cấu hình):\n%@\n"
+                @"Sửa: cài lại gói (postinst chown mobile) hoặc SSH: "
                 @"sudo chown -R mobile:mobile /var/jb/etc/ipfaker",
                 [failMsgs componentsJoinedByString:@"\n"]];
     }
@@ -388,13 +388,13 @@
     NSString *mk = flat[@"MarketingName"] ?: @"?";
     NSString *pt = flat[@"ProductType"] ?: @"?";
     NSString *msg = [NSString stringWithFormat:
-                     @"Applied %@ (%@) iOS %@ → %@",
+                     @"Đã áp dụng %@ (%@) iOS %@ → %@",
                      mk, pt, ios ?: @"?",
                      [okPaths componentsJoinedByString:@", "]];
     if (!jbOk) {
         msg = [msg stringByAppendingString:
-               @"\n⚠ CHƯA ghi /var/jb/etc/ipfaker — Zalo vẫn đọc config CŨ. "
-               @"Chạy: sudo chown -R mobile:mobile /var/jb/etc/ipfaker rồi Apply lại."];
+               @"\n⚠ CHƯA ghi /var/jb/etc/ipfaker — app đích vẫn đọc cấu hình cũ. "
+               @"Chạy: sudo chown -R mobile:mobile /var/jb/etc/ipfaker rồi lưu lại."];
     }
     if (failMsgs.count)
         msg = [msg stringByAppendingFormat:@"\n(partial) %@", [failMsgs componentsJoinedByString:@"; "]];
@@ -574,16 +574,16 @@
         if (parts.count) [needles addObject:parts.lastObject];
     }
 
-    step([NSString stringWithFormat:@"Bắt đầu wipe %lu app…", (unsigned long)bundles.count]);
-    [log addObject:[NSString stringWithFormat:@"Targets: %@", [bundles componentsJoinedByString:@", "]]];
+    step([NSString stringWithFormat:@"Bắt đầu xóa dữ liệu %lu app…", (unsigned long)bundles.count]);
+    [log addObject:[NSString stringWithFormat:@"Mục tiêu: %@", [bundles componentsJoinedByString:@", "]]];
 
     // 1) Kill each app
     for (NSString *bid in bundles) {
-        step([NSString stringWithFormat:@"Kill process: %@", bid]);
+        step([NSString stringWithFormat:@"Đóng tiến trình: %@", bid]);
         [self killAppBundleId:bid executable:nil];
     }
     usleep(350000);
-    [log addObject:@"① Kill processes"];
+    [log addObject:@"① Đã đóng tiến trình"];
 
     // 2) Zalo-specific privileged script when wiping Zalo
     BOOL wipingZalo = NO;
@@ -593,7 +593,7 @@
         }
     }
     if (wipingZalo) {
-        step(@"Chạy script wipe Zalo (libexec)…");
+        step(@"Chạy script xóa sâu (libexec)…");
         NSArray *scripts = @[
             @"/var/jb/usr/libexec/ipfaker-wipe-zalo",
             @"/var/jb/etc/ipfaker/wipe_zalo.sh",
@@ -605,56 +605,56 @@
             [fm setAttributes:@{ NSFilePosixPermissions: @0755 } ofItemAtPath:sp error:nil];
             int rc = [self runShellScript:sp args:@[]];
             if (rc >= 0) {
-                NSString *m = [NSString stringWithFormat:@"② Script wipe Zalo rc=%d", rc];
+                NSString *m = [NSString stringWithFormat:@"② Script xóa sâu (mã %d)", rc];
                 [log addObject:m]; step(m);
                 scriptRan = YES;
                 break;
             }
         }
         if (!scriptRan) {
-            [log addObject:@"② Script Zalo: skip — wipe native"];
-            step(@"Script Zalo không chạy — wipe native");
+            [log addObject:@"② Script: bỏ qua — xóa trực tiếp"];
+            step(@"Script không chạy — xóa trực tiếp");
         }
     }
 
     // 3) Data containers
-    step(@"Quét / xóa Data containers…");
+    step(@"Quét / xóa thư mục dữ liệu app…");
     NSUInteger dataWiped = 0;
     NSString *dataRoot = @"/var/mobile/Containers/Data/Application";
     for (NSString *uuid in [fm contentsOfDirectoryAtPath:dataRoot error:nil] ?: @[]) {
         NSString *root = [dataRoot stringByAppendingPathComponent:uuid];
         NSString *meta = [root stringByAppendingPathComponent:@".com.apple.mobile_container_manager.metadata.plist"];
         if (![self metadataAtPath:meta matchesAny:needles]) continue;
-        step([NSString stringWithFormat:@"Wipe container %@", [uuid substringToIndex:MIN((NSUInteger)8, uuid.length)]]);
+        step([NSString stringWithFormat:@"Xóa dữ liệu %@", [uuid substringToIndex:MIN((NSUInteger)8, uuid.length)]]);
         NSUInteger n = [self wipeContainerRoot:root fm:fm];
         dataWiped += n;
-        [log addObject:[NSString stringWithFormat:@"③ Data %@ items~%lu",
+        [log addObject:[NSString stringWithFormat:@"③ Dữ liệu %@ mục~%lu",
                         [uuid substringToIndex:MIN((NSUInteger)8, uuid.length)], (unsigned long)n]];
     }
     if (dataWiped == 0) {
-        [log addObject:@"③ Data: không tìm thấy / đã trống"];
-        step(@"Data container: trống hoặc không match");
+        [log addObject:@"③ Dữ liệu: không tìm thấy / đã trống"];
+        step(@"Thư mục dữ liệu: trống hoặc không khớp");
     }
 
     // 4) App Groups
-    step(@"Quét / xóa App Groups…");
+    step(@"Quét / xóa nhóm chia sẻ app…");
     NSUInteger groupWiped = 0;
     NSString *groupRoot = @"/var/mobile/Containers/Shared/AppGroup";
     for (NSString *uuid in [fm contentsOfDirectoryAtPath:groupRoot error:nil] ?: @[]) {
         NSString *root = [groupRoot stringByAppendingPathComponent:uuid];
         NSString *meta = [root stringByAppendingPathComponent:@".com.apple.mobile_container_manager.metadata.plist"];
         if (![self metadataAtPath:meta matchesAny:needles]) continue;
-        step([NSString stringWithFormat:@"Wipe AppGroup %@", [uuid substringToIndex:MIN((NSUInteger)8, uuid.length)]]);
+        step([NSString stringWithFormat:@"Xóa nhóm chia sẻ %@", [uuid substringToIndex:MIN((NSUInteger)8, uuid.length)]]);
         groupWiped += [self wipeContainerRoot:root fm:fm];
-        [log addObject:[NSString stringWithFormat:@"④ AppGroup %@", [uuid substringToIndex:MIN((NSUInteger)8, uuid.length)]]];
+        [log addObject:[NSString stringWithFormat:@"④ Nhóm chia sẻ %@", [uuid substringToIndex:MIN((NSUInteger)8, uuid.length)]]];
     }
     if (groupWiped == 0) {
-        [log addObject:@"④ AppGroup: trống"];
-        step(@"AppGroup: trống");
+        [log addObject:@"④ Nhóm chia sẻ: trống"];
+        step(@"Nhóm chia sẻ: trống");
     }
 
     // 5) Prefs / cookies / caches / splash
-    step(@"Xóa Prefs / Cookies / Caches / Splash…");
+    step(@"Xóa tuỳ chọn / cookie / bộ nhớ đệm / ảnh chụp…");
     NSUInteger crumb = 0;
     for (NSString *bid in bundles) {
         NSArray *paths = @[
@@ -678,12 +678,12 @@
         }
         if (hit && [fm removeItemAtPath:[snapRoot stringByAppendingPathComponent:name] error:nil]) crumb++;
     }
-    NSString *m5 = [NSString stringWithFormat:@"⑤ Prefs/Caches/Splash ~%lu", (unsigned long)crumb];
+    NSString *m5 = [NSString stringWithFormat:@"⑤ Tuỳ chọn/bộ nhớ đệm ~%lu", (unsigned long)crumb];
     [log addObject:m5]; step(m5);
 
     // 6) Keychain for zalo-ish only (safe subset)
     if (wipingZalo) {
-        step(@"Keychain best-effort (Zalo patterns)…");
+        step(@"Xóa keychain (cố gắng hết sức)…");
         NSString *sqlite = nil;
         for (NSString *c in @[ @"/var/jb/usr/bin/sqlite3", @"/usr/bin/sqlite3" ]) {
             if ([fm isExecutableFileAtPath:c]) { sqlite = c; break; }
@@ -705,23 +705,23 @@
                     int st = 0; waitpid(pid, &st, 0);
                 }
             }
-            [log addObject:@"⑥ Keychain Zalo purged (SQL)"];
-            step(@"Keychain Zalo: đã purge");
+            [log addObject:@"⑥ Keychain đã dọn (SQL)"];
+            step(@"Keychain: đã dọn");
         } else {
-            [log addObject:@"⑥ Keychain: skip (no sqlite/db)"];
+            [log addObject:@"⑥ Keychain: bỏ qua (không có sqlite/db)"];
             step(@"Keychain: bỏ qua");
         }
     }
 
     // 7) Kill again
-    step(@"Kill lại processes…");
+    step(@"Đóng lại các tiến trình…");
     for (NSString *bid in bundles)
         [self killAppBundleId:bid executable:nil];
-    [log addObject:@"⑦ Kill lại"];
+    [log addObject:@"⑦ Đóng tiến trình lần 2"];
 
-    step(@"Hoàn tất wipe");
+    step(@"Hoàn tất xóa dữ liệu");
     return [NSString stringWithFormat:
-            @"Đã wipe %lu app:\n%@\n\n→ Mở lại app = data sạch (như cài mới / reset local).",
+            @"Đã xóa dữ liệu %lu app:\n%@\n\n→ Mở lại app = dữ liệu sạch (như cài mới).",
             (unsigned long)bundles.count,
             [log componentsJoinedByString:@"\n"]];
 }

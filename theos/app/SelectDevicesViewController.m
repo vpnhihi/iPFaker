@@ -19,7 +19,7 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.view.backgroundColor = AppTheme.bg;
-    self.title = @"Select Devices";
+    self.title = @"Chọn thiết bị";
     [AppTheme styleNavigationBar:self.navigationController.navigationBar];
 
     [[NSNotificationCenter defaultCenter] addObserver:self
@@ -28,14 +28,14 @@
                                                object:nil];
 
     UILabel *header = [[UILabel alloc] init];
-    header.text = @"Select Devices";
+    header.text = @"Chọn thiết bị";
     header.font = AppTheme.titleFont;
     header.textColor = AppTheme.textPrimary;
     header.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:header];
 
     UILabel *sub = [[UILabel alloc] init];
-    sub.text = @"Multi-select · ✓ = đã chọn · có «Chọn tất cả» · Reset Data = random cặp hợp lệ";
+    sub.text = @"Chọn nhiều · ✓ = đã chọn · có «Chọn tất cả» · Đặt lại dữ liệu = ngẫu nhiên cặp hợp lệ";
     sub.font = AppTheme.captionFont;
     sub.textColor = AppTheme.textSecondary;
     sub.numberOfLines = 2;
@@ -62,7 +62,7 @@
     sep.backgroundColor = AppTheme.separator;
     sep.translatesAutoresizingMaskIntoConstraints = NO;
 
-    UIControl *iosRow = [self makeRowTitle:@"Chọn iOS (nhiều · theo matrix)"
+    UIControl *iosRow = [self makeRowTitle:@"Chọn iOS (nhiều · theo bảng tương thích)"
                                detailOut:&_iosDetailLabel
                                   action:@selector(pickIOS)];
 
@@ -73,12 +73,12 @@
     [self.card addSubview:stack];
     [sep.heightAnchor constraintEqualToConstant:1.0 / UIScreen.mainScreen.scale].active = YES;
 
-    UIButton *applyBtn = [AppTheme primaryButtonWithTitle:@"Reset + Save Data"
+    UIButton *applyBtn = [AppTheme primaryButtonWithTitle:@"Đặt lại + Lưu dữ liệu"
                                                    target:self
                                                    action:@selector(applyTapped)];
     [self.view addSubview:applyBtn];
 
-    UIButton *killBtn = [AppTheme primaryButtonWithTitle:@"Reset Data app"
+    UIButton *killBtn = [AppTheme primaryButtonWithTitle:@"Đặt lại dữ liệu app"
                                                   target:self
                                                   action:@selector(killRandomTapped)];
     killBtn.backgroundColor = [UIColor colorWithRed:0.85 green:0.35 blue:0.1 alpha:1.0];
@@ -197,13 +197,13 @@
     NSDictionary *dev = [st currentDevice] ?: @{};
     NSDictionary *disp = dev[@"display"] ?: @{};
 
-    self.deviceDetailLabel.text = [NSString stringWithFormat:@"%@\nActive: %@ · %@",
+    self.deviceDetailLabel.text = [NSString stringWithFormat:@"%@\nĐang dùng: %@ · %@",
                                    [st devicePoolSummary],
                                    dev[@"MarketingName"] ?: @"—",
                                    dev[@"ProductType"] ?: @"—"];
 
     NSDictionary *meta = [st currentIOSMeta] ?: @{};
-    self.iosDetailLabel.text = [NSString stringWithFormat:@"%@\nActive: iOS %@ · Build %@",
+    self.iosDetailLabel.text = [NSString stringWithFormat:@"%@\nĐang dùng: iOS %@ · Build %@",
                                 [st iosPoolSummary],
                                 st.selectedIOS ?: @"—",
                                 meta[@"BuildVersion"] ?: @"?"];
@@ -216,11 +216,11 @@
     }
 
     self.hintLabel.text = [NSString stringWithFormat:
-        @"Pool: %lu máy × iOS đã chọn → %lu cặp matrix hợp lệ.\n"
-        @"Matrix union: %lu bản iOS · Active id: %@\n"
-        @"Màn active: %@×%@ @%@\n"
-        @"Reset Data app = random model/iOS + full identity + wipe data.\n"
-        @"Reset + Save Data = random + ghi config (không wipe).\n%@",
+        @"Tập chọn: %lu máy × iOS → %lu cặp tương thích.\n"
+        @"Hợp iOS: %lu bản · Mã máy: %@\n"
+        @"Màn hình: %@×%@ @%@\n"
+        @"Đặt lại dữ liệu app = ngẫu nhiên model/iOS + full identity + xóa data.\n"
+        @"Đặt lại + Lưu = ngẫu nhiên + ghi cấu hình (không xóa data).\n%@",
         (unsigned long)st.selectedDeviceIds.count,
         (unsigned long)nPairs,
         (unsigned long)nCompat,
@@ -252,18 +252,18 @@
 
 - (void)applyTapped {
     UIView *host = self.tabBarController.view ?: self.navigationController.view ?: self.view;
-    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Reset + Save Data…"];
+    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Đang đặt lại + lưu…"];
     self.view.userInteractionEnabled = NO;
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-        [ov appendStep:@"Random máy + iOS…"];
+        [ov appendStep:@"Đang chọn ngẫu nhiên máy + iOS…"];
         NSString *msg = [AppState.shared applyRandomFromPool];
-        [ov appendStep:@"Đã ghi config"];
+        [ov appendStep:@"Đã ghi cấu hình"];
         dispatch_async(dispatch_get_main_queue(), ^{
             self.view.userInteractionEnabled = YES;
             [ov finishWithTitle:@"Đã lưu" detail:msg];
             [self refreshUI];
             [ov dismissAfter:1.2 completion:^{
-                [self alert:@"Reset + Save Data" msg:msg];
+                [self alert:@"Đặt lại + Lưu dữ liệu" msg:msg];
             }];
         });
     });
@@ -271,7 +271,7 @@
 
 - (void)killRandomTapped {
     UIView *host = self.tabBarController.view ?: self.navigationController.view ?: self.view;
-    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Reset Data app…"];
+    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Đang đặt lại dữ liệu app…"];
     self.view.userInteractionEnabled = NO;
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         NSString *msg = [AppState.shared killZaloAndRandomizeFromPoolProgress:^(NSString *step) {
@@ -282,7 +282,7 @@
             [ov finishWithTitle:@"Hoàn tất" detail:msg];
             [self refreshUI];
             [ov dismissAfter:1.6 completion:^{
-                [self alert:@"Reset Data app" msg:msg];
+                [self alert:@"Đặt lại dữ liệu app" msg:msg];
             }];
         });
     });

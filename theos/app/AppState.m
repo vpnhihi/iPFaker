@@ -68,7 +68,7 @@ static NSString *const kPoolWipeApps = @"ipf.pool.wipeBundleIds";
                            flat[@"MarketingName"] ?: @"?",
                            flat[@"ProductVersion"] ?: @"?"];
     } else if (!self.statusText.length) {
-        self.statusText = @"Chưa có config — chọn máy + iOS rồi Reset + Save Data";
+        self.statusText = @"Chưa có cấu hình — chọn máy + iOS rồi «Đặt lại + Lưu dữ liệu»";
     }
 }
 
@@ -333,7 +333,7 @@ static NSString *const kPoolWipeApps = @"ipf.pool.wipeBundleIds";
 
 - (NSString *)wipeAppsSummary {
     NSUInteger n = self.selectedWipeBundleIds.count;
-    if (n == 0) return @"Chưa chọn app (chạm để chọn)";
+    if (n == 0) return @"Chưa chọn ứng dụng (chạm để chọn)";
     NSMutableArray *names = [NSMutableArray array];
     for (NSString *bid in self.selectedWipeBundleIds) {
         if ([bid isEqualToString:@"com.apple.Maps"]) [names addObject:@"Bản đồ"];
@@ -343,8 +343,8 @@ static NSString *const kPoolWipeApps = @"ipf.pool.wipeBundleIds";
     }
     NSString *head = [names componentsJoinedByString:@", "];
     if (n > names.count)
-        return [NSString stringWithFormat:@"%lu app: %@…", (unsigned long)n, head];
-    return [NSString stringWithFormat:@"%lu app: %@", (unsigned long)n, head];
+        return [NSString stringWithFormat:@"%lu ứng dụng: %@…", (unsigned long)n, head];
+    return [NSString stringWithFormat:@"%lu ứng dụng: %@", (unsigned long)n, head];
 }
 
 #pragma mark - Apply / random pool
@@ -383,7 +383,7 @@ static NSString *const kPoolWipeApps = @"ipf.pool.wipeBundleIds";
 }
 
 - (NSString *)applyWithDevice:(NSDictionary *)dev ios:(NSString *)ios {
-    if (!dev) return @"Catalog trống";
+    if (!dev) return @"Danh mục máy trống";
     NSDictionary *meta = Catalog.shared.iosReleases[ios];
     if (!meta) return [NSString stringWithFormat:@"Không có iOS %@ trong catalog", ios];
 
@@ -393,7 +393,7 @@ static NSString *const kPoolWipeApps = @"ipf.pool.wipeBundleIds";
         if (!sup.count) return @"Máy này không có iOS trong matrix";
         ios = sup.lastObject;
         meta = Catalog.shared.iosReleases[ios];
-        if (!meta) return @"iOS matrix lỗi";
+        if (!meta) return @"Bảng iOS tương thích lỗi";
     }
 
     self.selectedDeviceId = dev[@"id"];
@@ -446,7 +446,7 @@ static NSString *const kPoolWipeApps = @"ipf.pool.wipeBundleIds";
     (void)reseedOnly;
     // Apply primary pair (or fix matrix) — full new identity
     NSDictionary *dev = [self currentDevice];
-    if (!dev) return @"Catalog trống — thiếu device_catalog.json";
+    if (!dev) return @"Danh mục máy trống — thiếu device_catalog.json";
     NSString *ios = self.selectedIOS ?: dev[@"defaultIOS"] ?: @"18.5";
     if (![Catalog.shared device:dev supportsIOS:ios]) {
         NSArray *forDev = [self selectedIOSCompatibleWithDevice:dev];
@@ -465,9 +465,9 @@ static NSString *const kPoolWipeApps = @"ipf.pool.wipeBundleIds";
     NSString *ios = nil;
     NSString *err = nil;
     if (![self pickRandomPairDevice:&dev ios:&ios error:&err])
-        return err ?: @"Random pool thất bại";
+        return err ?: @"Chọn ngẫu nhiên thất bại";
     NSString *msg = [self applyWithDevice:dev ios:ios];
-    return [NSString stringWithFormat:@"Random: %@ + iOS %@\n%@",
+    return [NSString stringWithFormat:@"Ngẫu nhiên: %@ + iOS %@\n%@",
             dev[@"MarketingName"] ?: dev[@"id"], ios, msg];
 }
 
@@ -476,17 +476,17 @@ static NSString *const kPoolWipeApps = @"ipf.pool.wipeBundleIds";
 }
 
 - (NSString *)killZaloAndRandomizeFromPoolProgress:(void (^)(NSString *))progress {
-    if (progress) progress(@"Random máy + iOS trong pool…");
+    if (progress) progress(@"Đang chọn ngẫu nhiên máy + iOS…");
     NSString *applyMsg = [self applyRandomFromPool];
-    // Wipe: selected wipe apps + lab spoof target (internal)
+    // Xóa data: app đã chọn + mục tiêu lab (nội bộ)
     NSMutableArray *wipeBids = [self.selectedWipeBundleIds mutableCopy] ?: [NSMutableArray array];
     for (NSString *b in @[ @"vn.com.vng.zingalo", @"com.zing.zalo" ]) {
         if (![wipeBids containsObject:b]) [wipeBids addObject:b];
     }
-    if (progress) progress([NSString stringWithFormat:@"Đã lưu profile — wipe %lu app…", (unsigned long)wipeBids.count]);
+    if (progress) progress([NSString stringWithFormat:@"Đã lưu hồ sơ — đang xóa %lu app…", (unsigned long)wipeBids.count]);
     NSString *wipeMsg = [ProfileBuilder wipeApps:wipeBids progress:progress];
     self.statusText = [NSString stringWithFormat:
-                       @"%@\n\n%@\n\n→ Mở lại app = data sạch + profile mới.",
+                       @"%@\n\n%@\n\n→ Mở lại app = dữ liệu sạch + hồ sơ mới.",
                        applyMsg, wipeMsg];
     [self postDidChange];
     return self.statusText;
@@ -504,11 +504,11 @@ static NSString *const kPoolWipeApps = @"ipf.pool.wipeBundleIds";
     [self ensureDefaults];
     NSArray *bids = [self.selectedWipeBundleIds copy];
     if (bids.count == 0) {
-        NSString *m = @"Chưa chọn app nào để wipe.";
+        NSString *m = @"Chưa chọn app nào để xóa dữ liệu.";
         self.statusText = m;
         return m;
     }
-    if (progress) progress([NSString stringWithFormat:@"Wipe %lu app đã chọn…", (unsigned long)bids.count]);
+    if (progress) progress([NSString stringWithFormat:@"Đang xóa %lu app đã chọn…", (unsigned long)bids.count]);
     NSString *m = [ProfileBuilder wipeApps:bids progress:progress];
     self.statusText = m;
     [self postDidChange];

@@ -60,7 +60,7 @@
     title.translatesAutoresizingMaskIntoConstraints = NO;
 
     UILabel *ver = [[UILabel alloc] init];
-    ver.text = @"Version: 2.6.0 · Lab device tools";
+    ver.text = @"Phiên bản: 2.6.2 · Công cụ lab thiết bị";
     ver.font = AppTheme.captionFont;
     ver.textColor = AppTheme.textSecondary;
     ver.translatesAutoresizingMaskIntoConstraints = NO;
@@ -82,8 +82,8 @@
     // Info card
     UIView *card = [AppTheme roundedCardIn:content];
 
-    UILabel *devHeader = [self boldLabel:@"Device Info"];
-    UILabel *ipHeader = [self boldLabel:@"Profile Info"];
+    UILabel *devHeader = [self boldLabel:@"Thông tin máy"];
+    UILabel *ipHeader = [self boldLabel:@"Hồ sơ ảo"];
 
     self.deviceModelLabel = [self bodyLabel];
     self.deviceVersionLabel = [self bodyLabel];
@@ -116,19 +116,19 @@
     [card addSubview:cols];
 
     UILabel *contact = [[UILabel alloc] init];
-    contact.text = @"Lab tools · không inject Cài đặt hệ thống";
+    contact.text = @"Công cụ lab · không can thiệp Cài đặt hệ thống";
     contact.font = AppTheme.captionFont;
     contact.textColor = AppTheme.accent;
     contact.numberOfLines = 2;
     contact.translatesAutoresizingMaskIntoConstraints = NO;
     [card addSubview:contact];
 
-    // Action buttons: Reset Data app | Reset + Save Data
-    UIButton *resetDataBtn = [AppTheme primaryButtonWithTitle:@"Reset Data app"
+    // Nút: Đặt lại dữ liệu app | Đặt lại + Lưu dữ liệu
+    UIButton *resetDataBtn = [AppTheme primaryButtonWithTitle:@"Đặt lại dữ liệu app"
                                                        target:self
                                                        action:@selector(killTapped)];
     resetDataBtn.backgroundColor = [UIColor colorWithRed:0.85 green:0.35 blue:0.1 alpha:1.0];
-    UIButton *applyBtn = [AppTheme primaryButtonWithTitle:@"Reset + Save Data"
+    UIButton *applyBtn = [AppTheme primaryButtonWithTitle:@"Đặt lại + Lưu dữ liệu"
                                                    target:self
                                                    action:@selector(applyTapped)];
 
@@ -143,10 +143,10 @@
     UIView *toggleCard = [AppTheme roundedCardIn:content];
     toggleCard.backgroundColor = AppTheme.cardAlt;
     NSArray *quick = @[
-        @[ @"Fake Device", @"FakeDevice" ],
-        @[ @"Fake Screen", @"FakeScreen" ],
-        @[ @"Fake Network", @"FakeNetwork" ],
-        @[ @"Hide Jailbreak", @"HideJailbreak" ],
+        @[ @"Giả lập thiết bị", @"FakeDevice" ],
+        @[ @"Giả lập màn hình", @"FakeScreen" ],
+        @[ @"Giả lập mạng", @"FakeNetwork" ],
+        @[ @"Ẩn jailbreak", @"HideJailbreak" ],
     ];
     UIStackView *toggles = [[UIStackView alloc] init];
     toggles.axis = UILayoutConstraintAxisVertical;
@@ -317,47 +317,47 @@
     BOOL worked = flat.count > 0;
 
     self.deviceModelLabel.text = [NSString stringWithFormat:@"Model: %@", model];
-    self.deviceVersionLabel.text = [NSString stringWithFormat:@"Version: %@", ios];
+    self.deviceVersionLabel.text = [NSString stringWithFormat:@"Phiên bản: %@", ios];
     self.deviceIdfaLabel.text = [NSString stringWithFormat:@"IDFA: %@", idfa];
-    self.deviceStatusLabel.text = worked ? @"Status: Worked" : @"Status: Idle";
+    self.deviceStatusLabel.text = worked ? @"Trạng thái: Đã áp dụng" : @"Trạng thái: Chưa áp dụng";
     self.deviceStatusLabel.textColor = worked ? AppTheme.success : AppTheme.textSecondary;
 
-    self.ipProxyLabel.text = [NSString stringWithFormat:@"Type: %@", flat[@"ProductType"] ?: dev[@"ProductType"] ?: @"—"];
-    self.ipAddrLabel.text = [NSString stringWithFormat:@"Serial: %@", flat[@"SerialNumber"] ?: @"—"];
-    self.ipCountryLabel.text = [NSString stringWithFormat:@"Region: %@", flat[@"RegionCode"] ?: flat[@"PartNumberRegion"] ?: @"VN"];
+    self.ipProxyLabel.text = [NSString stringWithFormat:@"Loại: %@", flat[@"ProductType"] ?: dev[@"ProductType"] ?: @"—"];
+    self.ipAddrLabel.text = [NSString stringWithFormat:@"Sê-ri: %@", flat[@"SerialNumber"] ?: @"—"];
+    self.ipCountryLabel.text = [NSString stringWithFormat:@"Vùng: %@", flat[@"RegionCode"] ?: flat[@"PartNumberRegion"] ?: @"VN"];
     self.ipTzLabel.text = [NSString stringWithFormat:@"Chip: %@", flat[@"ChipName"] ?: dev[@"chip"] ?: @"—"];
 
     NSUInteger nDev = Catalog.shared.devices.count;
     NSUInteger nIOS = Catalog.shared.iosReleases.count;
-    self.statusFooter.text = [NSString stringWithFormat:@"%@\nCatalog: %lu máy · %lu iOS",
+    self.statusFooter.text = [NSString stringWithFormat:@"%@\nDanh mục: %lu máy · %lu iOS",
                               st.statusText ?: @"",
                               (unsigned long)nDev, (unsigned long)nIOS];
 }
 
 - (void)applyTapped {
-    // Reset + Save Data: random identity + ghi config
+    // Đặt lại + Lưu: random identity + ghi config
     UIView *host = self.tabBarController.view ?: self.navigationController.view ?: self.view;
-    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Reset + Save Data…"];
+    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Đang đặt lại + lưu…"];
     self.view.userInteractionEnabled = NO;
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-        [ov appendStep:@"Random máy + iOS trong pool…"];
+        [ov appendStep:@"Đang chọn ngẫu nhiên máy + iOS…"];
         NSString *msg = [AppState.shared applyRandomFromPool];
-        [ov appendStep:@"Đã ghi config profile"];
+        [ov appendStep:@"Đã ghi hồ sơ cấu hình"];
         dispatch_async(dispatch_get_main_queue(), ^{
             self.view.userInteractionEnabled = YES;
             [ov finishWithTitle:@"Đã lưu" detail:msg];
             [self refreshUI];
             [ov dismissAfter:1.2 completion:^{
-                [self showAlertTitle:@"Reset + Save Data" message:msg];
+                [self showAlertTitle:@"Đặt lại + Lưu dữ liệu" message:msg];
             }];
         });
     });
 }
 
 - (void)killTapped {
-    // Reset Data app: random spoof + wipe data app (lab target)
+    // Đặt lại dữ liệu app: random spoof + xóa data
     UIView *host = self.tabBarController.view ?: self.navigationController.view ?: self.view;
-    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Reset Data app…"];
+    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Đang đặt lại dữ liệu app…"];
     self.view.userInteractionEnabled = NO;
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         NSString *msg = [AppState.shared killZaloAndRandomizeFromPoolProgress:^(NSString *step) {
@@ -368,7 +368,7 @@
             [ov finishWithTitle:@"Hoàn tất" detail:msg];
             [self refreshUI];
             [ov dismissAfter:1.6 completion:^{
-                [self showAlertTitle:@"Reset Data app" message:msg];
+                [self showAlertTitle:@"Đặt lại dữ liệu app" message:msg];
             }];
         });
     });

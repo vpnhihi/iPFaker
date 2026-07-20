@@ -44,7 +44,7 @@
             @[ @"Tên model", modelName ],
             @[ @"Số máy (Part)", modelNum ],
             @[ @"Axxxx (chạm)", reg ],
-            @[ @"Part Number", partNum ],
+            @[ @"Số part", partNum ],
             @[ @"Số sê-ri", serial ],
         ],
         @[
@@ -53,9 +53,9 @@
         ],
         @[
             @[ @"Phiên bản", [NSString stringWithFormat:@"iOS %@", ios] ],
-            @[ @"Build", build ],
-            @[ @"ProductType", ptype ],
-            @[ @"Board", hw ],
+            @[ @"Bản dựng", build ],
+            @[ @"Loại máy", ptype ],
+            @[ @"Bo mạch", hw ],
         ],
         @[
             @[ @"Chip", chip ],
@@ -83,9 +83,9 @@
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
     if (section == 0)
-        return @"Số máy Settings = Part Number (MU783KH/A). Chạm = Axxxx. Cả hai đều spoof. Serial/IDFA/IDFV/IMEI/EID random mỗi Apply.";
+        return @"Số máy mặc định = số part (vd. MU783KH/A). Chạm = Axxxx. Cả hai đều giả lập. Sê-ri/IDFA/IDFV/IMEI/EID ngẫu nhiên mỗi lần lưu.";
     if (section == 1)
-        return @"IDFA = advertisingIdentifier, IDFV = identifierForVendor — UUID v4 hoa, có gạch ngang.";
+        return @"IDFA / IDFV theo chuẩn UUID v4 (chữ hoa, có gạch ngang).";
     return nil;
 }
 

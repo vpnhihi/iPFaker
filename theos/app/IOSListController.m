@@ -68,7 +68,7 @@
     NSUInteger nShow = self.versions.count;
     return [NSString stringWithFormat:
             @"%lu đời máy · %lu iOS trong matrix · đã chọn %lu bản.\n"
-            @"Reset Data app sẽ random cặp (máy + iOS) hợp lệ trong pool.",
+            @"«Đặt lại dữ liệu app» sẽ chọn ngẫu nhiên cặp (máy + iOS) hợp lệ trong tập chọn.",
             (unsigned long)nDev, (unsigned long)nShow, (unsigned long)nSel];
 }
 

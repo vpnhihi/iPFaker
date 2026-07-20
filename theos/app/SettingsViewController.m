@@ -15,34 +15,34 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.title = @"Settings";
+    self.title = @"Cài đặt";
     self.view.backgroundColor = AppTheme.bg;
     self.tableView.backgroundColor = AppTheme.bg;
     self.tableView.separatorColor = AppTheme.separator;
     [AppTheme styleNavigationBar:self.navigationController.navigationBar];
 
-    // Shadow Tech–style toggles (mapped to lab spoof surface)
+    // Công tắc giả lập (map sang hook lab)
     self.sections = @[
         @[
-            @{ @"t": @"Fake Device", @"k": @"FakeDevice", @"d": @YES },
-            @{ @"t": @"Fake Hardware", @"k": @"FakeHardware", @"d": @YES },
-            @{ @"t": @"Fake Ads (IDFA/IDFV)", @"k": @"FakeAds", @"d": @YES },
-            @{ @"t": @"Fake Screen", @"k": @"FakeScreen", @"d": @YES },
-            @{ @"t": @"Fake Real Screen", @"k": @"FakeRealScreen", @"d": @YES },
-            @{ @"t": @"Fake Browser (UA)", @"k": @"FakeBrowser", @"d": @YES },
-            @{ @"t": @"Fake Network / Carrier", @"k": @"FakeNetwork", @"d": @YES },
-            @{ @"t": @"Fake Wifi Info", @"k": @"FakeWifi", @"d": @YES },
-            @{ @"t": @"Fake Sysctl", @"k": @"FakeSysctl", @"d": @YES },
-            @{ @"t": @"Fake Sys OSVersion", @"k": @"FakeSysOSVersion", @"d": @YES },
-            @{ @"t": @"Hide Jailbreak", @"k": @"HideJailbreak", @"d": @YES },
+            @{ @"t": @"Giả lập thiết bị", @"k": @"FakeDevice", @"d": @YES },
+            @{ @"t": @"Giả lập phần cứng", @"k": @"FakeHardware", @"d": @YES },
+            @{ @"t": @"Giả lập quảng cáo (IDFA/IDFV)", @"k": @"FakeAds", @"d": @YES },
+            @{ @"t": @"Giả lập màn hình", @"k": @"FakeScreen", @"d": @YES },
+            @{ @"t": @"Giả lập màn hình gốc (pixel)", @"k": @"FakeRealScreen", @"d": @YES },
+            @{ @"t": @"Giả lập trình duyệt (UA)", @"k": @"FakeBrowser", @"d": @YES },
+            @{ @"t": @"Giả lập mạng / nhà mạng", @"k": @"FakeNetwork", @"d": @YES },
+            @{ @"t": @"Giả lập Wi‑Fi", @"k": @"FakeWifi", @"d": @YES },
+            @{ @"t": @"Giả lập sysctl", @"k": @"FakeSysctl", @"d": @YES },
+            @{ @"t": @"Giả lập phiên bản hệ thống", @"k": @"FakeSysOSVersion", @"d": @YES },
+            @{ @"t": @"Ẩn jailbreak", @"k": @"HideJailbreak", @"d": @YES },
         ],
         @[
-            @{ @"t": @"Fake Locale (vi-VN + TZ)", @"k": @"FakeLocale", @"d": @YES },
-            @{ @"t": @"Fake Date Time (boot + offset)", @"k": @"FakeDateTime", @"d": @NO },
-            @{ @"t": @"Fake Location (WGS84)", @"k": @"FakeLocation", @"d": @YES },
-            @{ @"t": @"Fake Sensor", @"k": @"FakeSensor", @"d": @YES },
-            @{ @"t": @"Fake WebRTC (local IP)", @"k": @"FakeWebRTC", @"d": @YES },
-            @{ @"t": @"Disable WebRTC", @"k": @"DisableWebRTC", @"d": @NO },
+            @{ @"t": @"Giả lập ngôn ngữ / múi giờ", @"k": @"FakeLocale", @"d": @YES },
+            @{ @"t": @"Giả lập ngày giờ (boot/offset)", @"k": @"FakeDateTime", @"d": @NO },
+            @{ @"t": @"Giả lập vị trí (GPS)", @"k": @"FakeLocation", @"d": @YES },
+            @{ @"t": @"Giả lập cảm biến", @"k": @"FakeSensor", @"d": @YES },
+            @{ @"t": @"Giả lập WebRTC (IP nội bộ)", @"k": @"FakeWebRTC", @"d": @YES },
+            @{ @"t": @"Tắt WebRTC", @"k": @"DisableWebRTC", @"d": @NO },
         ],
     ];
 }
@@ -58,16 +58,16 @@
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
-    if (section == 0) return @"Fake surface (lab spoof)";
+    if (section == 0) return @"Lớp giả lập (lab)";
     if (section == 1) return @"Tuỳ chọn nâng cao";
     return @"Thông tin";
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
     if (section == 0)
-        return @"Mỗi switch bật/tắt hook sau Reset + Save Data. Format: UUID v4, IMEI Luhn, ITU E.212, ISO/BCP-47, IANA TZ, WGS84.";
+        return @"Mỗi công tắc bật/tắt hook sau «Đặt lại + Lưu dữ liệu». Định dạng: UUID v4, IMEI Luhn, ITU E.212, ISO/BCP-47, múi giờ IANA.";
     if (section == 1)
-        return @"Locale vi-VN · TZ Asia/Ho_Chi_Minh · GPS HCMC · WebRTC IP RFC1918. Fake Date Time mặc định TẮT (tránh lệch giờ TLS).";
+        return @"Ngôn ngữ vi-VN · Múi giờ Asia/Ho_Chi_Minh · GPS TP.HCM · WebRTC IP nội bộ. Giả lập ngày giờ mặc định TẮT (tránh lệch giờ TLS).";
     return nil;
 }
 
@@ -103,10 +103,10 @@
     cell.detailTextLabel.textColor = AppTheme.textSecondary;
     cell.selectionStyle = UITableViewCellSelectionStyleNone;
     if (indexPath.row == 0) {
-        cell.textLabel.text = @"Catalog devices";
+        cell.textLabel.text = @"Số đời máy trong danh mục";
         cell.detailTextLabel.text = [NSString stringWithFormat:@"%lu", (unsigned long)Catalog.shared.devices.count];
     } else {
-        cell.textLabel.text = @"iOS releases";
+        cell.textLabel.text = @"Số bản iOS trong danh mục";
         cell.detailTextLabel.text = [NSString stringWithFormat:@"%lu", (unsigned long)Catalog.shared.iosReleases.count];
     }
     return cell;

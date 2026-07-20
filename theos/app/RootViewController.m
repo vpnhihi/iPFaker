@@ -25,7 +25,7 @@
 
     // Quick Apply button
     self.navigationItem.rightBarButtonItem =
-        [[UIBarButtonItem alloc] initWithTitle:@"Apply"
+        [[UIBarButtonItem alloc] initWithTitle:@"Lưu"
                                          style:UIBarButtonItemStyleDone
                                         target:self
                                         action:@selector(quickApply)];
@@ -39,7 +39,7 @@
     NSUInteger nDev = Catalog.shared.devices.count;
     NSUInteger nIOS = Catalog.shared.iosReleases.count;
     self.statusText = [NSString stringWithFormat:
-        @"Lab · %lu máy · %lu iOS · không inject Settings",
+        @"Lab · %lu máy · %lu iOS · không can thiệp Cài đặt",
         (unsigned long)nDev, (unsigned long)nIOS];
 }
 
@@ -90,16 +90,16 @@
     switch (section) {
         case 0: return @"Hồ sơ lab";
         case 1: return @"Thao tác";
-        case 2: return @"Wipe";
+        case 2: return @"Xóa dữ liệu";
         default: return @"Trạng thái";
     }
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
     if (section == 0)
-        return @"Chọn model + iOS → Reset + Save Data (không đụng Cài đặt hệ thống).";
+        return @"Chọn model + iOS → Đặt lại + Lưu dữ liệu (không đụng Cài đặt hệ thống).";
     if (section == 1)
-        return @"Apply ghi config.plist vào /var/mobile/Library/iPFaker và /var/jb/etc/ipfaker.";
+        return @"Lưu ghi config.plist vào /var/mobile/Library/iPFaker và /var/jb/etc/ipfaker.";
     return nil;
 }
 
@@ -145,19 +145,19 @@
         }
     } else if (indexPath.section == 1) {
         if (indexPath.row == 0) {
-            cell.textLabel.text = @"Apply profile";
-            cell.detailTextLabel.text = @"Ghi config + serial/IDFA/IDFV mới";
+            cell.textLabel.text = @"Đặt lại + Lưu dữ liệu";
+            cell.detailTextLabel.text = @"Ghi cấu hình + sê-ri/IDFA/IDFV mới";
             cell.textLabel.textColor = [UIColor systemBlueColor];
         } else if (indexPath.row == 1) {
-            cell.textLabel.text = @"Reset + Save Data";
-            cell.detailTextLabel.text = @"Random identity + ghi config";
+            cell.textLabel.text = @"Đặt lại + Lưu (giữ model)";
+            cell.detailTextLabel.text = @"Ngẫu nhiên identity + ghi cấu hình";
         } else {
-            cell.textLabel.text = @"Reset Data app";
-            cell.detailTextLabel.text = @"Random profile + wipe data app";
+            cell.textLabel.text = @"Đặt lại dữ liệu app";
+            cell.detailTextLabel.text = @"Ngẫu nhiên hồ sơ + xóa data app";
             cell.textLabel.textColor = [UIColor systemOrangeColor];
         }
     } else if (indexPath.section == 2) {
-        cell.textLabel.text = @"Wipe data app";
+        cell.textLabel.text = @"Xóa dữ liệu app";
         cell.detailTextLabel.text = @"Xóa sạch data app đã chọn";
     } else {
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
@@ -212,7 +212,7 @@
             NSString *m = [AppState.shared killZaloAndRandomizeFromPool];
             self.statusText = m;
             [self.tableView reloadData];
-            [self toast:@"Reset Data app xong"];
+            [self toast:@"Đặt lại dữ liệu app xong"];
         }
         return;
     }
@@ -221,14 +221,14 @@
         NSString *m = [AppState.shared wipeSelectedAppsProgress:nil];
         self.statusText = m;
         [self.tableView reloadData];
-        [self toast:@"Wipe data app xong"];
+        [self toast:@"Xóa dữ liệu app xong"];
     }
 }
 
 - (void)applyProfileReseedOnly:(BOOL)reseedOnly {
     NSDictionary *dev = [self currentDevice];
     if (!dev) {
-        [self toast:@"Catalog trống — thiếu device_catalog.json"];
+        [self toast:@"Danh mục máy trống — thiếu device_catalog.json"];
         return;
     }
     NSString *ios = self.selectedIOS ?: dev[@"defaultIOS"] ?: @"18.5";
@@ -261,7 +261,7 @@
     self.statusText = result ?: @"OK";
     [self.tableView reloadData];
 
-    UIAlertController *a = [UIAlertController alertControllerWithTitle:@"Apply"
+    UIAlertController *a = [UIAlertController alertControllerWithTitle:@"Đã lưu"
                                                                message:result
                                                         preferredStyle:UIAlertControllerStyleAlert];
     [a addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];

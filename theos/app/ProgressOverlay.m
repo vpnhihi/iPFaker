@@ -18,7 +18,7 @@
     o.host = host;
     o.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     [o buildUI];
-    o.titleLabel.text = title ?: @"Đang xử lý…";
+    o.titleLabel.text = title.length ? title : @"Đang xử lý…";
     o.alpha = 0;
     [host addSubview:o];
     [UIView animateWithDuration:0.2 animations:^{ o.alpha = 1; }];
