@@ -2,7 +2,8 @@
 # Link libsubstrate.dylib (ElleKit), NOT CydiaSubstrate.framework (missing on Dopamine)
 
 export TARGET := iphone:clang:latest:14.0
-export ARCHS := arm64 arm64e
+# arm64e only — fat binaries + manual thin often break ldid coverage on Dopamine
+export ARCHS := arm64e
 export THEOS_PACKAGE_SCHEME := rootless
 
 include $(THEOS)/makefiles/common.mk
