@@ -1,98 +1,82 @@
 # iPFaker PC
 
-App Windows điều khiển **iPFaker** trên iPhone jailbreak qua **Wi‑Fi SSH** — **không cần cắm USB**.
+App Windows điều khiển iPhone lab qua **Wi‑Fi SSH** (không bắt buộc USB).
 
-## Yêu cầu
+Tổng quan dự án: [docs/MEMORY.md](../docs/MEMORY.md) · Cài iOS: [INSTALL_KHACH.md](../INSTALL_KHACH.md)
 
-| PC | iPhone |
-|----|--------|
-| Windows + Python 3.10+ | Dopamine rootless còn JB |
-| Cùng Wi‑Fi với máy | OpenSSH (mobile) bật |
-| `pip install paramiko` | Gói `com.ipfaker` đã cài (Sileo) |
+---
 
 ## Chạy
 
 ```bat
-pc_app\run_ipfaker_pc.bat
+pc_app\CHAY_APP.bat
 ```
 
 hoặc:
 
 ```bat
-cd Desktop\iPFaker
+cd C:\Users\Pem\Desktop\iPFaker
 python -m pip install -r pc_app\requirements.txt
 python pc_app\app.py
 ```
 
-## Kết nối
+Cấu hình local (IP, mật khẩu SSH, API keys):  
+`%APPDATA%\iPFakerPC\settings.json` — **không commit**.
 
-1. Trên iPhone: **Cài đặt → Wi‑Fi → (i) → Địa chỉ IP** (vd `192.168.1.10`)
-2. SSH user mặc định: `mobile`
-3. Trong app PC: nhập IP + mật khẩu → **Kết nối**
+---
 
-**Pool máy / iOS:** chọn trên app **iPFaker iPhone** (tab Chọn máy / iOS). PC **không** chọn pool — chỉ đọc `pools.json` từ máy.
+## Tabs
 
-Cấu hình PC: `%APPDATA%\iPFakerPC\settings.json` (tab **API SMS / Captcha**).
+| Tab | Việc |
+|-----|------|
+| **Điều khiển** | Kết nối SSH · spoof từ pool ĐT · wipe · **CHẠY QUY TRÌNH REG** |
+| **Quy trình 18 bước** | Bảng tên, DOB/gender, delay min–max từng bước |
+| **API keys** | BossOTP · RotaProxy · Captcha (2captcha / CapSolver / Achi) |
 
-## Nút chức năng
+### Pool máy / iOS
 
-| Nút | Giống app iOS | Hành vi |
-|-----|---------------|---------|
-| **Áp dụng máy đã chọn** | Ghi config | Random 1 cặp máy+iOS **hợp lệ** trong pool → ghi spoof |
-| **Đặt lại dữ liệu app** | Đặt lại dữ liệu app | Random spoof + **xóa data** → **mất login** |
-| **Đặt lại + Lưu dữ liệu** | Đặt lại + Lưu | Backup config+data → random spoof → wipe → **restore login** |
-| **Chỉ xóa data app** | Wipe tab | Xóa data app đã tick |
-| **Mở Zalo** | — | `uiopen` Zalo |
-| **Reg tự động → tới OTP** | Lab Frida | Spoof/wipe (tuỳ chọn) → mở Zalo → inject Gadget → chạm Đăng ký → điền SĐT |
-| **Gửi OTP / Tiếp reg** | Lab Frida | Điền OTP (nếu gõ trên PC) + tên + bấm Tiếp tục |
-| **Dừng Frida reg** | — | Gỡ session Frida |
+Chọn trên **app iPFaker iPhone** (tab Chọn máy). PC chỉ **đọc** `pools.json` / prefs — không có list chọn máy trên PC.
 
-### Reg tự động — cách dùng
+---
 
-1. Kết nối SSH, chọn pool máy/iOS  
-2. Nhập **SĐT** (+ tên hiển thị)  
-3. Tick *Random spoof* / *Xóa data Zalo* nếu muốn profile sạch  
-4. **Mở khóa màn hình** iPhone  
-5. Bấm **Reg tự động → tới OTP**  
-6. Khi Zalo hỏi OTP: nhập SMS trên máy **hoặc** gõ vào ô OTP → **Gửi OTP / Tiếp reg**  
-7. Captcha / chọn ảnh (nếu có) làm tay trên máy  
+## Quy trình reg 18 bước (tóm tắt)
 
-Cần: `pip install frida`, file `frida/zalo_ui_auto.bundle.js`, `opainject` trên máy (Dopamine), FridaGadget trên máy hoặc `downloads/FridaGadget.dylib`.
+1. RotaProxy xoay IP  
+2. Shadowrocket tắt/bật  
+3. iPFaker đặt lại data (pool điện thoại)  
+4–5. Zalo tạo TK + SĐT (BossOTP) + tick điều khoản  
+6. Captcha (Achi / 2captcha / CapSolver)  
+7. OTP BossOTP (có send-sms 7539/8500 nếu cần)  
+8. Privacy options  
+9. Tên (bảng random)  
+10. Sinh nhật + giới tính (bảng random)  
+11. Avatar → Bỏ qua  
+12. Danh bạ → skip/continue  
+13. Ngâm random (`13_soak`)  
+14–18. App Data Manager `com.tigisoftware.appdatamanager`  
 
-### API SMS (SĐT + OTP)
+Mọi bước: delay random — sửa tab **Quy trình 18 bước**.
 
-Tab **API SMS / Captcha**:
+---
 
-| Field | Ví dụ |
-|-------|--------|
-| URL thuê số | `https://PROVIDER/rent?key={api_key}&service=zalo` |
-| URL OTP | `https://PROVIDER/code?key={api_key}&id={order_id}` |
-| JSON path SĐT | `phone\|data.phone\|number` |
-| JSON path order | `id\|data.id\|order_id` |
-| JSON path OTP | `otp\|code\|data.code\|message` |
+## Module code
 
-Placeholder: `{api_key}`, `{order_id}`, `{id}`.
+| File | Vai trò |
+|------|---------|
+| `app.py` | GUI |
+| `device_client.py` | SSH |
+| `reg_pipeline.py` | Pipeline 18 bước |
+| `bossotp.py` | BossOTP API |
+| `rotaproxy.py` | RotaProxy changeip |
+| `captcha_providers.py` | Multi captcha |
+| `phone_pool.py` | Đọc pool từ iPhone |
+| `workflow_data/` | names, profiles, delays |
 
-### AchiCaptcha
+---
 
-| Field | Mặc định |
-|-------|----------|
-| createTask | `https://achicaptcha.com/api/createTask` |
-| getTaskResult | `https://achicaptcha.com/api/getTaskResult` |
-| API key | clientKey |
+## Dependencies
 
-Luồng: chụp màn hình iPhone → gửi ảnh base64 (ImageToTextTask) → điền text vào Zalo qua Frida.  
-Nếu docs Achi của bạn khác URL/body — sửa 2 URL (hoặc báo để chỉnh template JSON).
-
-## App mục tiêu
-
-Tick app cần lưu/xóa (mặc định Zalo). Maps / Thời tiết tùy chọn.
-
-Backup trên máy: `/var/mobile/Library/iPFaker/backups/<timestamp>/`
-
-## Lưu ý
-
-- Máy và PC **cùng mạng** (hoặc VPN/tunnel có route SSH).
-- Spoof Zalo vẫn do dylib `iPFakerMG` / `iPFakerCT` trên máy — app PC chỉ **ghi config + wipe/backup**.
-- Sau mỗi lần spoof: **mở lại Zalo** để nạp identity mới.
-- Không commit mật khẩu lên git; file settings nằm ngoài repo.
+```
+paramiko
+frida   # reg Frida UI
+```

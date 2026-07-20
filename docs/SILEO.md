@@ -1,98 +1,94 @@
-# Cài iPFaker bằng Sileo (file `.deb`)
+# Cài iPFaker bằng Sileo
 
-Gói rootless **Dopamine** / architecture `iphoneos-arm64` — giống cách cài HIOS.
+Gói **rootless Dopamine** · architecture **`iphoneos-arm64`** · package **`com.ipfaker`**.
 
-## Nguồn Sileo (thêm 1 lần)
+---
+
+## Nguồn Sileo (URL chuẩn)
 
 ```
 https://vpnhihi.github.io/ipfaker/
 ```
 
-1. **Sileo** → **Sources** → **+**  
-2. Dán URL trên → Add  
-3. Kéo refresh → tìm **iPFaker** → **Get** / Cài đặt  
+### Quan trọng — chữ thường
 
-> Cần bật **GitHub Pages** cho repo (Settings → Pages → GitHub Actions).  
-> Lần đầu push `sileo-repo/` sẽ deploy tự động (workflow `Sileo repo`).
+| URL | Kết quả |
+|-----|---------|
+| `https://vpnhihi.github.io/ipfaker/` | ✅ Đúng (Sileo dùng chữ thường) |
+| `https://vpnhihi.github.io/iPFaker/` | ❌ 404 — 0 gói |
 
-Nếu Pages chưa lên, cài file trực tiếp (mục dưới).
+Repo GitHub đã rename: **`vpnhihi/ipfaker`** (all lowercase) để khớp Sileo.
 
-## File gói
+### Thêm nguồn
 
-Sau khi build:
+1. **Sileo** → **Nguồn** → **+**  
+2. Dán URL → Add  
+3. Làm mới nguồn  
+4. Search **iPFaker** → Cài (**2.7.0+**)
+
+### Nếu lỗi “status 404 / Could not find release file”
+
+- Xóa nguồn cũ  
+- Thêm lại đúng `…/ipfaker/` (chữ thường)  
+- Kiểm tra Safari: mở URL trên có trang “iPFaker — nguồn Sileo” không  
+
+---
+
+## File `.deb` trực tiếp
 
 ```
-dist/sileo/com.ipfaker_2.3.4_iphoneos-arm64.deb
-sileo-repo/debs/com.ipfaker_2.3.4_iphoneos-arm64.deb
+https://vpnhihi.github.io/ipfaker/debs/com.ipfaker_2.7.0_iphoneos-arm64.deb
 ```
 
-Trong gói:
+Filza / AirDrop / Sileo Install package.
 
-| Thành phần | Đường dẫn |
-|------------|-----------|
-| iPFakerMG / CT | `/var/jb/usr/lib/TweakInject/` (DynamicLibraries = symlink cùng chỗ) |
+---
+
+## Trong gói cài
+
+| Thành phần | Đường dẫn on-device |
+|------------|---------------------|
+| iPFakerMG / iPFakerCT | `/var/jb/usr/lib/TweakInject/` |
 | Filter | Chỉ **Zalo** (không inject Settings) |
-| App (nếu CI build được) | `/var/jb/Applications/iPFaker.app` |
-| Catalog | `/var/jb/etc/ipfaker/device_catalog.json` |
+| App | `/var/jb/Applications/iPFaker.app` |
+| Catalog / config | `/var/jb/etc/ipfaker/` |
+| Backup / license | `/var/mobile/Library/iPFaker/` |
 
-`postinst`: trustcache (jbctl), `uicache`, tạo thư mục config, kill Zalo.
+`postinst`: trustcache (nếu có), `uicache`, chown mobile config, kill Zalo.
 
-## Cách 1 — Cài file `.deb` (nhanh nhất)
+---
 
-1. Tải `com.ipfaker_*.deb` (GitHub Actions artifact **ipfaker-sileo**, hoặc PC `dist/sileo/`)
-2. AirDrop / Filza / Safari → lưu vào máy  
-3. **Sileo** → tab **Packages** (hoặc tìm “Install package”) → chọn file  
-   hoặc **Filza** → chạm file `.deb` → **Install**  
-4. Respring nếu Sileo yêu cầu  
-5. Mở app **iPFaker** (nếu có trong gói) → chọn model → **Apply** → Kill Zalo → mở Zalo  
+## Build & publish (dev)
 
-## Cách 2 — Nguồn Sileo (repo)
+```bash
+# Build deb (sau Theos app + dylibs)
+python scripts/build_sileo_deb.py --version 2.7.0 --app theos/dist/app/iPFaker.app
 
-PC đã sinh:
+# Copy vào sileo-repo/debs, cập nhật Packages, rồi:
+python scripts/publish_gh_pages_sileo.py
+```
+
+- CI: workflow **Build Theos rootless** → artifact `ipfaker-sileo`  
+- Pages: branch **`gh-pages`** = nội dung `sileo-repo/`  
+- Script publish force-push `gh-pages` (ổn định hơn workflow Pages khi fail)
+
+### Cấu trúc `sileo-repo/`
 
 ```
-dist/sileo/repo/
+sileo-repo/
+  index.html
+  Release
   Packages
   Packages.gz
-  Release
-  debs/com.ipfaker_….deb
+  debs/com.ipfaker_2.7.0_iphoneos-arm64.deb
+  .nojekyll
 ```
 
-Host thư mục `repo/` lên HTTPS (GitHub Pages / máy chủ), rồi trong Sileo:
+`Packages` / `Release`: **LF only** (không CRLF).
 
-**Sources → + → URL** ví dụ:
+---
 
-```
-https://<your-pages-host>/
-```
+## Khách sau khi cài
 
-(URL trỏ tới chỗ có file `Release` + `Packages`.)
-
-## Build trên Windows (dylibs sẵn có)
-
-```bash
-python scripts/build_sileo_deb.py --version 2.3.0
-```
-
-- Có `dylibs_ci/iPFakerMG.dylib` + `CT` → gói dylibs + catalog  
-- Có thêm `theos/dist/app/iPFaker.app` → gói full (app + dylibs)
-
-## Build full trên GitHub Actions
-
-Push `main` → workflow **Build Theos rootless** → artifact **ipfaker-sileo** → lấy `.deb`.
-
-## Gỡ / conflict
-
-Package id: `com.ipfaker`  
-`Conflicts/Replaces: com.ipfaker.tweak` (gói tweak cũ).
-
-```bash
-# SSH
-dpkg -r com.ipfaker
-```
-
-## Lưu ý lab
-
-- Chỉ spoof **Zalo**, không đụng Cài đặt hệ thống  
-- Cần **ElleKit / Substrate** (Dopamine đã có)  
-- Sau cài: nếu Zalo chưa spoof, mở app Apply lại config + kill Zalo  
+→ [INSTALL_KHACH.md](../INSTALL_KHACH.md) (kích key Sheet)  
+→ [LICENSE_SHEET.md](LICENSE_SHEET.md)
