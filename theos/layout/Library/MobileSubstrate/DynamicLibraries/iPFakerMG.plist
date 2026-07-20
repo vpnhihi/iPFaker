@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Filter</key>
+	<dict>
+		<!-- Lab default: Zalo only. Expand later if needed (HIOS injects many apps). -->
+		<key>Bundles</key>
+		<array>
+			<string>com.zing.zalo</string>
+			<string>vn.com.vng.zingalo</string>
+		</array>
+		<key>Mode</key>
+		<string>Any</string>
+	</dict>
+</dict>
+</plist>

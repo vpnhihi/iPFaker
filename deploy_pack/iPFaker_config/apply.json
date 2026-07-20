@@ -1,0 +1,127 @@
+{
+  "name": "iPFaker One-Button Full Apply",
+  "version": "2.1.0",
+  "description": "Single action applies Fake Nông + Fake Sâu together for Zalo",
+  "target": {
+    "bundle_id": "com.zing.zalo",
+    "scope_only": true
+  },
+  "button": {
+    "id": "btn_apply_full",
+    "label": "Fake Full (Nông + Sâu)",
+    "action": "apply_full_nong_and_sau",
+    "enabled": true
+  },
+  "apply": {
+    "mode": "full",
+    "apply_nong": true,
+    "apply_sau": true,
+    "merge_strategy": "nong_first_sau_override",
+    "one_shot": true,
+    "require_both_levels": true,
+    "abort_if_partial": true
+  },
+  "sources": {
+    "master_profile": "config/device_profile.json",
+    "active_profile": "config/active_profile.json",
+    "main_plist": "config/main.plist"
+  },
+  "load_order": [
+    "identity",
+    "identity_deep",
+    "secure_element",
+    "model",
+    "hardware",
+    "os",
+    "display",
+    "display_deep",
+    "network",
+    "network_deep",
+    "telephony",
+    "esim_sim",
+    "telephony_deep",
+    "locale",
+    "storage",
+    "volume_disk_deep",
+    "battery",
+    "uidevice",
+    "mobilegestalt_map",
+    "mobilegestalt_map_deep",
+    "mobilegestalt_capabilities",
+    "sysctl_map",
+    "sysctl_deep",
+    "metal_gpu",
+    "camera_sensors",
+    "biometry",
+    "boot_time",
+    "webview",
+    "sdk_attribution",
+    "zalo_storage",
+    "jailbreak_hide",
+    "process_env",
+    "flags"
+  ],
+  "hooks_merged": {
+    "use_active_profile_hooks": true,
+    "mobilegestalt_from": "active_profile.hooks.mobilegestalt",
+    "sysctl_from": "active_profile.hooks.sysctl"
+  },
+  "modules": {
+    "force_all_enabled": true,
+    "list": [
+      "MobileGestalt",
+      "Sysctl",
+      "UIDevice",
+      "IDFA",
+      "IDFV",
+      "CoreTelephony",
+      "KeychainWipe",
+      "IOKit",
+      "Uname",
+      "NSProcessInfo",
+      "NSLocale",
+      "Dyld",
+      "JailbreakHide",
+      "NetworkInterface",
+      "UIScreen",
+      "DiskSpace",
+      "SecureElement",
+      "ESIM",
+      "TelephonyDeep",
+      "MGCapabilities",
+      "SysctlDeep",
+      "MetalGPU",
+      "CameraSensors",
+      "Biometry",
+      "DisplayDeep",
+      "BootTime",
+      "VolumeUUID",
+      "WebViewUA",
+      "SDKAttribution",
+      "ZaloStorageWipe",
+      "IdentityDeep"
+    ]
+  },
+  "on_press": [
+    { "step": 1, "action": "validate_config", "required": true },
+    { "step": 2, "action": "load_active_profile", "file": "config/active_profile.json", "required": true },
+    { "step": 3, "action": "enable_all_modules", "required": true },
+    { "step": 4, "action": "apply_fake_nong", "required": true },
+    { "step": 5, "action": "apply_fake_sau", "required": true },
+    { "step": 6, "action": "merge_confirm_both", "required": true },
+    { "step": 7, "action": "wipe_zalo_storage_if_enabled", "required": false },
+    { "step": 8, "action": "kill_relaunch_zalo", "bundle_id": "com.zing.zalo", "required": true },
+    { "step": 9, "action": "write_log", "file": "logs/apply_full.log", "required": true }
+  ],
+  "ui": {
+    "success_message": "Đã bật Fake Full (Nông + Sâu) cho Zalo",
+    "failure_message": "Apply thất bại — không apply dở (abort_if_partial)",
+    "confirm_before_apply": false
+  },
+  "safety": {
+    "lab_only": true,
+    "synthetic_identity_only": true,
+    "enforce_bundle_filter": true,
+    "block_system_processes": true
+  }
+}

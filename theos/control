@@ -1,0 +1,9 @@
+Package: com.ipfaker.tweak
+Name: iPFaker
+Depends: ellekit | mobilesubstrate, firmware (>= 15.0)
+Version: 2.2.0
+Architecture: iphoneos-arm64
+Description: Lab device-identity spoof for Zalo — dual dylib (MG + CT), rootless. Synthetic profiles only.
+Maintainer: iPFaker Lab
+Author: iPFaker Lab
+Section: Tweaks

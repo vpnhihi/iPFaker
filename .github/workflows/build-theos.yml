@@ -1,0 +1,68 @@
+# Build iPFaker MG+CT dylibs on GitHub-hosted macOS (no local Mac needed)
+# Trigger: Actions → "Build Theos rootless" → Run workflow
+# Artifact: ipfaker-dylibs.zip (iPFakerMG.dylib, iPFakerCT.dylib, plists)
+
+name: Build Theos rootless
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "theos/**"
+      - ".github/workflows/build-theos.yml"
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Theos
+        run: |
+          set -e
+          export THEOS=$HOME/theos
+          if [ ! -d "$THEOS" ]; then
+            git clone --depth=1 https://github.com/theos/theos.git "$THEOS"
+            cd "$THEOS"
+            git submodule update --init --recursive
+          fi
+          echo "THEOS=$THEOS" >> $GITHUB_ENV
+          # iOS SDK via theos sdks if needed
+          if [ ! -d "$THEOS/sdks" ] || [ -z "$(ls -A $THEOS/sdks 2>/dev/null)" ]; then
+            git clone --depth=1 https://github.com/theos/sdks.git "$THEOS/sdks" || true
+          fi
+
+      - name: Build package
+        working-directory: theos
+        run: |
+          set -e
+          export THEOS=$HOME/theos
+          # rootless arm64
+          make clean || true
+          make package FINALPACKAGE=1 || make package
+          echo "=== artifacts ==="
+          find . -name '*.dylib' -o -name '*.deb' | head -50
+
+      - name: Collect dylibs
+        working-directory: theos
+        run: |
+          set -e
+          mkdir -p dist
+          find .theos packages . -name 'iPFakerMG.dylib' -exec cp -f {} dist/ \; 2>/dev/null || true
+          find .theos packages . -name 'iPFakerCT.dylib' -exec cp -f {} dist/ \; 2>/dev/null || true
+          find .theos packages . -name 'iPFakerMG.plist' -exec cp -f {} dist/ \; 2>/dev/null || true
+          find .theos packages . -name 'iPFakerCT.plist' -exec cp -f {} dist/ \; 2>/dev/null || true
+          # from staging
+          find .theos/obj -name '*.dylib' -exec cp -f {} dist/ \; 2>/dev/null || true
+          cp -f layout/Library/MobileSubstrate/DynamicLibraries/*.plist dist/ 2>/dev/null || true
+          ls -la dist || true
+          find packages -name '*.deb' -exec cp -f {} dist/ \; 2>/dev/null || true
+          ls -la dist
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ipfaker-dylibs
+          path: theos/dist/*
+          if-no-files-found: warn

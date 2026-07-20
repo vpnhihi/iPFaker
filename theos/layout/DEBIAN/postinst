@@ -1,0 +1,61 @@
+#!/bin/sh
+# iPFaker postinst — rootless (/var/jb prefix applied by dpkg on RootHide)
+set -e
+
+ROOT="${JBROOT:-/var/jb}"
+# Some package managers already extract relative to jbroot; try both.
+MS=""
+for d in \
+  "$ROOT/Library/MobileSubstrate/DynamicLibraries" \
+  "/var/jb/Library/MobileSubstrate/DynamicLibraries" \
+  "/Library/MobileSubstrate/DynamicLibraries"
+do
+  if [ -d "$d" ]; then MS="$d"; break; fi
+done
+
+ETC=""
+for d in \
+  "$ROOT/etc/ipfaker" \
+  "/var/jb/etc/ipfaker" \
+  "/etc/ipfaker"
+do
+  mkdir -p "$d" 2>/dev/null || true
+  if [ -d "$d" ]; then ETC="$d"; break; fi
+done
+
+if [ -n "$MS" ]; then
+  for f in "$MS/iPFakerMG.dylib" "$MS/iPFakerMG.plist" \
+           "$MS/iPFakerCT.dylib" "$MS/iPFakerCT.plist"; do
+    [ -e "$f" ] || continue
+    chown root:wheel "$f" 2>/dev/null || true
+    case "$f" in
+      *.dylib) chmod 0755 "$f" 2>/dev/null || true ;;
+      *)       chmod 0644 "$f" 2>/dev/null || true ;;
+    esac
+  done
+fi
+
+if [ -n "$ETC" ]; then
+  chmod 0777 "$ETC" 2>/dev/null || true
+  # Seed README if empty
+  if [ ! -f "$ETC/README.txt" ]; then
+    cat > "$ETC/README.txt" <<'EOF'
+iPFaker config directory
+Place active_profile.json here (or use Windows deploy.ps1).
+Also mirrored at /var/mobile/Library/iPFaker/ for RootHide app readability.
+EOF
+  fi
+fi
+
+# mobile-readable mirror (RootHide: apps may not see /var/jb)
+MOB="/var/mobile/Library/iPFaker"
+mkdir -p "$MOB" 2>/dev/null || true
+chown mobile:mobile "$MOB" 2>/dev/null || true
+chmod 0755 "$MOB" 2>/dev/null || true
+
+# Soft-kill targets so next launch reloads dylibs
+killall -9 Zalo 2>/dev/null || true
+# CommCenter restart is heavier — optional; uncomment if CT spoof stale
+# killall -9 CommCenter 2>/dev/null || true
+
+exit 0
