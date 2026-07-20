@@ -52,7 +52,7 @@ def main() -> int:
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>iPFaker Sileo</title></head><body>
 <h1>iPFaker Sileo Repo</h1>
-<p><code>https://vpnhihi.github.io/iPFaker/</code></p>
+<p><code>https://vpnhihi.github.io/ipfaker/</code></p>
 <p>Package: com.ipfaker 2.3.5 (data.tar.lzma)</p>
 <p><a href="debs/com.ipfaker_2.3.5_iphoneos-arm64.deb">Download .deb</a></p>
 </body></html>
@@ -89,7 +89,7 @@ def main() -> int:
     env["GIT_ASKPASS"] = str(ask)
     env["GIT_TERMINAL_PROMPT"] = "0"
     subprocess.check_call(
-        ["git", "push", "-f", f"https://{user}@github.com/vpnhihi/iPFaker.git", "gh-pages"],
+        ["git", "push", "-f", f"https://{user}@github.com/vpnhihi/ipfaker.git", "gh-pages"],
         cwd=tmp,
         env=env,
     )
@@ -101,7 +101,7 @@ def main() -> int:
     time.sleep(15)
     for u in (
         "https://raw.githubusercontent.com/vpnhihi/iPFaker/gh-pages/debs/com.ipfaker_2.3.5_iphoneos-arm64.deb",
-        "https://vpnhihi.github.io/iPFaker/debs/com.ipfaker_2.3.5_iphoneos-arm64.deb",
+        "https://vpnhihi.github.io/ipfaker/debs/com.ipfaker_2.3.5_iphoneos-arm64.deb",
         "https://cdn.jsdelivr.net/gh/vpnhihi/iPFaker@gh-pages/debs/com.ipfaker_2.3.5_iphoneos-arm64.deb",
     ):
         try:

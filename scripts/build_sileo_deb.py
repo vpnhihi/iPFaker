@@ -224,7 +224,7 @@ Maintainer: iPFaker Lab
 Author: iPFaker Lab
 Section: Tweaks
 Priority: optional
-Homepage: https://github.com/vpnhihi/iPFaker
+Homepage: https://github.com/vpnhihi/ipfaker
 Description: {desc}
 Installed-Size: {installed_size_kb}
 """
@@ -492,7 +492,7 @@ Install on device (pick one):
 3) SSH: dpkg -i {deb_name}
 
 Sileo source:
-  https://vpnhihi.github.io/iPFaker/
+  https://vpnhihi.github.io/ipfaker/
 
 After install:
   Open iPFaker app (if included) → pick model → Apply → Kill Zalo → open Zalo

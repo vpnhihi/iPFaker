@@ -5,7 +5,7 @@ Gói rootless **Dopamine** / architecture `iphoneos-arm64` — giống cách cà
 ## Nguồn Sileo (thêm 1 lần)
 
 ```
-https://vpnhihi.github.io/iPFaker/
+https://vpnhihi.github.io/ipfaker/
 ```
 
 1. **Sileo** → **Sources** → **+**  
