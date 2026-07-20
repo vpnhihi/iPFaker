@@ -27,6 +27,11 @@
     self.navigationItem.searchController = self.search;
     self.definesPresentationContext = YES;
 
+    self.navigationItem.leftBarButtonItem =
+        [[UIBarButtonItem alloc] initWithTitle:@"Chọn tất cả"
+                                         style:UIBarButtonItemStylePlain
+                                        target:self
+                                        action:@selector(selectAllTapped)];
     self.navigationItem.rightBarButtonItem =
         [[UIBarButtonItem alloc] initWithTitle:@"Xong"
                                          style:UIBarButtonItemStyleDone
@@ -34,11 +39,17 @@
                                         action:@selector(doneTapped)];
 
     UILabel *hint = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, 320, 44)];
-    hint.text = @"  Chạm để chọn · chạm lại để bỏ · ✓ = đã chọn (giữ ≥1 máy)";
+    hint.text = @"  Chạm = chọn/bỏ · ✓ = đã chọn · nút «Chọn tất cả» · giữ ≥1 máy";
     hint.font = AppTheme.captionFont;
     hint.textColor = AppTheme.textSecondary;
     hint.numberOfLines = 2;
     self.tableView.tableHeaderView = hint;
+}
+
+- (void)selectAllTapped {
+    [AppState.shared selectAllDevices];
+    [self.tableView reloadData];
+    if (self.onChange) self.onChange();
 }
 
 - (void)doneTapped {

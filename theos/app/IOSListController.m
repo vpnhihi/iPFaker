@@ -15,6 +15,11 @@
     self.view.backgroundColor = AppTheme.bg;
     self.tableView.backgroundColor = self.view.backgroundColor;
 
+    self.navigationItem.leftBarButtonItem =
+        [[UIBarButtonItem alloc] initWithTitle:@"Chọn tất cả"
+                                         style:UIBarButtonItemStylePlain
+                                        target:self
+                                        action:@selector(selectAllTapped)];
     self.navigationItem.rightBarButtonItem =
         [[UIBarButtonItem alloc] initWithTitle:@"Xong"
                                          style:UIBarButtonItemStyleDone
@@ -22,13 +27,19 @@
                                         action:@selector(doneTapped)];
 
     UILabel *hint = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, 320, 48)];
-    hint.text = @"  Chỉ iOS matrix của đời máy đã chọn. Chạm = chọn / bỏ · ✓ = đã chọn";
+    hint.text = @"  Chỉ iOS matrix của đời máy đã chọn · Chạm = chọn/bỏ · «Chọn tất cả»";
     hint.font = AppTheme.captionFont;
     hint.textColor = AppTheme.textSecondary;
     hint.numberOfLines = 2;
     self.tableView.tableHeaderView = hint;
 
     [self reloadVersions];
+}
+
+- (void)selectAllTapped {
+    [AppState.shared selectAllIOS];
+    [self.tableView reloadData];
+    if (self.onChange) self.onChange();
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -57,7 +68,7 @@
     NSUInteger nShow = self.versions.count;
     return [NSString stringWithFormat:
             @"%lu đời máy · %lu iOS trong matrix · đã chọn %lu bản.\n"
-            @"Kill Zalo sẽ random cặp (máy + iOS) hợp lệ trong pool.",
+            @"Reset Data app sẽ random cặp (máy + iOS) hợp lệ trong pool.",
             (unsigned long)nDev, (unsigned long)nShow, (unsigned long)nSel];
 }
 

@@ -60,7 +60,7 @@
     title.translatesAutoresizingMaskIntoConstraints = NO;
 
     UILabel *ver = [[UILabel alloc] init];
-    ver.text = @"Version: 2.5.0 · Zalo lab spoof";
+    ver.text = @"Version: 2.6.0 · Lab device tools";
     ver.font = AppTheme.captionFont;
     ver.textColor = AppTheme.textSecondary;
     ver.translatesAutoresizingMaskIntoConstraints = NO;
@@ -116,22 +116,23 @@
     [card addSubview:cols];
 
     UILabel *contact = [[UILabel alloc] init];
-    contact.text = @"Lab: spoof chỉ Zalo · không inject Settings";
+    contact.text = @"Lab tools · không inject Cài đặt hệ thống";
     contact.font = AppTheme.captionFont;
     contact.textColor = AppTheme.accent;
     contact.numberOfLines = 2;
     contact.translatesAutoresizingMaskIntoConstraints = NO;
     [card addSubview:contact];
 
-    // Action buttons
-    UIButton *resetBtn = [AppTheme primaryButtonWithTitle:@"Reseed Identity"
-                                                   target:self
-                                                   action:@selector(reseedTapped)];
-    UIButton *applyBtn = [AppTheme primaryButtonWithTitle:@"Apply Profile"
+    // Action buttons: Reset Data app | Reset + Save Data
+    UIButton *resetDataBtn = [AppTheme primaryButtonWithTitle:@"Reset Data app"
+                                                       target:self
+                                                       action:@selector(killTapped)];
+    resetDataBtn.backgroundColor = [UIColor colorWithRed:0.85 green:0.35 blue:0.1 alpha:1.0];
+    UIButton *applyBtn = [AppTheme primaryButtonWithTitle:@"Reset + Save Data"
                                                    target:self
                                                    action:@selector(applyTapped)];
 
-    UIStackView *btnRow = [[UIStackView alloc] initWithArrangedSubviews:@[resetBtn, applyBtn]];
+    UIStackView *btnRow = [[UIStackView alloc] initWithArrangedSubviews:@[resetDataBtn, applyBtn]];
     btnRow.axis = UILayoutConstraintAxisHorizontal;
     btnRow.spacing = 12;
     btnRow.distribution = UIStackViewDistributionFillEqually;
@@ -156,16 +157,28 @@
         [toggles addArrangedSubview:[self toggleRowTitle:row[0] key:row[1]]];
     }
 
-    // Secondary actions
-    UIButton *killBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    [killBtn setTitle:@"Kill Zalo + Random + Wipe 100%" forState:UIControlStateNormal];
-    [killBtn setTitleColor:UIColor.orangeColor forState:UIControlStateNormal];
-    killBtn.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
-    killBtn.backgroundColor = AppTheme.cardAlt;
-    killBtn.layer.cornerRadius = 12;
-    killBtn.translatesAutoresizingMaskIntoConstraints = NO;
-    [killBtn addTarget:self action:@selector(killTapped) forControlEvents:UIControlEventTouchUpInside];
-    [content addSubview:killBtn];
+    // Terms / disclaimer card (replaces old kill button area)
+    UIView *termsCard = [AppTheme roundedCardIn:content];
+    termsCard.backgroundColor = AppTheme.cardAlt;
+    UILabel *termsTitle = [[UILabel alloc] init];
+    termsTitle.text = @"Điều khoản · Trách nhiệm · Miễn trừ";
+    termsTitle.font = AppTheme.sectionFont;
+    termsTitle.textColor = AppTheme.textPrimary;
+    termsTitle.translatesAutoresizingMaskIntoConstraints = NO;
+    UILabel *termsBody = [[UILabel alloc] init];
+    termsBody.numberOfLines = 0;
+    termsBody.font = AppTheme.captionFont;
+    termsBody.textColor = AppTheme.textSecondary;
+    termsBody.text =
+        @"ĐIỀU KHOẢN DỊCH VỤ\n"
+        @"Công cụ này chỉ dành cho mục đích nghiên cứu, kiểm thử kỹ thuật trên thiết bị do bạn sở hữu hợp pháp.\n\n"
+        @"TRÁCH NHIỆM KHÁCH HÀNG\n"
+        @"Bạn chịu toàn bộ trách nhiệm về cách sử dụng, cấu hình và hậu quả phát sinh từ việc dùng tool. Không chia sẻ cấu hình để lừa đảo, mạo danh, hoặc can thiệp trái phép hệ thống của bên thứ ba.\n\n"
+        @"MIỄN TRỪ TRÁCH NHIỆM / CẢNH BÁO\n"
+        @"Cấm sử dụng tool vào mục đích vi phạm pháp luật Việt Nam (bao gồm nhưng không giới hạn: lừa đảo, gian lận, xâm phạm dữ liệu, mạo danh). Nhà phát triển không chịu trách nhiệm hình sự/dân sự nếu người dùng cố ý sử dụng sai mục đích. Tiếp tục dùng tool đồng nghĩa bạn đã đọc và chấp nhận các điều khoản trên.";
+    termsBody.translatesAutoresizingMaskIntoConstraints = NO;
+    [termsCard addSubview:termsTitle];
+    [termsCard addSubview:termsBody];
 
     self.statusFooter = [[UILabel alloc] init];
     self.statusFooter.font = AppTheme.captionFont;
@@ -201,7 +214,7 @@
         [btnRow.topAnchor constraintEqualToAnchor:card.bottomAnchor constant:14],
         [btnRow.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:pad],
         [btnRow.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-pad],
-        [resetBtn.heightAnchor constraintEqualToConstant:56],
+        [resetDataBtn.heightAnchor constraintEqualToConstant:56],
         [applyBtn.heightAnchor constraintEqualToConstant:56],
 
         [toggleCard.topAnchor constraintEqualToAnchor:btnRow.bottomAnchor constant:16],
@@ -213,12 +226,19 @@
         [toggles.trailingAnchor constraintEqualToAnchor:toggleCard.trailingAnchor constant:-14],
         [toggles.bottomAnchor constraintEqualToAnchor:toggleCard.bottomAnchor constant:-4],
 
-        [killBtn.topAnchor constraintEqualToAnchor:toggleCard.bottomAnchor constant:14],
-        [killBtn.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:pad],
-        [killBtn.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-pad],
-        [killBtn.heightAnchor constraintEqualToConstant:48],
+        [termsCard.topAnchor constraintEqualToAnchor:toggleCard.bottomAnchor constant:14],
+        [termsCard.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:pad],
+        [termsCard.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-pad],
 
-        [self.statusFooter.topAnchor constraintEqualToAnchor:killBtn.bottomAnchor constant:14],
+        [termsTitle.topAnchor constraintEqualToAnchor:termsCard.topAnchor constant:12],
+        [termsTitle.leadingAnchor constraintEqualToAnchor:termsCard.leadingAnchor constant:14],
+        [termsTitle.trailingAnchor constraintEqualToAnchor:termsCard.trailingAnchor constant:-14],
+        [termsBody.topAnchor constraintEqualToAnchor:termsTitle.bottomAnchor constant:8],
+        [termsBody.leadingAnchor constraintEqualToAnchor:termsTitle.leadingAnchor],
+        [termsBody.trailingAnchor constraintEqualToAnchor:termsTitle.trailingAnchor],
+        [termsBody.bottomAnchor constraintEqualToAnchor:termsCard.bottomAnchor constant:-12],
+
+        [self.statusFooter.topAnchor constraintEqualToAnchor:termsCard.bottomAnchor constant:14],
         [self.statusFooter.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:pad],
         [self.statusFooter.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-pad],
         [self.statusFooter.bottomAnchor constraintEqualToAnchor:content.bottomAnchor constant:-28],
@@ -315,18 +335,29 @@
 }
 
 - (void)applyTapped {
-    NSString *msg = [AppState.shared applyReseedOnly:NO];
-    [self showAlertTitle:@"Apply Profile" message:msg];
-}
-
-- (void)reseedTapped {
-    NSString *msg = [AppState.shared applyReseedOnly:YES];
-    [self showAlertTitle:@"Reseed Identity" message:msg];
+    // Reset + Save Data: random identity + ghi config
+    UIView *host = self.tabBarController.view ?: self.navigationController.view ?: self.view;
+    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Reset + Save Data…"];
+    self.view.userInteractionEnabled = NO;
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        [ov appendStep:@"Random máy + iOS trong pool…"];
+        NSString *msg = [AppState.shared applyRandomFromPool];
+        [ov appendStep:@"Đã ghi config profile"];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.view.userInteractionEnabled = YES;
+            [ov finishWithTitle:@"Đã lưu" detail:msg];
+            [self refreshUI];
+            [ov dismissAfter:1.2 completion:^{
+                [self showAlertTitle:@"Reset + Save Data" message:msg];
+            }];
+        });
+    });
 }
 
 - (void)killTapped {
+    // Reset Data app: random spoof + wipe data app (lab target)
     UIView *host = self.tabBarController.view ?: self.navigationController.view ?: self.view;
-    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Kill Zalo + Random + Wipe…"];
+    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Reset Data app…"];
     self.view.userInteractionEnabled = NO;
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         NSString *msg = [AppState.shared killZaloAndRandomizeFromPoolProgress:^(NSString *step) {
@@ -337,7 +368,7 @@
             [ov finishWithTitle:@"Hoàn tất" detail:msg];
             [self refreshUI];
             [ov dismissAfter:1.6 completion:^{
-                [self showAlertTitle:@"Kill Zalo + Random + Wipe" message:msg];
+                [self showAlertTitle:@"Reset Data app" message:msg];
             }];
         });
     });
@@ -358,9 +389,6 @@
                                                                message:msg
                                                         preferredStyle:UIAlertControllerStyleAlert];
     [a addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
-    [a addAction:[UIAlertAction actionWithTitle:@"Kill Zalo + Wipe" style:UIAlertActionStyleDestructive handler:^(__unused UIAlertAction *_) {
-        [self killTapped];
-    }]];
     [self presentViewController:a animated:YES completion:nil];
 }
 

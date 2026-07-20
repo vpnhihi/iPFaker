@@ -24,7 +24,7 @@
     self.search = [[UISearchController alloc] initWithSearchResultsController:nil];
     self.search.searchResultsUpdater = self;
     self.search.obscuresBackgroundDuringPresentation = NO;
-    self.search.searchBar.placeholder = @"Maps, Weather, Zalo…";
+    self.search.searchBar.placeholder = @"Tên app, bundle id…";
     self.navigationItem.searchController = self.search;
     self.definesPresentationContext = YES;
 
@@ -35,7 +35,7 @@
                                         action:@selector(done)];
 
     UILabel *hint = [[UILabel alloc] initWithFrame:CGRectMake(0, 0, 320, 48)];
-    hint.text = @"  Chạm = chọn / bỏ · ✓ = đã chọn · Mặc định: Bản đồ + Thời tiết";
+    hint.text = @"  Chỉ app tải ngoài + Bản đồ/Thời tiết · Chạm = ✓ chọn/bỏ";
     hint.font = AppTheme.captionFont;
     hint.textColor = AppTheme.textSecondary;
     hint.numberOfLines = 2;

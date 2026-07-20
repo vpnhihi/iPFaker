@@ -34,7 +34,7 @@
     [self.view addSubview:header];
 
     UILabel *note = [[UILabel alloc] init];
-    note.text = @"Chọn app (multi ✓) · Mặc định Bản đồ + Thời tiết · Wipe hiện tiến trình giữa màn hình.";
+    note.text = @"Chọn app tải ngoài (multi ✓) · Mặc định Bản đồ + Thời tiết · Có overlay tiến trình.";
     note.font = AppTheme.captionFont;
     note.textColor = AppTheme.textSecondary;
     note.numberOfLines = 0;
@@ -52,16 +52,16 @@
                                                   action:@selector(wipeSelectedTapped)];
     wipeSel.backgroundColor = [UIColor colorWithRed:0.85 green:0.35 blue:0.1 alpha:1.0];
 
-    UIButton *killZalo = [AppTheme primaryButtonWithTitle:@"Kill Zalo + Random + Wipe 100%"
-                                                   target:self
-                                                   action:@selector(killZaloTapped)];
+    UIButton *resetData = [AppTheme primaryButtonWithTitle:@"Reset Data app"
+                                                    target:self
+                                                    action:@selector(resetDataTapped)];
 
-    UIButton *reseed = [UIButton buttonWithType:UIButtonTypeSystem];
-    [reseed setTitle:@"Apply primary (không wipe data)" forState:UIControlStateNormal];
-    [reseed setTitleColor:AppTheme.accent forState:UIControlStateNormal];
-    reseed.titleLabel.font = AppTheme.bodyFont;
-    reseed.translatesAutoresizingMaskIntoConstraints = NO;
-    [reseed addTarget:self action:@selector(reseedTapped) forControlEvents:UIControlEventTouchUpInside];
+    UIButton *saveData = [UIButton buttonWithType:UIButtonTypeSystem];
+    [saveData setTitle:@"Reset + Save Data (không wipe)" forState:UIControlStateNormal];
+    [saveData setTitleColor:AppTheme.accent forState:UIControlStateNormal];
+    saveData.titleLabel.font = AppTheme.bodyFont;
+    saveData.translatesAutoresizingMaskIntoConstraints = NO;
+    [saveData addTarget:self action:@selector(saveDataTapped) forControlEvents:UIControlEventTouchUpInside];
 
     self.hintLabel = [[UILabel alloc] init];
     self.hintLabel.font = AppTheme.captionFont;
@@ -70,8 +70,8 @@
     self.hintLabel.translatesAutoresizingMaskIntoConstraints = NO;
 
     [self.view addSubview:wipeSel];
-    [self.view addSubview:killZalo];
-    [self.view addSubview:reseed];
+    [self.view addSubview:resetData];
+    [self.view addSubview:saveData];
     [self.view addSubview:self.hintLabel];
 
     CGFloat pad = 16;
@@ -98,15 +98,15 @@
         [wipeSel.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-pad],
         [wipeSel.heightAnchor constraintEqualToConstant:52],
 
-        [killZalo.topAnchor constraintEqualToAnchor:wipeSel.bottomAnchor constant:10],
-        [killZalo.leadingAnchor constraintEqualToAnchor:wipeSel.leadingAnchor],
-        [killZalo.trailingAnchor constraintEqualToAnchor:wipeSel.trailingAnchor],
-        [killZalo.heightAnchor constraintEqualToConstant:52],
+        [resetData.topAnchor constraintEqualToAnchor:wipeSel.bottomAnchor constant:10],
+        [resetData.leadingAnchor constraintEqualToAnchor:wipeSel.leadingAnchor],
+        [resetData.trailingAnchor constraintEqualToAnchor:wipeSel.trailingAnchor],
+        [resetData.heightAnchor constraintEqualToConstant:52],
 
-        [reseed.topAnchor constraintEqualToAnchor:killZalo.bottomAnchor constant:12],
-        [reseed.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+        [saveData.topAnchor constraintEqualToAnchor:resetData.bottomAnchor constant:12],
+        [saveData.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
 
-        [self.hintLabel.topAnchor constraintEqualToAnchor:reseed.bottomAnchor constant:16],
+        [self.hintLabel.topAnchor constraintEqualToAnchor:saveData.bottomAnchor constant:16],
         [self.hintLabel.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:pad],
         [self.hintLabel.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-pad],
     ]];
@@ -163,12 +163,13 @@
 }
 
 - (void)refreshUI {
-    self.appsDetailLabel.text = [NSString stringWithFormat:@"%@\nTổng %lu app trên máy",
+    self.appsDetailLabel.text = [NSString stringWithFormat:@"%@\nDanh sách: %lu app (ngoài + Bản đồ/Thời tiết)",
                                  [AppState.shared wipeAppsSummary],
                                  (unsigned long)AppCatalog.shared.apps.count];
     self.hintLabel.text = [NSString stringWithFormat:
-        @"• Wipe data app đã chọn: xóa container/prefs của pool.\n"
-        @"• Kill Zalo + Random: spoof mới + wipe 100%% Zalo.\n"
+        @"• Wipe data app đã chọn: xóa container/prefs pool.\n"
+        @"• Reset Data app: random profile + wipe data.\n"
+        @"• Reset + Save Data: random + ghi config (không wipe).\n"
         @"%@\n%@",
         [AppState.shared wipeAppsSummary],
         AppState.shared.statusText ?: @""];
@@ -215,15 +216,19 @@
     }];
 }
 
-- (void)killZaloTapped {
-    [self runWithProgressTitle:@"Kill Zalo + Random + Wipe…" work:^NSString *(void (^step)(NSString *)) {
+- (void)resetDataTapped {
+    [self runWithProgressTitle:@"Reset Data app…" work:^NSString *(void (^step)(NSString *)) {
         return [AppState.shared killZaloAndRandomizeFromPoolProgress:step];
     }];
 }
 
-- (void)reseedTapped {
-    NSString *m = [AppState.shared applyReseedOnly:YES];
-    [self alert:@"Apply primary" msg:m];
+- (void)saveDataTapped {
+    [self runWithProgressTitle:@"Reset + Save Data…" work:^NSString *(void (^step)(NSString *)) {
+        step(@"Random máy + iOS trong pool…");
+        NSString *msg = [AppState.shared applyRandomFromPool];
+        step(@"Đã ghi config");
+        return msg;
+    }];
 }
 
 - (void)alert:(NSString *)t msg:(NSString *)m {

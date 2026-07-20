@@ -35,7 +35,7 @@
     [self.view addSubview:header];
 
     UILabel *sub = [[UILabel alloc] init];
-    sub.text = @"Multi-select · ✓ = đã chọn · Kill Zalo = random cặp máy+iOS hợp lệ";
+    sub.text = @"Multi-select · ✓ = đã chọn · có «Chọn tất cả» · Reset Data = random cặp hợp lệ";
     sub.font = AppTheme.captionFont;
     sub.textColor = AppTheme.textSecondary;
     sub.numberOfLines = 2;
@@ -73,24 +73,16 @@
     [self.card addSubview:stack];
     [sep.heightAnchor constraintEqualToConstant:1.0 / UIScreen.mainScreen.scale].active = YES;
 
-    UIButton *applyBtn = [AppTheme primaryButtonWithTitle:@"Apply (random trong pool)"
+    UIButton *applyBtn = [AppTheme primaryButtonWithTitle:@"Reset + Save Data"
                                                    target:self
                                                    action:@selector(applyTapped)];
     [self.view addSubview:applyBtn];
 
-    UIButton *killBtn = [AppTheme primaryButtonWithTitle:@"Kill Zalo + Random + Wipe 100%"
+    UIButton *killBtn = [AppTheme primaryButtonWithTitle:@"Reset Data app"
                                                   target:self
                                                   action:@selector(killRandomTapped)];
     killBtn.backgroundColor = [UIColor colorWithRed:0.85 green:0.35 blue:0.1 alpha:1.0];
     [self.view addSubview:killBtn];
-
-    UIButton *reseedBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    [reseedBtn setTitle:@"Apply primary (máy/iOS đang active)" forState:UIControlStateNormal];
-    [reseedBtn setTitleColor:AppTheme.accent forState:UIControlStateNormal];
-    reseedBtn.titleLabel.font = AppTheme.bodyFont;
-    reseedBtn.translatesAutoresizingMaskIntoConstraints = NO;
-    [reseedBtn addTarget:self action:@selector(reseedTapped) forControlEvents:UIControlEventTouchUpInside];
-    [self.view addSubview:reseedBtn];
 
     self.hintLabel = [[UILabel alloc] init];
     self.hintLabel.font = AppTheme.captionFont;
@@ -128,10 +120,7 @@
         [killBtn.trailingAnchor constraintEqualToAnchor:applyBtn.trailingAnchor],
         [killBtn.heightAnchor constraintEqualToConstant:50],
 
-        [reseedBtn.topAnchor constraintEqualToAnchor:killBtn.bottomAnchor constant:10],
-        [reseedBtn.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
-
-        [self.hintLabel.topAnchor constraintEqualToAnchor:reseedBtn.bottomAnchor constant:16],
+        [self.hintLabel.topAnchor constraintEqualToAnchor:killBtn.bottomAnchor constant:16],
         [self.hintLabel.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:pad],
         [self.hintLabel.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-pad],
 
@@ -227,10 +216,11 @@
     }
 
     self.hintLabel.text = [NSString stringWithFormat:
-        @"Pool: %lu máy × iOS đã chọn → %lu cặp matrix hợp lệ (random khi Kill Zalo).\n"
+        @"Pool: %lu máy × iOS đã chọn → %lu cặp matrix hợp lệ.\n"
         @"Matrix union: %lu bản iOS · Active id: %@\n"
         @"Màn active: %@×%@ @%@\n"
-        @"Kill Zalo = random model/iOS + serial/IDFA/IDFV/IMEI/MAC/UA… theo catalog máy.\n%@",
+        @"Reset Data app = random model/iOS + full identity + wipe data.\n"
+        @"Reset + Save Data = random + ghi config (không wipe).\n%@",
         (unsigned long)st.selectedDeviceIds.count,
         (unsigned long)nPairs,
         (unsigned long)nCompat,
@@ -261,13 +251,27 @@
 }
 
 - (void)applyTapped {
-    NSString *msg = [AppState.shared applyRandomFromPool];
-    [self alert:@"Apply (random pool)" msg:msg];
+    UIView *host = self.tabBarController.view ?: self.navigationController.view ?: self.view;
+    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Reset + Save Data…"];
+    self.view.userInteractionEnabled = NO;
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        [ov appendStep:@"Random máy + iOS…"];
+        NSString *msg = [AppState.shared applyRandomFromPool];
+        [ov appendStep:@"Đã ghi config"];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.view.userInteractionEnabled = YES;
+            [ov finishWithTitle:@"Đã lưu" detail:msg];
+            [self refreshUI];
+            [ov dismissAfter:1.2 completion:^{
+                [self alert:@"Reset + Save Data" msg:msg];
+            }];
+        });
+    });
 }
 
 - (void)killRandomTapped {
     UIView *host = self.tabBarController.view ?: self.navigationController.view ?: self.view;
-    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Kill Zalo + Random + Wipe…"];
+    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Reset Data app…"];
     self.view.userInteractionEnabled = NO;
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         NSString *msg = [AppState.shared killZaloAndRandomizeFromPoolProgress:^(NSString *step) {
@@ -278,15 +282,10 @@
             [ov finishWithTitle:@"Hoàn tất" detail:msg];
             [self refreshUI];
             [ov dismissAfter:1.6 completion:^{
-                [self alert:@"Kill Zalo + Random + Wipe" msg:msg];
+                [self alert:@"Reset Data app" msg:msg];
             }];
         });
     });
-}
-
-- (void)reseedTapped {
-    NSString *msg = [AppState.shared applyReseedOnly:YES];
-    [self alert:@"Apply primary" msg:msg];
 }
 
 - (void)alert:(NSString *)title msg:(NSString *)msg {

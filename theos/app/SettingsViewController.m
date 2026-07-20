@@ -58,14 +58,14 @@
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
-    if (section == 0) return @"Fake surface (Zalo spoof)";
+    if (section == 0) return @"Fake surface (lab spoof)";
     if (section == 1) return @"Tuỳ chọn nâng cao";
     return @"Thông tin";
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
     if (section == 0)
-        return @"Mỗi switch bật/tắt hook thật trong Zalo sau Apply. Format: UUID v4, IMEI Luhn, ITU E.212, ISO/BCP-47, IANA TZ, WGS84.";
+        return @"Mỗi switch bật/tắt hook sau Reset + Save Data. Format: UUID v4, IMEI Luhn, ITU E.212, ISO/BCP-47, IANA TZ, WGS84.";
     if (section == 1)
         return @"Locale vi-VN · TZ Asia/Ho_Chi_Minh · GPS HCMC · WebRTC IP RFC1918. Fake Date Time mặc định TẮT (tránh lệch giờ TLS).";
     return nil;

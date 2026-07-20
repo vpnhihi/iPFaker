@@ -21,10 +21,21 @@
     return s;
 }
 
+/// Keep only: third-party (non com.apple.*) + Bản đồ + Thời tiết.
+- (BOOL)shouldListBundleId:(NSString *)bid {
+    if (!bid.length) return NO;
+    if ([bid isEqualToString:@"com.apple.Maps"]) return YES;
+    if ([bid isEqualToString:@"com.apple.weather"]) return YES;
+    // Drop stock system apps; keep sideloaded / App Store third-party
+    if ([bid hasPrefix:@"com.apple."]) return NO;
+    // Skip common system-ish prefixes
+    if ([bid hasPrefix:@"com.apple.WebKit"] || [bid hasPrefix:@"com.apple.UIKit"]) return NO;
+    return YES;
+}
+
 - (void)reload {
     NSMutableDictionary<NSString *, AppCatalogItem *> *map = [NSMutableDictionary dictionary];
 
-    // 1) LSApplicationWorkspace (private, works on JB with no-sandbox)
     @try {
         Class wsClass = NSClassFromString(@"LSApplicationWorkspace");
         if (wsClass) {
@@ -47,9 +58,7 @@
                         ver = ((id (*)(id, SEL))objc_msgSend)(proxy, NSSelectorFromString(@"shortVersionString"));
                     if ([proxy respondsToSelector:NSSelectorFromString(@"bundleExecutable")])
                         exe = ((id (*)(id, SEL))objc_msgSend)(proxy, NSSelectorFromString(@"bundleExecutable"));
-                    if (!bid.length) continue;
-                    // Skip junk / hidden placeholders
-                    if ([bid hasPrefix:@"com.apple.WebKit"] || [bid hasPrefix:@"com.apple.UIKit"]) continue;
+                    if (![self shouldListBundleId:bid]) continue;
                     AppCatalogItem *it = [[AppCatalogItem alloc] init];
                     it.bundleId = bid;
                     it.name = name.length ? name : bid;
@@ -62,49 +71,35 @@
         }
     } @catch (__unused NSException *ex) {}
 
-    // 2) Fallback seed list if LS empty (still show useful targets)
-    if (map.count == 0) {
-        NSArray *seed = @[
-            @[ @"com.apple.Maps", @"Bản đồ" ],
-            @[ @"com.apple.weather", @"Thời tiết" ],
-            @[ @"com.apple.mobilesafari", @"Safari" ],
-            @[ @"com.apple.mobilecal", @"Lịch" ],
-            @[ @"com.apple.MobileSMS", @"Tin nhắn" ],
-            @[ @"com.apple.mobilemail", @"Mail" ],
-            @[ @"com.apple.Preferences", @"Cài đặt" ],
-            @[ @"com.apple.AppStore", @"App Store" ],
-            @[ @"com.apple.camera", @"Camera" ],
-            @[ @"com.apple.mobileslideshow", @"Ảnh" ],
-            @[ @"com.apple.Music", @"Nhạc" ],
-            @[ @"vn.com.vng.zingalo", @"Zalo" ],
-            @[ @"com.zing.zalo", @"Zalo (alt)" ],
-        ];
-        for (NSArray *row in seed) {
-            AppCatalogItem *it = [[AppCatalogItem alloc] init];
-            it.bundleId = row[0];
-            it.name = row[1];
-            it.systemApp = [it.bundleId hasPrefix:@"com.apple."];
-            map[it.bundleId] = it;
-        }
-    }
-
-    // Ensure Maps + Weather always present
+    // Always ensure Maps + Weather present
     for (NSArray *must in @[
         @[ @"com.apple.Maps", @"Bản đồ" ],
         @[ @"com.apple.weather", @"Thời tiết" ],
-        @[ @"vn.com.vng.zingalo", @"Zalo" ],
     ]) {
         if (!map[must[0]]) {
             AppCatalogItem *it = [[AppCatalogItem alloc] init];
             it.bundleId = must[0];
             it.name = must[1];
-            it.systemApp = [must[0] hasPrefix:@"com.apple."];
+            it.systemApp = YES;
             map[must[0]] = it;
         }
     }
 
+    // Fallback if LS empty: only Maps + Weather
+    if (map.count == 0) {
+        for (NSArray *row in @[
+            @[ @"com.apple.Maps", @"Bản đồ" ],
+            @[ @"com.apple.weather", @"Thời tiết" ],
+        ]) {
+            AppCatalogItem *it = [[AppCatalogItem alloc] init];
+            it.bundleId = row[0];
+            it.name = row[1];
+            it.systemApp = YES;
+            map[it.bundleId] = it;
+        }
+    }
+
     NSArray *all = [[map allValues] sortedArrayUsingComparator:^NSComparisonResult(AppCatalogItem *a, AppCatalogItem *b) {
-        // Defaults first-ish: Maps, Weather, then name
         NSInteger pa = [self pinRank:a.bundleId];
         NSInteger pb = [self pinRank:b.bundleId];
         if (pa != pb) return pa < pb ? NSOrderedAscending : NSOrderedDescending;
@@ -116,8 +111,6 @@
 - (NSInteger)pinRank:(NSString *)bid {
     if ([bid isEqualToString:@"com.apple.Maps"]) return 0;
     if ([bid isEqualToString:@"com.apple.weather"]) return 1;
-    if ([bid isEqualToString:@"vn.com.vng.zingalo"] || [bid isEqualToString:@"com.zing.zalo"]) return 2;
-    if ([bid hasPrefix:@"com.apple."]) return 10;
     return 20;
 }
 

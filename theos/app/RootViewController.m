@@ -39,7 +39,7 @@
     NSUInteger nDev = Catalog.shared.devices.count;
     NSUInteger nIOS = Catalog.shared.iosReleases.count;
     self.statusText = [NSString stringWithFormat:
-        @"Lab · %lu máy · %lu iOS · chỉ spoof Zalo (không đụng Settings)",
+        @"Lab · %lu máy · %lu iOS · không inject Settings",
         (unsigned long)nDev, (unsigned long)nIOS];
 }
 
@@ -97,7 +97,7 @@
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
     if (section == 0)
-        return @"Chọn model + iOS → Apply. Zalo đọc config (không đụng Cài đặt hệ thống).";
+        return @"Chọn model + iOS → Reset + Save Data (không đụng Cài đặt hệ thống).";
     if (section == 1)
         return @"Apply ghi config.plist vào /var/mobile/Library/iPFaker và /var/jb/etc/ipfaker.";
     return nil;
@@ -152,13 +152,13 @@
             cell.textLabel.text = @"Reseed identity";
             cell.detailTextLabel.text = @"Giữ model/iOS, random serial & UUID";
         } else {
-            cell.textLabel.text = @"Kill Zalo";
-            cell.detailTextLabel.text = @"Đóng Zalo để load config mới";
+            cell.textLabel.text = @"Reset Data app";
+            cell.detailTextLabel.text = @"Random profile + wipe data app";
             cell.textLabel.textColor = [UIColor systemOrangeColor];
         }
     } else if (indexPath.section == 2) {
-        cell.textLabel.text = @"Wipe Zalo (lab note)";
-        cell.detailTextLabel.text = @"Full wipe an toàn hơn từ PC (wipe_and_ready.py)";
+        cell.textLabel.text = @"Wipe data app";
+        cell.detailTextLabel.text = @"Xóa sạch data app đã chọn";
     } else {
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
         cell.textLabel.text = self.statusText ?: @"—";

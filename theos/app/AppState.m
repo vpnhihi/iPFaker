@@ -68,7 +68,7 @@ static NSString *const kPoolWipeApps = @"ipf.pool.wipeBundleIds";
                            flat[@"MarketingName"] ?: @"?",
                            flat[@"ProductVersion"] ?: @"?"];
     } else if (!self.statusText.length) {
-        self.statusText = @"Chưa có config — chọn máy + iOS (multi) rồi Apply / Kill Zalo";
+        self.statusText = @"Chưa có config — chọn máy + iOS rồi Reset + Save Data";
     }
 }
 
@@ -205,6 +205,41 @@ static NSString *const kPoolWipeApps = @"ipf.pool.wipeBundleIds";
     return [self.selectedIOSList containsObject:ios];
 }
 
+- (void)selectAllDevices {
+    NSMutableArray *ids = [NSMutableArray array];
+    for (NSDictionary *d in Catalog.shared.devices) {
+        NSString *did = d[@"id"];
+        if (did.length) [ids addObject:did];
+    }
+    if (ids.count == 0) return;
+    self.selectedDeviceIds = ids;
+    if (!self.selectedDeviceId.length || ![self.selectedDeviceIds containsObject:self.selectedDeviceId])
+        self.selectedDeviceId = self.selectedDeviceIds.firstObject;
+    // Prune/refresh iOS pool against new device set
+    NSArray *compat = [self compatibleIOSForSelectedDevices];
+    NSMutableArray *kept = [NSMutableArray array];
+    for (NSString *v in self.selectedIOSList) {
+        if ([compat containsObject:v]) [kept addObject:v];
+    }
+    self.selectedIOSList = kept;
+    if (self.selectedIOSList.count == 0 && compat.count)
+        [self.selectedIOSList addObject:compat.lastObject];
+    if (![self.selectedIOSList containsObject:self.selectedIOS])
+        self.selectedIOS = self.selectedIOSList.firstObject;
+    [self savePools];
+    [self postDidChange];
+}
+
+- (void)selectAllIOS {
+    NSArray *compat = [self compatibleIOSForSelectedDevices];
+    if (compat.count == 0) return;
+    self.selectedIOSList = [compat mutableCopy];
+    if (!self.selectedIOS.length || ![self.selectedIOSList containsObject:self.selectedIOS])
+        self.selectedIOS = self.selectedIOSList.lastObject;
+    [self savePools];
+    [self postDidChange];
+}
+
 - (NSArray<NSString *> *)compatibleIOSForSelectedDevices {
     // Union of supportedIOS for all selected devices, sorted numeric ascending
     NSMutableSet *set = [NSMutableSet set];
@@ -303,7 +338,6 @@ static NSString *const kPoolWipeApps = @"ipf.pool.wipeBundleIds";
     for (NSString *bid in self.selectedWipeBundleIds) {
         if ([bid isEqualToString:@"com.apple.Maps"]) [names addObject:@"Bản đồ"];
         else if ([bid isEqualToString:@"com.apple.weather"]) [names addObject:@"Thời tiết"];
-        else if ([bid containsString:@"zalo"] || [bid containsString:@"zing"]) [names addObject:@"Zalo"];
         else [names addObject:bid.pathExtension.length ? bid.pathExtension : bid];
         if (names.count >= 4) break;
     }
@@ -444,11 +478,15 @@ static NSString *const kPoolWipeApps = @"ipf.pool.wipeBundleIds";
 - (NSString *)killZaloAndRandomizeFromPoolProgress:(void (^)(NSString *))progress {
     if (progress) progress(@"Random máy + iOS trong pool…");
     NSString *applyMsg = [self applyRandomFromPool];
-    if (progress) progress(@"Đã apply spoof — bắt đầu wipe data Zalo…");
-    NSString *wipeMsg = [ProfileBuilder wipeApps:@[ @"vn.com.vng.zingalo", @"com.zing.zalo" ]
-                                        progress:progress];
+    // Wipe: selected wipe apps + lab spoof target (internal)
+    NSMutableArray *wipeBids = [self.selectedWipeBundleIds mutableCopy] ?: [NSMutableArray array];
+    for (NSString *b in @[ @"vn.com.vng.zingalo", @"com.zing.zalo" ]) {
+        if (![wipeBids containsObject:b]) [wipeBids addObject:b];
+    }
+    if (progress) progress([NSString stringWithFormat:@"Đã lưu profile — wipe %lu app…", (unsigned long)wipeBids.count]);
+    NSString *wipeMsg = [ProfileBuilder wipeApps:wipeBids progress:progress];
     self.statusText = [NSString stringWithFormat:
-                       @"%@\n\n%@\n\n→ Mở Zalo = máy mới + form login trống.",
+                       @"%@\n\n%@\n\n→ Mở lại app = data sạch + profile mới.",
                        applyMsg, wipeMsg];
     [self postDidChange];
     return self.statusText;

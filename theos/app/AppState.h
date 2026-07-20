@@ -32,6 +32,10 @@ NS_ASSUME_NONNULL_BEGIN
 - (BOOL)toggleIOS:(NSString *)ios;
 - (BOOL)isDeviceSelected:(NSString *)deviceId;
 - (BOOL)isIOSSelected:(NSString *)ios;
+/// Select all devices in catalog.
+- (void)selectAllDevices;
+/// Select all iOS versions compatible with current device pool.
+- (void)selectAllIOS;
 
 - (BOOL)toggleWipeBundleId:(NSString *)bundleId;
 - (BOOL)isWipeAppSelected:(NSString *)bundleId;
