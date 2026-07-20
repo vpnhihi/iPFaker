@@ -235,6 +235,18 @@
         return;
     }
     NSString *ios = self.selectedIOS ?: dev[@"defaultIOS"] ?: @"18.5";
+    // Enforce support matrix
+    if (![Catalog.shared device:dev supportsIOS:ios]) {
+        NSArray *sup = [Catalog.shared supportedIOSForDevice:dev];
+        if (sup.count) {
+            ios = sup.lastObject;
+            self.selectedIOS = ios;
+            [self toast:[NSString stringWithFormat:@"iOS không hợp lệ → dùng %@", ios]];
+        } else {
+            [self toast:@"Máy này không có iOS trong matrix"];
+            return;
+        }
+    }
     NSDictionary *meta = Catalog.shared.iosReleases[ios];
     if (!meta) {
         ios = dev[@"defaultIOS"] ?: @"18.5";

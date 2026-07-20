@@ -57,4 +57,16 @@
     return nil;
 }
 
+- (NSArray<NSString *> *)supportedIOSForDevice:(NSDictionary *)device {
+    id arr = device[@"supportedIOS"];
+    if ([arr isKindOfClass:[NSArray class]] && [arr count] > 0)
+        return arr;
+    return @[];
+}
+
+- (BOOL)device:(NSDictionary *)device supportsIOS:(NSString *)ios {
+    if (!ios.length) return NO;
+    return [[self supportedIOSForDevice:device] containsObject:ios];
+}
+
 @end

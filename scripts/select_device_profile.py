@@ -27,6 +27,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CATALOG = ROOT / "config" / "device_catalog.json"
+COMPAT = ROOT / "config" / "ios_device_compat.json"
 OUT_PLIST = ROOT / "config" / "config.plist"
 OUT_ACTIVE = ROOT / "config" / "active_profile.json"
 OUT_SELECTED = ROOT / "config" / "selected_profile.json"
@@ -34,6 +35,23 @@ OUT_SELECTED = ROOT / "config" / "selected_profile.json"
 
 def load_catalog() -> dict:
     return json.loads(CATALOG.read_text(encoding="utf-8"))
+
+
+def load_compat() -> dict:
+    if COMPAT.exists():
+        return json.loads(COMPAT.read_text(encoding="utf-8"))
+    return {}
+
+
+def device_supported_ios(device: dict, cat: dict, compat: dict | None = None) -> list[str]:
+    """iOS versions allowed for this device (strict matrix)."""
+    if device.get("supportedIOS"):
+        return list(device["supportedIOS"])
+    did = device.get("id") or ""
+    inherit = device.get("compatInherit") or did
+    if compat is None:
+        compat = load_compat()
+    return list(compat.get("device_to_ios", {}).get(inherit, []))
 
 
 def norm(s: str) -> str:
@@ -88,10 +106,16 @@ def list_devices(cat: dict) -> None:
     print("iOS builds in catalog:", len(cat["ios_releases"]))
 
 
-def list_ios(cat: dict) -> None:
+def list_ios(cat: dict, device: dict | None = None) -> None:
+    supported = set(device_supported_ios(device, cat)) if device else None
     for ver, meta in cat["ios_releases"].items():
+        if supported is not None and ver not in supported:
+            continue
         lab = " [lab]" if meta.get("lab") else ""
         print(f"  {ver:10}  build={meta['BuildVersion']}{lab}")
+    if device:
+        print(f"\nDevice: {device.get('MarketingName')} ({device.get('id')})")
+        print(f"Supported builds: {len(device_supported_ios(device, cat))}")
 
 
 def random_serial() -> str:
@@ -111,31 +135,49 @@ def random_imei() -> str:
     return body[:15]
 
 
-def clamp_ios(device: dict, ios: str | None, cat: dict) -> tuple[str, dict]:
+def clamp_ios(
+    device: dict,
+    ios: str | None,
+    cat: dict,
+    *,
+    force: bool = False,
+) -> tuple[str, dict]:
     releases = cat["ios_releases"]
+    supported = device_supported_ios(device, cat)
+    strict = bool(cat.get("compat", {}).get("strict", True)) and not force
+
     if ios is None:
-        ios = device.get("defaultIOS") or "18.5"
+        ios = device.get("defaultIOS") or (supported[-1] if supported else "18.5")
+
     if ios not in releases:
-        # try prefix match latest
-        cands = [k for k in releases if k.startswith(ios)]
+        # try prefix match latest within supported if strict
+        pool = supported if (strict and supported) else list(releases.keys())
+        cands = [k for k in pool if k.startswith(ios)]
+        if not cands:
+            cands = [k for k in releases if k.startswith(ios)]
         if cands:
             ios = sorted(cands, key=lambda x: [int(p) for p in x.split(".")])[-1]
         else:
             raise SystemExit(f"Unknown iOS version: {ios}. Use --list-ios")
-    # soft warn range
-    def ver_tuple(v: str):
-        return tuple(int(x) for x in v.split(".")[:3])
 
-    try:
-        vt = ver_tuple(ios)
-        if device.get("minIOS") and vt < ver_tuple(device["minIOS"]):
-            print(f"WARN: {device['MarketingName']} rarely runs iOS {ios} (min ~{device['minIOS']})", file=sys.stderr)
-        if device.get("maxIOS") and vt > ver_tuple(device["maxIOS"].split(".")[0] + ".99.99" if device["maxIOS"].count(".") == 0 else device["maxIOS"]):
-            # simple: compare major
-            if int(ios.split(".")[0]) > int(device["maxIOS"].split(".")[0]):
-                print(f"WARN: {device['MarketingName']} lab maxIOS={device['maxIOS']}, you chose {ios}", file=sys.stderr)
-    except Exception:
-        pass
+    if strict:
+        if not supported:
+            raise SystemExit(
+                f"Device {device.get('id')} has no supported iOS in matrix "
+                f"(iphone6/6-plus not listed). Use another model or --force."
+            )
+        if ios not in supported:
+            # nearest supported same major if any
+            maj = ios.split(".")[0]
+            same = [v for v in supported if v.split(".")[0] == maj]
+            hint = same[-1] if same else supported[-1]
+            raise SystemExit(
+                f"INVALID pair: {device.get('MarketingName')} ({device.get('id')}) "
+                f"does not support iOS {ios} per matrix.\n"
+                f"  supported: {supported[0]} … {supported[-1]} ({len(supported)} builds)\n"
+                f"  try: -i {hint}   or --force to override"
+            )
+
     return ios, releases[ios]
 
 
@@ -380,12 +422,13 @@ def deploy_to_device() -> None:
 def main() -> int:
     ap = argparse.ArgumentParser(description="Select iPFaker device + iOS lab profile")
     ap.add_argument("--list", action="store_true", help="List all devices")
-    ap.add_argument("--list-ios", action="store_true", help="List iOS versions")
+    ap.add_argument("--list-ios", action="store_true", help="List iOS versions (filter by -d if set)")
     ap.add_argument("--device", "-d", help="Device id / marketing name / ProductType")
-    ap.add_argument("--ios", "-i", help="iOS version e.g. 18.5, 17.6.1, 19.0")
+    ap.add_argument("--ios", "-i", help="iOS version e.g. 18.5, 17.6.1")
     ap.add_argument("--name", help="UserAssignedDeviceName")
-    ap.add_argument("--random", action="store_true", help="Random device + default iOS")
+    ap.add_argument("--random", action="store_true", help="Random device + default iOS (matrix-valid only)")
     ap.add_argument("--deploy", action="store_true", help="Push config.plist to phone via SSH")
+    ap.add_argument("--force", action="store_true", help="Allow invalid device+iOS pairs (bypass matrix)")
     args = ap.parse_args()
 
     cat = load_catalog()
@@ -393,11 +436,18 @@ def main() -> int:
         list_devices(cat)
         return 0
     if args.list_ios:
-        list_ios(cat)
+        dev = find_device(cat, args.device) if args.device else None
+        if args.device and not dev:
+            print(f"Device not found: {args.device}", file=sys.stderr)
+            return 1
+        list_ios(cat, dev)
         return 0
 
     if args.random:
-        device = random.choice(cat["devices"])
+        pool = [d for d in cat["devices"] if device_supported_ios(d, cat)]
+        if not pool:
+            pool = cat["devices"]
+        device = random.choice(pool)
     elif args.device:
         device = find_device(cat, args.device)
         if not device:
@@ -407,9 +457,10 @@ def main() -> int:
         ap.print_help()
         print("\nExamples:\n  python scripts/select_device_profile.py --list")
         print("  python scripts/select_device_profile.py -d iphone16-pro-max -i 18.5 --deploy")
+        print("  python scripts/select_device_profile.py -d iphone15-pro --list-ios")
         return 2
 
-    ios_ver, ios_meta = clamp_ios(device, args.ios, cat)
+    ios_ver, ios_meta = clamp_ios(device, args.ios, cat, force=args.force)
     built = build_profile(device, ios_ver, ios_meta, args.name)
     write_plist(built["flat"], OUT_PLIST)
     OUT_ACTIVE.write_text(json.dumps(built["active"], indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

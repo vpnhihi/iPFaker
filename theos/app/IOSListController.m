@@ -10,7 +10,11 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     self.title = @"Chọn iOS";
-    self.versions = Catalog.shared.iosVersionsSorted.reverseObjectEnumerator.allObjects; // newest first
+    // Strict matrix: only iOS builds this device actually supports
+    NSArray *sup = [Catalog.shared supportedIOSForDevice:self.device ?: @{}];
+    if (sup.count == 0)
+        sup = Catalog.shared.iosVersionsSorted;
+    self.versions = [[sup reverseObjectEnumerator] allObjects]; // newest first
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
@@ -20,10 +24,12 @@
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
     NSString *min = self.device[@"minIOS"];
     NSString *max = self.device[@"maxIOS"];
+    NSUInteger n = self.versions.count;
     if (min || max)
-        return [NSString stringWithFormat:@"Gợi ý máy này: min %@ · max %@ · default %@",
-                min ?: @"?", max ?: @"?", self.device[@"defaultIOS"] ?: @"?"];
-    return @"iOS 19–26 là lab placeholder.";
+        return [NSString stringWithFormat:
+                @"Chỉ iOS hợp lệ cho máy này (matrix): %lu bản · min %@ · max %@ · default %@",
+                (unsigned long)n, min ?: @"?", max ?: @"?", self.device[@"defaultIOS"] ?: @"?"];
+    return @"Không có iOS trong matrix cho máy này.";
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
