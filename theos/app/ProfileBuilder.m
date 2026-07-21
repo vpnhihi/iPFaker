@@ -62,11 +62,11 @@
             @"Enabled", @"FakeDevice", @"FakeHardware", @"FakeAds", @"FakeScreen", @"FakeRealScreen",
             @"FakeBrowser", @"FakeNetwork", @"FakeWifi", @"FakeSysctl", @"FakeSysOSVersion",
             @"HideJailbreak", @"FakeLocale", @"FakeDateTime", @"FakeLocation", @"FakeSensor",
-            @"FakeWebRTC", @"DisableWebRTC", @"FakeProxy",
+            @"FakeWebRTC", @"DisableWebRTC", @"FakeProxy", @"DisableAppAttest",
             // Proxy / AppAttest / geo meta
             @"EnableProxy", @"ProxyHost", @"ProxyPort", @"ProxyType",
-            @"ProxyUsername", @"ProxyPassword", @"DisableAppAttest",
-            @"FakeWebRTC", @"DisableWebRTC", @"WebRTCLocalIP", @"FakeSensor",
+            @"ProxyUsername", @"ProxyPassword",
+            @"WebRTCLocalIP",
             @"SyncGeoFromProxy", @"ProxyEgressIP", @"ProxyGeoCity", @"ProxyGeoCountry",
             @"ProxyGeoISP", @"ProxyGeoRegion", @"GeoSyncedAtUnix",
             @"ProxyGeoBox", @"ProxyGeoCenterLat", @"ProxyGeoCenterLon", @"GeoRandomInCity",
@@ -507,13 +507,8 @@
         @"UserAgent": ua,
         @"HTTPUserAgent": ua,
         @"WebRTCLocalIP": webrtcIP.length ? webrtcIP : @"10.0.0.2",
-        @"FakeWebRTC": @YES,
-        @"DisableWebRTC": @NO,
-        // Client-side hole mitigations (not Graph/OTP/ASN server)
+        // FakeWebRTC / DisableWebRTC / FakeSensor / HideJailbreak / FakeWifi set above once
         @"DisableAppAttest": @YES,
-        @"FakeSensor": @YES,
-        @"HideJailbreak": @YES,
-        @"FakeWifi": @YES,
     };
 }
 
@@ -1591,7 +1586,7 @@
     for (NSString *sudoBin in @[ @"/var/jb/usr/bin/sudo", @"/usr/bin/sudo" ]) {
         if (![fm isExecutableFileAtPath:sudoBin]) continue;
         pid_t pid = 0;
-        const char *argv[] = { sudoBin.UTF8String, "-n", @"sh", script.UTF8String, NULL };
+        const char *argv[] = { sudoBin.UTF8String, "-n", "sh", script.UTF8String, NULL };
         if (posix_spawn(&pid, sudoBin.UTF8String, NULL, NULL, (char *const *)argv, NULL) == 0 && pid > 0) {
             int st = 0;
             waitpid(pid, &st, 0);
