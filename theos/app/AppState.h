@@ -10,8 +10,10 @@ NS_ASSUME_NONNULL_BEGIN
 /// Multi-select pools (persisted). At least one device + one iOS after ensureDefaults.
 @property (nonatomic, strong) NSMutableArray<NSString *> *selectedDeviceIds;
 @property (nonatomic, strong) NSMutableArray<NSString *> *selectedIOSList;
-/// Wipe tab multi-select (default: Maps + Weather).
+/// Wipe tab multi-select (default: Maps + Weather + Safari).
 @property (nonatomic, strong) NSMutableArray<NSString *> *selectedWipeBundleIds;
+/// Multi-app spoof inject targets (default: Zalo). Written to TweakInject filter plists.
+@property (nonatomic, strong) NSMutableArray<NSString *> *selectedSpoofBundleIds;
 
 /// Active pair last applied / current primary (synced with pools).
 @property (nonatomic, copy, nullable) NSString *selectedDeviceId;
@@ -40,6 +42,14 @@ NS_ASSUME_NONNULL_BEGIN
 - (BOOL)toggleWipeBundleId:(NSString *)bundleId;
 - (BOOL)isWipeAppSelected:(NSString *)bundleId;
 - (NSString *)wipeAppsSummary;
+
+- (BOOL)toggleSpoofBundleId:(NSString *)bundleId;
+- (BOOL)isSpoofAppSelected:(NSString *)bundleId;
+- (NSString *)spoofAppsSummary;
+- (void)selectAllSpoofAppsFromCatalog:(NSArray *)items;
+- (void)deselectAllSpoofAppsKeepingZalo:(BOOL)keepZalo;
+/// Write ElleKit filter plists for MG/CT/JB from selected spoof apps.
+- (NSString *)applySpoofAppFiltersProgress:(nullable void (^)(NSString *step))progress;
 
 - (NSArray<NSString *> *)compatibleIOSForSelectedDevices;
 - (NSArray<NSString *> *)selectedIOSCompatibleWithDevice:(NSDictionary *)device;

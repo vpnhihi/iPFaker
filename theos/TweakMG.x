@@ -46,15 +46,11 @@ static void IPFMark(const char *msg) {
 
         NSString *bid = [[NSBundle mainBundle] bundleIdentifier] ?: @"";
         // Filter scopes inject; allow Zalo + Settings (About / Giới thiệu).
-        // Product wall: Zalo only (Settings inject crashed historically — filter plists match)
-        if (bid.length > 0) {
-            BOOL ok =
-                [bid isEqualToString:@"vn.com.vng.zingalo"]
-                || [bid isEqualToString:@"com.zing.zalo"];
-            if (!ok) {
-                IPFMark("CTOR_SKIP_BID");
-                return;
-            }
+        // Multi-app spoof: ElleKit Filter.plist decides inject targets.
+        // Hard-block Settings (historical crash). Do not second-guess other bundles.
+        if (bid.length > 0 && [bid isEqualToString:@"com.apple.Preferences"]) {
+            IPFMark("CTOR_SKIP_PREFS");
+            return;
         }
 
         BOOL ok = [[IPFConfig shared] reload];

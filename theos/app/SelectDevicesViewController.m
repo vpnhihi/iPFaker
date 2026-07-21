@@ -4,11 +4,13 @@
 #import "Catalog.h"
 #import "DeviceListController.h"
 #import "IOSListController.h"
+#import "SpoofAppsController.h"
 #import "ProgressOverlay.h"
 
 @interface SelectDevicesViewController ()
 @property (nonatomic, strong) UILabel *deviceDetailLabel;
 @property (nonatomic, strong) UILabel *iosDetailLabel;
+@property (nonatomic, strong) UILabel *spoofDetailLabel;
 @property (nonatomic, strong) UILabel *hintLabel;
 @property (nonatomic, strong) UIActivityIndicatorView *spinner;
 @property (nonatomic, strong) UIView *card;
@@ -66,7 +68,16 @@
                                detailOut:&_iosDetailLabel
                                   action:@selector(pickIOS)];
 
-    UIStackView *stack = [[UIStackView alloc] initWithArrangedSubviews:@[deviceRow, sep, iosRow]];
+    UIView *sep2 = [[UIView alloc] init];
+    sep2.backgroundColor = AppTheme.separator;
+    sep2.translatesAutoresizingMaskIntoConstraints = NO;
+    [sep2.heightAnchor constraintEqualToConstant:1.0 / UIScreen.mainScreen.scale].active = YES;
+
+    UIControl *spoofRow = [self makeRowTitle:@"Multi-app spoof (app nhận inject)"
+                                  detailOut:&_spoofDetailLabel
+                                     action:@selector(pickSpoofApps)];
+
+    UIStackView *stack = [[UIStackView alloc] initWithArrangedSubviews:@[deviceRow, sep, iosRow, sep2, spoofRow]];
     stack.axis = UILayoutConstraintAxisVertical;
     stack.spacing = 0;
     stack.translatesAutoresizingMaskIntoConstraints = NO;
@@ -208,6 +219,9 @@
                                 st.selectedIOS ?: @"—",
                                 meta[@"BuildVersion"] ?: @"?"];
 
+    self.spoofDetailLabel.text = [NSString stringWithFormat:@"%@\nChạm để chọn app · Apply trong list ghi filter inject",
+                                  [st spoofAppsSummary]];
+
     NSUInteger nCompat = [st compatibleIOSForSelectedDevices].count;
     NSUInteger nPairs = 0;
     for (NSString *did in st.selectedDeviceIds) {
@@ -217,12 +231,13 @@
 
     self.hintLabel.text = [NSString stringWithFormat:
         @"Tập chọn: %lu máy × iOS → %lu cặp tương thích.\n"
-        @"Hợp iOS: %lu bản · Mã máy: %@\n"
+        @"Multi-app spoof: %lu app · Hợp iOS: %lu bản · Mã: %@\n"
         @"Màn hình: %@×%@ @%@\n"
         @"Đặt lại dữ liệu app = máy mới + xóa data (mất đăng nhập).\n"
         @"Đặt lại + Lưu = lưu data/máy → máy mới → khôi phục data (giữ đăng nhập).\n%@",
         (unsigned long)st.selectedDeviceIds.count,
         (unsigned long)nPairs,
+        (unsigned long)st.selectedSpoofBundleIds.count,
         (unsigned long)nCompat,
         dev[@"id"] ?: @"",
         disp[@"NativeWidth"] ?: @"?",
@@ -243,6 +258,15 @@
 
 - (void)pickIOS {
     IOSListController *vc = [[IOSListController alloc] initWithStyle:UITableViewStyleInsetGrouped];
+    __weak typeof(self) weakSelf = self;
+    vc.onChange = ^{
+        [weakSelf refreshUI];
+    };
+    [self.navigationController pushViewController:vc animated:YES];
+}
+
+- (void)pickSpoofApps {
+    SpoofAppsController *vc = [[SpoofAppsController alloc] initWithStyle:UITableViewStyleInsetGrouped];
     __weak typeof(self) weakSelf = self;
     vc.onChange = ^{
         [weakSelf refreshUI];

@@ -1,5 +1,5 @@
 // iPFakerCT — entry (HIOS ChangeInfoIosCT style)
-// Filter: Zalo bundles + CommCenter executables
+// Filter: Multi-app spoof bundles + CommCenter executables
 
 #import <Foundation/Foundation.h>
 #import "IPFConfig.h"
@@ -10,13 +10,11 @@
     @autoreleasepool {
         NSString *bid = [[NSBundle mainBundle] bundleIdentifier] ?: @"";
         NSString *exec = [[NSProcessInfo processInfo] processName] ?: @"";
-        BOOL isZalo = [bid isEqualToString:@"vn.com.vng.zingalo"]
-                   || [bid isEqualToString:@"com.zing.zalo"];
         BOOL isCT = [exec.lowercaseString containsString:@"commcenter"]
                  || [exec.lowercaseString containsString:@"coretelephony"];
-        // Empty bid + not CT: still allow (filter-scoped); only skip known non-targets
-        if (bid.length && !isZalo && !isCT) {
-            NSLog(@"[iPFakerCT] skip bid=%@ exec=%@", bid, exec);
+        // Multi-app: ElleKit filter scopes inject. Never Settings.
+        if (bid.length && [bid isEqualToString:@"com.apple.Preferences"]) {
+            NSLog(@"[iPFakerCT] skip Preferences");
             return;
         }
 
@@ -26,8 +24,8 @@
             return;
         }
         IPFInstallCTHooks();
-        // Network/IOKit rewrite lives in CT (loads reliably on Dopamine)
-        if (isZalo || bid.length == 0) {
+        // Deep rewrite for app processes (not only Zalo) + empty bid CT helpers
+        if (!isCT || bid.length == 0) {
             IPFInstallDeepHooks();
         }
         NSString *home = NSHomeDirectory();

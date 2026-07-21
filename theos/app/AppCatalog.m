@@ -7,6 +7,7 @@
 
 @interface AppCatalog ()
 @property (nonatomic, strong) NSArray<AppCatalogItem *> *apps;
+@property (nonatomic, strong) NSArray<AppCatalogItem *> *spoofApps;
 @end
 
 @implementation AppCatalog
@@ -121,7 +122,83 @@
 - (AppCatalogItem *)itemWithBundleId:(NSString *)bid {
     for (AppCatalogItem *it in self.apps)
         if ([it.bundleId isEqualToString:bid]) return it;
+    for (AppCatalogItem *it in self.spoofApps)
+        if ([it.bundleId isEqualToString:bid]) return it;
     return nil;
+}
+
+/// Stock apps shown in HIOS Multi-app spoof (exclude Preferences — inject crash).
++ (NSArray<NSArray *> *)hiosStockSpoofApps {
+    return @[
+        @[ @"com.apple.AppStore", @"App Store" ],
+        @[ @"com.apple.calculator", @"Calculator" ],
+        @[ @"com.apple.camera", @"Camera" ],
+        @[ @"com.apple.mobiletimer", @"Clock" ],
+        @[ @"com.apple.MobileAddressBook", @"Contacts" ],
+        @[ @"com.apple.facetime", @"FaceTime" ],
+        @[ @"com.apple.DocumentsApp", @"Files" ],
+        @[ @"com.apple.findmy", @"Find My" ],
+        @[ @"com.apple.Health", @"Health" ],
+        @[ @"com.apple.Home", @"Home" ],
+        @[ @"com.apple.MobileStore", @"iTunes Store" ],
+        @[ @"com.apple.Maps", @"Maps" ],
+        @[ @"com.apple.measure", @"Measure" ],
+        @[ @"com.apple.MobileSMS", @"Messages" ],
+        @[ @"com.apple.Music", @"Music" ],
+        @[ @"com.apple.news", @"News" ],
+        @[ @"com.apple.mobilenotes", @"Notes" ],
+        @[ @"com.apple.mobilephone", @"Phone" ],
+        @[ @"com.apple.mobileslideshow", @"Photos" ],
+        @[ @"com.apple.podcasts", @"Podcasts" ],
+        @[ @"com.apple.reminders", @"Reminders" ],
+        @[ @"com.apple.mobilesafari", @"Safari" ],
+        @[ @"com.apple.shortcuts", @"Shortcuts" ],
+        @[ @"com.apple.stocks", @"Stocks" ],
+        @[ @"com.apple.tips", @"Tips" ],
+        @[ @"com.apple.tv", @"TV" ],
+        @[ @"com.apple.VoiceMemos", @"Voice Memos" ],
+        @[ @"com.apple.Passbook", @"Wallet" ],
+        @[ @"com.apple.Bridge", @"Watch" ],
+        @[ @"com.apple.weather", @"Weather" ],
+        @[ @"com.apple.iBooks", @"Books" ],
+        @[ @"vn.com.vng.zingalo", @"Zalo" ],
+        @[ @"com.zing.zalo", @"Zalo (alt)" ],
+    ];
+}
+
+- (void)reloadSpoofCatalog {
+    NSMutableDictionary<NSString *, AppCatalogItem *> *map = [NSMutableDictionary dictionary];
+
+    // 1) Stock HIOS-like list
+    for (NSArray *row in [AppCatalog hiosStockSpoofApps]) {
+        AppCatalogItem *it = [[AppCatalogItem alloc] init];
+        it.bundleId = row[0];
+        it.name = row[1];
+        it.systemApp = ![it.bundleId containsString:@"zalo"] && ![it.bundleId containsString:@"zing"];
+        map[it.bundleId] = it;
+    }
+
+    // 2) Merge third-party from LS (reuse wipe scan via temporary reload of apps)
+    [self reload];
+    for (AppCatalogItem *it in self.apps) {
+        if (!it.bundleId.length) continue;
+        if ([it.bundleId isEqualToString:@"com.apple.Preferences"]) continue;
+        if (!map[it.bundleId]) {
+            map[it.bundleId] = it;
+        } else if (it.name.length) {
+            map[it.bundleId].name = it.name;
+            map[it.bundleId].version = it.version;
+        }
+    }
+
+    NSArray *all = [[map allValues] sortedArrayUsingComparator:^NSComparisonResult(AppCatalogItem *a, AppCatalogItem *b) {
+        // Zalo first, then alpha
+        BOOL az = [a.bundleId.lowercaseString containsString:@"zalo"] || [a.bundleId.lowercaseString containsString:@"zing"];
+        BOOL bz = [b.bundleId.lowercaseString containsString:@"zalo"] || [b.bundleId.lowercaseString containsString:@"zing"];
+        if (az != bz) return az ? NSOrderedAscending : NSOrderedDescending;
+        return [a.name localizedCaseInsensitiveCompare:b.name];
+    }];
+    self.spoofApps = all;
 }
 
 @end

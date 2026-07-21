@@ -7,6 +7,7 @@ NSNotificationName const AppStateDidChangeNotification = @"AppStateDidChangeNoti
 static NSString *const kPoolDevices = @"ipf.pool.deviceIds";
 static NSString *const kPoolIOS = @"ipf.pool.iosList";
 static NSString *const kPoolWipeApps = @"ipf.pool.wipeBundleIds";
+static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
 
 @implementation AppState
 
@@ -18,6 +19,7 @@ static NSString *const kPoolWipeApps = @"ipf.pool.wipeBundleIds";
         s.selectedDeviceIds = [NSMutableArray array];
         s.selectedIOSList = [NSMutableArray array];
         s.selectedWipeBundleIds = [NSMutableArray array];
+        s.selectedSpoofBundleIds = [NSMutableArray array];
         [[Catalog shared] reload];
         [s loadPools];
         [s reloadFromDisk];
@@ -32,18 +34,22 @@ static NSString *const kPoolWipeApps = @"ipf.pool.wipeBundleIds";
     NSArray *d = [NSUserDefaults.standardUserDefaults arrayForKey:kPoolDevices];
     NSArray *i = [NSUserDefaults.standardUserDefaults arrayForKey:kPoolIOS];
     NSArray *w = [NSUserDefaults.standardUserDefaults arrayForKey:kPoolWipeApps];
+    NSArray *sp = [NSUserDefaults.standardUserDefaults arrayForKey:kPoolSpoofApps];
     if ([d isKindOfClass:[NSArray class]] && d.count)
         self.selectedDeviceIds = [d mutableCopy];
     if ([i isKindOfClass:[NSArray class]] && i.count)
         self.selectedIOSList = [i mutableCopy];
     if ([w isKindOfClass:[NSArray class]] && w.count)
         self.selectedWipeBundleIds = [w mutableCopy];
+    if ([sp isKindOfClass:[NSArray class]] && sp.count)
+        self.selectedSpoofBundleIds = [sp mutableCopy];
 }
 
 - (void)savePools {
     [NSUserDefaults.standardUserDefaults setObject:[self.selectedDeviceIds copy] forKey:kPoolDevices];
     [NSUserDefaults.standardUserDefaults setObject:[self.selectedIOSList copy] forKey:kPoolIOS];
     [NSUserDefaults.standardUserDefaults setObject:[self.selectedWipeBundleIds copy] forKey:kPoolWipeApps];
+    [NSUserDefaults.standardUserDefaults setObject:[self.selectedSpoofBundleIds copy] forKey:kPoolSpoofApps];
     // PC app đọc pool từ đây (không chọn máy/iOS trên PC)
     @try {
         NSString *dir = @"/var/mobile/Library/iPFaker";
@@ -52,6 +58,7 @@ static NSString *const kPoolWipeApps = @"ipf.pool.wipeBundleIds";
             @"devices": [self.selectedDeviceIds copy] ?: @[],
             @"ios": [self.selectedIOSList copy] ?: @[],
             @"wipeApps": [self.selectedWipeBundleIds copy] ?: @[],
+            @"spoofApps": [self.selectedSpoofBundleIds copy] ?: @[],
             @"updated": @([[NSDate date] timeIntervalSince1970]),
         };
         NSData *json = [NSJSONSerialization dataWithJSONObject:pools options:NSJSONWritingPrettyPrinted error:nil];
@@ -148,6 +155,23 @@ static NSString *const kPoolWipeApps = @"ipf.pool.wipeBundleIds";
         if (isClassicDefault) {
             [self.selectedWipeBundleIds addObject:@"com.apple.mobilesafari"];
             [self savePools];
+        }
+    }
+    // Multi-app spoof default: Zalo only (lab wall). Settings never injected.
+    if (self.selectedSpoofBundleIds.count == 0) {
+        [self.selectedSpoofBundleIds addObject:@"vn.com.vng.zingalo"];
+        [self.selectedSpoofBundleIds addObject:@"com.zing.zalo"];
+    } else {
+        [self.selectedSpoofBundleIds removeObject:@"com.apple.Preferences"];
+        BOOL hasZalo = NO;
+        for (NSString *b in self.selectedSpoofBundleIds) {
+            if ([b.lowercaseString containsString:@"zalo"] || [b.lowercaseString containsString:@"zing"]) {
+                hasZalo = YES; break;
+            }
+        }
+        if (!hasZalo) {
+            [self.selectedSpoofBundleIds insertObject:@"vn.com.vng.zingalo" atIndex:0];
+            [self.selectedSpoofBundleIds addObject:@"com.zing.zalo"];
         }
     }
     [self savePools];
@@ -359,6 +383,89 @@ static NSString *const kPoolWipeApps = @"ipf.pool.wipeBundleIds";
     return [self.selectedWipeBundleIds containsObject:bundleId];
 }
 
+#pragma mark - Multi-app spoof
+
+- (BOOL)isSpoofAppSelected:(NSString *)bundleId {
+    return bundleId.length && [self.selectedSpoofBundleIds containsObject:bundleId];
+}
+
+- (BOOL)toggleSpoofBundleId:(NSString *)bundleId {
+    if (!bundleId.length) return NO;
+    if ([bundleId isEqualToString:@"com.apple.Preferences"]) return NO;
+    if ([self.selectedSpoofBundleIds containsObject:bundleId]) {
+        // Never leave empty — keep at least one Zalo id
+        BOOL isZalo = [bundleId.lowercaseString containsString:@"zalo"]
+            || [bundleId.lowercaseString containsString:@"zing"];
+        if (isZalo) {
+            NSUInteger zaloCount = 0;
+            for (NSString *b in self.selectedSpoofBundleIds) {
+                if ([b.lowercaseString containsString:@"zalo"] || [b.lowercaseString containsString:@"zing"])
+                    zaloCount++;
+            }
+            if (zaloCount <= 1 && self.selectedSpoofBundleIds.count <= 2)
+                return YES; // refuse deselect last zalo when only zalo selected
+        }
+        [self.selectedSpoofBundleIds removeObject:bundleId];
+        if (self.selectedSpoofBundleIds.count == 0) {
+            [self.selectedSpoofBundleIds addObject:@"vn.com.vng.zingalo"];
+            [self.selectedSpoofBundleIds addObject:@"com.zing.zalo"];
+        }
+    } else {
+        [self.selectedSpoofBundleIds addObject:bundleId];
+    }
+    [self savePools];
+    [self postDidChange];
+    return [self.selectedSpoofBundleIds containsObject:bundleId];
+}
+
+- (void)selectAllSpoofAppsFromCatalog:(NSArray *)items {
+    [self.selectedSpoofBundleIds removeAllObjects];
+    for (id it in items) {
+        NSString *bid = nil;
+        if ([it respondsToSelector:@selector(bundleId)])
+            bid = [it valueForKey:@"bundleId"];
+        else if ([it isKindOfClass:[NSString class]])
+            bid = (NSString *)it;
+        if (!bid.length) continue;
+        if ([bid isEqualToString:@"com.apple.Preferences"]) continue;
+        if (![self.selectedSpoofBundleIds containsObject:bid])
+            [self.selectedSpoofBundleIds addObject:bid];
+    }
+    if (self.selectedSpoofBundleIds.count == 0) {
+        [self.selectedSpoofBundleIds addObject:@"vn.com.vng.zingalo"];
+        [self.selectedSpoofBundleIds addObject:@"com.zing.zalo"];
+    }
+    [self savePools];
+    [self postDidChange];
+}
+
+- (void)deselectAllSpoofAppsKeepingZalo:(BOOL)keepZalo {
+    [self.selectedSpoofBundleIds removeAllObjects];
+    if (keepZalo) {
+        [self.selectedSpoofBundleIds addObject:@"vn.com.vng.zingalo"];
+        [self.selectedSpoofBundleIds addObject:@"com.zing.zalo"];
+    }
+    [self savePools];
+    [self postDidChange];
+}
+
+- (NSString *)spoofAppsSummary {
+    NSUInteger n = self.selectedSpoofBundleIds.count;
+    if (n == 0) return @"Chưa chọn app spoof";
+    if (n <= 3) return [self.selectedSpoofBundleIds componentsJoinedByString:@", "];
+    return [NSString stringWithFormat:@"%lu app spoof (Zalo + …)", (unsigned long)n];
+}
+
+- (NSString *)applySpoofAppFiltersProgress:(void (^)(NSString *))progress {
+    [self ensureDefaults];
+    if (progress) progress(@"Ghi danh sách Multi-app spoof…");
+    NSString *msg = [ProfileBuilder applySpoofFiltersForBundles:self.selectedSpoofBundleIds
+                                                       progress:progress];
+    self.statusText = msg;
+    [self postDidChange];
+    return msg;
+}
+
 - (NSString *)wipeAppsSummary {
     NSUInteger n = self.selectedWipeBundleIds.count;
     if (n == 0) return @"Chưa chọn ứng dụng (chạm để chọn)";
@@ -462,11 +569,14 @@ static NSString *const kPoolWipeApps = @"ipf.pool.wipeBundleIds";
     flat = mflat;
 
     NSString *result = [ProfileBuilder applyFlatProfile:flat deviceId:dev[@"id"] ios:ios];
+    // Keep Multi-app spoof filters in sync with wall (identity + inject targets)
+    NSString *filt = [ProfileBuilder applySpoofFiltersForBundles:self.selectedSpoofBundleIds progress:nil];
     self.lastFlat = flat;
-    self.statusText = [NSString stringWithFormat:@"%@ · %@ / iOS %@",
+    self.statusText = [NSString stringWithFormat:@"%@ · %@ / iOS %@\n%@",
                        result ?: @"OK",
                        dev[@"MarketingName"] ?: dev[@"id"],
-                       ios];
+                       ios,
+                       filt ?: @""];
     [self postDidChange];
     return self.statusText;
 }

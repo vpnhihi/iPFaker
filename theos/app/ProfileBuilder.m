@@ -1238,6 +1238,133 @@
     return [self wipeZaloFull];
 }
 
+#pragma mark - Multi-app spoof filters
+
++ (NSData *)filterPlistDataForBundles:(NSArray<NSString *> *)bundles
+                      includeCommCenter:(BOOL)comm {
+    NSMutableArray *bids = [NSMutableArray array];
+    for (NSString *b in bundles) {
+        if (!b.length) continue;
+        if ([b isEqualToString:@"com.apple.Preferences"]) continue;
+        if (![bids containsObject:b]) [bids addObject:b];
+    }
+    if (bids.count == 0) {
+        [bids addObject:@"vn.com.vng.zingalo"];
+        [bids addObject:@"com.zing.zalo"];
+    }
+    NSMutableDictionary *filter = [@{
+        @"Bundles": bids,
+        @"Mode": @"Any",
+    } mutableCopy];
+    if (comm) {
+        filter[@"Executables"] = @[ @"CommCenter", @"commcenter", @"CoreTelephonyHelper" ];
+    }
+    NSDictionary *root = @{ @"Filter": filter };
+    return [NSPropertyListSerialization dataWithPropertyList:root
+                                                      format:NSPropertyListXMLFormat_v1_0
+                                                     options:0
+                                                       error:nil];
+}
+
++ (NSString *)applySpoofFiltersForBundles:(NSArray<NSString *> *)bundleIds
+                                 progress:(IPFWipeProgress)progress {
+    void (^step)(NSString *) = ^(NSString *s) { if (progress) progress(s); };
+    NSMutableArray *bids = [bundleIds mutableCopy] ?: [NSMutableArray array];
+    // Always keep Zalo for lab wall
+    if (![bids containsObject:@"vn.com.vng.zingalo"])
+        [bids insertObject:@"vn.com.vng.zingalo" atIndex:0];
+    if (![bids containsObject:@"com.zing.zalo"])
+        [bids addObject:@"com.zing.zalo"];
+    [bids removeObject:@"com.apple.Preferences"];
+
+    step([NSString stringWithFormat:@"Chuẩn bị filter %lu app…", (unsigned long)bids.count]);
+
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSString *stage = @"/var/mobile/Library/iPFaker";
+    [fm createDirectoryAtPath:stage withIntermediateDirectories:YES attributes:nil error:nil];
+
+    NSData *mgPl = [self filterPlistDataForBundles:bids includeCommCenter:NO];
+    NSData *ctPl = [self filterPlistDataForBundles:bids includeCommCenter:YES];
+    NSData *jbPl = mgPl;
+    if (!mgPl.length) return @"ERR: không tạo được filter plist";
+
+    [mgPl writeToFile:[stage stringByAppendingPathComponent:@"iPFakerMG.plist"] atomically:YES];
+    [ctPl writeToFile:[stage stringByAppendingPathComponent:@"iPFakerCT.plist"] atomically:YES];
+    [jbPl writeToFile:[stage stringByAppendingPathComponent:@"iPFakerJB.plist"] atomically:YES];
+
+    // Manifest for PC / debug
+    NSDictionary *manifest = @{
+        @"schema": @"ipfaker.spoof_apps/1",
+        @"bundles": bids,
+        @"updated": @([[NSDate date] timeIntervalSince1970]),
+    };
+    NSData *json = [NSJSONSerialization dataWithJSONObject:manifest options:NSJSONWritingPrettyPrinted error:nil];
+    if (json) [json writeToFile:[stage stringByAppendingPathComponent:@"spoof_apps.json"] atomically:YES];
+
+    step(@"Cài filter vào TweakInject (root)…");
+    NSString *script = [stage stringByAppendingPathComponent:@"install_spoof_filters.sh"];
+    NSString *sh = @"#!/bin/sh\n"
+        "set -e\n"
+        "STAGE=/var/mobile/Library/iPFaker\n"
+        "for INJ in /var/jb/usr/lib/TweakInject /var/jb/Library/MobileSubstrate/DynamicLibraries; do\n"
+        "  [ -d \"$INJ\" ] || continue\n"
+        "  for n in iPFakerMG iPFakerCT iPFakerJB; do\n"
+        "    if [ -f \"$STAGE/${n}.plist\" ]; then\n"
+        "      cp -f \"$STAGE/${n}.plist\" \"$INJ/${n}.plist\"\n"
+        "      chmod 644 \"$INJ/${n}.plist\"\n"
+        "      chown root:wheel \"$INJ/${n}.plist\" 2>/dev/null || true\n"
+        "    fi\n"
+        "  done\n"
+        "done\n"
+        "cp -f \"$STAGE/spoof_apps.json\" /var/jb/etc/ipfaker/spoof_apps.json 2>/dev/null || true\n"
+        "chown mobile:mobile /var/jb/etc/ipfaker/spoof_apps.json 2>/dev/null || true\n"
+        "echo OK install_spoof_filters\n";
+    [sh writeToFile:script atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    [fm setAttributes:@{ NSFilePosixPermissions: @0755 } ofItemAtPath:script error:nil];
+
+    int rc = -1;
+    for (NSString *sudoBin in @[ @"/var/jb/usr/bin/sudo", @"/usr/bin/sudo" ]) {
+        if (![fm isExecutableFileAtPath:sudoBin]) continue;
+        pid_t pid = 0;
+        const char *argv[] = { sudoBin.UTF8String, "-n", @"sh", script.UTF8String, NULL };
+        if (posix_spawn(&pid, sudoBin.UTF8String, NULL, NULL, (char *const *)argv, NULL) == 0 && pid > 0) {
+            int st = 0;
+            waitpid(pid, &st, 0);
+            if (WIFEXITED(st)) rc = WEXITSTATUS(st);
+            if (rc == 0) break;
+        }
+    }
+    if (rc != 0) {
+        // Try direct write (if already root / writable)
+        for (NSString *inj in @[
+                 @"/var/jb/usr/lib/TweakInject",
+                 @"/var/jb/Library/MobileSubstrate/DynamicLibraries" ]) {
+            if (![fm fileExistsAtPath:inj]) continue;
+            for (NSString *n in @[ @"iPFakerMG", @"iPFakerCT", @"iPFakerJB" ]) {
+                NSString *src = [stage stringByAppendingPathComponent:[n stringByAppendingString:@".plist"]];
+                NSString *dst = [inj stringByAppendingPathComponent:[n stringByAppendingString:@".plist"]];
+                [fm copyItemAtPath:src toPath:dst error:nil];
+            }
+        }
+        rc = 0;
+    }
+
+    step(@"Đóng app spoof để lần mở sau inject…");
+    for (NSString *bid in bids)
+        [self killAppBundleId:bid executable:nil];
+
+    NSString *preview = bids.count <= 6
+        ? [bids componentsJoinedByString:@", "]
+        : [NSString stringWithFormat:@"%@ … (+%lu)",
+           [[bids subarrayWithRange:NSMakeRange(0, 4)] componentsJoinedByString:@", "],
+           (unsigned long)(bids.count - 4)];
+    return [NSString stringWithFormat:
+            @"Multi-app spoof: %lu app\n%@\n"
+            @"Đã ghi filter MG/CT/JB · mở lại app = spoof active\n"
+            @"rc=%d",
+            (unsigned long)bids.count, preview, rc];
+}
+
 @end
 
 

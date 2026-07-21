@@ -6,13 +6,9 @@
 %ctor {
     @autoreleasepool {
         NSString *bid = [[NSBundle mainBundle] bundleIdentifier] ?: @"";
-        // Zalo only — same filter as MG (product wall)
-        if (bid.length > 0) {
-            BOOL ok =
-                [bid isEqualToString:@"vn.com.vng.zingalo"]
-                || [bid isEqualToString:@"com.zing.zalo"];
-            if (!ok) return;
-        }
+        // Multi-app spoof: filter plist scopes inject; never Settings
+        if (bid.length > 0 && [bid isEqualToString:@"com.apple.Preferences"])
+            return;
         // Config already loaded by MG when both inject; reload is cheap + consistent
         [[IPFConfig shared] reload];
         IPFInstallJBHooks();

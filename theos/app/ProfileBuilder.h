@@ -48,6 +48,10 @@ typedef void (^IPFWipeProgress)(NSString *step);
 /// Full wipe Zalo only.
 + (NSString *)wipeZaloFull;
 + (NSString *)wipeZaloLab;
+
+/// Multi-app spoof: write ElleKit filter plists for MG/CT/JB from selected bundle IDs.
++ (NSString *)applySpoofFiltersForBundles:(NSArray<NSString *> *)bundleIds
+                                 progress:(nullable IPFWipeProgress)progress;
 @end
 
 NS_ASSUME_NONNULL_END
