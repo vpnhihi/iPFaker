@@ -15,9 +15,10 @@ include $(THEOS)/makefiles/common.mk
 TWEAK_NAME = iPFakerMG iPFakerCT iPFakerJB
 
 # MG = spoof + Extra (screen/disk/UA/getifaddrs/access-stat/WKWebView)
-# fishhook.c: LAST-RESORT only when MSHookFunction missing (not used when ElleKit present)
-iPFakerMG_FILES = TweakMG.x src/IPFConfig.m src/IPFHooksMG.m src/IPFHooksExtra.m src/fishhook.c
-iPFakerMG_CFLAGS = -fobjc-arc -Os -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src -DIPF_FISHHOOK_FALLBACK=1
+# fishhook.c OFF by default: keeps MG ~123k AMFI-safe. ElleKit MSHook is primary on Dopamine.
+# Optional: add src/fishhook.c + -DIPF_FISHHOOK_FALLBACK=1 only if MSHook is unavailable.
+iPFakerMG_FILES = TweakMG.x src/IPFConfig.m src/IPFHooksMG.m src/IPFHooksExtra.m
+iPFakerMG_CFLAGS = -fobjc-arc -Os -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
 # WebKit used only via runtime (objc_getClass) — hard-link WebKit broke Dopamine code-sign coverage
 iPFakerMG_FRAMEWORKS = UIKit Foundation AdSupport CFNetwork
 iPFakerMG_LIBRARIES = substrate
