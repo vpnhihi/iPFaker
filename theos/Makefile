@@ -35,7 +35,8 @@ iPFakerCT_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerCT.dylib -W
 # JB: hide + Server (Proxy/AppAttest/WebRTC). Keep ~100–106k inject OK.
 iPFakerJB_FILES = TweakJB.x src/IPFConfig.m src/IPFHooksJB.m src/IPFHooksServer.m
 iPFakerJB_CFLAGS = -fobjc-arc -Os -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
-iPFakerJB_FRAMEWORKS = Foundation CFNetwork
+# No CFNetwork hard-link (AMFI/signature friendlier); Server uses string proxy keys
+iPFakerJB_FRAMEWORKS = Foundation
 iPFakerJB_LIBRARIES = substrate
 iPFakerJB_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerJB.dylib -Wl,-dead_strip
 
