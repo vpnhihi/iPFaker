@@ -34,7 +34,7 @@
     [self.view addSubview:header];
 
     UILabel *note = [[UILabel alloc] init];
-    note.text = @"Chọn app tải ngoài (chọn nhiều ✓) · Mặc định Bản đồ + Thời tiết · Hiện tiến trình giữa màn hình.";
+    note.text = @"Chọn app (✓ nhiều) · Mặc định Bản đồ + Thời tiết · 1 chạm = kill + wipe container/group + kiểm tra sạch.";
     note.font = AppTheme.captionFont;
     note.textColor = AppTheme.textSecondary;
     note.numberOfLines = 0;
@@ -47,10 +47,10 @@
                                    action:@selector(pickApps)];
     [card addSubview:appsRow];
 
-    UIButton *wipeSel = [AppTheme primaryButtonWithTitle:@"Xóa dữ liệu app đã chọn"
+    UIButton *wipeSel = [AppTheme primaryButtonWithTitle:@"Xóa 1 chạm (tin cậy)"
                                                   target:self
                                                   action:@selector(wipeSelectedTapped)];
-    wipeSel.backgroundColor = [UIColor colorWithRed:0.85 green:0.35 blue:0.1 alpha:1.0];
+    wipeSel.backgroundColor = [UIColor colorWithRed:0.85 green:0.25 blue:0.12 alpha:1.0];
 
     UIButton *resetData = [AppTheme primaryButtonWithTitle:@"Đặt lại dữ liệu app"
                                                     target:self
@@ -167,9 +167,9 @@
                                  [AppState.shared wipeAppsSummary],
                                  (unsigned long)AppCatalog.shared.apps.count];
     self.hintLabel.text = [NSString stringWithFormat:
-        @"• Xóa dữ liệu app đã chọn: xóa container (mất đăng nhập).\n"
-        @"• Đặt lại dữ liệu app: máy mới + xóa data (mất đăng nhập).\n"
-        @"• Đặt lại + Lưu: lưu data+máy → máy mới → xóa → khôi phục (giữ đăng nhập).\n"
+        @"• Xóa 1 chạm (tin cậy): kill → script root multi-app → container/group/plugin → kiểm tra sạch (mất đăng nhập).\n"
+        @"• Đặt lại dữ liệu app: máy spoof mới + xóa data (mất đăng nhập).\n"
+        @"• Đặt lại + Lưu: spoof mới nhưng khôi phục data (giữ đăng nhập).\n"
         @"%@\n%@",
         [AppState.shared wipeAppsSummary],
         AppState.shared.statusText ?: @""];
@@ -208,12 +208,25 @@
 
 - (void)wipeSelectedTapped {
     if (AppState.shared.selectedWipeBundleIds.count == 0) {
-        [self alert:@"Xóa dữ liệu" msg:@"Chưa chọn app. Chạm «Chọn app để xóa dữ liệu» và tích ✓."];
+        [self alert:@"Xóa 1 chạm" msg:@"Chưa chọn app. Chạm «Chọn app để xóa dữ liệu» và tích ✓."];
         return;
     }
-    [self runWithProgressTitle:@"Đang xóa dữ liệu app…" work:^NSString *(void (^step)(NSString *)) {
-        return [AppState.shared wipeSelectedAppsProgress:step];
-    }];
+    NSString *sum = [AppState.shared wipeAppsSummary];
+    UIAlertController *c = [UIAlertController
+        alertControllerWithTitle:@"Xóa 1 chạm (tin cậy)?"
+                         message:[NSString stringWithFormat:
+                                  @"Sẽ xóa sạch dữ liệu (mất đăng nhập):\n%@\n\n"
+                                  @"Kill tiến trình → wipe container / app group / plugin → kiểm tra.",
+                                  sum]
+                  preferredStyle:UIAlertControllerStyleAlert];
+    [c addAction:[UIAlertAction actionWithTitle:@"Huỷ" style:UIAlertActionStyleCancel handler:nil]];
+    __weak typeof(self) weakSelf = self;
+    [c addAction:[UIAlertAction actionWithTitle:@"Xóa ngay" style:UIAlertActionStyleDestructive handler:^(__unused UIAlertAction *a) {
+        [weakSelf runWithProgressTitle:@"Xóa 1 chạm (tin cậy)…" work:^NSString *(void (^step)(NSString *)) {
+            return [AppState.shared wipeSelectedAppsProgress:step];
+        }];
+    }]];
+    [self presentViewController:c animated:YES completion:nil];
 }
 
 - (void)resetDataTapped {

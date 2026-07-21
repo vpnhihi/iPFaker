@@ -126,8 +126,10 @@ for f in "$ROOT/etc/ipfaker/config.plist" /var/jb/etc/ipfaker/config.plist \
     chmod 644 "$f" 2>/dev/null || true
   fi
 done
-# Wipe helper executable
-for w in /var/jb/usr/libexec/ipfaker-wipe-zalo /var/jb/etc/ipfaker/wipe_zalo.sh \
+# Wipe helpers (multi-app + Zalo legacy)
+for w in /var/jb/usr/libexec/ipfaker-wipe-apps /var/jb/etc/ipfaker/wipe_apps.sh \
+         /var/mobile/Library/iPFaker/wipe_apps.sh \
+         /var/jb/usr/libexec/ipfaker-wipe-zalo /var/jb/etc/ipfaker/wipe_zalo.sh \
          /var/mobile/Library/iPFaker/wipe_zalo.sh; do
   if [ -f "$w" ]; then
     chmod 755 "$w" 2>/dev/null || true
@@ -408,7 +410,13 @@ def build(version: str, app_path: str | None) -> Path:
         readme = b"iPFaker lab config dir. Apply profile from iPFaker.app or PC scripts.\n"
         add_file(tar, "var/jb/etc/ipfaker/README.txt", track(readme), 0o644)
 
-        # Full wipe helper used by app Kill Zalo
+        # Multi-app wipe (1-tap trusted) + legacy Zalo-only helper
+        wipe_apps = ROOT / "injector" / "wipe_apps.sh"
+        if wipe_apps.is_file():
+            wdata = track(wipe_apps.read_bytes())
+            add_file(tar, "var/jb/usr/libexec/ipfaker-wipe-apps", wdata, 0o755)
+            add_file(tar, "var/jb/etc/ipfaker/wipe_apps.sh", wdata, 0o755)
+            add_file(tar, "var/mobile/Library/iPFaker/wipe_apps.sh", wdata, 0o755)
         wipe_src = ROOT / "injector" / "wipe_zalo.sh"
         if wipe_src.is_file():
             wdata = track(wipe_src.read_bytes())

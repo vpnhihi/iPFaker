@@ -677,21 +677,34 @@
     return -1;
 }
 
-/// True if metadata plist text contains any of the bundle markers.
+/// True if metadata matches bundle markers (binary MCM plists: MCMMetadataIdentifier).
 + (BOOL)metadataAtPath:(NSString *)metaPath matchesAny:(NSArray<NSString *> *)needles {
     NSData *data = [NSData dataWithContentsOfFile:metaPath];
     if (!data.length) return NO;
-    NSString *s = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
-    if (!s) {
-        // binary plist
-        id obj = [NSPropertyListSerialization propertyListWithData:data options:0 format:NULL error:nil];
-        s = [obj description];
+    id obj = [NSPropertyListSerialization propertyListWithData:data options:0 format:NULL error:nil];
+    NSMutableArray<NSString *> *hay = [NSMutableArray array];
+    if ([obj isKindOfClass:[NSDictionary class]]) {
+        NSDictionary *d = (NSDictionary *)obj;
+        for (NSString *k in @[ @"MCMMetadataIdentifier", @"Identifier", @"CFBundleIdentifier",
+                               @"com.apple.MobileContainerManager.ContentClass" ]) {
+            id v = d[k];
+            if ([v isKindOfClass:[NSString class]] && [(NSString *)v length])
+                [hay addObject:[(NSString *)v lowercaseString]];
+        }
+        // Nested dicts / description fallback
+        [hay addObject:[[d description] lowercaseString]];
+    } else {
+        NSString *s = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+        if (s.length) [hay addObject:s.lowercaseString];
+        else if (obj) [hay addObject:[[obj description] lowercaseString]];
     }
-    if (!s.length) return NO;
-    NSString *low = s.lowercaseString;
+    if (!hay.count) return NO;
     for (NSString *n in needles) {
-        if (n.length && [low rangeOfString:n.lowercaseString].location != NSNotFound)
-            return YES;
+        if (!n.length) continue;
+        NSString *nl = n.lowercaseString;
+        for (NSString *h in hay) {
+            if ([h rangeOfString:nl].location != NSNotFound) return YES;
+        }
     }
     return NO;
 }
@@ -742,13 +755,81 @@
 + (NSArray<NSString *> *)containerPathsUnder:(NSString *)base matchingNeedles:(NSArray *)needles {
     NSFileManager *fm = [NSFileManager defaultManager];
     NSMutableArray *out = [NSMutableArray array];
+    if (![fm fileExistsAtPath:base]) return out;
     for (NSString *uuid in [fm contentsOfDirectoryAtPath:base error:nil] ?: @[]) {
         NSString *root = [base stringByAppendingPathComponent:uuid];
+        BOOL isDir = NO;
+        if (![fm fileExistsAtPath:root isDirectory:&isDir] || !isDir) continue;
         NSString *meta = [root stringByAppendingPathComponent:@".com.apple.mobile_container_manager.metadata.plist"];
         if ([self metadataAtPath:meta matchesAny:needles])
             [out addObject:root];
     }
     return out;
+}
+
+/// Write targets file for root wipe script (one bid per line).
++ (BOOL)writeWipeTargets:(NSArray<NSString *> *)bundles {
+    NSString *path = @"/var/mobile/Library/iPFaker/wipe_targets.txt";
+    NSMutableString *body = [NSMutableString stringWithString:@"# iPFaker wipe targets\n"];
+    for (NSString *b in bundles) {
+        if (b.length) [body appendFormat:@"%@\n", b];
+    }
+    NSError *err = nil;
+    [[NSFileManager defaultManager] createDirectoryAtPath:@"/var/mobile/Library/iPFaker"
+                              withIntermediateDirectories:YES attributes:nil error:nil];
+    return [body writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:&err];
+}
+
+/// Run multi-app wipe script as root when possible (Dopamine sudo).
++ (int)runTrustedWipeScriptForBundles:(NSArray<NSString *> *)bundles {
+    [self writeWipeTargets:bundles];
+    NSArray *scripts = @[
+        @"/var/jb/usr/libexec/ipfaker-wipe-apps",
+        @"/var/jb/etc/ipfaker/wipe_apps.sh",
+        @"/var/mobile/Library/iPFaker/wipe_apps.sh",
+        @"/var/jb/usr/libexec/ipfaker-wipe-zalo", // legacy Zalo-only fallback
+        @"/var/jb/etc/ipfaker/wipe_zalo.sh",
+        @"/var/mobile/Library/iPFaker/wipe_zalo.sh",
+    ];
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSMutableArray *args = [NSMutableArray arrayWithObject:@"--targets-file"];
+    [args addObject:@"/var/mobile/Library/iPFaker/wipe_targets.txt"];
+    for (NSString *b in bundles) {
+        if (!b.length) continue;
+        [args addObject:@"--bundle"];
+        [args addObject:b];
+    }
+
+    for (NSString *sp in scripts) {
+        if (![fm fileExistsAtPath:sp]) continue;
+        [fm setAttributes:@{ NSFilePosixPermissions: @0755 } ofItemAtPath:sp error:nil];
+        // Prefer passwordless sudo (mobile often has sudo on Dopamine lab)
+        for (NSString *sudoBin in @[ @"/var/jb/usr/bin/sudo", @"/usr/bin/sudo" ]) {
+            if (![fm isExecutableFileAtPath:sudoBin]) continue;
+            NSMutableArray *sargv = [NSMutableArray arrayWithObjects:sudoBin, @"-n", @"sh", sp, nil];
+            [sargv addObjectsFromArray:args];
+            char **argv = calloc(sargv.count + 1, sizeof(char *));
+            if (!argv) continue;
+            for (NSUInteger i = 0; i < sargv.count; i++)
+                argv[i] = (char *)[sargv[i] UTF8String];
+            pid_t pid = 0;
+            int rc = posix_spawn(&pid, sudoBin.UTF8String, NULL, NULL, argv, NULL);
+            free(argv);
+            if (rc == 0 && pid > 0) {
+                int st = 0;
+                waitpid(pid, &st, 0);
+                if (WIFEXITED(st)) {
+                    int code = WEXITSTATUS(st);
+                    // 0 ok, 5 residual (still success-ish), 4 not found
+                    if (code == 0 || code == 5) return code;
+                }
+            }
+        }
+        // Direct sh (if app has enough rights)
+        int direct = [self runShellScript:sp args:args];
+        if (direct == 0 || direct == 5) return direct;
+    }
+    return -1;
 }
 
 + (BOOL)copyTreeFrom:(NSString *)src to:(NSString *)dst fm:(NSFileManager *)fm {
@@ -1007,7 +1088,7 @@
         step([NSString stringWithFormat:@"Đóng tiến trình: %@", bid]);
         [self killAppBundleId:bid executable:nil];
     }
-    usleep(350000);
+    usleep(400000);
     [log addObject:@"① Đã đóng tiến trình"];
 
     BOOL wipingZalo = NO;
@@ -1016,50 +1097,58 @@
             wipingZalo = YES; break;
         }
     }
-    if (wipingZalo && !skipScript) {
-        step(@"Chạy script xóa sâu (libexec)…");
-        NSArray *scripts = @[
-            @"/var/jb/usr/libexec/ipfaker-wipe-zalo",
-            @"/var/jb/etc/ipfaker/wipe_zalo.sh",
-            @"/var/mobile/Library/iPFaker/wipe_zalo.sh",
-        ];
-        BOOL scriptRan = NO;
-        for (NSString *sp in scripts) {
-            if (![fm fileExistsAtPath:sp]) continue;
-            [fm setAttributes:@{ NSFilePosixPermissions: @0755 } ofItemAtPath:sp error:nil];
-            int rc = [self runShellScript:sp args:@[]];
-            if (rc >= 0) {
-                NSString *m = [NSString stringWithFormat:@"② Script xóa sâu (mã %d)", rc];
-                [log addObject:m]; step(m);
-                scriptRan = YES;
-                break;
-            }
+
+    // One-tap trusted path: root multi-app script (all selected bundles)
+    BOOL scriptTrusted = NO;
+    if (!skipScript) {
+        step(@"Chạy script xóa tin cậy (root multi-app)…");
+        int rc = [self runTrustedWipeScriptForBundles:bundles];
+        if (rc == 0 || rc == 5) {
+            scriptTrusted = YES;
+            NSString *m = [NSString stringWithFormat:
+                           @"② Script tin cậy OK (mã %d)%@",
+                           rc, rc == 5 ? @" — còn file rác nhỏ, đã dọn skeleton" : @""];
+            [log addObject:m];
+            step(m);
+        } else {
+            [log addObject:[NSString stringWithFormat:@"② Script root: mã %d — xóa trực tiếp bổ sung", rc]];
+            step(@"Script root không đủ quyền — xóa trực tiếp");
         }
-        if (!scriptRan) {
-            [log addObject:@"② Script: bỏ qua — xóa trực tiếp"];
-            step(@"Script không chạy — xóa trực tiếp");
-        }
-    } else if (skipScript) {
+    } else {
         step(@"Bỏ script xóa sâu (chế độ giữ đăng nhập)");
+        [log addObject:@"② Script: bỏ qua"];
     }
 
+    // Always also wipe via NSFileManager (covers non-root + residual after script)
     step(@"Quét / xóa thư mục dữ liệu app…");
     NSUInteger dataWiped = 0;
     for (NSString *root in [self containerPathsUnder:@"/var/mobile/Containers/Data/Application" matchingNeedles:needles]) {
         step([NSString stringWithFormat:@"Xóa dữ liệu %@", root.lastPathComponent]);
         dataWiped += [self wipeContainerRoot:root fm:fm];
     }
-    if (dataWiped == 0) {
+    // PluginKit extensions
+    for (NSString *base in @[
+             @"/var/mobile/Containers/Data/PluginKitPlugin",
+             @"/private/var/mobile/Containers/Data/PluginKitPlugin" ]) {
+        for (NSString *root in [self containerPathsUnder:base matchingNeedles:needles]) {
+            dataWiped += [self wipeContainerRoot:root fm:fm];
+        }
+    }
+    if (dataWiped == 0 && !scriptTrusted) {
         [log addObject:@"③ Dữ liệu: không tìm thấy / đã trống"];
         step(@"Thư mục dữ liệu: trống hoặc không khớp");
     } else {
-        [log addObject:[NSString stringWithFormat:@"③ Dữ liệu mục~%lu", (unsigned long)dataWiped]];
+        [log addObject:[NSString stringWithFormat:@"③ Dữ liệu mục~%lu%@",
+                        (unsigned long)dataWiped,
+                        scriptTrusted ? @" (+script)" : @""]];
     }
 
     step(@"Quét / xóa nhóm chia sẻ app…");
     NSUInteger groupWiped = 0;
     for (NSString *root in [self containerPathsUnder:@"/var/mobile/Containers/Shared/AppGroup" matchingNeedles:needles]) {
-        step([NSString stringWithFormat:@"Xóa nhóm chia sẻ %@", [root.lastPathComponent substringToIndex:MIN((NSUInteger)8, root.lastPathComponent.length)]]);
+        NSString *tail = root.lastPathComponent;
+        if (tail.length > 8) tail = [tail substringToIndex:8];
+        step([NSString stringWithFormat:@"Xóa nhóm chia sẻ %@", tail]);
         groupWiped += [self wipeContainerRoot:root fm:fm];
     }
     [log addObject:groupWiped ? [NSString stringWithFormat:@"④ Nhóm chia sẻ ~%lu", (unsigned long)groupWiped] : @"④ Nhóm chia sẻ: trống"];
@@ -1079,8 +1168,7 @@
     [log addObject:[NSString stringWithFormat:@"⑤ Tuỳ chọn/bộ nhớ đệm ~%lu", (unsigned long)crumb]];
 
     if (wipingZalo && !skipKeychain) {
-        step(@"Xóa keychain (cố gắng hết sức)…");
-        // same as before
+        step(@"Xóa keychain Zalo (cố gắng hết sức)…");
         NSString *sqlite = nil;
         for (NSString *c in @[ @"/var/jb/usr/bin/sqlite3", @"/usr/bin/sqlite3" ]) {
             if ([fm isExecutableFileAtPath:c]) { sqlite = c; break; }
@@ -1100,10 +1188,11 @@
                     int st = 0; waitpid(pid, &st, 0);
                 }
             }
-            [log addObject:@"⑥ Keychain đã dọn"];
+            [log addObject:@"⑥ Keychain Zalo đã dọn"];
             step(@"Keychain: đã dọn");
         } else {
             step(@"Keychain: bỏ qua");
+            [log addObject:@"⑥ Keychain: bỏ qua"];
         }
     } else if (skipKeychain) {
         step(@"Giữ keychain (để phiên đăng nhập)");
@@ -1113,9 +1202,30 @@
     step(@"Đóng lại các tiến trình…");
     for (NSString *bid in bundles) [self killAppBundleId:bid executable:nil];
 
-    step(@"Hoàn tất xóa dữ liệu");
+    // Verify residual files
+    NSUInteger residual = 0;
+    for (NSString *root in [self containerPathsUnder:@"/var/mobile/Containers/Data/Application" matchingNeedles:needles]) {
+        for (NSString *sub in @[ @"Documents", @"Library", @"tmp" ]) {
+            NSString *p = [root stringByAppendingPathComponent:sub];
+            NSDirectoryEnumerator *en = [fm enumeratorAtPath:p];
+            for (NSString *rel in en) {
+                NSString *full = [p stringByAppendingPathComponent:rel];
+                BOOL isDir = NO;
+                if ([fm fileExistsAtPath:full isDirectory:&isDir] && !isDir) residual++;
+            }
+        }
+    }
+    if (residual == 0) {
+        [log addObject:@"⑦ Kiểm tra: sạch (0 file rác)"];
+        step(@"Kiểm tra: sạch");
+    } else {
+        [log addObject:[NSString stringWithFormat:@"⑦ Kiểm tra: còn ~%lu file (mở lại app = first launch thường OK)", (unsigned long)residual]];
+        step([NSString stringWithFormat:@"Còn ~%lu file rác", (unsigned long)residual]);
+    }
+
+    step(@"Hoàn tất xóa 1 chạm");
     return [NSString stringWithFormat:
-            @"Đã xóa dữ liệu %lu app:\n%@",
+            @"Xóa 1 chạm %lu app:\n%@",
             (unsigned long)bundles.count,
             [log componentsJoinedByString:@"\n"]];
 }
