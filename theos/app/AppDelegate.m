@@ -3,7 +3,6 @@
 #import "AppState.h"
 #import "MainViewController.h"
 #import "SelectDevicesViewController.h"
-#import "WipeViewController.h"
 #import "SettingsViewController.h"
 #import "LoginViewController.h"
 #import "IPFLicenseManager.h"
@@ -60,19 +59,15 @@
     UINavigationController *selectNav = [[UINavigationController alloc] initWithRootViewController:select];
     selectNav.tabBarItem = [self itemTitle:@"Chọn máy" systemImage:@"iphone" tag:1];
 
-    WipeViewController *wipe = [[WipeViewController alloc] init];
-    UINavigationController *wipeNav = [[UINavigationController alloc] initWithRootViewController:wipe];
-    wipeNav.tabBarItem = [self itemTitle:@"Xóa app" systemImage:@"trash" tag:2];
-
     SettingsViewController *settings = [[SettingsViewController alloc] init];
     UINavigationController *settingsNav = [[UINavigationController alloc] initWithRootViewController:settings];
-    settingsNav.tabBarItem = [self itemTitle:@"Cài đặt" systemImage:@"gearshape.fill" tag:3];
+    settingsNav.tabBarItem = [self itemTitle:@"Cài đặt" systemImage:@"gearshape.fill" tag:2];
 
-    for (UINavigationController *nav in @[ mainNav, selectNav, wipeNav, settingsNav ]) {
+    for (UINavigationController *nav in @[ mainNav, selectNav, settingsNav ]) {
         [AppTheme styleNavigationBar:nav.navigationBar];
     }
 
-    tabs.viewControllers = @[ mainNav, selectNav, wipeNav, settingsNav ];
+    tabs.viewControllers = @[ mainNav, selectNav, settingsNav ];
     tabs.selectedIndex = 0;
     self.window.rootViewController = tabs;
 }

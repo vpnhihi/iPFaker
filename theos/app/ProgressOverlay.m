@@ -14,15 +14,29 @@
 @implementation ProgressOverlay
 
 + (instancetype)showOn:(UIView *)host title:(NSString *)title {
-    ProgressOverlay *o = [[ProgressOverlay alloc] initWithFrame:host.bounds];
-    o.host = host;
-    o.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    [o buildUI];
-    o.titleLabel.text = title.length ? title : @"Đang xử lý…";
-    o.alpha = 0;
-    [host addSubview:o];
-    [UIView animateWithDuration:0.2 animations:^{ o.alpha = 1; }];
-    [o.spinner startAnimating];
+    if (!host) {
+        // Fallback: avoid nil crash when tab/nav not ready
+        host = UIApplication.sharedApplication.keyWindow
+            ?: UIApplication.sharedApplication.windows.firstObject;
+    }
+    if (!host) {
+        // Last resort: create off-window overlay (still non-nil)
+        host = [[UIView alloc] initWithFrame:[UIScreen mainScreen].bounds];
+    }
+    __block ProgressOverlay *o = nil;
+    void (^build)(void) = ^{
+        o = [[ProgressOverlay alloc] initWithFrame:host.bounds];
+        o.host = host;
+        o.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        [o buildUI];
+        o.titleLabel.text = title.length ? title : @"Đang xử lý…";
+        o.alpha = 0;
+        [host addSubview:o];
+        [UIView animateWithDuration:0.2 animations:^{ o.alpha = 1; }];
+        [o.spinner startAnimating];
+    };
+    if ([NSThread isMainThread]) build();
+    else dispatch_sync(dispatch_get_main_queue(), build);
     return o;
 }
 
@@ -107,17 +121,21 @@
 
 - (void)appendStep:(NSString *)step {
     if (!step.length) return;
-    dispatch_async(dispatch_get_main_queue(), ^{
+    // Never block worker with sleep; UI only on main
+    if ([NSThread isMainThread]) {
         self.stepLabel.text = step;
+        if (!self.log) self.log = [NSMutableString string];
         [self.log appendFormat:@"• %@\n", step];
         self.logView.text = self.log;
         if (self.logView.text.length > 0) {
             NSRange r = NSMakeRange(self.logView.text.length - 1, 1);
             [self.logView scrollRangeToVisible:r];
         }
-    });
-    // Let UI breathe between steps
-    [NSThread sleepForTimeInterval:0.03];
+    } else {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self appendStep:step];
+        });
+    }
 }
 
 - (void)finishWithTitle:(NSString *)title detail:(NSString *)detail {

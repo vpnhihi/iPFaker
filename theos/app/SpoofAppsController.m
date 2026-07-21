@@ -15,18 +15,42 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.title = @"Multi-app spoof";
+    self.title = @"App lab";
     self.view.backgroundColor = AppTheme.bg;
     self.tableView.backgroundColor = self.view.backgroundColor;
 
     [[AppCatalog shared] reloadSpoofCatalog];
-    self.items = AppCatalog.shared.spoofApps;
+    // Only third-party (installed / social) — hide system apps
+    NSMutableArray *tp = [NSMutableArray array];
+    for (AppCatalogItem *it in AppCatalog.shared.spoofApps) {
+        if (!it.bundleId.length) continue;
+        if ([AppState isSystemLabBundleId:it.bundleId]) continue;
+        if (it.systemApp && [it.bundleId hasPrefix:@"com.apple."]) continue;
+        [tp addObject:it];
+    }
+    // Also merge live third-party from wipe scan
+    [[AppCatalog shared] reload];
+    for (AppCatalogItem *it in AppCatalog.shared.apps) {
+        if (!it.bundleId.length || it.systemApp) continue;
+        if ([AppState isSystemLabBundleId:it.bundleId]) continue;
+        BOOL exists = NO;
+        for (AppCatalogItem *x in tp) {
+            if ([x.bundleId isEqualToString:it.bundleId]) { exists = YES; break; }
+        }
+        if (!exists) [tp addObject:it];
+    }
+    self.items = [tp sortedArrayUsingComparator:^NSComparisonResult(AppCatalogItem *a, AppCatalogItem *b) {
+        BOOL az = [a.bundleId.lowercaseString containsString:@"zalo"];
+        BOOL bz = [b.bundleId.lowercaseString containsString:@"zalo"];
+        if (az != bz) return az ? NSOrderedAscending : NSOrderedDescending;
+        return [a.name localizedCaseInsensitiveCompare:b.name];
+    }];
     self.filtered = self.items;
 
     self.search = [[UISearchController alloc] initWithSearchResultsController:nil];
     self.search.searchResultsUpdater = self;
     self.search.obscuresBackgroundDuringPresentation = NO;
-    self.search.searchBar.placeholder = @"Search apps";
+    self.search.searchBar.placeholder = @"Tìm app";
     self.navigationItem.searchController = self.search;
     self.definesPresentationContext = YES;
 
@@ -36,79 +60,37 @@
                                         target:self
                                         action:@selector(applyFilters)];
 
-    UIView *header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 320, 176)];
+    UIView *header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 320, 56)];
     UIButton *all = [UIButton buttonWithType:UIButtonTypeSystem];
-    [all setTitle:@"Select All" forState:UIControlStateNormal];
+    [all setTitle:@"Chọn tất cả" forState:UIControlStateNormal];
     all.titleLabel.font = AppTheme.sectionFont;
     all.translatesAutoresizingMaskIntoConstraints = NO;
     [all addTarget:self action:@selector(selectAllTapped) forControlEvents:UIControlEventTouchUpInside];
 
     UIButton *none = [UIButton buttonWithType:UIButtonTypeSystem];
-    [none setTitle:@"Deselect All" forState:UIControlStateNormal];
+    [none setTitle:@"Bỏ chọn" forState:UIControlStateNormal];
     none.titleLabel.font = AppTheme.sectionFont;
     none.translatesAutoresizingMaskIntoConstraints = NO;
     [none addTarget:self action:@selector(deselectAllTapped) forControlEvents:UIControlEventTouchUpInside];
 
-    UIButton *core = [UIButton buttonWithType:UIButtonTypeSystem];
-    [core setTitle:@"Lab core" forState:UIControlStateNormal];
-    core.titleLabel.font = AppTheme.sectionFont;
-    core.translatesAutoresizingMaskIntoConstraints = NO;
-    [core addTarget:self action:@selector(labCoreTapped) forControlEvents:UIControlEventTouchUpInside];
-
-    UIButton *stock = [UIButton buttonWithType:UIButtonTypeSystem];
-    [stock setTitle:@"Lab stock" forState:UIControlStateNormal];
-    stock.titleLabel.font = AppTheme.sectionFont;
-    stock.translatesAutoresizingMaskIntoConstraints = NO;
-    [stock addTarget:self action:@selector(labStockTapped) forControlEvents:UIControlEventTouchUpInside];
-
     UIButton *social = [UIButton buttonWithType:UIButtonTypeSystem];
-    [social setTitle:@"Lab social (FB/IG/TT…)" forState:UIControlStateNormal];
+    [social setTitle:@"Social" forState:UIControlStateNormal];
     social.titleLabel.font = AppTheme.sectionFont;
     social.translatesAutoresizingMaskIntoConstraints = NO;
     [social addTarget:self action:@selector(labSocialTapped) forControlEvents:UIControlEventTouchUpInside];
 
-    UILabel *hint = [[UILabel alloc] init];
-    hint.text = @"1 list lab: spoof identity + wipe session (đồng bộ tab Xóa). "
-                @"Lab-core / social preset. CT+WebKit helper auto. Không inject Settings.";
-    hint.font = AppTheme.captionFont;
-    hint.textColor = AppTheme.textSecondary;
-    hint.numberOfLines = 3;
-    hint.translatesAutoresizingMaskIntoConstraints = NO;
-
     [header addSubview:all];
     [header addSubview:none];
-    [header addSubview:core];
-    [header addSubview:stock];
     [header addSubview:social];
-    [header addSubview:hint];
     [NSLayoutConstraint activateConstraints:@[
-        [all.topAnchor constraintEqualToAnchor:header.topAnchor constant:10],
+        [all.centerYAnchor constraintEqualToAnchor:header.centerYAnchor],
         [all.leadingAnchor constraintEqualToAnchor:header.leadingAnchor constant:16],
         [none.centerYAnchor constraintEqualToAnchor:all.centerYAnchor],
-        [none.trailingAnchor constraintEqualToAnchor:header.trailingAnchor constant:-16],
-        [core.topAnchor constraintEqualToAnchor:all.bottomAnchor constant:8],
-        [core.leadingAnchor constraintEqualToAnchor:header.leadingAnchor constant:16],
-        [stock.centerYAnchor constraintEqualToAnchor:core.centerYAnchor],
-        [stock.trailingAnchor constraintEqualToAnchor:header.trailingAnchor constant:-16],
-        [social.topAnchor constraintEqualToAnchor:core.bottomAnchor constant:6],
-        [social.leadingAnchor constraintEqualToAnchor:header.leadingAnchor constant:16],
-        [hint.topAnchor constraintEqualToAnchor:social.bottomAnchor constant:6],
-        [hint.leadingAnchor constraintEqualToAnchor:header.leadingAnchor constant:16],
-        [hint.trailingAnchor constraintEqualToAnchor:header.trailingAnchor constant:-16],
+        [none.centerXAnchor constraintEqualToAnchor:header.centerXAnchor],
+        [social.centerYAnchor constraintEqualToAnchor:all.centerYAnchor],
+        [social.trailingAnchor constraintEqualToAnchor:header.trailingAnchor constant:-16],
     ]];
     self.tableView.tableHeaderView = header;
-}
-
-- (void)labCoreTapped {
-    [AppState.shared applyLabCoreSpoofPreset];
-    [self.tableView reloadData];
-    if (self.onChange) self.onChange();
-}
-
-- (void)labStockTapped {
-    [AppState.shared applyLabStockSpoofPreset];
-    [self.tableView reloadData];
-    if (self.onChange) self.onChange();
 }
 
 - (void)labSocialTapped {
@@ -124,7 +106,6 @@
 }
 
 - (void)deselectAllTapped {
-    // Keep Zalo always selected for lab wall
     [AppState.shared deselectAllSpoofAppsKeepingZalo:YES];
     [self.tableView reloadData];
     if (self.onChange) self.onChange();
@@ -132,15 +113,21 @@
 
 - (void)applyFilters {
     UIView *host = self.navigationController.view ?: self.view;
-    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Áp dụng Multi-app spoof…"];
+    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Áp dụng filter…"];
+    if (!ov) return;
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-        NSString *msg = [AppState.shared applySpoofAppFiltersProgress:^(NSString *s) {
-            [ov appendStep:s];
-        }];
+        NSString *msg = nil;
+        @try {
+            msg = [AppState.shared applySpoofAppFiltersProgress:^(NSString *s) {
+                [ov appendStep:s];
+            }];
+        } @catch (NSException *ex) {
+            msg = [NSString stringWithFormat:@"Lỗi: %@", ex.reason ?: @"?"];
+        }
         dispatch_async(dispatch_get_main_queue(), ^{
             [ov finishWithTitle:@"Xong" detail:msg];
-            [ov dismissAfter:1.6 completion:^{
-                UIAlertController *a = [UIAlertController alertControllerWithTitle:@"Multi-app spoof"
+            [ov dismissAfter:1.0 completion:^{
+                UIAlertController *a = [UIAlertController alertControllerWithTitle:@"App lab"
                                                                            message:msg
                                                                     preferredStyle:UIAlertControllerStyleAlert];
                 [a addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
@@ -156,9 +143,8 @@
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
-    return [NSString stringWithFormat:@"Đã chọn %lu / %lu app · Apply để ghi filter inject",
-            (unsigned long)AppState.shared.selectedSpoofBundleIds.count,
-            (unsigned long)self.items.count];
+    return [NSString stringWithFormat:@"Đã chọn %lu app",
+            (unsigned long)AppState.shared.selectedSpoofBundleIds.count];
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -166,6 +152,7 @@
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cid];
     if (!cell)
         cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:cid];
+    if (indexPath.row >= (NSInteger)self.filtered.count) return cell;
     AppCatalogItem *it = self.filtered[indexPath.row];
     BOOL on = [AppState.shared isSpoofAppSelected:it.bundleId];
     cell.backgroundColor = AppTheme.cardAlt;
@@ -181,19 +168,10 @@
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
+    if (indexPath.row >= (NSInteger)self.filtered.count) return;
     AppCatalogItem *it = self.filtered[indexPath.row];
-    // Block Settings — historical crash with inject
-    if ([it.bundleId isEqualToString:@"com.apple.Preferences"]) {
-        UIAlertController *a = [UIAlertController alertControllerWithTitle:@"Không inject Settings"
-                                                                   message:@"Settings (Preferences) đã từng crash khi inject — lab wall giữ ngoài scope."
-                                                            preferredStyle:UIAlertControllerStyleAlert];
-        [a addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
-        [self presentViewController:a animated:YES completion:nil];
-        return;
-    }
     [AppState.shared toggleSpoofBundleId:it.bundleId];
     [tableView reloadRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationNone];
-    [tableView reloadSections:[NSIndexSet indexSetWithIndex:0] withRowAnimation:UITableViewRowAnimationNone];
     if (self.onChange) self.onChange();
 }
 
@@ -202,12 +180,12 @@
     if (!q.length) {
         self.filtered = self.items;
     } else {
-        NSMutableArray *out = [NSMutableArray array];
+        NSMutableArray *f = [NSMutableArray array];
         for (AppCatalogItem *it in self.items) {
-            NSString *blob = [[NSString stringWithFormat:@"%@ %@", it.name, it.bundleId] lowercaseString];
-            if ([blob containsString:q]) [out addObject:it];
+            if ([it.name.lowercaseString containsString:q] || [it.bundleId.lowercaseString containsString:q])
+                [f addObject:it];
         }
-        self.filtered = out;
+        self.filtered = f;
     }
     [self.tableView reloadData];
 }

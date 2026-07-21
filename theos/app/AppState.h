@@ -122,13 +122,19 @@ NS_ASSUME_NONNULL_BEGIN
 /// Nút «Đồng bộ Location» — geo random-in-city qua proxy (fail-soft).
 - (NSString *)syncLocationNowProgress:(nullable void (^)(NSString *step))progress;
 
-/// Spoof master → wipe mirror (1 list lab).
+/// Spoof master → wipe mirror (1 list lab user-facing).
 - (void)syncLabAppPoolsFromSpoofMaster;
-/// Unified lab apps (spoof = wipe after sync).
+/// User-selected third-party lab apps (UI).
 - (NSArray<NSString *> *)labAppTargets;
-/// Method A: wipe/relaunch session apps (bỏ Safari/Maps/Weather/WebKit — vẫn spoof filter).
+/// Inject filter = third-party selected + system lab (Safari/Maps/Weather) always.
+- (NSArray<NSString *> *)filterSpoofTargets;
+/// Wipe session = third-party selected + system lab (system wipe ngầm, không hiện UI).
+- (NSArray<NSString *> *)sessionWipeTargets;
+/// @deprecated alias → sessionWipeTargets
 - (NSArray<NSString *> *)sessionWipeRelaunchTargets;
 + (BOOL)isSystemLabBundleId:(NSString *)bundleId;
+/// System apps always wiped/injected in background (not shown in picker).
++ (NSArray<NSString *> *)systemLabBackgroundBundleIds;
 
 - (void)postDidChange;
 

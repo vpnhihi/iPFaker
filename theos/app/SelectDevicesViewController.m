@@ -36,14 +36,6 @@
     header.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:header];
 
-    UILabel *sub = [[UILabel alloc] init];
-    sub.text = @"Chọn nhiều · ✓ = đã chọn · có «Chọn tất cả» · Đặt lại dữ liệu = ngẫu nhiên cặp hợp lệ";
-    sub.font = AppTheme.captionFont;
-    sub.textColor = AppTheme.textSecondary;
-    sub.numberOfLines = 2;
-    sub.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.view addSubview:sub];
-
     if (@available(iOS 13.0, *)) {
         self.spinner = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleLarge];
     } else {
@@ -56,7 +48,7 @@
 
     self.card = [AppTheme roundedCardIn:self.view];
 
-    UIControl *deviceRow = [self makeRowTitle:@"Chọn đời máy (nhiều)"
+    UIControl *deviceRow = [self makeRowTitle:@"Chọn đời máy"
                                  detailOut:&_deviceDetailLabel
                                     action:@selector(pickDevice)];
 
@@ -64,7 +56,7 @@
     sep.backgroundColor = AppTheme.separator;
     sep.translatesAutoresizingMaskIntoConstraints = NO;
 
-    UIControl *iosRow = [self makeRowTitle:@"Chọn iOS (nhiều · theo bảng tương thích)"
+    UIControl *iosRow = [self makeRowTitle:@"Chọn iOS"
                                detailOut:&_iosDetailLabel
                                   action:@selector(pickIOS)];
 
@@ -73,7 +65,7 @@
     sep2.translatesAutoresizingMaskIntoConstraints = NO;
     [sep2.heightAnchor constraintEqualToConstant:1.0 / UIScreen.mainScreen.scale].active = YES;
 
-    UIControl *spoofRow = [self makeRowTitle:@"Multi-app spoof (app nhận inject)"
+    UIControl *spoofRow = [self makeRowTitle:@"App lab (spoof + wipe)"
                                   detailOut:&_spoofDetailLabel
                                      action:@selector(pickSpoofApps)];
 
@@ -95,24 +87,13 @@
     killBtn.backgroundColor = [UIColor colorWithRed:0.85 green:0.35 blue:0.1 alpha:1.0];
     [self.view addSubview:killBtn];
 
-    self.hintLabel = [[UILabel alloc] init];
-    self.hintLabel.font = AppTheme.captionFont;
-    self.hintLabel.textColor = AppTheme.textSecondary;
-    self.hintLabel.numberOfLines = 0;
-    self.hintLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.view addSubview:self.hintLabel];
-
     CGFloat pad = 16;
     [NSLayoutConstraint activateConstraints:@[
         [header.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor constant:8],
         [header.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:pad],
         [header.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-pad],
 
-        [sub.topAnchor constraintEqualToAnchor:header.bottomAnchor constant:4],
-        [sub.leadingAnchor constraintEqualToAnchor:header.leadingAnchor],
-        [sub.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-pad],
-
-        [self.card.topAnchor constraintEqualToAnchor:sub.bottomAnchor constant:16],
+        [self.card.topAnchor constraintEqualToAnchor:header.bottomAnchor constant:16],
         [self.card.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:pad],
         [self.card.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-pad],
 
@@ -130,10 +111,6 @@
         [killBtn.leadingAnchor constraintEqualToAnchor:applyBtn.leadingAnchor],
         [killBtn.trailingAnchor constraintEqualToAnchor:applyBtn.trailingAnchor],
         [killBtn.heightAnchor constraintEqualToConstant:50],
-
-        [self.hintLabel.topAnchor constraintEqualToAnchor:killBtn.bottomAnchor constant:16],
-        [self.hintLabel.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:pad],
-        [self.hintLabel.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-pad],
 
         [self.spinner.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
         [self.spinner.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor],
@@ -219,31 +196,8 @@
                                 st.selectedIOS ?: @"—",
                                 meta[@"BuildVersion"] ?: @"?"];
 
-    self.spoofDetailLabel.text = [NSString stringWithFormat:@"%@\nChạm để chọn app · Apply trong list ghi filter inject",
-                                  [st spoofAppsSummary]];
-
-    NSUInteger nCompat = [st compatibleIOSForSelectedDevices].count;
-    NSUInteger nPairs = 0;
-    for (NSString *did in st.selectedDeviceIds) {
-        NSDictionary *d = [Catalog.shared deviceWithId:did];
-        nPairs += [st selectedIOSCompatibleWithDevice:d ?: @{}].count;
-    }
-
-    self.hintLabel.text = [NSString stringWithFormat:
-        @"Tập chọn: %lu máy × iOS → %lu cặp tương thích.\n"
-        @"Multi-app spoof: %lu app · Hợp iOS: %lu bản · Mã: %@\n"
-        @"Màn hình: %@×%@ @%@\n"
-        @"Đặt lại dữ liệu app (1 chạm) = spoof + xóa sạch + mở lại (mất đăng nhập).\n"
-        @"Đặt lại + Lưu (1 chạm) = backup session → spoof → restore → kill+mở lại (giữ đăng nhập).\n%@",
-        (unsigned long)st.selectedDeviceIds.count,
-        (unsigned long)nPairs,
-        (unsigned long)st.selectedSpoofBundleIds.count,
-        (unsigned long)nCompat,
-        dev[@"id"] ?: @"",
-        disp[@"NativeWidth"] ?: @"?",
-        disp[@"NativeHeight"] ?: @"?",
-        disp[@"ScreenScale"] ?: @"?",
-        st.statusText ?: @""];
+    self.spoofDetailLabel.text = [st spoofAppsSummary];
+    (void)disp;
 }
 
 - (void)pickDevice {
@@ -276,18 +230,24 @@
 
 - (void)applyTapped {
     UIView *host = self.tabBarController.view ?: self.navigationController.view ?: self.view;
-    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"1 chạm: Đặt lại + Lưu + Mở app…"];
+    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Đặt lại + Lưu…"];
+    if (!ov) return;
     self.view.userInteractionEnabled = NO;
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-        NSString *msg = [AppState.shared saveDataThenResetProgress:^(NSString *step) {
-            [ov appendStep:step];
-        }];
+        NSString *msg = nil;
+        @try {
+            msg = [AppState.shared saveDataThenResetProgress:^(NSString *step) {
+                [ov appendStep:step];
+            }];
+        } @catch (NSException *ex) {
+            msg = [NSString stringWithFormat:@"Lỗi: %@", ex.reason ?: @"?"];
+        }
         dispatch_async(dispatch_get_main_queue(), ^{
             self.view.userInteractionEnabled = YES;
-            [ov finishWithTitle:@"Hoàn tất (1 chạm)" detail:msg];
+            [ov finishWithTitle:@"Hoàn tất" detail:msg];
             [self refreshUI];
-            [ov dismissAfter:1.8 completion:^{
-                [self alert:@"Đặt lại + Lưu dữ liệu (1 chạm)" msg:msg];
+            [ov dismissAfter:1.0 completion:^{
+                [self alert:@"Đặt lại + Lưu dữ liệu" msg:msg];
             }];
         });
     });
@@ -295,18 +255,24 @@
 
 - (void)killRandomTapped {
     UIView *host = self.tabBarController.view ?: self.navigationController.view ?: self.view;
-    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"1 chạm: Đặt lại dữ liệu + Mở app…"];
+    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Đặt lại dữ liệu app…"];
+    if (!ov) return;
     self.view.userInteractionEnabled = NO;
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-        NSString *msg = [AppState.shared killZaloAndRandomizeFromPoolProgress:^(NSString *step) {
-            [ov appendStep:step];
-        }];
+        NSString *msg = nil;
+        @try {
+            msg = [AppState.shared killZaloAndRandomizeFromPoolProgress:^(NSString *step) {
+                [ov appendStep:step];
+            }];
+        } @catch (NSException *ex) {
+            msg = [NSString stringWithFormat:@"Lỗi: %@", ex.reason ?: @"?"];
+        }
         dispatch_async(dispatch_get_main_queue(), ^{
             self.view.userInteractionEnabled = YES;
-            [ov finishWithTitle:@"Hoàn tất (1 chạm)" detail:msg];
+            [ov finishWithTitle:@"Hoàn tất" detail:msg];
             [self refreshUI];
-            [ov dismissAfter:1.6 completion:^{
-                [self alert:@"Đặt lại dữ liệu app (1 chạm)" msg:msg];
+            [ov dismissAfter:1.0 completion:^{
+                [self alert:@"Đặt lại dữ liệu app" msg:msg];
             }];
         });
     });

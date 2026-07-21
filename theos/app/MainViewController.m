@@ -4,8 +4,6 @@
 #import "Catalog.h"
 #import "AboutLabController.h"
 #import "ProgressOverlay.h"
-#import "IPFLicenseManager.h"
-#import "AppDelegate.h"
 #import "ProfileBuilder.h"
 
 @interface MainViewController () <UITextFieldDelegate>
@@ -77,7 +75,7 @@
     title.translatesAutoresizingMaskIntoConstraints = NO;
 
     UILabel *ver = [[UILabel alloc] init];
-    ver.text = @"Phiên bản: 2.9.0 · Công cụ lab thiết bị";
+    ver.text = @"Phiên bản: 2.9.1 · Công cụ lab thiết bị";
     ver.font = AppTheme.captionFont;
     ver.textColor = AppTheme.textSecondary;
     ver.translatesAutoresizingMaskIntoConstraints = NO;
@@ -92,17 +90,9 @@
     aboutBtn.translatesAutoresizingMaskIntoConstraints = NO;
     [aboutBtn addTarget:self action:@selector(openAbout) forControlEvents:UIControlEventTouchUpInside];
 
-    UIButton *logoutBtn = [UIButton buttonWithType:UIButtonTypeSystem];
-    [logoutBtn setTitle:@"Đăng xuất" forState:UIControlStateNormal];
-    logoutBtn.titleLabel.font = AppTheme.captionFont;
-    logoutBtn.tintColor = [UIColor colorWithRed:0.95 green:0.4 blue:0.35 alpha:1];
-    logoutBtn.translatesAutoresizingMaskIntoConstraints = NO;
-    [logoutBtn addTarget:self action:@selector(logoutTapped) forControlEvents:UIControlEventTouchUpInside];
-
     [content addSubview:title];
     [content addSubview:ver];
     [content addSubview:aboutBtn];
-    [content addSubview:logoutBtn];
 
     // Info card
     UIView *card = [AppTheme roundedCardIn:content];
@@ -139,14 +129,6 @@
     cols.spacing = 12;
     cols.translatesAutoresizingMaskIntoConstraints = NO;
     [card addSubview:cols];
-
-    UILabel *contact = [[UILabel alloc] init];
-    contact.text = @"Lab · spoof + wipe session cùng list app · Cài đặt = công tắc giả lập";
-    contact.font = AppTheme.captionFont;
-    contact.textColor = AppTheme.accent;
-    contact.numberOfLines = 2;
-    contact.translatesAutoresizingMaskIntoConstraints = NO;
-    [card addSubview:contact];
 
     // —— Collapsible proxy (home) ——
     self.proxyCard = [AppTheme roundedCardIn:content];
@@ -208,14 +190,6 @@
     resetDataBtn.translatesAutoresizingMaskIntoConstraints = NO;
     [content addSubview:resetDataBtn];
 
-    UILabel *resetHint = [[UILabel alloc] init];
-    resetHint.text = @"Nhanh: filter identity + spoof + geo + xóa session app lab + mở lại (mất đăng nhập)";
-    resetHint.font = AppTheme.captionFont;
-    resetHint.textColor = AppTheme.textSecondary;
-    resetHint.numberOfLines = 2;
-    resetHint.translatesAutoresizingMaskIntoConstraints = NO;
-    [content addSubview:resetHint];
-
     UIButton *applyBtn = [AppTheme primaryButtonWithTitle:@"Đặt lại + Lưu dữ liệu"
                                                    target:self
                                                    action:@selector(applyTapped)];
@@ -229,15 +203,7 @@
     locBtn.translatesAutoresizingMaskIntoConstraints = NO;
     [content addSubview:locBtn];
 
-    UILabel *locHint = [[UILabel alloc] init];
-    locHint.text = @"Geo random trong thành phố proxy → Map / Thời tiết / FakeLocation";
-    locHint.font = AppTheme.captionFont;
-    locHint.textColor = AppTheme.textSecondary;
-    locHint.numberOfLines = 2;
-    locHint.translatesAutoresizingMaskIntoConstraints = NO;
-    [content addSubview:locHint];
-
-    // Terms
+    // Terms (compact)
     UIView *termsCard = [AppTheme roundedCardIn:content];
     termsCard.backgroundColor = AppTheme.cardAlt;
     UILabel *termsTitle = [[UILabel alloc] init];
@@ -250,12 +216,8 @@
     termsBody.font = AppTheme.captionFont;
     termsBody.textColor = AppTheme.textSecondary;
     termsBody.text =
-        @"ĐIỀU KHOẢN DỊCH VỤ\n"
-        @"Công cụ này chỉ dành cho mục đích nghiên cứu, kiểm thử kỹ thuật trên thiết bị do bạn sở hữu hợp pháp.\n\n"
-        @"TRÁCH NHIỆM KHÁCH HÀNG\n"
-        @"Bạn chịu toàn bộ trách nhiệm về cách sử dụng, cấu hình và hậu quả phát sinh từ việc dùng tool.\n\n"
-        @"MIỄN TRỪ / CẢNH BÁO\n"
-        @"Cấm sử dụng vào mục đích vi phạm pháp luật. Tiếp tục dùng tool đồng nghĩa bạn đã chấp nhận điều khoản.";
+        @"Chỉ dùng nghiên cứu/kiểm thử trên thiết bị bạn sở hữu. Cấm vi phạm pháp luật. "
+        @"Bạn chịu trách nhiệm khi sử dụng tool.";
     termsBody.translatesAutoresizingMaskIntoConstraints = NO;
     [termsCard addSubview:termsTitle];
     [termsCard addSubview:termsBody];
@@ -263,7 +225,7 @@
     self.statusFooter = [[UILabel alloc] init];
     self.statusFooter.font = AppTheme.captionFont;
     self.statusFooter.textColor = AppTheme.textSecondary;
-    self.statusFooter.numberOfLines = 0;
+    self.statusFooter.numberOfLines = 2;
     self.statusFooter.translatesAutoresizingMaskIntoConstraints = NO;
     [content addSubview:self.statusFooter];
 
@@ -278,9 +240,6 @@
         [aboutBtn.widthAnchor constraintEqualToConstant:36],
         [aboutBtn.heightAnchor constraintEqualToConstant:36],
 
-        [logoutBtn.centerYAnchor constraintEqualToAnchor:ver.centerYAnchor],
-        [logoutBtn.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-pad],
-
         [card.topAnchor constraintEqualToAnchor:ver.bottomAnchor constant:16],
         [card.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:pad],
         [card.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-pad],
@@ -288,11 +247,7 @@
         [cols.topAnchor constraintEqualToAnchor:card.topAnchor constant:16],
         [cols.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:14],
         [cols.trailingAnchor constraintEqualToAnchor:card.trailingAnchor constant:-14],
-
-        [contact.topAnchor constraintEqualToAnchor:cols.bottomAnchor constant:12],
-        [contact.leadingAnchor constraintEqualToAnchor:cols.leadingAnchor],
-        [contact.trailingAnchor constraintEqualToAnchor:cols.trailingAnchor],
-        [contact.bottomAnchor constraintEqualToAnchor:card.bottomAnchor constant:-14],
+        [cols.bottomAnchor constraintEqualToAnchor:card.bottomAnchor constant:-16],
 
         // Proxy card
         [self.proxyCard.topAnchor constraintEqualToAnchor:card.bottomAnchor constant:12],
@@ -325,11 +280,7 @@
         [resetDataBtn.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-pad],
         [resetDataBtn.heightAnchor constraintEqualToConstant:56],
 
-        [resetHint.topAnchor constraintEqualToAnchor:resetDataBtn.bottomAnchor constant:6],
-        [resetHint.leadingAnchor constraintEqualToAnchor:resetDataBtn.leadingAnchor],
-        [resetHint.trailingAnchor constraintEqualToAnchor:resetDataBtn.trailingAnchor],
-
-        [applyBtn.topAnchor constraintEqualToAnchor:resetHint.bottomAnchor constant:12],
+        [applyBtn.topAnchor constraintEqualToAnchor:resetDataBtn.bottomAnchor constant:10],
         [applyBtn.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:pad],
         [applyBtn.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-pad],
         [applyBtn.heightAnchor constraintEqualToConstant:48],
@@ -339,11 +290,7 @@
         [locBtn.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-pad],
         [locBtn.heightAnchor constraintEqualToConstant:48],
 
-        [locHint.topAnchor constraintEqualToAnchor:locBtn.bottomAnchor constant:6],
-        [locHint.leadingAnchor constraintEqualToAnchor:locBtn.leadingAnchor],
-        [locHint.trailingAnchor constraintEqualToAnchor:locBtn.trailingAnchor],
-
-        [termsCard.topAnchor constraintEqualToAnchor:locHint.bottomAnchor constant:14],
+        [termsCard.topAnchor constraintEqualToAnchor:locBtn.bottomAnchor constant:14],
         [termsCard.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:pad],
         [termsCard.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-pad],
 
@@ -355,10 +302,10 @@
         [termsBody.trailingAnchor constraintEqualToAnchor:termsTitle.trailingAnchor],
         [termsBody.bottomAnchor constraintEqualToAnchor:termsCard.bottomAnchor constant:-12],
 
-        [self.statusFooter.topAnchor constraintEqualToAnchor:termsCard.bottomAnchor constant:14],
+        [self.statusFooter.topAnchor constraintEqualToAnchor:termsCard.bottomAnchor constant:12],
         [self.statusFooter.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:pad],
         [self.statusFooter.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-pad],
-        [self.statusFooter.bottomAnchor constraintEqualToAnchor:content.bottomAnchor constant:-28],
+        [self.statusFooter.bottomAnchor constraintEqualToAnchor:content.bottomAnchor constant:-24],
     ]];
 
     [self updateProxyHeaderTitle];
@@ -513,46 +460,34 @@
     }
     [self updateProxyHeaderTitle];
 
-    NSUInteger nDev = Catalog.shared.devices.count;
-    NSUInteger nIOS = Catalog.shared.iosReleases.count;
-    NSString *lic = [IPFLicenseManager.shared statusSummary];
-    self.statusFooter.text = [NSString stringWithFormat:@"%@\n%@\nDanh mục: %lu máy · %lu iOS · Lab apps: %lu",
-                              st.statusText ?: @"",
-                              lic ?: @"",
-                              (unsigned long)nDev, (unsigned long)nIOS,
-                              (unsigned long)st.selectedSpoofBundleIds.count];
+    NSString *msg = st.statusText ?: @"";
+    if (msg.length > 120) msg = [[msg substringToIndex:117] stringByAppendingString:@"…"];
+    self.statusFooter.text = msg;
 }
 
 #pragma mark - Actions
 
-- (void)logoutTapped {
-    UIAlertController *ac = [UIAlertController alertControllerWithTitle:@"Đăng xuất key"
-                                                                message:@"Xóa phiên key trên máy này?"
-                                                         preferredStyle:UIAlertControllerStyleAlert];
-    [ac addAction:[UIAlertAction actionWithTitle:@"Hủy" style:UIAlertActionStyleCancel handler:nil]];
-    [ac addAction:[UIAlertAction actionWithTitle:@"Đăng xuất" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *a) {
-        [IPFLicenseManager.shared logout];
-        AppDelegate *del = (AppDelegate *)UIApplication.sharedApplication.delegate;
-        if ([del respondsToSelector:@selector(showLogin)]) {
-            [del showLogin];
-        }
-    }]];
-    [self presentViewController:ac animated:YES completion:nil];
-}
-
 - (void)applyTapped {
     UIView *host = self.tabBarController.view ?: self.navigationController.view ?: self.view;
+    if (!host) host = self.view;
     ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Đặt lại + Lưu…"];
+    if (!ov) return;
     self.view.userInteractionEnabled = NO;
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-        NSString *msg = [AppState.shared saveDataThenResetProgress:^(NSString *step) {
-            [ov appendStep:step];
-        }];
+        NSString *msg = nil;
+        @try {
+            msg = [AppState.shared saveDataThenResetProgress:^(NSString *step) {
+                [ov appendStep:step];
+            }];
+        } @catch (NSException *ex) {
+            msg = [NSString stringWithFormat:@"Lỗi: %@", ex.reason ?: @"exception"];
+        }
+        if (!msg.length) msg = @"Xong";
         dispatch_async(dispatch_get_main_queue(), ^{
             self.view.userInteractionEnabled = YES;
             [ov finishWithTitle:@"Hoàn tất" detail:msg];
             [self refreshUI];
-            [ov dismissAfter:1.4 completion:^{
+            [ov dismissAfter:1.0 completion:^{
                 [self showAlertTitle:@"Đặt lại + Lưu dữ liệu" message:msg];
             }];
         });
@@ -562,7 +497,7 @@
 - (void)killTapped {
     UIAlertController *ac = [UIAlertController
         alertControllerWithTitle:@"Đặt lại dữ liệu app?"
-                         message:@"Spoof mới + geo (nếu proxy) + xóa session app lab + mở lại.\nMất đăng nhập."
+                         message:@"Spoof mới + xóa session (mất đăng nhập). Không tự mở lại app."
                   preferredStyle:UIAlertControllerStyleAlert];
     [ac addAction:[UIAlertAction actionWithTitle:@"Hủy" style:UIAlertActionStyleCancel handler:nil]];
     __weak typeof(self) weakSelf = self;
@@ -574,17 +509,25 @@
 
 - (void)runResetAppData {
     UIView *host = self.tabBarController.view ?: self.navigationController.view ?: self.view;
+    if (!host) host = self.view;
     ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Đặt lại dữ liệu app…"];
+    if (!ov) return;
     self.view.userInteractionEnabled = NO;
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-        NSString *msg = [AppState.shared killZaloAndRandomizeFromPoolProgress:^(NSString *step) {
-            [ov appendStep:step];
-        }];
+        NSString *msg = nil;
+        @try {
+            msg = [AppState.shared killZaloAndRandomizeFromPoolProgress:^(NSString *step) {
+                [ov appendStep:step];
+            }];
+        } @catch (NSException *ex) {
+            msg = [NSString stringWithFormat:@"Lỗi: %@", ex.reason ?: @"exception"];
+        }
+        if (!msg.length) msg = @"Xong";
         dispatch_async(dispatch_get_main_queue(), ^{
             self.view.userInteractionEnabled = YES;
             [ov finishWithTitle:@"Hoàn tất" detail:msg];
             [self refreshUI];
-            [ov dismissAfter:1.2 completion:^{
+            [ov dismissAfter:1.0 completion:^{
                 [self showAlertTitle:@"Đặt lại dữ liệu app" message:msg];
             }];
         });
