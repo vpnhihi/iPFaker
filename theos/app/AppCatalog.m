@@ -26,6 +26,7 @@
     if (!bid.length) return NO;
     if ([bid isEqualToString:@"com.apple.Maps"]) return YES;
     if ([bid isEqualToString:@"com.apple.weather"]) return YES;
+    if ([bid isEqualToString:@"com.apple.mobilesafari"]) return YES;
     // Drop stock system apps; keep sideloaded / App Store third-party
     if ([bid hasPrefix:@"com.apple."]) return NO;
     // Skip common system-ish prefixes
@@ -71,10 +72,11 @@
         }
     } @catch (__unused NSException *ex) {}
 
-    // Always ensure Maps + Weather present
+    // Always ensure Maps + Weather + Safari present
     for (NSArray *must in @[
         @[ @"com.apple.Maps", @"Bản đồ" ],
         @[ @"com.apple.weather", @"Thời tiết" ],
+        @[ @"com.apple.mobilesafari", @"Safari" ],
     ]) {
         if (!map[must[0]]) {
             AppCatalogItem *it = [[AppCatalogItem alloc] init];
@@ -85,11 +87,12 @@
         }
     }
 
-    // Fallback if LS empty: only Maps + Weather
+    // Fallback if LS empty: Maps + Weather + Safari
     if (map.count == 0) {
         for (NSArray *row in @[
             @[ @"com.apple.Maps", @"Bản đồ" ],
             @[ @"com.apple.weather", @"Thời tiết" ],
+            @[ @"com.apple.mobilesafari", @"Safari" ],
         ]) {
             AppCatalogItem *it = [[AppCatalogItem alloc] init];
             it.bundleId = row[0];
@@ -111,6 +114,7 @@
 - (NSInteger)pinRank:(NSString *)bid {
     if ([bid isEqualToString:@"com.apple.Maps"]) return 0;
     if ([bid isEqualToString:@"com.apple.weather"]) return 1;
+    if ([bid isEqualToString:@"com.apple.mobilesafari"]) return 2;
     return 20;
 }
 

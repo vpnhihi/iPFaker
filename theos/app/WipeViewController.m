@@ -34,7 +34,7 @@
     [self.view addSubview:header];
 
     UILabel *note = [[UILabel alloc] init];
-    note.text = @"Chọn app (✓ nhiều) · Mặc định Bản đồ + Thời tiết · 1 chạm = kill + wipe container/group + kiểm tra sạch.";
+    note.text = @"Chọn app (✓ nhiều) · Mặc định Bản đồ + Thời tiết + Safari · 1 chạm = kill + wipe container/group + kiểm tra sạch.";
     note.font = AppTheme.captionFont;
     note.textColor = AppTheme.textSecondary;
     note.numberOfLines = 0;
@@ -163,7 +163,7 @@
 }
 
 - (void)refreshUI {
-    self.appsDetailLabel.text = [NSString stringWithFormat:@"%@\nDanh sách: %lu app (ngoài + Bản đồ/Thời tiết)",
+    self.appsDetailLabel.text = [NSString stringWithFormat:@"%@\nDanh sách: %lu app (ngoài + Bản đồ/Thời tiết/Safari)",
                                  [AppState.shared wipeAppsSummary],
                                  (unsigned long)AppCatalog.shared.apps.count];
     self.hintLabel.text = [NSString stringWithFormat:

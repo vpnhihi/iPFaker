@@ -130,10 +130,25 @@ static NSString *const kPoolWipeApps = @"ipf.pool.wipeBundleIds";
         if (self.selectedIOS.length && ![self.selectedIOSList containsObject:self.selectedIOS])
             [self.selectedIOSList addObject:self.selectedIOS];
     }
-    // Default wipe apps: Maps + Weather (Bản đồ, Thời tiết)
+    // Default wipe apps: Maps + Weather + Safari (Bản đồ, Thời tiết, Safari)
     if (self.selectedWipeBundleIds.count == 0) {
-        [self.selectedWipeBundleIds addObject:@"com.apple.Maps"];
-        [self.selectedWipeBundleIds addObject:@"com.apple.weather"];
+        [self.selectedWipeBundleIds addObjectsFromArray:@[
+            @"com.apple.Maps",
+            @"com.apple.weather",
+            @"com.apple.mobilesafari",
+        ]];
+    } else {
+        // Migrate classic Maps+Weather default → also include Safari (once)
+        NSArray *classic = @[ @"com.apple.Maps", @"com.apple.weather" ];
+        BOOL isClassicDefault =
+            self.selectedWipeBundleIds.count == 2
+            && [self.selectedWipeBundleIds containsObject:classic[0]]
+            && [self.selectedWipeBundleIds containsObject:classic[1]]
+            && ![self.selectedWipeBundleIds containsObject:@"com.apple.mobilesafari"];
+        if (isClassicDefault) {
+            [self.selectedWipeBundleIds addObject:@"com.apple.mobilesafari"];
+            [self savePools];
+        }
     }
     [self savePools];
 }
@@ -351,6 +366,7 @@ static NSString *const kPoolWipeApps = @"ipf.pool.wipeBundleIds";
     for (NSString *bid in self.selectedWipeBundleIds) {
         if ([bid isEqualToString:@"com.apple.Maps"]) [names addObject:@"Bản đồ"];
         else if ([bid isEqualToString:@"com.apple.weather"]) [names addObject:@"Thời tiết"];
+        else if ([bid isEqualToString:@"com.apple.mobilesafari"]) [names addObject:@"Safari"];
         else [names addObject:bid.pathExtension.length ? bid.pathExtension : bid];
         if (names.count >= 4) break;
     }
