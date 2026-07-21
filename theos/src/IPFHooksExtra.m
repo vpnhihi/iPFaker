@@ -83,7 +83,8 @@ static CGFloat IPFScale(void) {
             ?: [[IPFConfig shared] mgValueForKey:@"main-screen-scale"];
         if ([v respondsToSelector:@selector(doubleValue)]) sc = [v doubleValue];
     }
-    return (sc >= 1.0) ? (CGFloat)sc : 3.0;
+    // No SKU default (was 3.0 = Pro-class); 2.0 is safest generic if profile missing
+    return (sc >= 1.0) ? (CGFloat)sc : 2.0;
 }
 
 static CGSize IPFNativeSize(void) {
@@ -94,10 +95,11 @@ static CGSize IPFNativeSize(void) {
             ?: [[IPFConfig shared] mgValueForKey:@"main-screen-width"];
         id h = [[IPFConfig shared] stringForKey:@"main-screen-height"]
             ?: [[IPFConfig shared] mgValueForKey:@"main-screen-height"];
-        ww = [w respondsToSelector:@selector(doubleValue)] ? [w doubleValue] : 1179;
-        hh = [h respondsToSelector:@selector(doubleValue)] ? [h doubleValue] : 2556;
+        if ([w respondsToSelector:@selector(doubleValue)]) ww = [w doubleValue];
+        if ([h respondsToSelector:@selector(doubleValue)]) hh = [h doubleValue];
     }
     if (ww < 1 || hh < 1) {
+        // Derive from LogicalScreen* × scale (any catalog device)
         double lw = [[IPFConfig shared] doubleForKey:@"LogicalScreenWidth" fallback:0];
         double lh = [[IPFConfig shared] doubleForKey:@"LogicalScreenHeight" fallback:0];
         CGFloat sc = IPFScale();
@@ -106,6 +108,7 @@ static CGSize IPFNativeSize(void) {
             hh = lh * sc;
         }
     }
+    // Still missing → leave zero so caller can fall through to real screen (no fake SKU)
     return CGSizeMake((CGFloat)ww, (CGFloat)hh);
 }
 
@@ -139,10 +142,12 @@ static NSInteger (*orig_maxFPS)(id, SEL);
 static CGRect (*orig_bounds)(id, SEL);
 
 static CGRect stub_nativeBounds(id self, SEL _cmd) {
-    // pixels — must match catalog model (do not leave real XS Max native)
+    // pixels — from active profile (any catalog device). No fixed-SKU default.
     if (!IPFScreenOn())
         return orig_nativeBounds ? orig_nativeBounds(self, _cmd) : CGRectZero;
     CGSize s = IPFNativeSize();
+    if (s.width < 1 || s.height < 1)
+        return orig_nativeBounds ? orig_nativeBounds(self, _cmd) : CGRectZero;
     IPFLogScreenOnce(s, IPFScale(), IPFMaxFPS());
     return CGRectMake(0, 0, s.width, s.height);
 }
@@ -798,10 +803,16 @@ static NSString *IPFWebSpoofJS(void) {
     double nw = [[IPFConfig shared] doubleForKey:@"main-screen-width" fallback:0];
     double nh = [[IPFConfig shared] doubleForKey:@"main-screen-height" fallback:0];
     if (sc < 1) sc = IPFScale();
+    // Derive logical from native when missing — never hardcode one SKU (e.g. 15 Pro Max)
     if (lw < 1 && nw > 0 && sc > 0) lw = nw / sc;
     if (lh < 1 && nh > 0 && sc > 0) lh = nh / sc;
-    if (lw < 1) lw = 430;
-    if (lh < 1) lh = 932;
+    if (lw < 1 || lh < 1) {
+        CGSize n = IPFNativeSize();
+        CGFloat sc2 = IPFScale();
+        if (sc2 < 1) sc2 = 1;
+        if (lw < 1) lw = n.width / sc2;
+        if (lh < 1) lh = n.height / sc2;
+    }
     // devicePixelRatio ≡ scale (MDN / CSS pixels vs device pixels)
     int sw = (int)llround(lw);
     int sh = (int)llround(lh);
@@ -905,8 +916,14 @@ static id stub_wkInitFrameConfig(id self, SEL _cmd, CGRect frame, id configurati
         static int once = 0;
         if (!once) {
             once = 1;
-            double lw = [[IPFConfig shared] doubleForKey:@"LogicalScreenWidth" fallback:430];
-            double sc = [[IPFConfig shared] doubleForKey:@"main-screen-scale" fallback:3];
+            double lw = [[IPFConfig shared] doubleForKey:@"LogicalScreenWidth" fallback:0];
+            double sc = [[IPFConfig shared] doubleForKey:@"main-screen-scale" fallback:0];
+            if (lw < 1 || sc < 1) {
+                CGSize n = IPFNativeSize();
+                sc = IPFScale();
+                if (sc < 1) sc = 1;
+                lw = n.width / sc;
+            }
             IPFExTrace([NSString stringWithFormat:
                 @"WKWebView UA+JS injected sw=%.0f dpr=%.1f", lw, sc]);
         }

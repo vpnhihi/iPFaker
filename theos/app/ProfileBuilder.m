@@ -207,16 +207,32 @@
     NSString *regionCode = @{ @"LL":@"US", @"J":@"JP", @"CH":@"CN", @"KH":@"KR", @"ZA":@"SG", @"ZP":@"HK",
                               @"B":@"GB", @"D":@"DE", @"F":@"FR", @"T":@"IT", @"X":@"AU", @"C":@"CA" }[regLetters] ?: @"VN";
 
-    NSInteger w = [disp[@"NativeWidth"] integerValue] ?: 1170;
-    NSInteger h = [disp[@"NativeHeight"] integerValue] ?: 2532;
-    NSInteger scale = [disp[@"ScreenScale"] integerValue] ?: 3;
+    // Display — 100% from catalog row (any device), never hardcode one model
+    NSInteger w = [disp[@"NativeWidth"] integerValue];
+    NSInteger h = [disp[@"NativeHeight"] integerValue];
+    NSInteger scale = [disp[@"ScreenScale"] integerValue];
+    if (scale < 1) scale = 2;
+    if (w < 1) w = [disp[@"LogicalWidth"] integerValue] * scale;
+    if (h < 1) h = [disp[@"LogicalHeight"] integerValue] * scale;
+    NSInteger logicalW = [disp[@"LogicalWidth"] integerValue];
+    NSInteger logicalH = [disp[@"LogicalHeight"] integerValue];
+    if (logicalW < 1 && scale > 0) logicalW = w / scale;
+    if (logicalH < 1 && scale > 0) logicalH = h / scale;
     NSInteger pitch = [disp[@"Pitch"] integerValue] ?: 460;
+    NSInteger maxHz = [disp[@"MaxRefreshHz"] integerValue];
+    if (maxHz < 1) maxHz = 60;
     NSInteger cores = [device[@"cpuCores"] integerValue] ?: 6;
 
-    // Storage (bytes) — catalog storageGB or typical tier; free ≈ 35–55% used
-    NSInteger storageGB = [device[@"storageGB"] integerValue];
+    // Storage tier from catalog storageOptionsGB (or storageGB); free 35–55%
+    NSInteger storageGB = 0;
+    id opts = device[@"storageOptionsGB"];
+    if ([opts isKindOfClass:[NSArray class]] && [(NSArray *)opts count] > 0) {
+        NSArray *arr = (NSArray *)opts;
+        storageGB = [arr[arc4random_uniform((u_int32_t)arr.count)] integerValue];
+    }
+    if (storageGB <= 0) storageGB = [device[@"storageGB"] integerValue];
     if (storageGB <= 0) storageGB = 128;
-    long long totalDisk = (long long)storageGB * 1000LL * 1000LL * 1000LL; // decimal GB (iOS reports 1000-base)
+    long long totalDisk = (long long)storageGB * 1000LL * 1000LL * 1000LL; // decimal GB
     long long freeDisk = (long long)(totalDisk * (0.35 + (arc4random_uniform(200) / 1000.0)));
 
     // Boot time: now − [3d … 21d] (kern.boottime timeval.tv_sec, Unix epoch)
@@ -279,7 +295,13 @@
         @"FakeSysOSVersion": @YES,
         @"HideJailbreak": @YES,
         @"FakeBrowser": @YES,
-        @"ProductType": device[@"ProductType"] ?: @"iPhone16,1",
+        @"FakeLocale": @YES,
+        @"FakeLocation": @YES,
+        @"FakeSensor": @YES,
+        @"FakeWebRTC": @YES,
+        @"DisableWebRTC": @NO,
+        // Class A — always from selected catalog device (any model, not one fixed SKU)
+        @"ProductType": device[@"ProductType"] ?: @"",
         @"MarketingName": device[@"MarketingName"] ?: @"iPhone",
         @"DeviceName": @"iPhone",
         @"UserAssignedDeviceName": devName,
@@ -341,11 +363,14 @@
         @"MobileNetworkCode": @"04",
         @"ISOCountryCode": @"vn",
         @"AllowsVOIP": @YES,
-        // Display (native pixels + scale)
+        // Display (catalog native + logical + scale) — UIScreen / WK JS / MG same source
         @"main-screen-width": @(w),
         @"main-screen-height": @(h),
         @"main-screen-scale": @(scale),
         @"main-screen-pitch": @(pitch),
+        @"LogicalScreenWidth": @(logicalW),
+        @"LogicalScreenHeight": @(logicalH),
+        @"ScreenDiagonalInches": [NSString stringWithFormat:@"%@", disp[@"DiagonalInches"] ?: @""],
         @"PhysicalMemoryMB": @(ramMB),
         @"PhysicalMemoryBytes": @(ramBytes),
         @"hw.memsize": @(ramBytes),
@@ -354,10 +379,11 @@
         @"hw.logicalcpu": @(cores),
         @"ChipName": device[@"chip"] ?: @"",
         @"DeviceCatalogId": device[@"id"] ?: @"",
-        @"MaxRefreshHz": disp[@"MaxRefreshHz"] ?: @60,
+        @"MaxRefreshHz": @(maxHz),
         @"DeviceYear": device[@"year"] ?: @0,
         @"BatteryMah": device[@"batteryMah"] ?: @0,
-        // Disk bytes
+        // Disk bytes (tier from catalog storageOptionsGB)
+        @"DiskCapacityGB": @(storageGB),
         @"TotalDiskCapacity": @(totalDisk),
         @"FreeDiskSpace": @(freeDisk),
         // Locale / TZ (BCP-47, ISO, IANA)
@@ -425,8 +451,9 @@
     NSMutableArray *okPaths = [NSMutableArray array];
     NSMutableArray *failMsgs = [NSMutableArray array];
 
+    // active_profile schema mirrors select_device_profile.py (any device + iOS)
     NSDictionary *active = @{
-        @"schema": @"ipfaker.active_profile/2",
+        @"schema": @"ipfaker.active_profile/3",
         @"generated_from": @"iPFaker.app",
         @"device_id": deviceId ?: @"",
         @"ios": ios ?: @"",
@@ -435,8 +462,16 @@
             @"ProductType": flat[@"ProductType"] ?: @"",
             @"MarketingName": flat[@"MarketingName"] ?: @"",
             @"HWModelStr": flat[@"HWModelStr"] ?: @"",
+            @"HardwareModel": flat[@"HardwareModel"] ?: flat[@"HWModelStr"] ?: @"",
+            @"ModelNumber": flat[@"ModelNumber"] ?: @"",
+            @"PartNumber": flat[@"PartNumber"] ?: @"",
+            @"RegulatoryModelNumber": flat[@"RegulatoryModelNumber"] ?: @"",
+            @"HardwarePlatform": flat[@"HardwarePlatform"] ?: @"",
+            @"CPUArchitecture": flat[@"CPUArchitecture"] ?: @"",
             @"PhysicalMemoryMB": flat[@"PhysicalMemoryMB"] ?: @0,
             @"ChipName": flat[@"ChipName"] ?: @"",
+            @"DiskCapacityGB": flat[@"DiskCapacityGB"] ?: @0,
+            @"UserAssignedDeviceName": flat[@"UserAssignedDeviceName"] ?: @"",
         },
         @"os": @{
             @"ProductVersion": flat[@"ProductVersion"] ?: @"",
@@ -446,6 +481,33 @@
             @"NativeWidth": flat[@"main-screen-width"] ?: @0,
             @"NativeHeight": flat[@"main-screen-height"] ?: @0,
             @"ScreenScale": flat[@"main-screen-scale"] ?: @0,
+            @"LogicalWidth": flat[@"LogicalScreenWidth"] ?: @0,
+            @"LogicalHeight": flat[@"LogicalScreenHeight"] ?: @0,
+            @"MaxRefreshHz": flat[@"MaxRefreshHz"] ?: @60,
+            @"main-screen-pitch": flat[@"main-screen-pitch"] ?: @0,
+            @"DiagonalInches": flat[@"ScreenDiagonalInches"] ?: @"",
+        },
+        @"storage": @{
+            @"TotalDiskCapacity": flat[@"TotalDiskCapacity"] ?: @0,
+            @"FreeDiskSpace": flat[@"FreeDiskSpace"] ?: @0,
+            @"DiskCapacityGB": flat[@"DiskCapacityGB"] ?: @0,
+        },
+        @"webview": @{
+            @"UserAgent": flat[@"UserAgent"] ?: @"",
+            @"HTTPUserAgent": flat[@"HTTPUserAgent"] ?: @"",
+        },
+        @"hooks": @{
+            @"mobilegestalt": @{
+                @"ProductType": flat[@"ProductType"] ?: @"",
+                @"MarketingName": flat[@"MarketingName"] ?: @"",
+                @"HWModelStr": flat[@"HWModelStr"] ?: @"",
+            },
+            @"sysctl": @{
+                @"hw.machine": flat[@"ProductType"] ?: @"",
+                @"hw.model": flat[@"HWModelStr"] ?: @"",
+                @"hw.memsize": flat[@"hw.memsize"] ?: @0,
+                @"hw.ncpu": flat[@"hw.ncpu"] ?: @0,
+            },
         },
     };
     NSData *json = [NSJSONSerialization dataWithJSONObject:active options:NSJSONWritingPrettyPrinted error:&err];

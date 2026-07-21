@@ -372,8 +372,12 @@ def random_imei() -> str:
     return body14 + _luhn_check_digit(body14)
 
 
-def validate_identity(flat: dict) -> list[str]:
-    """Return list of problems (empty = OK). Lab format + cross-field consistency."""
+def validate_identity(flat: dict, device: dict | None = None, ios_meta: dict | None = None) -> list[str]:
+    """Return list of problems (empty = OK). Lab format + catalog cross-field consistency.
+
+    When *device* / *ios_meta* are provided, Class A fields must match catalog
+    (works for every device row — not only one SKU like 15 Pro Max).
+    """
     errs: list[str] = []
     sn = str(flat.get("SerialNumber") or "")
     if not re.fullmatch(r"[A-Z2-9]{10,12}", sn):
@@ -420,15 +424,19 @@ def validate_identity(flat: dict) -> list[str]:
     for ak in ("IOPlatformSerialNumber", "MLBSerialNumber"):
         if flat.get(ak) and flat.get(ak) != sn:
             errs.append(f"{ak} must equal SerialNumber")
-    # Screen consistency: native ≈ logical * scale
+    # Screen: if catalog provided, catalog is authority (Plus models: 1080≠414*3).
+    # Without catalog, only flag gross mismatch (allow Apple downsampling slack).
     try:
         nw = int(flat.get("main-screen-width") or 0)
         nh = int(flat.get("main-screen-height") or 0)
         sc = int(flat.get("main-screen-scale") or 0)
         lw = int(flat.get("LogicalScreenWidth") or 0)
         lh = int(flat.get("LogicalScreenHeight") or 0)
-        if nw and nh and sc and lw and lh:
-            if abs(nw - lw * sc) > sc or abs(nh - lh * sc) > sc:
+        if nw and nh and sc and lw and lh and not device:
+            # Loose check only when no catalog row (Plus can be ~20% off)
+            if abs(nw - lw * sc) > max(sc * 80, nw * 0.25) or abs(
+                nh - lh * sc
+            ) > max(sc * 80, nh * 0.25):
                 errs.append(
                     f"screen mismatch native {nw}x{nh} vs logical {lw}x{lh}@{sc}"
                 )
@@ -442,7 +450,124 @@ def validate_identity(flat: dict) -> list[str]:
             errs.append("FreeDiskSpace > TotalDiskCapacity")
     except (TypeError, ValueError):
         pass
+
+    # --- Class A: flat must match selected catalog device + iOS (all models) ---
+    if device:
+        if flat.get("ProductType") != device.get("ProductType"):
+            errs.append(
+                f"ProductType {flat.get('ProductType')!r} != catalog {device.get('ProductType')!r}"
+            )
+        if flat.get("MarketingName") != device.get("MarketingName"):
+            errs.append(
+                f"MarketingName {flat.get('MarketingName')!r} != catalog {device.get('MarketingName')!r}"
+            )
+        if flat.get("HWModelStr") != device.get("HWModelStr"):
+            errs.append(
+                f"HWModelStr {flat.get('HWModelStr')!r} != catalog {device.get('HWModelStr')!r}"
+            )
+        disp = device.get("display") or {}
+        try:
+            if int(flat.get("main-screen-width") or 0) != int(disp.get("NativeWidth") or 0):
+                errs.append("main-screen-width != catalog NativeWidth")
+            if int(flat.get("main-screen-height") or 0) != int(disp.get("NativeHeight") or 0):
+                errs.append("main-screen-height != catalog NativeHeight")
+            if int(flat.get("main-screen-scale") or 0) != int(disp.get("ScreenScale") or 0):
+                errs.append("main-screen-scale != catalog ScreenScale")
+            cat_lw = int(disp.get("LogicalWidth") or 0)
+            cat_lh = int(disp.get("LogicalHeight") or 0)
+            if cat_lw and int(flat.get("LogicalScreenWidth") or 0) != cat_lw:
+                errs.append("LogicalScreenWidth != catalog LogicalWidth")
+            if cat_lh and int(flat.get("LogicalScreenHeight") or 0) != cat_lh:
+                errs.append("LogicalScreenHeight != catalog LogicalHeight")
+            if int(flat.get("PhysicalMemoryMB") or 0) != int(device.get("PhysicalMemoryMB") or 0):
+                errs.append("PhysicalMemoryMB != catalog")
+        except (TypeError, ValueError) as ex:
+            errs.append(f"catalog numeric compare: {ex}")
+        opts = device.get("storageOptionsGB") or []
+        try:
+            cap = flat.get("DiskCapacityGB")
+            if cap not in ("", None) and opts:
+                if int(cap) not in [int(x) for x in opts]:
+                    errs.append(f"DiskCapacityGB {cap} not in storageOptionsGB {opts}")
+        except (TypeError, ValueError):
+            errs.append("DiskCapacityGB not int")
+    if ios_meta:
+        if flat.get("ProductVersion") != ios_meta.get("ProductVersion"):
+            errs.append(
+                f"ProductVersion {flat.get('ProductVersion')!r} != {ios_meta.get('ProductVersion')!r}"
+            )
+        if flat.get("BuildVersion") != ios_meta.get("BuildVersion"):
+            errs.append(
+                f"BuildVersion {flat.get('BuildVersion')!r} != {ios_meta.get('BuildVersion')!r}"
+            )
+        # UA must embed same OS version (underscored)
+        ua = str(flat.get("UserAgent") or flat.get("HTTPUserAgent") or "")
+        pv = str(ios_meta.get("ProductVersion") or "")
+        if ua and pv:
+            ua_os = pv.replace(".", "_")
+            if ua_os not in ua:
+                errs.append(f"UserAgent missing OS {ua_os!r}")
     return errs
+
+
+def validate_all_devices(cat: dict, *, samples_per_device: int = 1) -> int:
+    """Generate + validate a profile for every catalog device (matrix-valid iOS).
+
+    Returns number of failures. Ensures identity pipeline is SKU-agnostic.
+    """
+    fails = 0
+    ok = 0
+    skipped = 0
+    print(
+        f"{'device_id':22} {'MarketingName':28} {'ProductType':12} iOS        result"
+    )
+    print("-" * 100)
+    for device in cat["devices"]:
+        supported = device_supported_ios(device, cat)
+        if not supported:
+            skipped += 1
+            print(f"{device.get('id',''):22} {str(device.get('MarketingName',''))[:28]:28} SKIP no iOS matrix")
+            continue
+        # Exercise default + mid + first supported when possible
+        picks = []
+        picks.append(device.get("defaultIOS") if device.get("defaultIOS") in supported else supported[-1])
+        if samples_per_device > 1 and len(supported) > 1:
+            picks.append(supported[0])
+        if samples_per_device > 2 and len(supported) > 2:
+            picks.append(supported[len(supported) // 2])
+        seen = set()
+        for ios in picks:
+            if ios in seen:
+                continue
+            seen.add(ios)
+            try:
+                ios_ver, ios_meta = clamp_ios(device, ios, cat, force=False)
+            except SystemExit as e:
+                fails += 1
+                print(f"{device['id']:22} clamp fail: {e}")
+                continue
+            built = build_profile(device, ios_ver, ios_meta, None)
+            errs = validate_identity(built["flat"], device=device, ios_meta=ios_meta)
+            if errs:
+                fails += 1
+                print(
+                    f"{device['id']:22} {device['MarketingName'][:28]:28} "
+                    f"{device['ProductType']:12} {ios_ver:10} FAIL"
+                )
+                for e in errs[:6]:
+                    print(f"  · {e}")
+            else:
+                ok += 1
+                disp = device["display"]
+                print(
+                    f"{device['id']:22} {device['MarketingName'][:28]:28} "
+                    f"{device['ProductType']:12} {ios_ver:10} OK "
+                    f"{disp['NativeWidth']}x{disp['NativeHeight']}@"
+                    f"{disp['ScreenScale']} RAM={device['PhysicalMemoryMB']}"
+                )
+    print("-" * 100)
+    print(f"OK={ok} FAIL={fails} SKIP={skipped} devices={len(cat['devices'])}")
+    return fails
 
 
 def clamp_ios(
@@ -898,6 +1023,17 @@ def main() -> int:
     ap.add_argument("--ios", "-i", help="iOS version e.g. 18.5, 17.6.1")
     ap.add_argument("--name", help="UserAssignedDeviceName")
     ap.add_argument("--random", action="store_true", help="Random device + default iOS (matrix-valid only)")
+    ap.add_argument(
+        "--validate-all",
+        action="store_true",
+        help="Build+validate profile for EVERY catalog device (no write)",
+    )
+    ap.add_argument(
+        "--samples",
+        type=int,
+        default=1,
+        help="With --validate-all: iOS samples per device (1–3)",
+    )
     ap.add_argument("--deploy", action="store_true", help="Push config.plist to phone via SSH")
     ap.add_argument("--force", action="store_true", help="Allow invalid device+iOS pairs (bypass matrix)")
     args = ap.parse_args()
@@ -913,6 +1049,10 @@ def main() -> int:
             return 1
         list_ios(cat, dev)
         return 0
+    if args.validate_all:
+        n = max(1, min(3, int(args.samples or 1)))
+        fails = validate_all_devices(cat, samples_per_device=n)
+        return 1 if fails else 0
 
     if args.random:
         pool = [d for d in cat["devices"] if device_supported_ios(d, cat)]
@@ -929,12 +1069,14 @@ def main() -> int:
         print("\nExamples:\n  python scripts/select_device_profile.py --list")
         print("  python scripts/select_device_profile.py -d iphone16-pro-max -i 18.5 --deploy")
         print("  python scripts/select_device_profile.py -d iphone15-pro --list-ios")
+        print("  python scripts/select_device_profile.py --validate-all")
+        print("  python scripts/select_device_profile.py --random --deploy  # any matrix-valid device")
         return 2
 
     ios_ver, ios_meta = clamp_ios(device, args.ios, cat, force=args.force)
     built = build_profile(device, ios_ver, ios_meta, args.name)
     flat = built["flat"]
-    id_errs = validate_identity(flat)
+    id_errs = validate_identity(flat, device=device, ios_meta=ios_meta)
     if id_errs:
         print("IDENTITY CONSISTENCY FAIL — not writing:", file=sys.stderr)
         for e in id_errs:

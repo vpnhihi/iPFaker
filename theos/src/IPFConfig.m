@@ -269,7 +269,11 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
     // Ensure MarketingName present for Zalo device list
     if (self.mgMap && !self.mgMap[@"MarketingName"]) {
         NSMutableDictionary *m = [self.mgMap mutableCopy];
-        NSString *mkt = self.model[@"MarketingName"] ?: self.model[@"ProductName"] ?: @"iPhone 15 Pro";
+        // Prefer model/flat MarketingName for ANY catalog device — never force one SKU
+        NSString *mkt = self.model[@"MarketingName"]
+            ?: self.model[@"ProductName"]
+            ?: self.flat[@"MarketingName"]
+            ?: @"iPhone";
         m[@"MarketingName"] = mkt;
         self.mgMap = m;
     }

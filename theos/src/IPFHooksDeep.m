@@ -56,12 +56,16 @@ static void IPFResolve(void) {
 }
 
 static NSString *IPFFakePT(void) {
-    return [[IPFConfig shared] mgValueForKey:@"ProductType"] ?: @"iPhone16,1";
+    // Must come from active profile (any catalog device) — no fixed 15 Pro default
+    NSString *pt = [[IPFConfig shared] mgValueForKey:@"ProductType"]
+        ?: [[IPFConfig shared] stringForKey:@"ProductType"];
+    return pt.length ? pt : nil;
 }
 static NSString *IPFFakeHW(void) {
-    return [[IPFConfig shared] mgValueForKey:@"HWModelStr"]
+    NSString *hw = [[IPFConfig shared] mgValueForKey:@"HWModelStr"]
         ?: [[IPFConfig shared] mgValueForKey:@"HardwareModel"]
-        ?: @"D83AP";
+        ?: [[IPFConfig shared] stringForKey:@"HWModelStr"];
+    return hw.length ? hw : nil;
 }
 
 // Replace known real XS Max fingerprints in UTF-8 payloads
@@ -72,9 +76,10 @@ static NSData *IPFRewritePayload(NSData *data) {
         if (!s) return data; // binary body — skip
         NSString *pt = IPFFakePT();
         NSString *hw = IPFFakeHW();
+        if (!pt.length && !hw.length) return data; // no profile → do not rewrite to a fixed SKU
         NSString *out = s;
         BOOL changed = NO;
-        // Rewrite common real fingerprints → spoofed ProductType / board
+        // Rewrite common real fingerprints → current profile ProductType / board (any device)
         NSArray *realPT = @[
             @"iPhone7,1", @"iPhone7,2", @"iPhone8,1", @"iPhone8,2", @"iPhone8,4",
             @"iPhone9,1", @"iPhone9,2", @"iPhone9,3", @"iPhone9,4",
@@ -97,18 +102,22 @@ static NSData *IPFRewritePayload(NSData *data) {
             @"D37AP", @"D38AP", @"D83AP", @"D84AP",
             @"D47AP", @"D48AP", @"D93AP", @"D94AP", @"D23AP",
         ];
-        for (NSString *r in realPT) {
-            if ([r isEqualToString:pt]) continue;
-            if ([out rangeOfString:r].location != NSNotFound) {
-                out = [out stringByReplacingOccurrencesOfString:r withString:pt];
-                changed = YES;
+        if (pt.length) {
+            for (NSString *r in realPT) {
+                if ([r isEqualToString:pt]) continue;
+                if ([out rangeOfString:r].location != NSNotFound) {
+                    out = [out stringByReplacingOccurrencesOfString:r withString:pt];
+                    changed = YES;
+                }
             }
         }
-        for (NSString *r in realHW) {
-            if ([r isEqualToString:hw]) continue;
-            if ([out rangeOfString:r].location != NSNotFound) {
-                out = [out stringByReplacingOccurrencesOfString:r withString:hw];
-                changed = YES;
+        if (hw.length) {
+            for (NSString *r in realHW) {
+                if ([r isEqualToString:hw]) continue;
+                if ([out rangeOfString:r].location != NSNotFound) {
+                    out = [out stringByReplacingOccurrencesOfString:r withString:hw];
+                    changed = YES;
+                }
             }
         }
         NSString *mk = [[IPFConfig shared] mgValueForKey:@"MarketingName"];
@@ -133,7 +142,7 @@ static NSData *IPFRewritePayload(NSData *data) {
             }
         }
         if (changed) {
-            IPFLog([NSString stringWithFormat:@"NET rewrite body len %lu → fakePT=%@", (unsigned long)data.length, pt]);
+            IPFLog([NSString stringWithFormat:@"NET rewrite body len %lu → fakePT=%@", (unsigned long)data.length, pt ?: @"(nil)"]);
             return [out dataUsingEncoding:NSUTF8StringEncoding];
         }
     }
