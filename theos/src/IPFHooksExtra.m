@@ -251,7 +251,7 @@ static int stub_statfs(const char *path, struct statfs *buf) {
 }
 
 #pragma mark - Jailbreak path hide
-// Lab_Environment_Hardening.md + HIOS denylist. Fail = ENOENT / NO / NULL.
+// Lab_Environment_Hardening.md + lab denylist. Fail = ENOENT / NO / NULL.
 // MUST allow iPFaker config so spoof profile still loads inside Zalo.
 
 #import <stdio.h>
@@ -305,6 +305,14 @@ static BOOL IPFIsJBPath(const char *path) {
         "/.bootstrapped_electra",
         "/.bootstraprc",
         "/bootstraprc",
+        "/bootstrap",
+        "/electra",
+        "/var/LIB",
+        "/jb/",
+        "unc0ver",
+        "taurine",
+        "odyssey",
+        "chimera",
         "/usr/lib/frida",
         "/usr/lib/libfrida",
         "frida-server",
@@ -374,7 +382,11 @@ static BOOL stub_canOpen(id self, SEL _cmd, NSURL *url) {
             || [s hasPrefix:@"filza://"] || [s hasPrefix:@"undecimus://"] || [s hasPrefix:@"activator://"]
             || [s hasPrefix:@"dopamine://"] || [s hasPrefix:@"ellekit://"]
             || [s hasPrefix:@"ssh://"] || [s hasPrefix:@"newterm://"]
-            || [s hasPrefix:@"santander://"]) {
+            || [s hasPrefix:@"santander://"] || [s hasPrefix:@"trollstore://"]
+            || [s hasPrefix:@"apt-repo://"] || [s hasPrefix:@"package://"]
+            || [s hasPrefix:@"installer://"] || [s hasPrefix:@"palera1n://"]
+            || [s hasPrefix:@"checkra1n://"] || [s hasPrefix:@"taurine://"]
+            || [s hasPrefix:@"odyssey://"] || [s hasPrefix:@"unc0ver://"]) {
             IPFJBHideLogOnce("canOpenURL", s.UTF8String);
             return NO;
         }
@@ -546,13 +558,9 @@ static void stub_startUpdating(id self, SEL _cmd) {
 
 static id (*orig_accelerometerData)(id, SEL);
 static id stub_accelerometerData(id self, SEL _cmd) {
-    if (![[IPFConfig shared] flag:@"FakeSensor" defaultYes:NO])
-        return orig_accelerometerData ? orig_accelerometerData(self, _cmd) : nil;
-    // When spoofing sensors: prefer "device at rest, face up" if we can't inject CMAcceleration easily.
-    // Returning real data when motion is needed is safer; for static fingerprinting, zero motion is fine.
-    // Best-effort: return original if present else nil (avoid crash fabricating private CM structs).
-    id real = orig_accelerometerData ? orig_accelerometerData(self, _cmd) : nil;
-    return real; // structure layout is private — fingerprint often checks availability; gravity via gravity property
+    // Always return real samples when available — fabricating CMAcceleration risks crash.
+    // FakeSensor only forces *availability* flags (see is*Available stubs).
+    return orig_accelerometerData ? orig_accelerometerData(self, _cmd) : nil;
 }
 
 static id (*orig_gravity)(id, SEL);
@@ -561,11 +569,29 @@ static id (*orig_gravity)(id, SEL);
 
 static BOOL (*orig_isAccelAvailable)(id, SEL);
 static BOOL stub_isAccelAvailable(id self, SEL _cmd) {
-    if ([[IPFConfig shared] flag:@"FakeSensor" defaultYes:NO]) {
-        // Report available (normal iPhone)
+    if ([[IPFConfig shared] flag:@"FakeSensor" defaultYes:YES]) {
+        // Report available (normal iPhone) — avoids "no motion hardware" fingerprint
         return YES;
     }
     return orig_isAccelAvailable ? orig_isAccelAvailable(self, _cmd) : YES;
+}
+
+static BOOL (*orig_isGyroAvailable)(id, SEL);
+static BOOL stub_isGyroAvailable(id self, SEL _cmd) {
+    if ([[IPFConfig shared] flag:@"FakeSensor" defaultYes:YES]) return YES;
+    return orig_isGyroAvailable ? orig_isGyroAvailable(self, _cmd) : YES;
+}
+
+static BOOL (*orig_isDeviceMotionAvailable)(id, SEL);
+static BOOL stub_isDeviceMotionAvailable(id self, SEL _cmd) {
+    if ([[IPFConfig shared] flag:@"FakeSensor" defaultYes:YES]) return YES;
+    return orig_isDeviceMotionAvailable ? orig_isDeviceMotionAvailable(self, _cmd) : YES;
+}
+
+static BOOL (*orig_isMagnetometerAvailable)(id, SEL);
+static BOOL stub_isMagnetometerAvailable(id self, SEL _cmd) {
+    if ([[IPFConfig shared] flag:@"FakeSensor" defaultYes:YES]) return YES;
+    return orig_isMagnetometerAvailable ? orig_isMagnetometerAvailable(self, _cmd) : YES;
 }
 
 #pragma mark - Hostname + getifaddrs (FakeDevice / FakeWifi)
@@ -656,21 +682,47 @@ static int stub_getifaddrs(struct ifaddrs **ifap) {
             IPFExTrace(@"getifaddrs skip (no valid WifiAddress in config)");
             return rc;
         }
+        // Prefer en0 (Wi‑Fi) for stable path; also en1/awdl0/pdp_ip* only when name known.
+        // Patching ALL AF_LINK with same MAC can break multi-interface fingerprint checks.
         int patched = 0;
+        int patched_en0 = 0;
         for (struct ifaddrs *ifa = *ifap; ifa; ifa = ifa->ifa_next) {
-            if (!ifa->ifa_addr) continue;
+            if (!ifa->ifa_addr || !ifa->ifa_name) continue;
             if (ifa->ifa_addr->sa_family != AF_LINK) continue;
             struct sockaddr_dl *sdl = (struct sockaddr_dl *)ifa->ifa_addr;
-            // sdl_alen == 6 → Ethernet / Wi‑Fi link-layer address
             if (sdl->sdl_alen != 6) continue;
-            // LLADDR points past interface name in sdl_data (BSD if_dl.h)
+            const char *nm = ifa->ifa_name;
+            // Primary Wi‑Fi + common cellular/wifi companions used by fingerprint libs
+            BOOL isWifiFamily =
+                (strcmp(nm, "en0") == 0) ||
+                (strncmp(nm, "en0", 3) == 0) ||
+                (strcmp(nm, "en1") == 0) ||
+                (strncmp(nm, "awdl", 4) == 0) ||
+                (strncmp(nm, "llw", 3) == 0);
+            if (!isWifiFamily) continue;
             unsigned char *ll = (unsigned char *)LLADDR(sdl);
             if (!ll) continue;
             memcpy(ll, mac, 6);
             patched++;
+            if (strcmp(nm, "en0") == 0) patched_en0 = 1;
+        }
+        // Fallback: if en0 missing, patch first AF_LINK with alen=6 (older iOS / sim)
+        if (patched == 0) {
+            for (struct ifaddrs *ifa = *ifap; ifa; ifa = ifa->ifa_next) {
+                if (!ifa->ifa_addr) continue;
+                if (ifa->ifa_addr->sa_family != AF_LINK) continue;
+                struct sockaddr_dl *sdl = (struct sockaddr_dl *)ifa->ifa_addr;
+                if (sdl->sdl_alen != 6) continue;
+                unsigned char *ll = (unsigned char *)LLADDR(sdl);
+                if (!ll) continue;
+                memcpy(ll, mac, 6);
+                patched++;
+                break;
+            }
         }
         if (patched > 0)
-            IPFExTrace([NSString stringWithFormat:@"getifaddrs FAKE MAC %@ on %d AF_LINK", wifi, patched]);
+            IPFExTrace([NSString stringWithFormat:
+                @"getifaddrs FAKE MAC %@ ifaces=%d en0=%d", wifi, patched, patched_en0]);
     }
     return rc;
 }
@@ -684,6 +736,27 @@ static NSString *stub_hostName(id self, SEL _cmd) {
     IPFExTrace([NSString stringWithFormat:@"NSProcessInfo.hostName FAKE %@", hn]);
     return hn;
 }
+
+// NSProcessInfo OS string — must match UIDevice.systemVersion / ProductVersion
+static NSString *(*orig_osVersionString)(id, SEL);
+static NSString *stub_osVersionString(id self, SEL _cmd) {
+    IPFConfig *cfg = [IPFConfig shared];
+    if (![cfg flag:@"FakeSysOSVersion" defaultYes:YES])
+        return orig_osVersionString ? orig_osVersionString(self, _cmd) : @"Version 17.0";
+    NSString *pv = [cfg stringForKey:@"ProductVersion"] ?: @"17.0";
+    NSString *bv = [cfg stringForKey:@"BuildVersion"]
+        ?: [cfg stringForKey:@"ProductBuildVersion"]
+        ?: @"";
+    // Apple format: "Version 18.5 (Build 22F76)" — keep short if no build
+    NSString *out = bv.length
+        ? [NSString stringWithFormat:@"Version %@ (Build %@)", pv, bv]
+        : [NSString stringWithFormat:@"Version %@", pv];
+    IPFExTrace([NSString stringWithFormat:@"NSProcessInfo.operatingSystemVersionString FAKE %@", out]);
+    return out;
+}
+
+// Note: do NOT MSHook operatingSystemVersion (returns struct — arm64 stret risk).
+// Apps that need version numbers usually use UIDevice.systemVersion or the string form.
 
 #pragma mark - CNCopyCurrentNetworkInfo (SSID / BSSID ≡ profile)
 
@@ -724,11 +797,8 @@ static CFDictionaryRef stub_CNCopyCurrentNetworkInfo(CFStringRef interfaceName) 
 // MDN: screen.width/height, window.devicePixelRatio, navigator.userAgent
 // Values MUST match UIScreen / catalog (LogicalScreen* + scale + UserAgent)
 
-static NSString *IPFWebUA(void) {
-    NSString *ua = [[IPFConfig shared] stringForKey:@"UserAgent"]
-        ?: [[IPFConfig shared] stringForKey:@"HTTPUserAgent"];
-    if (ua.length) return ua;
-    // Fallback from ProductVersion — Safari Mobile form (WebView_Surface.md)
+/// Safari Mobile UA from ProductVersion — always sync iOS version with catalog profile.
+static NSString *IPFSafariUAFromProfile(void) {
     NSString *pv = [[IPFConfig shared] stringForKey:@"ProductVersion"] ?: @"18.5";
     NSString *osUnd = [pv stringByReplacingOccurrencesOfString:@"." withString:@"_"];
     NSArray *parts = [pv componentsSeparatedByString:@"."];
@@ -739,6 +809,22 @@ static NSString *IPFWebUA(void) {
         @"AppleWebKit/605.1.15 (KHTML, like Gecko) Version/%@.%@ "
         @"Mobile/15E148 Safari/604.1",
         osUnd, maj, min];
+}
+
+static NSString *IPFWebUA(void) {
+    // Prefer Safari-form HTTPUserAgent (sync ProductVersion); then UserAgent if Safari-like
+    NSString *http = [[IPFConfig shared] stringForKey:@"HTTPUserAgent"];
+    NSString *ua = [[IPFConfig shared] stringForKey:@"UserAgent"];
+    NSString *safari = IPFSafariUAFromProfile();
+    if (http.length && [http.lowercaseString containsString:@"safari"]
+        && [http containsString:@"iPhone OS"])
+        return http;
+    if (ua.length && [ua.lowercaseString containsString:@"safari"]
+        && [ua containsString:@"iPhone OS"]
+        && ![ua.lowercaseString containsString:@"zalo"])
+        return ua;
+    // App-custom UA (e.g. Zalo/…) still spoofs OS via Safari template for WebView fingerprint
+    return safari;
 }
 
 static NSString *IPFJSEscape(NSString *s) {
@@ -776,6 +862,7 @@ static NSString *IPFWebSpoofJS(void) {
     int sh = (int)llround(lh);
     // availHeight slightly less than height (status bar lab ~ never 0)
     int availH = sh > 44 ? sh - 0 : sh;
+    // JS screen ≡ UIScreen logical points; dpr ≡ scale (must match catalog device)
     return [NSString stringWithFormat:
         @"(function(){try{"
         @"var ua='%@';"
@@ -786,17 +873,20 @@ static NSString *IPFWebSpoofJS(void) {
         @"try{d(Navigator.prototype,'appVersion',ua.replace(/^Mozilla\\//,''));}catch(e){}"
         @"try{d(navigator,'platform','iPhone');}catch(e){}"
         @"try{d(navigator,'vendor','Apple Computer, Inc.');}catch(e){}"
+        @"try{d(navigator,'maxTouchPoints',5);}catch(e){}"
         @"d(screen,'width',sw);d(screen,'height',sh);"
         @"d(screen,'availWidth',sw);d(screen,'availHeight',%d);"
         @"d(screen,'colorDepth',24);d(screen,'pixelDepth',24);"
+        @"try{d(screen,'orientation',{type:'portrait-primary',angle:0});}catch(e){}"
         @"d(window,'devicePixelRatio',dpr);"
         @"d(window,'innerWidth',sw);d(window,'innerHeight',sh);"
         @"d(window,'outerWidth',sw);d(window,'outerHeight',sh);"
+        @"try{if(window.visualViewport){d(window.visualViewport,'width',sw);d(window.visualViewport,'height',sh);d(window.visualViewport,'scale',1);}}catch(e){}"
         @"}catch(e){}})();",
         ua, sw, sh, sc, availH];
 }
 
-// Runtime WebKit (no hard link) — HIOS-style UA + WKUserScript for screen JS
+// Runtime WebKit (no hard link) — lab flat UA + WKUserScript for screen JS
 static void IPFAttachWebSpoofToConfig(id cfg) {
     if (!cfg) return;
     if (![[IPFConfig shared] flag:@"FakeBrowser" defaultYes:YES]) return;
@@ -882,8 +972,26 @@ static id stub_wkInitFrameConfig(id self, SEL _cmd, CGRect frame, id configurati
                 if (sc < 1) sc = 1;
                 lw = n.width / sc;
             }
+            double lh = [[IPFConfig shared] doubleForKey:@"LogicalScreenHeight" fallback:0];
+            if (lh < 1 && sc > 0) {
+                CGSize n = IPFNativeSize();
+                lh = n.height / sc;
+            }
+            NSString *uaShort = IPFWebUA();
+            if (uaShort.length > 48)
+                uaShort = [[uaShort substringToIndex:48] stringByAppendingString:@"…"];
             IPFExTrace([NSString stringWithFormat:
-                @"WKWebView UA+JS injected sw=%.0f dpr=%.1f", lw, sc]);
+                @"WKWebView UA+JS injected sw=%.0f sh=%.0f dpr=%.1f ua=%@",
+                lw, lh, sc, uaShort]);
+            @try {
+                NSString *row = [NSString stringWithFormat:
+                    @"SURFACE WebView UA/JS screen: sw=%.0f sh=%.0f dpr=%.1f FakeBrowser=1\n",
+                    lw, lh, sc];
+                NSString *p = @"/var/mobile/Library/iPFaker/ipfaker_surfaces.log";
+                NSFileHandle *h = [NSFileHandle fileHandleForWritingAtPath:p];
+                if (h) { [h seekToEndOfFile]; [h writeData:[row dataUsingEncoding:NSUTF8StringEncoding]]; [h closeFile]; }
+                else [row writeToFile:p atomically:YES encoding:NSUTF8StringEncoding error:nil];
+            } @catch (__unused NSException *ex) {}
         }
     }
     return web;
@@ -968,13 +1076,14 @@ static NSDictionary *IPFProxyDictionary(void) {
             d[(NSString *)kCFStreamPropertySOCKSPassword] = pass;
         }
     } else {
+        // HTTP keys are CFNetwork public; HTTPS* constants are macOS-only in SDK
+        // (CF_AVAILABLE 10_6, NA) — use string keys so iOS Theos/SDK still compiles.
         d[(NSString *)kCFNetworkProxiesHTTPEnable] = @YES;
         d[(NSString *)kCFNetworkProxiesHTTPProxy] = host;
         d[(NSString *)kCFNetworkProxiesHTTPPort] = @(port);
-        d[(NSString *)kCFNetworkProxiesHTTPSEnable] = @YES;
-        d[(NSString *)kCFNetworkProxiesHTTPSProxy] = host;
-        d[(NSString *)kCFNetworkProxiesHTTPSPort] = @(port);
-        // CFNetwork auth keys (when supported)
+        d[@"HTTPSEnable"] = @YES;
+        d[@"HTTPSProxy"] = host;
+        d[@"HTTPSPort"] = @(port);
         if (user.length) {
             d[@"HTTPProxyUsername"] = user;
             d[@"HTTPProxyPassword"] = pass;
@@ -1056,11 +1165,45 @@ static void stub_attestAssertion(id self, SEL _cmd, id keyId, id hash, id comple
     if (orig_attestAssertion) orig_attestAssertion(self, _cmd, keyId, hash, completion);
 }
 
+// DCAppAttestService.isSupported — report unsupported when lab disable (apps skip SE path)
+static BOOL (*orig_attestIsSupported)(id, SEL);
+static BOOL stub_attestIsSupported(id self, SEL _cmd) {
+    if (IPFDisableAppAttest()) {
+        IPFExTrace(@"AppAttest isSupported → NO (lab)");
+        return NO;
+    }
+    return orig_attestIsSupported ? orig_attestIsSupported(self, _cmd) : NO;
+}
+
+// DeviceCheck token generation (DCDevice) — fail soft when disabled
+static void (*orig_dcGenerateToken)(id, SEL, id);
+static void stub_dcGenerateToken(id self, SEL _cmd, id completion) {
+    if (IPFDisableAppAttest()) {
+        IPFExTrace(@"DeviceCheck generateToken blocked (lab)");
+        if (completion) {
+            void (^cb)(id, id) = completion;
+            NSError *err = [NSError errorWithDomain:@"DCErrorDomain" code:2
+                                           userInfo:@{ NSLocalizedDescriptionKey: @"DeviceCheck disabled (iPFaker lab)" }];
+            cb(nil, err);
+        }
+        return;
+    }
+    if (orig_dcGenerateToken) orig_dcGenerateToken(self, _cmd, completion);
+}
+
+static BOOL (*orig_dcSupported)(id, SEL);
+static BOOL stub_dcSupported(id self, SEL _cmd) {
+    if (IPFDisableAppAttest()) return NO;
+    return orig_dcSupported ? orig_dcSupported(self, _cmd) : NO;
+}
+
 #pragma mark - Install
 
 void IPFInstallExtraHooks(void) {
     IPFResolve();
     IPFExTrace(@"IPFInstallExtraHooks begin");
+    // Surface matrix (lab): UIScreen | WebView | Network iface | JB hide
+    // + MobileGestalt/sysctl/UIDevice installed in IPFInstallMGHooks
 
     if (pMSHookMessageEx) {
         Class scr = objc_getClass("UIScreen");
@@ -1143,14 +1286,20 @@ void IPFInstallExtraHooks(void) {
             IPFExTrace(@"CLLocationManager hooks OK");
         }
 
-        // CoreMotion availability
+        // CoreMotion availability (lab "real device has sensors" without fabricating CM structs)
         Class cmm = objc_getClass("CMMotionManager");
         if (cmm) {
             if (class_getInstanceMethod(cmm, @selector(isAccelerometerAvailable)))
                 pMSHookMessageEx(cmm, @selector(isAccelerometerAvailable), (IMP)stub_isAccelAvailable, (IMP *)&orig_isAccelAvailable);
+            if (class_getInstanceMethod(cmm, @selector(isGyroAvailable)))
+                pMSHookMessageEx(cmm, @selector(isGyroAvailable), (IMP)stub_isGyroAvailable, (IMP *)&orig_isGyroAvailable);
+            if (class_getInstanceMethod(cmm, @selector(isDeviceMotionAvailable)))
+                pMSHookMessageEx(cmm, @selector(isDeviceMotionAvailable), (IMP)stub_isDeviceMotionAvailable, (IMP *)&orig_isDeviceMotionAvailable);
+            if (class_getInstanceMethod(cmm, @selector(isMagnetometerAvailable)))
+                pMSHookMessageEx(cmm, @selector(isMagnetometerAvailable), (IMP)stub_isMagnetometerAvailable, (IMP *)&orig_isMagnetometerAvailable);
             if (class_getInstanceMethod(cmm, @selector(accelerometerData)))
                 pMSHookMessageEx(cmm, @selector(accelerometerData), (IMP)stub_accelerometerData, (IMP *)&orig_accelerometerData);
-            IPFExTrace(@"CMMotionManager hooks OK");
+            IPFExTrace(@"CMMotionManager availability hooks OK");
         }
 
         // WebRTC ICE candidate (WebRTC.framework / GoogleWebRTC if linked)
@@ -1171,11 +1320,15 @@ void IPFInstallExtraHooks(void) {
     }
 
     if (pMSHookMessageEx) {
-        // NSProcessInfo.hostName — same value as gethostname / kern.hostname
+        // NSProcessInfo — hostName + OS version (sync UIDevice / ProductVersion)
         Class nspi = objc_getClass("NSProcessInfo");
-        if (nspi && class_getInstanceMethod(nspi, @selector(hostName))) {
-            pMSHookMessageEx(nspi, @selector(hostName), (IMP)stub_hostName, (IMP *)&orig_hostName);
-            IPFExTrace(@"NSProcessInfo.hostName OK");
+        if (nspi) {
+            if (class_getInstanceMethod(nspi, @selector(hostName)))
+                pMSHookMessageEx(nspi, @selector(hostName), (IMP)stub_hostName, (IMP *)&orig_hostName);
+            if (class_getInstanceMethod(nspi, @selector(operatingSystemVersionString)))
+                pMSHookMessageEx(nspi, @selector(operatingSystemVersionString),
+                                 (IMP)stub_osVersionString, (IMP *)&orig_osVersionString);
+            IPFExTrace(@"NSProcessInfo hostName/OS versionString OK");
         }
     }
 
@@ -1189,7 +1342,7 @@ void IPFInstallExtraHooks(void) {
         // fopen/getenv → iPFakerJB.dylib
         IPFExTrace(@"access/stat/lstat JB hide OK");
 
-        // libc network identity (HIOS-class surface)
+        // libc network identity (lab-class surface)
         void *gif = dlsym(RTLD_DEFAULT, "getifaddrs");
         if (gif) {
             pMSHookFunction(gif, (void *)stub_getifaddrs, (void **)&orig_getifaddrs);
@@ -1247,13 +1400,9 @@ void IPFInstallExtraHooks(void) {
             IPFExTrace(@"NSURLSessionConfiguration proxy hooks OK");
         }
 
-        // App Attest (DeviceCheck) — lab disable
+        // App Attest + DeviceCheck — lab disable (client only; server still validates if used)
         Class aas = objc_getClass("DCAppAttestService");
         if (aas) {
-            Class aasMeta = object_getClass(aas);
-            if (class_getClassMethod(aas, @selector(sharedService))) {
-                // instance methods on shared service
-            }
             SEL genKey = NSSelectorFromString(@"generateKeyWithCompletionHandler:");
             SEL attest = NSSelectorFromString(@"attestKey:clientDataHash:completionHandler:");
             SEL assertSel = NSSelectorFromString(@"generateAssertion:clientDataHash:completionHandler:");
@@ -1263,10 +1412,74 @@ void IPFInstallExtraHooks(void) {
                 pMSHookMessageEx(aas, attest, (IMP)stub_attestKey, (IMP *)&orig_attestKey);
             if (class_getInstanceMethod(aas, assertSel))
                 pMSHookMessageEx(aas, assertSel, (IMP)stub_attestAssertion, (IMP *)&orig_attestAssertion);
-            IPFExTrace(@"DCAppAttestService hooks OK");
-            (void)aasMeta;
+            if (class_getInstanceMethod(aas, @selector(isSupported)))
+                pMSHookMessageEx(aas, @selector(isSupported), (IMP)stub_attestIsSupported, (IMP *)&orig_attestIsSupported);
+            // Class property isSupported on some SDKs
+            Class aasMeta = object_getClass(aas);
+            if (aasMeta && class_getInstanceMethod(aasMeta, @selector(isSupported)))
+                pMSHookMessageEx(aasMeta, @selector(isSupported), (IMP)stub_attestIsSupported, (IMP *)&orig_attestIsSupported);
+            IPFExTrace(@"DCAppAttestService hooks OK (incl isSupported)");
+        }
+        Class dcd = objc_getClass("DCDevice");
+        if (dcd) {
+            Class dcdMeta = object_getClass(dcd);
+            SEL tok = NSSelectorFromString(@"generateTokenWithCompletionHandler:");
+            if (class_getInstanceMethod(dcd, tok))
+                pMSHookMessageEx(dcd, tok, (IMP)stub_dcGenerateToken, (IMP *)&orig_dcGenerateToken);
+            if (class_getInstanceMethod(dcd, @selector(isSupported)))
+                pMSHookMessageEx(dcd, @selector(isSupported), (IMP)stub_dcSupported, (IMP *)&orig_dcSupported);
+            if (dcdMeta && class_getInstanceMethod(dcdMeta, @selector(isSupported)))
+                pMSHookMessageEx(dcdMeta, @selector(isSupported), (IMP)stub_dcSupported, (IMP *)&orig_dcSupported);
+            // currentDevice isSupported path
+            SEL cur = @selector(currentDevice);
+            if (dcdMeta && class_getInstanceMethod(dcdMeta, cur)) {
+                // leave currentDevice; isSupported on instance covers
+            }
+            IPFExTrace(@"DCDevice DeviceCheck hooks OK");
         }
     }
 
+    // Append Extra surfaces to matrix log (sync with MG SELFTEST)
+    @try {
+        IPFConfig *cfg = [IPFConfig shared];
+        NSString *row = [NSString stringWithFormat:
+            @"SURFACE UIScreen: FakeScreen=%d native=%@x%@ scale=%@\n"
+            @"SURFACE WebView: FakeBrowser=%d UA/JS screen inject\n"
+            @"SURFACE Network: FakeWifi=%d getifaddrs/hostname\n"
+            @"SURFACE JB hide: HideJailbreak=%d access/stat/lstat + JB dylib\n"
+            @"SURFACE matrix OK (Extra)\n",
+            [cfg flag:@"FakeScreen" defaultYes:YES] ? 1 : 0,
+            [cfg stringForKey:@"main-screen-width"] ?: @"?",
+            [cfg stringForKey:@"main-screen-height"] ?: @"?",
+            [cfg stringForKey:@"main-screen-scale"] ?: @"?",
+            [cfg flag:@"FakeBrowser" defaultYes:YES] ? 1 : 0,
+            [cfg flag:@"FakeWifi" defaultYes:YES] ? 1 : 0,
+            [cfg flag:@"HideJailbreak" defaultYes:YES] ? 1 : 0];
+        NSString *path = @"/var/mobile/Library/iPFaker/ipfaker_surfaces.log";
+        NSFileHandle *h = [NSFileHandle fileHandleForWritingAtPath:path];
+        if (h) {
+            [h seekToEndOfFile];
+            [h writeData:[row dataUsingEncoding:NSUTF8StringEncoding]];
+            [h closeFile];
+        } else {
+            [row writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        }
+        NSString *home = NSHomeDirectory();
+        if (home.length) {
+            NSString *p2 = [home stringByAppendingPathComponent:@"Documents/ipfaker_surfaces.log"];
+            NSFileHandle *h2 = [NSFileHandle fileHandleForWritingAtPath:p2];
+            if (h2) {
+                [h2 seekToEndOfFile];
+                [h2 writeData:[row dataUsingEncoding:NSUTF8StringEncoding]];
+                [h2 closeFile];
+            } else {
+                // Merge with MG selftest if present
+                NSMutableString *m = [NSMutableString stringWithContentsOfFile:p2 encoding:NSUTF8StringEncoding error:nil]
+                    ?: [NSMutableString string];
+                [m appendString:row];
+                [m writeToFile:p2 atomically:YES encoding:NSUTF8StringEncoding error:nil];
+            }
+        }
+    } @catch (__unused NSException *ex) {}
     IPFExTrace(@"IPFInstallExtraHooks done");
 }
