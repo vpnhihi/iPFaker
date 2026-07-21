@@ -972,33 +972,8 @@ void IPFInstallExtraHooks(void) {
                 pMSHookMessageEx(wkw, @selector(initWithCoder:), (IMP)stub_wkInitCoder, (IMP *)&orig_wkInitCoder);
             IPFExTrace(@"WKWebView UA+JS hooks OK");
         }
-
-        // Compact App Attest soft-disable (full Proxy/WebRTC remain in IPFHooksServer / JB when inject allows)
-        if ([[IPFConfig shared] flag:@"DisableAppAttest" defaultYes:NO]) {
-            Class aas = objc_getClass("DCAppAttestService");
-            if (aas) {
-                SEL genKey = NSSelectorFromString(@"generateKeyWithCompletionHandler:");
-                SEL isSup = @selector(isSupported);
-                // Block generateKey via IMP swap that always errors
-                if (class_getInstanceMethod(aas, genKey)) {
-                    IMP block = imp_implementationWithBlock(^(id self, id completion) {
-                        if (completion) {
-                            void (^cb)(id, id) = completion;
-                            NSError *err = [NSError errorWithDomain:@"DCErrorDomain" code:2
-                                                           userInfo:@{ NSLocalizedDescriptionKey: @"App Attest disabled (iPFaker)" }];
-                            cb(nil, err);
-                        }
-                    });
-                    method_setImplementation(class_getInstanceMethod(aas, genKey), block);
-                }
-                if (class_getInstanceMethod(aas, isSup)) {
-                    IMP block2 = imp_implementationWithBlock(^BOOL(id self) { return NO; });
-                    method_setImplementation(class_getInstanceMethod(aas, isSup), block2);
-                }
-                IPFExTrace(@"DCAppAttest compact disable OK");
-            }
-        }
-        // Full Proxy / WebRTC ICE → IPFHooksServer (JB pack when size allows)
+        // Proxy / AppAttest / WebRTC full hooks: IPFHooksServer.m
+        // (pack into JB only if inject size allows; flags still dual-path config)
     }
 
     // Append Extra surfaces to matrix log (sync with MG SELFTEST)
