@@ -68,8 +68,8 @@
     [social addTarget:self action:@selector(labSocialTapped) forControlEvents:UIControlEventTouchUpInside];
 
     UILabel *hint = [[UILabel alloc] init];
-    hint.text = @"Lab-core: Zalo+Safari+Maps+Weather · Lab social: +FB/IG/TikTok/Shopee/Telegram. "
-                @"CT inject CommCenter. Apply ghi filter. Không inject Settings.";
+    hint.text = @"1 list lab: spoof identity + wipe session (đồng bộ tab Xóa). "
+                @"Lab-core / social preset. CT+WebKit helper auto. Không inject Settings.";
     hint.font = AppTheme.captionFont;
     hint.textColor = AppTheme.textSecondary;
     hint.numberOfLines = 3;

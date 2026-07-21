@@ -10,9 +10,9 @@ NS_ASSUME_NONNULL_BEGIN
 /// Multi-select pools (persisted). At least one device + one iOS after ensureDefaults.
 @property (nonatomic, strong) NSMutableArray<NSString *> *selectedDeviceIds;
 @property (nonatomic, strong) NSMutableArray<NSString *> *selectedIOSList;
-/// Wipe tab multi-select (default: Maps + Weather + Safari).
+/// Wipe targets — **synced 1:1 with spoof** (identity giả + mất session cùng app).
 @property (nonatomic, strong) NSMutableArray<NSString *> *selectedWipeBundleIds;
-/// Multi-app spoof inject targets (default: Zalo). Written to TweakInject filter plists.
+/// Multi-app lab targets: inject filter + session wipe (master list).
 @property (nonatomic, strong) NSMutableArray<NSString *> *selectedSpoofBundleIds;
 
 /// Active pair last applied / current primary (synced with pools).
@@ -119,6 +119,16 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// After «Đặt lại…»: if proxy ON, write proxy keys + random-in-city geo to dual-path config.
 - (NSString *)attachProxyGeoRandomInCityProgress:(nullable void (^)(NSString *step))progress;
+/// Nút «Đồng bộ Location» — geo random-in-city qua proxy (fail-soft).
+- (NSString *)syncLocationNowProgress:(nullable void (^)(NSString *step))progress;
+
+/// Spoof master → wipe mirror (1 list lab).
+- (void)syncLabAppPoolsFromSpoofMaster;
+/// Unified lab apps (spoof = wipe after sync).
+- (NSArray<NSString *> *)labAppTargets;
+/// Method A: wipe/relaunch session apps (bỏ Safari/Maps/Weather/WebKit — vẫn spoof filter).
+- (NSArray<NSString *> *)sessionWipeRelaunchTargets;
++ (BOOL)isSystemLabBundleId:(NSString *)bundleId;
 
 - (void)postDidChange;
 

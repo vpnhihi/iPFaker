@@ -34,7 +34,7 @@
     [self.view addSubview:header];
 
     UILabel *note = [[UILabel alloc] init];
-    note.text = @"Chọn app (✓ nhiều) · Mặc định Bản đồ + Thời tiết + Safari · 1 chạm = kill + wipe container/group + kiểm tra sạch.";
+    note.text = @"Cùng list Multi-app lab: tick app = spoof identity + xóa session. Reset nhanh bỏ wipe Safari/Maps/Weather (vẫn inject).";
     note.font = AppTheme.captionFont;
     note.textColor = AppTheme.textSecondary;
     note.numberOfLines = 0;
@@ -42,7 +42,7 @@
     [self.view addSubview:note];
 
     UIView *card = [AppTheme roundedCardIn:self.view];
-    UIControl *appsRow = [self makeRowTitle:@"Chọn app để xóa dữ liệu (nhiều)"
+    UIControl *appsRow = [self makeRowTitle:@"App lab (spoof + wipe session)"
                                 detailOut:&_appsDetailLabel
                                    action:@selector(pickApps)];
     [card addSubview:appsRow];

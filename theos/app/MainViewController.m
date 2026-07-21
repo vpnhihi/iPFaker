@@ -6,9 +6,11 @@
 #import "ProgressOverlay.h"
 #import "IPFLicenseManager.h"
 #import "AppDelegate.h"
+#import "ProfileBuilder.h"
 
-@interface MainViewController ()
+@interface MainViewController () <UITextFieldDelegate>
 @property (nonatomic, strong) UIScrollView *scroll;
+@property (nonatomic, strong) UIView *contentView;
 @property (nonatomic, strong) UILabel *deviceModelLabel;
 @property (nonatomic, strong) UILabel *deviceVersionLabel;
 @property (nonatomic, strong) UILabel *deviceIdfaLabel;
@@ -18,6 +20,16 @@
 @property (nonatomic, strong) UILabel *ipCountryLabel;
 @property (nonatomic, strong) UILabel *ipTzLabel;
 @property (nonatomic, strong) UILabel *statusFooter;
+
+// Collapsible proxy on home
+@property (nonatomic, strong) UIView *proxyCard;
+@property (nonatomic, strong) UIButton *proxyHeaderBtn;
+@property (nonatomic, strong) UIView *proxyBody;
+@property (nonatomic, strong) UITextField *proxyPasteField;
+@property (nonatomic, strong) UISwitch *proxyEnableSw;
+@property (nonatomic, strong) NSLayoutConstraint *proxyBodyHeight;
+@property (nonatomic, assign) BOOL proxyExpanded;
+@property (nonatomic, assign) BOOL applyingProxyToggle;
 @end
 
 @implementation MainViewController
@@ -27,6 +39,7 @@
     self.view.backgroundColor = AppTheme.bg;
     self.navigationItem.title = @"";
     self.navigationController.navigationBarHidden = YES;
+    self.proxyExpanded = NO;
 
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(refreshUI)
@@ -36,10 +49,12 @@
     self.scroll = [[UIScrollView alloc] init];
     self.scroll.translatesAutoresizingMaskIntoConstraints = NO;
     self.scroll.alwaysBounceVertical = YES;
+    self.scroll.keyboardDismissMode = UIScrollViewKeyboardDismissModeOnDrag;
     [self.view addSubview:self.scroll];
 
     UIView *content = [[UIView alloc] init];
     content.translatesAutoresizingMaskIntoConstraints = NO;
+    self.contentView = content;
     [self.scroll addSubview:content];
 
     [NSLayoutConstraint activateConstraints:@[
@@ -62,7 +77,7 @@
     title.translatesAutoresizingMaskIntoConstraints = NO;
 
     UILabel *ver = [[UILabel alloc] init];
-    ver.text = @"Phiên bản: 2.7.0 · Công cụ lab thiết bị";
+    ver.text = @"Phiên bản: 2.9.0 · Công cụ lab thiết bị";
     ver.font = AppTheme.captionFont;
     ver.textColor = AppTheme.textSecondary;
     ver.translatesAutoresizingMaskIntoConstraints = NO;
@@ -126,14 +141,65 @@
     [card addSubview:cols];
 
     UILabel *contact = [[UILabel alloc] init];
-    contact.text = @"Công cụ lab · không can thiệp Cài đặt hệ thống";
+    contact.text = @"Lab · spoof + wipe session cùng list app · Cài đặt = công tắc giả lập";
     contact.font = AppTheme.captionFont;
     contact.textColor = AppTheme.accent;
     contact.numberOfLines = 2;
     contact.translatesAutoresizingMaskIntoConstraints = NO;
     [card addSubview:contact];
 
-    // Primary wall: full reset (filter+flags+proxy/geo+spoof+wipe+relaunch)
+    // —— Collapsible proxy (home) ——
+    self.proxyCard = [AppTheme roundedCardIn:content];
+    self.proxyCard.backgroundColor = AppTheme.cardAlt;
+    self.proxyCard.clipsToBounds = YES;
+
+    self.proxyHeaderBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+    self.proxyHeaderBtn.contentHorizontalAlignment = UIControlContentHorizontalAlignmentLeft;
+    self.proxyHeaderBtn.titleLabel.font = AppTheme.sectionFont;
+    self.proxyHeaderBtn.tintColor = AppTheme.textPrimary;
+    [self.proxyHeaderBtn setTitleColor:AppTheme.textPrimary forState:UIControlStateNormal];
+    self.proxyHeaderBtn.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.proxyHeaderBtn addTarget:self action:@selector(toggleProxyExpanded) forControlEvents:UIControlEventTouchUpInside];
+    [self.proxyCard addSubview:self.proxyHeaderBtn];
+
+    self.proxyBody = [[UIView alloc] init];
+    self.proxyBody.translatesAutoresizingMaskIntoConstraints = NO;
+    self.proxyBody.clipsToBounds = YES;
+    [self.proxyCard addSubview:self.proxyBody];
+
+    UILabel *enLab = [[UILabel alloc] init];
+    enLab.text = @"Bật proxy trên máy";
+    enLab.font = AppTheme.bodyFont;
+    enLab.textColor = AppTheme.textPrimary;
+    enLab.translatesAutoresizingMaskIntoConstraints = NO;
+
+    self.proxyEnableSw = [[UISwitch alloc] init];
+    self.proxyEnableSw.onTintColor = AppTheme.success;
+    self.proxyEnableSw.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.proxyEnableSw addTarget:self action:@selector(homeProxyEnableChanged:) forControlEvents:UIControlEventValueChanged];
+
+    self.proxyPasteField = [[UITextField alloc] init];
+    self.proxyPasteField.placeholder = @"host:port:user:pass";
+    self.proxyPasteField.font = [UIFont monospacedDigitSystemFontOfSize:14 weight:UIFontWeightRegular];
+    self.proxyPasteField.textColor = AppTheme.textPrimary;
+    self.proxyPasteField.autocapitalizationType = UITextAutocapitalizationTypeNone;
+    self.proxyPasteField.autocorrectionType = UITextAutocorrectionTypeNo;
+    self.proxyPasteField.keyboardType = UIKeyboardTypeURL;
+    self.proxyPasteField.clearButtonMode = UITextFieldViewModeWhileEditing;
+    self.proxyPasteField.borderStyle = UITextBorderStyleRoundedRect;
+    self.proxyPasteField.backgroundColor = [UIColor colorWithWhite:1 alpha:0.08];
+    self.proxyPasteField.delegate = self;
+    self.proxyPasteField.returnKeyType = UIReturnKeyDone;
+    self.proxyPasteField.translatesAutoresizingMaskIntoConstraints = NO;
+
+    [self.proxyBody addSubview:enLab];
+    [self.proxyBody addSubview:self.proxyEnableSw];
+    [self.proxyBody addSubview:self.proxyPasteField];
+
+    self.proxyBodyHeight = [self.proxyBody.heightAnchor constraintEqualToConstant:0];
+    self.proxyBody.hidden = YES;
+
+    // Primary actions
     UIButton *resetDataBtn = [AppTheme primaryButtonWithTitle:@"Đặt lại dữ liệu app"
                                                        target:self
                                                        action:@selector(killTapped)];
@@ -143,7 +209,7 @@
     [content addSubview:resetDataBtn];
 
     UILabel *resetHint = [[UILabel alloc] init];
-    resetHint.text = @"Full wall: filter + spoof + geo theo proxy + xóa data app + mở lại (mất đăng nhập)";
+    resetHint.text = @"Nhanh: filter identity + spoof + geo + xóa session app lab + mở lại (mất đăng nhập)";
     resetHint.font = AppTheme.captionFont;
     resetHint.textColor = AppTheme.textSecondary;
     resetHint.numberOfLines = 2;
@@ -156,25 +222,22 @@
     applyBtn.translatesAutoresizingMaskIntoConstraints = NO;
     [content addSubview:applyBtn];
 
-    // Quick toggles (subset)
-    UIView *toggleCard = [AppTheme roundedCardIn:content];
-    toggleCard.backgroundColor = AppTheme.cardAlt;
-    NSArray *quick = @[
-        @[ @"Giả lập thiết bị", @"FakeDevice" ],
-        @[ @"Giả lập màn hình", @"FakeScreen" ],
-        @[ @"Giả lập mạng", @"FakeNetwork" ],
-        @[ @"Ẩn jailbreak", @"HideJailbreak" ],
-    ];
-    UIStackView *toggles = [[UIStackView alloc] init];
-    toggles.axis = UILayoutConstraintAxisVertical;
-    toggles.spacing = 0;
-    toggles.translatesAutoresizingMaskIntoConstraints = NO;
-    [toggleCard addSubview:toggles];
-    for (NSArray *row in quick) {
-        [toggles addArrangedSubview:[self toggleRowTitle:row[0] key:row[1]]];
-    }
+    UIButton *locBtn = [AppTheme primaryButtonWithTitle:@"Đồng bộ Location"
+                                                 target:self
+                                                 action:@selector(syncLocationTapped)];
+    locBtn.backgroundColor = [UIColor colorWithRed:0.18 green:0.42 blue:0.72 alpha:1.0];
+    locBtn.translatesAutoresizingMaskIntoConstraints = NO;
+    [content addSubview:locBtn];
 
-    // Terms / disclaimer card (replaces old kill button area)
+    UILabel *locHint = [[UILabel alloc] init];
+    locHint.text = @"Geo random trong thành phố proxy → Map / Thời tiết / FakeLocation";
+    locHint.font = AppTheme.captionFont;
+    locHint.textColor = AppTheme.textSecondary;
+    locHint.numberOfLines = 2;
+    locHint.translatesAutoresizingMaskIntoConstraints = NO;
+    [content addSubview:locHint];
+
+    // Terms
     UIView *termsCard = [AppTheme roundedCardIn:content];
     termsCard.backgroundColor = AppTheme.cardAlt;
     UILabel *termsTitle = [[UILabel alloc] init];
@@ -190,9 +253,9 @@
         @"ĐIỀU KHOẢN DỊCH VỤ\n"
         @"Công cụ này chỉ dành cho mục đích nghiên cứu, kiểm thử kỹ thuật trên thiết bị do bạn sở hữu hợp pháp.\n\n"
         @"TRÁCH NHIỆM KHÁCH HÀNG\n"
-        @"Bạn chịu toàn bộ trách nhiệm về cách sử dụng, cấu hình và hậu quả phát sinh từ việc dùng tool. Không chia sẻ cấu hình để lừa đảo, mạo danh, hoặc can thiệp trái phép hệ thống của bên thứ ba.\n\n"
-        @"MIỄN TRỪ TRÁCH NHIỆM / CẢNH BÁO\n"
-        @"Cấm sử dụng tool vào mục đích vi phạm pháp luật Việt Nam (bao gồm nhưng không giới hạn: lừa đảo, gian lận, xâm phạm dữ liệu, mạo danh). Nhà phát triển không chịu trách nhiệm hình sự/dân sự nếu người dùng cố ý sử dụng sai mục đích. Tiếp tục dùng tool đồng nghĩa bạn đã đọc và chấp nhận các điều khoản trên.";
+        @"Bạn chịu toàn bộ trách nhiệm về cách sử dụng, cấu hình và hậu quả phát sinh từ việc dùng tool.\n\n"
+        @"MIỄN TRỪ / CẢNH BÁO\n"
+        @"Cấm sử dụng vào mục đích vi phạm pháp luật. Tiếp tục dùng tool đồng nghĩa bạn đã chấp nhận điều khoản.";
     termsBody.translatesAutoresizingMaskIntoConstraints = NO;
     [termsCard addSubview:termsTitle];
     [termsCard addSubview:termsBody];
@@ -218,7 +281,7 @@
         [logoutBtn.centerYAnchor constraintEqualToAnchor:ver.centerYAnchor],
         [logoutBtn.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-pad],
 
-        [card.topAnchor constraintEqualToAnchor:ver.bottomAnchor constant:18],
+        [card.topAnchor constraintEqualToAnchor:ver.bottomAnchor constant:16],
         [card.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:pad],
         [card.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-pad],
 
@@ -226,12 +289,38 @@
         [cols.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:14],
         [cols.trailingAnchor constraintEqualToAnchor:card.trailingAnchor constant:-14],
 
-        [contact.topAnchor constraintEqualToAnchor:cols.bottomAnchor constant:14],
+        [contact.topAnchor constraintEqualToAnchor:cols.bottomAnchor constant:12],
         [contact.leadingAnchor constraintEqualToAnchor:cols.leadingAnchor],
         [contact.trailingAnchor constraintEqualToAnchor:cols.trailingAnchor],
         [contact.bottomAnchor constraintEqualToAnchor:card.bottomAnchor constant:-14],
 
-        [resetDataBtn.topAnchor constraintEqualToAnchor:card.bottomAnchor constant:14],
+        // Proxy card
+        [self.proxyCard.topAnchor constraintEqualToAnchor:card.bottomAnchor constant:12],
+        [self.proxyCard.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:pad],
+        [self.proxyCard.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-pad],
+
+        [self.proxyHeaderBtn.topAnchor constraintEqualToAnchor:self.proxyCard.topAnchor constant:4],
+        [self.proxyHeaderBtn.leadingAnchor constraintEqualToAnchor:self.proxyCard.leadingAnchor constant:14],
+        [self.proxyHeaderBtn.trailingAnchor constraintEqualToAnchor:self.proxyCard.trailingAnchor constant:-14],
+        [self.proxyHeaderBtn.heightAnchor constraintEqualToConstant:44],
+
+        [self.proxyBody.topAnchor constraintEqualToAnchor:self.proxyHeaderBtn.bottomAnchor],
+        [self.proxyBody.leadingAnchor constraintEqualToAnchor:self.proxyCard.leadingAnchor],
+        [self.proxyBody.trailingAnchor constraintEqualToAnchor:self.proxyCard.trailingAnchor],
+        [self.proxyBody.bottomAnchor constraintEqualToAnchor:self.proxyCard.bottomAnchor constant:-4],
+        self.proxyBodyHeight,
+
+        [enLab.topAnchor constraintEqualToAnchor:self.proxyBody.topAnchor constant:4],
+        [enLab.leadingAnchor constraintEqualToAnchor:self.proxyBody.leadingAnchor constant:14],
+        [self.proxyEnableSw.centerYAnchor constraintEqualToAnchor:enLab.centerYAnchor],
+        [self.proxyEnableSw.trailingAnchor constraintEqualToAnchor:self.proxyBody.trailingAnchor constant:-14],
+
+        [self.proxyPasteField.topAnchor constraintEqualToAnchor:enLab.bottomAnchor constant:10],
+        [self.proxyPasteField.leadingAnchor constraintEqualToAnchor:self.proxyBody.leadingAnchor constant:14],
+        [self.proxyPasteField.trailingAnchor constraintEqualToAnchor:self.proxyBody.trailingAnchor constant:-14],
+        [self.proxyPasteField.heightAnchor constraintEqualToConstant:36],
+
+        [resetDataBtn.topAnchor constraintEqualToAnchor:self.proxyCard.bottomAnchor constant:14],
         [resetDataBtn.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:pad],
         [resetDataBtn.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-pad],
         [resetDataBtn.heightAnchor constraintEqualToConstant:56],
@@ -245,16 +334,16 @@
         [applyBtn.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-pad],
         [applyBtn.heightAnchor constraintEqualToConstant:48],
 
-        [toggleCard.topAnchor constraintEqualToAnchor:applyBtn.bottomAnchor constant:16],
-        [toggleCard.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:pad],
-        [toggleCard.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-pad],
+        [locBtn.topAnchor constraintEqualToAnchor:applyBtn.bottomAnchor constant:10],
+        [locBtn.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:pad],
+        [locBtn.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-pad],
+        [locBtn.heightAnchor constraintEqualToConstant:48],
 
-        [toggles.topAnchor constraintEqualToAnchor:toggleCard.topAnchor constant:4],
-        [toggles.leadingAnchor constraintEqualToAnchor:toggleCard.leadingAnchor constant:14],
-        [toggles.trailingAnchor constraintEqualToAnchor:toggleCard.trailingAnchor constant:-14],
-        [toggles.bottomAnchor constraintEqualToAnchor:toggleCard.bottomAnchor constant:-4],
+        [locHint.topAnchor constraintEqualToAnchor:locBtn.bottomAnchor constant:6],
+        [locHint.leadingAnchor constraintEqualToAnchor:locBtn.leadingAnchor],
+        [locHint.trailingAnchor constraintEqualToAnchor:locBtn.trailingAnchor],
 
-        [termsCard.topAnchor constraintEqualToAnchor:toggleCard.bottomAnchor constant:14],
+        [termsCard.topAnchor constraintEqualToAnchor:locHint.bottomAnchor constant:14],
         [termsCard.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:pad],
         [termsCard.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-pad],
 
@@ -272,12 +361,14 @@
         [self.statusFooter.bottomAnchor constraintEqualToAnchor:content.bottomAnchor constant:-28],
     ]];
 
+    [self updateProxyHeaderTitle];
     [self refreshUI];
 }
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     self.navigationController.navigationBarHidden = YES;
+    [[AppState shared] loadProxyFromDualPathConfig];
     [self refreshUI];
 }
 
@@ -299,40 +390,101 @@
     return l;
 }
 
-- (UIView *)toggleRowTitle:(NSString *)title key:(NSString *)key {
-    UIView *row = [[UIView alloc] init];
-    row.translatesAutoresizingMaskIntoConstraints = NO;
+#pragma mark - Proxy collapse
 
-    UILabel *lab = [[UILabel alloc] init];
-    lab.text = title;
-    lab.font = AppTheme.bodyFont;
-    lab.textColor = AppTheme.textPrimary;
-    lab.translatesAutoresizingMaskIntoConstraints = NO;
-
-    UISwitch *sw = [[UISwitch alloc] init];
-    sw.onTintColor = AppTheme.success;
-    sw.on = [AppState.shared toggleForKey:key defaultOn:YES];
-    sw.accessibilityIdentifier = key;
-    [sw addTarget:self action:@selector(toggleChanged:) forControlEvents:UIControlEventValueChanged];
-    sw.translatesAutoresizingMaskIntoConstraints = NO;
-
-    [row addSubview:lab];
-    [row addSubview:sw];
-    [NSLayoutConstraint activateConstraints:@[
-        [row.heightAnchor constraintEqualToConstant:48],
-        [lab.leadingAnchor constraintEqualToAnchor:row.leadingAnchor],
-        [lab.centerYAnchor constraintEqualToAnchor:row.centerYAnchor],
-        [sw.trailingAnchor constraintEqualToAnchor:row.trailingAnchor],
-        [sw.centerYAnchor constraintEqualToAnchor:row.centerYAnchor],
-        [lab.trailingAnchor constraintLessThanOrEqualToAnchor:sw.leadingAnchor constant:-8],
-    ]];
-    return row;
+- (NSString *)currentProxyPasteLine {
+    AppState *st = AppState.shared;
+    NSString *host = [st proxyHost] ?: @"";
+    NSInteger port = [st proxyPort];
+    if (!host.length || port <= 0) return @"";
+    NSString *user = [st proxyUsername] ?: @"";
+    NSString *pass = [st proxyPassword] ?: @"";
+    if (user.length || pass.length)
+        return [NSString stringWithFormat:@"%@:%ld:%@:%@", host, (long)port, user, pass];
+    return [NSString stringWithFormat:@"%@:%ld", host, (long)port];
 }
 
-- (void)toggleChanged:(UISwitch *)sw {
-    NSString *key = sw.accessibilityIdentifier;
-    if (key.length) [AppState.shared setToggle:sw.on forKey:key];
+- (void)updateProxyHeaderTitle {
+    AppState *st = AppState.shared;
+    NSString *chev = self.proxyExpanded ? @"▼" : @"▶";
+    NSString *state = [st proxyEnabled] && [st proxyHost].length
+        ? [NSString stringWithFormat:@"ON · %@:%ld", [st proxyHost], (long)[st proxyPort]]
+        : @"Tắt";
+    [self.proxyHeaderBtn setTitle:[NSString stringWithFormat:@"%@  Proxy  ·  %@", chev, state]
+                         forState:UIControlStateNormal];
 }
+
+- (void)toggleProxyExpanded {
+    self.proxyExpanded = !self.proxyExpanded;
+    self.proxyBodyHeight.constant = self.proxyExpanded ? 96 : 0;
+    self.proxyBody.hidden = !self.proxyExpanded;
+    [self updateProxyHeaderTitle];
+    [UIView animateWithDuration:0.22 animations:^{
+        [self.view layoutIfNeeded];
+    }];
+}
+
+- (void)homeProxyEnableChanged:(UISwitch *)sw {
+    if (self.applyingProxyToggle) return;
+    [self.view endEditing:YES];
+    self.applyingProxyToggle = YES;
+
+    NSString *err = nil;
+    NSString *line = self.proxyPasteField.text ?: @"";
+    if (sw.on) {
+        if (!line.length || ![[AppState shared] applyProxyPasteLine:line error:&err]) {
+            self.applyingProxyToggle = NO;
+            sw.on = NO;
+            [self showAlertTitle:@"Proxy" message:err ?: @"Dán host:port:user:pass trước khi bật"];
+            return;
+        }
+        [[AppState shared] setProxyEnabled:YES];
+    } else {
+        if (line.length)
+            [[AppState shared] applyProxyPasteLine:line error:nil];
+        [[AppState shared] setProxyEnabled:NO];
+    }
+    [[AppState shared] saveProxyAppAttest];
+
+    UIView *host = self.tabBarController.view ?: self.navigationController.view ?: self.view;
+    ProgressOverlay *ov = [ProgressOverlay showOn:host title:sw.on ? @"Bật proxy…" : @"Tắt proxy…"];
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        NSString *msg = nil;
+        if (sw.on) {
+            msg = [[AppState shared] applyProxyAppAttestToConfigProgress:^(NSString *s) {
+                [ov appendStep:s];
+            }];
+        } else {
+            NSDictionary *keys = [[AppState shared] proxyAppAttestFlatKeys];
+            msg = [ProfileBuilder mergeKeysIntoConfig:keys progress:^(NSString *s) {
+                [ov appendStep:s];
+            }];
+        }
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.applyingProxyToggle = NO;
+            [self updateProxyHeaderTitle];
+            [self refreshUI];
+            [ov finishWithTitle:sw.on ? @"Proxy ON" : @"Proxy OFF" detail:msg];
+            [ov dismissAfter:1.0 completion:nil];
+        });
+    });
+}
+
+- (BOOL)textFieldShouldReturn:(UITextField *)textField {
+    [textField resignFirstResponder];
+    if (textField == self.proxyPasteField && textField.text.length) {
+        NSString *err = nil;
+        [[AppState shared] applyProxyPasteLine:textField.text error:&err];
+        if (err.length) [self showAlertTitle:@"Proxy" message:err];
+        else {
+            self.proxyPasteField.text = [self currentProxyPasteLine];
+            [self updateProxyHeaderTitle];
+        }
+    }
+    return YES;
+}
+
+#pragma mark - UI data
 
 - (void)refreshUI {
     AppState *st = AppState.shared;
@@ -355,18 +507,27 @@
     self.ipCountryLabel.text = [NSString stringWithFormat:@"Vùng: %@", flat[@"RegionCode"] ?: flat[@"PartNumberRegion"] ?: @"VN"];
     self.ipTzLabel.text = [NSString stringWithFormat:@"Chip: %@", flat[@"ChipName"] ?: dev[@"chip"] ?: @"—"];
 
+    if (!self.applyingProxyToggle) {
+        self.proxyPasteField.text = [self currentProxyPasteLine];
+        self.proxyEnableSw.on = [st proxyEnabled];
+    }
+    [self updateProxyHeaderTitle];
+
     NSUInteger nDev = Catalog.shared.devices.count;
     NSUInteger nIOS = Catalog.shared.iosReleases.count;
     NSString *lic = [IPFLicenseManager.shared statusSummary];
-    self.statusFooter.text = [NSString stringWithFormat:@"%@\n%@\nDanh mục: %lu máy · %lu iOS",
+    self.statusFooter.text = [NSString stringWithFormat:@"%@\n%@\nDanh mục: %lu máy · %lu iOS · Lab apps: %lu",
                               st.statusText ?: @"",
                               lic ?: @"",
-                              (unsigned long)nDev, (unsigned long)nIOS];
+                              (unsigned long)nDev, (unsigned long)nIOS,
+                              (unsigned long)st.selectedSpoofBundleIds.count];
 }
+
+#pragma mark - Actions
 
 - (void)logoutTapped {
     UIAlertController *ac = [UIAlertController alertControllerWithTitle:@"Đăng xuất key"
-                                                                message:@"Xóa phiên key trên máy này? (Sheet: đặt E=Out nếu muốn vô hiệu hẳn)"
+                                                                message:@"Xóa phiên key trên máy này?"
                                                          preferredStyle:UIAlertControllerStyleAlert];
     [ac addAction:[UIAlertAction actionWithTitle:@"Hủy" style:UIAlertActionStyleCancel handler:nil]];
     [ac addAction:[UIAlertAction actionWithTitle:@"Đăng xuất" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *a) {
@@ -380,9 +541,8 @@
 }
 
 - (void)applyTapped {
-    // 1 chạm: backup session → spoof mới → restore → kill → relaunch (giữ đăng nhập)
     UIView *host = self.tabBarController.view ?: self.navigationController.view ?: self.view;
-    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"1 chạm: Đặt lại + Lưu + Mở app…"];
+    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Đặt lại + Lưu…"];
     self.view.userInteractionEnabled = NO;
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         NSString *msg = [AppState.shared saveDataThenResetProgress:^(NSString *step) {
@@ -390,20 +550,19 @@
         }];
         dispatch_async(dispatch_get_main_queue(), ^{
             self.view.userInteractionEnabled = YES;
-            [ov finishWithTitle:@"Hoàn tất (1 chạm)" detail:msg];
+            [ov finishWithTitle:@"Hoàn tất" detail:msg];
             [self refreshUI];
-            [ov dismissAfter:1.8 completion:^{
-                [self showAlertTitle:@"Đặt lại + Lưu dữ liệu (1 chạm)" message:msg];
+            [ov dismissAfter:1.4 completion:^{
+                [self showAlertTitle:@"Đặt lại + Lưu dữ liệu" message:msg];
             }];
         });
     });
 }
 
 - (void)killTapped {
-    // Full wall: filter + flags + proxy/geo + spoof + wipe + relaunch (mất đăng nhập)
     UIAlertController *ac = [UIAlertController
         alertControllerWithTitle:@"Đặt lại dữ liệu app?"
-                         message:@"Spoof máy mới + geo theo proxy + xóa sạch data app đã chọn + mở lại.\nMất đăng nhập.\nBật proxy (tab IP/Proxy) nếu cần IP ảo."
+                         message:@"Spoof mới + geo (nếu proxy) + xóa session app lab + mở lại.\nMất đăng nhập."
                   preferredStyle:UIAlertControllerStyleAlert];
     [ac addAction:[UIAlertAction actionWithTitle:@"Hủy" style:UIAlertActionStyleCancel handler:nil]];
     __weak typeof(self) weakSelf = self;
@@ -425,8 +584,32 @@
             self.view.userInteractionEnabled = YES;
             [ov finishWithTitle:@"Hoàn tất" detail:msg];
             [self refreshUI];
-            [ov dismissAfter:1.6 completion:^{
+            [ov dismissAfter:1.2 completion:^{
                 [self showAlertTitle:@"Đặt lại dữ liệu app" message:msg];
+            }];
+        });
+    });
+}
+
+- (void)syncLocationTapped {
+    [self.view endEditing:YES];
+    if (self.proxyPasteField.text.length)
+        [[AppState shared] applyProxyPasteLine:self.proxyPasteField.text error:nil];
+    UIView *host = self.tabBarController.view ?: self.navigationController.view ?: self.view;
+    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Đồng bộ Location…"];
+    self.view.userInteractionEnabled = NO;
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        NSString *msg = [AppState.shared syncLocationNowProgress:^(NSString *step) {
+            [ov appendStep:step];
+        }];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.view.userInteractionEnabled = YES;
+            BOOL ok = [msg containsString:@"Đã đồng bộ"] || [msg containsString:@"random"] || [msg containsString:@"Latitude"]
+                || (![msg hasPrefix:@"Bật proxy"] && ![msg containsString:@"FAIL"]);
+            [ov finishWithTitle:ok ? @"Location OK" : @"Location" detail:msg];
+            [self refreshUI];
+            [ov dismissAfter:1.2 completion:^{
+                [self showAlertTitle:@"Đồng bộ Location" message:msg];
             }];
         });
     });
@@ -448,17 +631,6 @@
                                                         preferredStyle:UIAlertControllerStyleAlert];
     [a addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
     [self presentViewController:a animated:YES completion:nil];
-}
-
-- (void)toast:(NSString *)msg {
-    UIAlertController *a = [UIAlertController alertControllerWithTitle:nil
-                                                               message:msg
-                                                        preferredStyle:UIAlertControllerStyleAlert];
-    [self presentViewController:a animated:YES completion:^{
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            [a dismissViewControllerAnimated:YES completion:nil];
-        });
-    }];
 }
 
 - (void)dealloc {

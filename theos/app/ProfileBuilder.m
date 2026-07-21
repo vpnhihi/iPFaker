@@ -840,8 +840,8 @@
         if (!opened) opened = [self openBundleIdViaWorkspace:bid];
         if (opened) [ok addObject:bid];
         else [fail addObject:bid];
-        // Brief gap so SpringBoard can schedule next open
-        usleep(350 * 1000);
+        // Brief gap so SpringBoard can schedule next open (Method A: shorter)
+        usleep(160 * 1000);
     }
     NSMutableString *msg = [NSMutableString stringWithFormat:
                             @"Relaunch %lu app: OK=%lu",

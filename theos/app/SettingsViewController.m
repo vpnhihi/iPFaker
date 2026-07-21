@@ -70,9 +70,11 @@
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
     if (section == 0)
-        return @"Mỗi công tắc bật/tắt hook sau «Đặt lại + Lưu dữ liệu». Định dạng: UUID v4, IMEI Luhn, ITU E.212, ISO/BCP-47, múi giờ IANA.";
+        return @"Công tắc giả lập (trang chủ đã gọn). Bật/tắt hook khi «Đặt lại…». Giả lập thiết bị / màn hình / mạng / Ẩn JB nằm ở đây.";
     if (section == 1)
-        return @"Ngôn ngữ vi-VN · Múi giờ Asia/Ho_Chi_Minh · GPS TP.HCM · WebRTC IP nội bộ. Giả lập ngày giờ mặc định TẮT (tránh lệch giờ TLS).";
+        return @"Ngôn ngữ · múi giờ · GPS · WebRTC. Giả lập ngày giờ mặc định TẮT (tránh lệch giờ TLS).";
+    if (section == (NSInteger)self.sections.count)
+        return @"Proxy nhanh: trang chủ (ô dán + bật/tắt). Tại đây: Type / Test / AppAttest / geo chi tiết.";
     return nil;
 }
 
@@ -110,12 +112,12 @@
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
         cell.accessoryView = nil;
         if (indexPath.row == 0) {
-            cell.textLabel.text = @"Proxy settings · AppAttest";
+            cell.textLabel.text = @"Proxy / AppAttest / Geo (chi tiết)";
             NSString *host = [AppState.shared proxyHost];
             BOOL en = [AppState.shared proxyEnabled];
             cell.detailTextLabel.text = en && host.length
                 ? [NSString stringWithFormat:@"ON · %@:%ld · %@", host, (long)[AppState.shared proxyPort], [AppState.shared proxyType]]
-                : ([AppState.shared disableAppAttest] ? @"Proxy off · AppAttest disabled" : @"Tắt · chạm để cấu hình");
+                : @"Trang chủ: dán proxy · đây: Type/Test/AA/geo";
         } else {
             cell.textLabel.text = @"Verify expected vs live MG";
             cell.detailTextLabel.text = @"So config dual-path với stub MG / CT filter";
