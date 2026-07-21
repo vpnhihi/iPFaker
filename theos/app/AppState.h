@@ -71,6 +71,10 @@ NS_ASSUME_NONNULL_BEGIN
 /// 1 chạm «Đặt lại + Lưu»: backup session → random spoof → soft wipe+restore → geo? → kill+relaunch (giữ đăng nhập).
 - (NSString *)saveDataThenResetProgress:(nullable void (^)(NSString *step))progress;
 
+/// Thương mại 1 nút «Vượt Zalo»: Lab-core + flags server-mitigation + proxy/geo + spoof + wipe full + relaunch.
+/// Mất đăng nhập — identity sạch; không bypass Graph/OTP server (cần proxy sạch + hành vi).
+- (NSString *)vuotZaloOneTapProgress:(nullable void (^)(NSString *step))progress;
+
 - (void)killZalo;
 - (NSString *)wipeZaloLab;
 /// Wipe all selected Wipe-tab apps with progress.

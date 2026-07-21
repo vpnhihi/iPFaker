@@ -1,8 +1,9 @@
 // Extra spoof surface for Zalo — gated by config Fake* flags:
 //  FakeScreen / FakeRealScreen, FakeHardware (disk), HideJailbreak (access/stat/lstat + canOpenURL),
 //  FakeBrowser (UA), FakeLocale (BCP-47 + IANA TZ), FakeDateTime,
-//  FakeLocation (WGS84), FakeSensor, FakeWebRTC / DisableWebRTC,
+//  FakeLocation (WGS84), FakeSensor,
 //  FakeWifi: getifaddrs MAC; FakeDevice/FakeNetwork: gethostname + NSProcessInfo.hostName.
+// Proxy / AppAttest / WebRTC ICE → IPFHooksServer (packed in CT) — keeps MG AMFI-safe.
 // Expanded fopen/getenv/fileExists → iPFakerJB.dylib (split stack / AMFI size).
 // Complements IPFHooksMG / CT. Keep defensive — never crash Zalo.
 //
@@ -30,7 +31,7 @@
 #import <math.h>
 #import <errno.h>
 #import <ctype.h>
-#import <CFNetwork/CFNetwork.h>
+// CFNetwork proxy hooks live in IPFHooksServer.m (CT)
 
 typedef void (*MSHookFunction_t)(void *symbol, void *replace, void **result);
 typedef void (*MSHookMessageEx_t)(Class _class, SEL sel, IMP imp, IMP *result);
@@ -1016,188 +1017,7 @@ static id stub_wkInitCoder(id self, SEL _cmd, id coder) {
     return web;
 }
 
-#pragma mark - WebRTC local IP rewrite (FakeWebRTC)
-
-static NSString *(*orig_description_rtc)(id, SEL);
-// Hook SDP-ish strings is fragile. Instead rewrite common local-IP patterns in NSString if FakeWebRTC.
-// Safer: intercept RTCIceCandidate candidate property if class exists.
-
-static NSString *(*orig_iceCandidate)(id, SEL);
-static NSString *stub_iceCandidate(id self, SEL _cmd) {
-    NSString *real = orig_iceCandidate ? orig_iceCandidate(self, _cmd) : nil;
-    if (!real) return real;
-    if ([[IPFConfig shared] flag:@"DisableWebRTC" defaultYes:NO]) {
-        IPFExTrace(@"WebRTC candidate blocked (DisableWebRTC)");
-        return @"";
-    }
-    if (![[IPFConfig shared] flag:@"FakeWebRTC" defaultYes:NO]) return real;
-    // Replace host candidates' IPv4 with RFC1918 lab IP (not a public leak)
-    NSString *fakeIP = [[IPFConfig shared] stringForKey:@"WebRTCLocalIP"] ?: @"10.0.0.2";
-    // candidate:... <ip> ...
-    NSError *err = nil;
-    NSRegularExpression *re = [NSRegularExpression
-        regularExpressionWithPattern:@"\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b"
-                             options:0 error:&err];
-    if (!re) return real;
-    NSString *out = [re stringByReplacingMatchesInString:real
-                                                 options:0
-                                                   range:NSMakeRange(0, real.length)
-                                            withTemplate:fakeIP];
-    if (![out isEqualToString:real])
-        IPFExTrace([NSString stringWithFormat:@"WebRTC candidate IP → %@", fakeIP]);
-    return out;
-}
-
-#pragma mark - Proxy (EnableProxy + ProxyHost/Port/Type)
-
-static BOOL IPFProxyOn(void) {
-    return [[IPFConfig shared] flag:@"EnableProxy" defaultYes:NO]
-        || [[IPFConfig shared] flag:@"FakeProxy" defaultYes:NO];
-}
-
-static NSDictionary *IPFProxyDictionary(void) {
-    if (!IPFProxyOn()) return nil;
-    NSString *host = [[IPFConfig shared] stringForKey:@"ProxyHost"];
-    if (!host.length) return nil;
-    double portD = [[IPFConfig shared] doubleForKey:@"ProxyPort" fallback:0];
-    NSInteger port = (NSInteger)portD;
-    if (port <= 0) {
-        NSString *ps = [[IPFConfig shared] stringForKey:@"ProxyPort"];
-        port = ps.integerValue;
-    }
-    if (port <= 0 || port > 65535) return nil;
-    NSString *type = ([[IPFConfig shared] stringForKey:@"ProxyType"] ?: @"HTTP").uppercaseString;
-    NSString *user = [[IPFConfig shared] stringForKey:@"ProxyUsername"] ?: @"";
-    NSString *pass = [[IPFConfig shared] stringForKey:@"ProxyPassword"] ?: @"";
-    NSMutableDictionary *d = [NSMutableDictionary dictionary];
-    if ([type containsString:@"SOCKS"]) {
-        d[(NSString *)kCFStreamPropertySOCKSProxyHost] = host;
-        d[(NSString *)kCFStreamPropertySOCKSProxyPort] = @(port);
-        if (user.length) {
-            d[(NSString *)kCFStreamPropertySOCKSUser] = user;
-            d[(NSString *)kCFStreamPropertySOCKSPassword] = pass;
-        }
-    } else {
-        // HTTP keys are CFNetwork public; HTTPS* constants are macOS-only in SDK
-        // (CF_AVAILABLE 10_6, NA) — use string keys so iOS Theos/SDK still compiles.
-        d[(NSString *)kCFNetworkProxiesHTTPEnable] = @YES;
-        d[(NSString *)kCFNetworkProxiesHTTPProxy] = host;
-        d[(NSString *)kCFNetworkProxiesHTTPPort] = @(port);
-        d[@"HTTPSEnable"] = @YES;
-        d[@"HTTPSProxy"] = host;
-        d[@"HTTPSPort"] = @(port);
-        if (user.length) {
-            d[@"HTTPProxyUsername"] = user;
-            d[@"HTTPProxyPassword"] = pass;
-            d[@"HTTPSProxyUsername"] = user;
-            d[@"HTTPSProxyPassword"] = pass;
-        }
-    }
-    return d;
-}
-
-static NSDictionary *(*orig_connectionProxyDictionary)(id, SEL);
-static NSDictionary *stub_connectionProxyDictionary(id self, SEL _cmd) {
-    NSDictionary *forced = IPFProxyDictionary();
-    if (forced) return forced;
-    return orig_connectionProxyDictionary ? orig_connectionProxyDictionary(self, _cmd) : nil;
-}
-
-static void (*orig_setConnectionProxyDictionary)(id, SEL, NSDictionary *);
-static void stub_setConnectionProxyDictionary(id self, SEL _cmd, NSDictionary *dict) {
-    NSDictionary *forced = IPFProxyDictionary();
-    if (forced) {
-        if (orig_setConnectionProxyDictionary)
-            orig_setConnectionProxyDictionary(self, _cmd, forced);
-        return;
-    }
-    if (orig_setConnectionProxyDictionary)
-        orig_setConnectionProxyDictionary(self, _cmd, dict);
-}
-
-#pragma mark - App Attest disable (DCAppAttestService)
-
-static BOOL IPFDisableAppAttest(void) {
-    return [[IPFConfig shared] flag:@"DisableAppAttest" defaultYes:NO];
-}
-
-static void (*orig_attestGenerateKey)(id, SEL, id);
-static void stub_attestGenerateKey(id self, SEL _cmd, id completion) {
-    if (IPFDisableAppAttest()) {
-        IPFExTrace(@"AppAttest generateKey blocked");
-        if (completion) {
-            // completion(NSString *keyId, NSError *error)
-            void (^cb)(id, id) = completion;
-            NSError *err = [NSError errorWithDomain:@"DCErrorDomain" code:2
-                                           userInfo:@{ NSLocalizedDescriptionKey: @"App Attest disabled (iPFaker lab)" }];
-            cb(nil, err);
-        }
-        return;
-    }
-    if (orig_attestGenerateKey) orig_attestGenerateKey(self, _cmd, completion);
-}
-
-static void (*orig_attestKey)(id, SEL, id, id, id);
-static void stub_attestKey(id self, SEL _cmd, id keyId, id hash, id completion) {
-    if (IPFDisableAppAttest()) {
-        IPFExTrace(@"AppAttest attestKey blocked");
-        if (completion) {
-            void (^cb)(id, id) = completion;
-            NSError *err = [NSError errorWithDomain:@"DCErrorDomain" code:2
-                                           userInfo:@{ NSLocalizedDescriptionKey: @"App Attest disabled (iPFaker lab)" }];
-            cb(nil, err);
-        }
-        return;
-    }
-    if (orig_attestKey) orig_attestKey(self, _cmd, keyId, hash, completion);
-}
-
-static void (*orig_attestAssertion)(id, SEL, id, id, id);
-static void stub_attestAssertion(id self, SEL _cmd, id keyId, id hash, id completion) {
-    if (IPFDisableAppAttest()) {
-        IPFExTrace(@"AppAttest generateAssertion blocked");
-        if (completion) {
-            void (^cb)(id, id) = completion;
-            NSError *err = [NSError errorWithDomain:@"DCErrorDomain" code:2
-                                           userInfo:@{ NSLocalizedDescriptionKey: @"App Attest disabled (iPFaker lab)" }];
-            cb(nil, err);
-        }
-        return;
-    }
-    if (orig_attestAssertion) orig_attestAssertion(self, _cmd, keyId, hash, completion);
-}
-
-// DCAppAttestService.isSupported — report unsupported when lab disable (apps skip SE path)
-static BOOL (*orig_attestIsSupported)(id, SEL);
-static BOOL stub_attestIsSupported(id self, SEL _cmd) {
-    if (IPFDisableAppAttest()) {
-        IPFExTrace(@"AppAttest isSupported → NO (lab)");
-        return NO;
-    }
-    return orig_attestIsSupported ? orig_attestIsSupported(self, _cmd) : NO;
-}
-
-// DeviceCheck token generation (DCDevice) — fail soft when disabled
-static void (*orig_dcGenerateToken)(id, SEL, id);
-static void stub_dcGenerateToken(id self, SEL _cmd, id completion) {
-    if (IPFDisableAppAttest()) {
-        IPFExTrace(@"DeviceCheck generateToken blocked (lab)");
-        if (completion) {
-            void (^cb)(id, id) = completion;
-            NSError *err = [NSError errorWithDomain:@"DCErrorDomain" code:2
-                                           userInfo:@{ NSLocalizedDescriptionKey: @"DeviceCheck disabled (iPFaker lab)" }];
-            cb(nil, err);
-        }
-        return;
-    }
-    if (orig_dcGenerateToken) orig_dcGenerateToken(self, _cmd, completion);
-}
-
-static BOOL (*orig_dcSupported)(id, SEL);
-static BOOL stub_dcSupported(id self, SEL _cmd) {
-    if (IPFDisableAppAttest()) return NO;
-    return orig_dcSupported ? orig_dcSupported(self, _cmd) : NO;
-}
+// WebRTC / Proxy / AppAttest implementations → IPFHooksServer.m (CT pack, AMFI)
 
 #pragma mark - Install
 
@@ -1303,22 +1123,7 @@ void IPFInstallExtraHooks(void) {
                 pMSHookMessageEx(cmm, @selector(accelerometerData), (IMP)stub_accelerometerData, (IMP *)&orig_accelerometerData);
             IPFExTrace(@"CMMotionManager availability hooks OK");
         }
-
-        // WebRTC ICE candidate (WebRTC.framework / GoogleWebRTC if linked)
-        const char *rtcClasses[] = {
-            "RTCIceCandidate", "RTC_OBJC_TYPE(RTCIceCandidate)", NULL
-        };
-        for (int i = 0; rtcClasses[i]; i++) {
-            Class rc = objc_getClass(rtcClasses[i]);
-            if (!rc) continue;
-            if (class_getInstanceMethod(rc, @selector(sdp)))
-                pMSHookMessageEx(rc, @selector(sdp), (IMP)stub_iceCandidate, (IMP *)&orig_iceCandidate);
-            SEL cand = NSSelectorFromString(@"candidate"); // some versions
-            if (class_getInstanceMethod(rc, cand))
-                pMSHookMessageEx(rc, cand, (IMP)stub_iceCandidate, (IMP *)&orig_iceCandidate);
-            IPFExTrace([NSString stringWithFormat:@"RTCIceCandidate hook on %s", rtcClasses[i]]);
-            break;
-        }
+        // WebRTC ICE → IPFInstallServerHooks (CT)
     }
 
     if (pMSHookMessageEx) {
@@ -1388,57 +1193,7 @@ void IPFInstallExtraHooks(void) {
                 pMSHookMessageEx(wkw, @selector(initWithCoder:), (IMP)stub_wkInitCoder, (IMP *)&orig_wkInitCoder);
             IPFExTrace(@"WKWebView UA+JS hooks OK");
         }
-
-        // Proxy: NSURLSessionConfiguration.connectionProxyDictionary
-        Class usc = objc_getClass("NSURLSessionConfiguration");
-        if (usc) {
-            if (class_getInstanceMethod(usc, @selector(connectionProxyDictionary)))
-                pMSHookMessageEx(usc, @selector(connectionProxyDictionary),
-                                 (IMP)stub_connectionProxyDictionary, (IMP *)&orig_connectionProxyDictionary);
-            if (class_getInstanceMethod(usc, @selector(setConnectionProxyDictionary:)))
-                pMSHookMessageEx(usc, @selector(setConnectionProxyDictionary:),
-                                 (IMP)stub_setConnectionProxyDictionary, (IMP *)&orig_setConnectionProxyDictionary);
-            // Default/ephemeral sessions pick up proxy via getter
-            IPFExTrace(@"NSURLSessionConfiguration proxy hooks OK");
-        }
-
-        // App Attest + DeviceCheck — lab disable (client only; server still validates if used)
-        Class aas = objc_getClass("DCAppAttestService");
-        if (aas) {
-            SEL genKey = NSSelectorFromString(@"generateKeyWithCompletionHandler:");
-            SEL attest = NSSelectorFromString(@"attestKey:clientDataHash:completionHandler:");
-            SEL assertSel = NSSelectorFromString(@"generateAssertion:clientDataHash:completionHandler:");
-            if (class_getInstanceMethod(aas, genKey))
-                pMSHookMessageEx(aas, genKey, (IMP)stub_attestGenerateKey, (IMP *)&orig_attestGenerateKey);
-            if (class_getInstanceMethod(aas, attest))
-                pMSHookMessageEx(aas, attest, (IMP)stub_attestKey, (IMP *)&orig_attestKey);
-            if (class_getInstanceMethod(aas, assertSel))
-                pMSHookMessageEx(aas, assertSel, (IMP)stub_attestAssertion, (IMP *)&orig_attestAssertion);
-            if (class_getInstanceMethod(aas, @selector(isSupported)))
-                pMSHookMessageEx(aas, @selector(isSupported), (IMP)stub_attestIsSupported, (IMP *)&orig_attestIsSupported);
-            // Class property isSupported on some SDKs
-            Class aasMeta = object_getClass(aas);
-            if (aasMeta && class_getInstanceMethod(aasMeta, @selector(isSupported)))
-                pMSHookMessageEx(aasMeta, @selector(isSupported), (IMP)stub_attestIsSupported, (IMP *)&orig_attestIsSupported);
-            IPFExTrace(@"DCAppAttestService hooks OK (incl isSupported)");
-        }
-        Class dcd = objc_getClass("DCDevice");
-        if (dcd) {
-            Class dcdMeta = object_getClass(dcd);
-            SEL tok = NSSelectorFromString(@"generateTokenWithCompletionHandler:");
-            if (class_getInstanceMethod(dcd, tok))
-                pMSHookMessageEx(dcd, tok, (IMP)stub_dcGenerateToken, (IMP *)&orig_dcGenerateToken);
-            if (class_getInstanceMethod(dcd, @selector(isSupported)))
-                pMSHookMessageEx(dcd, @selector(isSupported), (IMP)stub_dcSupported, (IMP *)&orig_dcSupported);
-            if (dcdMeta && class_getInstanceMethod(dcdMeta, @selector(isSupported)))
-                pMSHookMessageEx(dcdMeta, @selector(isSupported), (IMP)stub_dcSupported, (IMP *)&orig_dcSupported);
-            // currentDevice isSupported path
-            SEL cur = @selector(currentDevice);
-            if (dcdMeta && class_getInstanceMethod(dcdMeta, cur)) {
-                // leave currentDevice; isSupported on instance covers
-            }
-            IPFExTrace(@"DCDevice DeviceCheck hooks OK");
-        }
+        // Proxy + AppAttest + DeviceCheck → IPFInstallServerHooks (CT)
     }
 
     // Append Extra surfaces to matrix log (sync with MG SELFTEST)

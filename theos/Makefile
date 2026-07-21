@@ -24,10 +24,11 @@ iPFakerMG_FRAMEWORKS = UIKit Foundation AdSupport CFNetwork
 iPFakerMG_LIBRARIES = substrate
 iPFakerMG_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerMG.dylib
 
-# CT always loaded cleanly on Dopamine — carry network model rewrite here
-iPFakerCT_FILES = TweakCT.x src/IPFConfig.m src/IPFHooksCT.m src/IPFHooksDeep.m
+# CT always loaded cleanly on Dopamine — telephony + Deep + Server mitigations
+# (Proxy/AppAttest/WebRTC moved out of MG Extra for AMFI ≤130k budget)
+iPFakerCT_FILES = TweakCT.x src/IPFConfig.m src/IPFHooksCT.m src/IPFHooksDeep.m src/IPFHooksServer.m
 iPFakerCT_CFLAGS = -fobjc-arc -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
-iPFakerCT_FRAMEWORKS = UIKit Foundation CoreTelephony
+iPFakerCT_FRAMEWORKS = UIKit Foundation CoreTelephony CFNetwork
 iPFakerCT_LIBRARIES = substrate
 iPFakerCT_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerCT.dylib
 

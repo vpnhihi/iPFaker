@@ -133,7 +133,23 @@
     contact.translatesAutoresizingMaskIntoConstraints = NO;
     [card addSubview:contact];
 
-    // 1 chạm lab wall (cùng flow trong AppState)
+    // Thương mại 1 nút lớn (flow Vượt Zalo) + 2 nút lab phụ
+    UIButton *vuotBtn = [AppTheme primaryButtonWithTitle:@"Vượt Zalo 1 chạm"
+                                                  target:self
+                                                  action:@selector(vuotZaloTapped)];
+    vuotBtn.backgroundColor = [UIColor colorWithRed:0.12 green:0.55 blue:0.32 alpha:1.0];
+    vuotBtn.titleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
+    vuotBtn.translatesAutoresizingMaskIntoConstraints = NO;
+    [content addSubview:vuotBtn];
+
+    UILabel *vuotHint = [[UILabel alloc] init];
+    vuotHint.text = @"1 nút: Lab-core + spoof + wipe sạch + mở Zalo · Gắn proxy trước khi login";
+    vuotHint.font = AppTheme.captionFont;
+    vuotHint.textColor = AppTheme.textSecondary;
+    vuotHint.numberOfLines = 2;
+    vuotHint.translatesAutoresizingMaskIntoConstraints = NO;
+    [content addSubview:vuotHint];
+
     UIButton *resetDataBtn = [AppTheme primaryButtonWithTitle:@"Đặt lại dữ liệu app"
                                                        target:self
                                                        action:@selector(killTapped)];
@@ -224,11 +240,20 @@
         [contact.trailingAnchor constraintEqualToAnchor:cols.trailingAnchor],
         [contact.bottomAnchor constraintEqualToAnchor:card.bottomAnchor constant:-14],
 
-        [btnRow.topAnchor constraintEqualToAnchor:card.bottomAnchor constant:14],
+        [vuotBtn.topAnchor constraintEqualToAnchor:card.bottomAnchor constant:14],
+        [vuotBtn.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:pad],
+        [vuotBtn.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-pad],
+        [vuotBtn.heightAnchor constraintEqualToConstant:58],
+
+        [vuotHint.topAnchor constraintEqualToAnchor:vuotBtn.bottomAnchor constant:6],
+        [vuotHint.leadingAnchor constraintEqualToAnchor:vuotBtn.leadingAnchor],
+        [vuotHint.trailingAnchor constraintEqualToAnchor:vuotBtn.trailingAnchor],
+
+        [btnRow.topAnchor constraintEqualToAnchor:vuotHint.bottomAnchor constant:12],
         [btnRow.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:pad],
         [btnRow.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-pad],
-        [resetDataBtn.heightAnchor constraintEqualToConstant:56],
-        [applyBtn.heightAnchor constraintEqualToConstant:56],
+        [resetDataBtn.heightAnchor constraintEqualToConstant:48],
+        [applyBtn.heightAnchor constraintEqualToConstant:48],
 
         [toggleCard.topAnchor constraintEqualToAnchor:btnRow.bottomAnchor constant:16],
         [toggleCard.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:pad],
@@ -362,6 +387,38 @@
         }
     }]];
     [self presentViewController:ac animated:YES completion:nil];
+}
+
+- (void)vuotZaloTapped {
+    UIAlertController *ac = [UIAlertController
+        alertControllerWithTitle:@"Vượt Zalo 1 chạm?"
+                         message:@"Spoof máy mới + xóa sạch data/KC Zalo + mở lại.\nMất đăng nhập.\nGắn proxy sạch (tab Proxy) trước khi login."
+                  preferredStyle:UIAlertControllerStyleAlert];
+    [ac addAction:[UIAlertAction actionWithTitle:@"Hủy" style:UIAlertActionStyleCancel handler:nil]];
+    __weak typeof(self) weakSelf = self;
+    [ac addAction:[UIAlertAction actionWithTitle:@"Chạy 1 chạm" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *a) {
+        [weakSelf runVuotZalo];
+    }]];
+    [self presentViewController:ac animated:YES completion:nil];
+}
+
+- (void)runVuotZalo {
+    UIView *host = self.tabBarController.view ?: self.navigationController.view ?: self.view;
+    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Vượt Zalo 1 chạm…"];
+    self.view.userInteractionEnabled = NO;
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        NSString *msg = [AppState.shared vuotZaloOneTapProgress:^(NSString *step) {
+            [ov appendStep:step];
+        }];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.view.userInteractionEnabled = YES;
+            [ov finishWithTitle:@"Vượt Zalo xong" detail:msg];
+            [self refreshUI];
+            [ov dismissAfter:1.6 completion:^{
+                [self showAlertTitle:@"Vượt Zalo 1 chạm" message:msg];
+            }];
+        });
+    });
 }
 
 - (void)applyTapped {

@@ -7,7 +7,7 @@ name: Build Theos rootless
 on:
   workflow_dispatch:
   push:
-    branches: [master, main]
+    branches: [master, main, lab-gap-fill]
 
 jobs:
   build:
@@ -101,15 +101,21 @@ jobs:
             echo "FATAL: still links CydiaSubstrate.framework"
             exit 1
           fi
-          # Size budget: Dopamine often rejects MG â‰³130â€“140k (signature coverage)
+          # Size budget: lab Dopamine rejects MG ~140k (AMFI). Target Extra-only MG ≤130k.
+          # Proxy/AppAttest/WebRTC live in CT (IPFHooksServer) so MG stays lean.
           MGSIZE=$(stat -f%z dist/iPFakerMG.dylib 2>/dev/null || stat -c%s dist/iPFakerMG.dylib)
-          echo "MGSIZE=$MGSIZE"
-          if [ "$MGSIZE" -gt 150000 ]; then
-            echo "FATAL: MG $MGSIZE > 150000 — AMFI risk; slim Extra"
+          CTSIZE=$(stat -f%z dist/iPFakerCT.dylib 2>/dev/null || stat -c%s dist/iPFakerCT.dylib)
+          echo "MGSIZE=$MGSIZE CTSIZE=$CTSIZE"
+          if [ "$MGSIZE" -gt 132000 ]; then
+            echo "FATAL: MG $MGSIZE > 132000 — AMFI lab reject zone; slim Extra further"
             exit 1
           fi
-          if [ "$MGSIZE" -gt 130000 ]; then
-            echo "WARN: MG $MGSIZE > 130k â€” deploy may hybrid-fallback to webview MG"
+          if [ "$MGSIZE" -gt 128000 ]; then
+            echo "WARN: MG $MGSIZE near AMFI edge (prefer ≤125k Extra core)"
+          fi
+          if [ "$CTSIZE" -gt 200000 ]; then
+            echo "FATAL: CT $CTSIZE unexpectedly large"
+            exit 1
           fi
           ldid -h dist/iPFakerMG.dylib 2>&1 | grep -q CDHash=
           ldid -h dist/iPFakerCT.dylib 2>&1 | grep -q CDHash=
