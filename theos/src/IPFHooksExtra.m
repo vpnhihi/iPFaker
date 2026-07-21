@@ -14,9 +14,9 @@
 #import "IPFConfig.h"
 
 #import <UIKit/UIKit.h>
-#import <WebKit/WebKit.h>
 #import <objc/runtime.h>
 #import <objc/message.h>
+// WebKit types via runtime only (avoid hard-link WebKit → code-sign issues on Dopamine)
 #import <dlfcn.h>
 #import <unistd.h>
 #import <sys/stat.h>
@@ -827,40 +827,43 @@ static NSString *IPFWebSpoofJS(void) {
         ua, sw, sh, sc, availH];
 }
 
-static void IPFAttachWebSpoofToConfig(WKWebViewConfiguration *cfg) {
+// Runtime WebKit (no hard link) — HIOS-style UA + WKUserScript for screen JS
+static void IPFAttachWebSpoofToConfig(id cfg) {
     if (!cfg) return;
     if (![[IPFConfig shared] flag:@"FakeBrowser" defaultYes:YES]) return;
     @try {
-        WKUserContentController *ucc = cfg.userContentController;
+        Class CfgCls = objc_getClass("WKWebViewConfiguration");
+        Class UCC = objc_getClass("WKUserContentController");
+        Class US = objc_getClass("WKUserScript");
+        if (!CfgCls || !UCC || !US) return;
+        if (![cfg isKindOfClass:CfgCls]) return;
+        id ucc = [cfg valueForKey:@"userContentController"];
         if (!ucc) {
-            ucc = [[WKUserContentController alloc] init];
-            cfg.userContentController = ucc;
+            ucc = [[UCC alloc] init];
+            [cfg setValue:ucc forKey:@"userContentController"];
         }
         NSString *js = IPFWebSpoofJS();
         if (!js.length) return;
-        // atDocumentStart — before page scripts (Apple WKUserScript)
-        WKUserScript *script = [[WKUserScript alloc]
-            initWithSource:js
-             injectionTime:WKUserScriptInjectionTimeAtDocumentStart
-          forMainFrameOnly:NO];
-        [ucc addUserScript:script];
-        // also atDocumentEnd — re-apply if page overwrote properties
-        WKUserScript *script2 = [[WKUserScript alloc]
-            initWithSource:js
-             injectionTime:WKUserScriptInjectionTimeAtDocumentEnd
-          forMainFrameOnly:NO];
-        [ucc addUserScript:script2];
+        // injectionTime: 0 = AtDocumentStart, 1 = AtDocumentEnd (WKUserScriptInjectionTime)
+        id scriptStart = ((id (*)(id, SEL, id, NSInteger, BOOL))objc_msgSend)(
+            [US alloc], @selector(initWithSource:injectionTime:forMainFrameOnly:),
+            js, (NSInteger)0, NO);
+        id scriptEnd = ((id (*)(id, SEL, id, NSInteger, BOOL))objc_msgSend)(
+            [US alloc], @selector(initWithSource:injectionTime:forMainFrameOnly:),
+            js, (NSInteger)1, NO);
+        if (scriptStart) [ucc performSelector:@selector(addUserScript:) withObject:scriptStart];
+        if (scriptEnd) [ucc performSelector:@selector(addUserScript:) withObject:scriptEnd];
     } @catch (__unused NSException *ex) {}
 }
 
-static void IPFApplyWebViewUA(WKWebView *web) {
+static void IPFApplyWebViewUA(id web) {
     if (!web) return;
     if (![[IPFConfig shared] flag:@"FakeBrowser" defaultYes:YES]) return;
     NSString *ua = IPFWebUA();
     if (!ua.length) return;
     @try {
         if ([web respondsToSelector:@selector(setCustomUserAgent:)])
-            [web setCustomUserAgent:ua];
+            [web performSelector:@selector(setCustomUserAgent:) withObject:ua];
     } @catch (__unused NSException *ex) {}
 }
 
@@ -875,7 +878,6 @@ static NSString *stub_customUA(id self, SEL _cmd) {
 
 static void (*orig_setCustomUA)(id, SEL, NSString *);
 static void stub_setCustomUA(id self, SEL _cmd, NSString *ua) {
-    // Force profile UA — app cannot set conflicting custom UA
     if ([[IPFConfig shared] flag:@"FakeBrowser" defaultYes:YES]) {
         NSString *forced = IPFWebUA();
         if (forced.length) {
@@ -888,21 +890,18 @@ static void stub_setCustomUA(id self, SEL _cmd, NSString *ua) {
 
 static id (*orig_wkInitFrameConfig)(id, SEL, CGRect, id);
 static id stub_wkInitFrameConfig(id self, SEL _cmd, CGRect frame, id configuration) {
-    WKWebViewConfiguration *cfg = configuration;
-    if (![cfg isKindOfClass:[WKWebViewConfiguration class]])
-        cfg = [[WKWebViewConfiguration alloc] init];
-    else {
-        // Copy so we don't mutate a shared frozen config unexpectedly
-        @try {
-            cfg = [cfg copy];
-        } @catch (__unused NSException *ex) {
-            cfg = configuration;
-        }
+    Class CfgCls = objc_getClass("WKWebViewConfiguration");
+    id cfg = configuration;
+    if (CfgCls && cfg && [cfg isKindOfClass:CfgCls]) {
+        @try { cfg = [cfg copy]; } @catch (__unused NSException *ex) {}
+    } else if (CfgCls) {
+        cfg = [[CfgCls alloc] init];
     }
     IPFAttachWebSpoofToConfig(cfg);
     id web = orig_wkInitFrameConfig ? orig_wkInitFrameConfig(self, _cmd, frame, cfg) : nil;
-    if ([web isKindOfClass:[WKWebView class]]) {
-        IPFApplyWebViewUA((WKWebView *)web);
+    Class Wk = objc_getClass("WKWebView");
+    if (Wk && web && [web isKindOfClass:Wk]) {
+        IPFApplyWebViewUA(web);
         static int once = 0;
         if (!once) {
             once = 1;
@@ -918,14 +917,15 @@ static id stub_wkInitFrameConfig(id self, SEL _cmd, CGRect frame, id configurati
 static id (*orig_wkInitCoder)(id, SEL, id);
 static id stub_wkInitCoder(id self, SEL _cmd, id coder) {
     id web = orig_wkInitCoder ? orig_wkInitCoder(self, _cmd, coder) : nil;
-    if ([web isKindOfClass:[WKWebView class]]) {
-        IPFApplyWebViewUA((WKWebView *)web);
-        // Storyboard init: inject via evaluateJavaScript when possible later
+    Class Wk = objc_getClass("WKWebView");
+    if (Wk && web && [web isKindOfClass:Wk]) {
+        IPFApplyWebViewUA(web);
         @try {
-            WKWebView *w = (WKWebView *)web;
             NSString *js = IPFWebSpoofJS();
-            if (js.length)
-                [w evaluateJavaScript:js completionHandler:nil];
+            if (js.length && [web respondsToSelector:@selector(evaluateJavaScript:completionHandler:)]) {
+                ((void (*)(id, SEL, id, id))objc_msgSend)(
+                    web, @selector(evaluateJavaScript:completionHandler:), js, nil);
+            }
         } @catch (__unused NSException *ex) {}
     }
     return web;
