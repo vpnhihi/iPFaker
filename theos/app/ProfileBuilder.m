@@ -319,8 +319,6 @@
         @"VolumeUUID": volumeUUID,
         @"IOPlatformSerialNumber": serial,
         @"MLBSerialNumber": serial,
-        @"SSID": ssid,
-        @"BSSID": bssid,
         // ITU-T E.212 MCC/MNC — Viettel 452/04; ISO 3166-1 alpha-2
         @"carrierName": @"Viettel",
         @"carrierMCC": @"452",
