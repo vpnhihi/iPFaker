@@ -165,36 +165,49 @@ static void IPFServerLiteCtor(void) {
             if (!pMS) { IPFLiteTrace(@"no MSHook"); return; }
             IPFLiteTrace(@"ServerLite begin");
 
-            Class aas = objc_getClass("DCAppAttestService");
-            if (aas) {
-                SEL genKey = NSSelectorFromString(@"generateKeyWithCompletionHandler:");
-                SEL attest = NSSelectorFromString(@"attestKey:clientDataHash:completionHandler:");
-                SEL asrt = NSSelectorFromString(@"generateAssertion:clientDataHash:completionHandler:");
-                if (class_getInstanceMethod(aas, genKey))
-                    pMS(aas, genKey, (IMP)s_genKey, (IMP *)&o_genKey);
-                if (class_getInstanceMethod(aas, attest))
-                    pMS(aas, attest, (IMP)s_attest, (IMP *)&o_attest);
-                if (class_getInstanceMethod(aas, asrt))
-                    pMS(aas, asrt, (IMP)s_assert, (IMP *)&o_assert);
-                if (class_getInstanceMethod(aas, @selector(isSupported)))
-                    pMS(aas, @selector(isSupported), (IMP)s_isSup, (IMP *)&o_isSup);
-                Class meta = object_getClass(aas);
-                if (meta && class_getInstanceMethod(meta, @selector(isSupported)))
-                    pMS(meta, @selector(isSupported), (IMP)s_isSup, (IMP *)&o_isSup);
-                IPFLiteTrace(@"AppAttest OK");
-            }
-            Class dcd = objc_getClass("DCDevice");
-            if (dcd) {
-                SEL tok = NSSelectorFromString(@"generateTokenWithCompletionHandler:");
-                if (class_getInstanceMethod(dcd, tok))
-                    pMS(dcd, tok, (IMP)s_dcTok, (IMP *)&o_dcTok);
-                if (class_getInstanceMethod(dcd, @selector(isSupported)))
-                    pMS(dcd, @selector(isSupported), (IMP)s_dcSup, (IMP *)&o_dcSup);
-                Class meta = object_getClass(dcd);
-                if (meta && class_getInstanceMethod(meta, @selector(isSupported)))
-                    pMS(meta, @selector(isSupported), (IMP)s_dcSup, (IMP *)&o_dcSup);
-                IPFLiteTrace(@"DeviceCheck OK");
-            }
+            // DeviceCheck/AppAttest frameworks may load after first UIKit tick
+            void (^installAA)(void) = ^{
+                Class aas = objc_getClass("DCAppAttestService");
+                if (!aas) {
+                    // force-load DeviceCheck.framework
+                    dlopen("/System/Library/Frameworks/DeviceCheck.framework/DeviceCheck", RTLD_NOW);
+                    aas = objc_getClass("DCAppAttestService");
+                }
+                if (aas) {
+                    SEL genKey = NSSelectorFromString(@"generateKeyWithCompletionHandler:");
+                    SEL attest = NSSelectorFromString(@"attestKey:clientDataHash:completionHandler:");
+                    SEL asrt = NSSelectorFromString(@"generateAssertion:clientDataHash:completionHandler:");
+                    if (class_getInstanceMethod(aas, genKey))
+                        pMS(aas, genKey, (IMP)s_genKey, (IMP *)&o_genKey);
+                    if (class_getInstanceMethod(aas, attest))
+                        pMS(aas, attest, (IMP)s_attest, (IMP *)&o_attest);
+                    if (class_getInstanceMethod(aas, asrt))
+                        pMS(aas, asrt, (IMP)s_assert, (IMP *)&o_assert);
+                    if (class_getInstanceMethod(aas, @selector(isSupported)))
+                        pMS(aas, @selector(isSupported), (IMP)s_isSup, (IMP *)&o_isSup);
+                    Class meta = object_getClass(aas);
+                    if (meta && class_getInstanceMethod(meta, @selector(isSupported)))
+                        pMS(meta, @selector(isSupported), (IMP)s_isSup, (IMP *)&o_isSup);
+                    IPFLiteTrace(@"AppAttest OK");
+                } else {
+                    IPFLiteTrace(@"AppAttest class nil");
+                }
+                Class dcd = objc_getClass("DCDevice");
+                if (dcd) {
+                    SEL tok = NSSelectorFromString(@"generateTokenWithCompletionHandler:");
+                    if (class_getInstanceMethod(dcd, tok))
+                        pMS(dcd, tok, (IMP)s_dcTok, (IMP *)&o_dcTok);
+                    if (class_getInstanceMethod(dcd, @selector(isSupported)))
+                        pMS(dcd, @selector(isSupported), (IMP)s_dcSup, (IMP *)&o_dcSup);
+                    Class meta = object_getClass(dcd);
+                    if (meta && class_getInstanceMethod(meta, @selector(isSupported)))
+                        pMS(meta, @selector(isSupported), (IMP)s_dcSup, (IMP *)&o_dcSup);
+                    IPFLiteTrace(@"DeviceCheck OK");
+                }
+            };
+            installAA();
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)),
+                           dispatch_get_main_queue(), installAA);
             Class usc = objc_getClass("NSURLSessionConfiguration");
             if (usc) {
                 if (class_getInstanceMethod(usc, @selector(connectionProxyDictionary)))

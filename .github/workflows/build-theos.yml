@@ -160,6 +160,16 @@ jobs:
             cp -f theos/dist/iPFakerMG.dylib dylibs_ci/
             cp -f theos/dist/iPFakerCT.dylib dylibs_ci/
             cp -f theos/dist/iPFakerJB.dylib dylibs_ci/ 2>/dev/null || true
+            cp -f theos/dist/iPFakerAA.dylib dylibs_ci/ 2>/dev/null || true
+          fi
+          # Ensure app lands in artifact even if sileo pack fails
+          APPDIR=$(find theos -type d -name 'iPFaker.app' 2>/dev/null | head -1)
+          if [ -n "$APPDIR" ] && [ -f "$APPDIR/iPFaker" ]; then
+            mkdir -p theos/dist/app
+            rm -rf theos/dist/app/iPFaker.app
+            cp -a "$APPDIR" theos/dist/app/iPFaker.app
+            echo "Staged app for artifact: theos/dist/app/iPFaker.app"
+            ls -la theos/dist/app/iPFaker.app | head
           fi
           if [ ! -d theos/dist/app/iPFaker.app ]; then
             echo "Skip Sileo deb (no app)"
