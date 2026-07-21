@@ -1,8 +1,9 @@
 // Extra spoof surface for Zalo — gated by config Fake* flags:
-//  FakeScreen / FakeRealScreen, FakeHardware (disk), HideJailbreak,
+//  FakeScreen / FakeRealScreen, FakeHardware (disk), HideJailbreak (access/stat/lstat + canOpenURL),
 //  FakeBrowser (UA), FakeLocale (BCP-47 + IANA TZ), FakeDateTime,
 //  FakeLocation (WGS84), FakeSensor, FakeWebRTC / DisableWebRTC,
 //  FakeWifi: getifaddrs MAC; FakeDevice/FakeNetwork: gethostname + NSProcessInfo.hostName.
+// Expanded fopen/getenv/fileExists → iPFakerJB.dylib (split stack / AMFI size).
 // Complements IPFHooksMG / CT. Keep defensive — never crash Zalo.
 //
 // Standards:
@@ -354,57 +355,7 @@ static int stub_lstat(const char *path, struct stat *buf) {
     return orig_lstat ? orig_lstat(path, buf) : -1;
 }
 
-static FILE *(*orig_fopen)(const char *, const char *);
-static FILE *stub_fopen(const char *path, const char *mode) {
-    if (IPFIsJBPath(path)) { IPFJBHideLogOnce("fopen", path); errno = ENOENT; return NULL; }
-    return orig_fopen ? orig_fopen(path, mode) : NULL;
-}
-
-static char *(*orig_getenv)(const char *);
-static char *stub_getenv(const char *name) {
-    if (!name) return orig_getenv ? orig_getenv(name) : NULL;
-    if (![[IPFConfig shared] flag:@"HideJailbreak" defaultYes:YES])
-        return orig_getenv ? orig_getenv(name) : NULL;
-    static const char *kEnv[] = {
-        "DYLD_INSERT_LIBRARIES",
-        "DYLD_LIBRARY_PATH",
-        "DYLD_FRAMEWORK_PATH",
-        "DYLD_PRINT_TO_FILE",
-        "_MSSafeMode",
-        "SSLKEYLOGFILE",
-        NULL
-    };
-    for (int i = 0; kEnv[i]; i++) {
-        if (strcmp(name, kEnv[i]) == 0) {
-            IPFJBHideLogOnce("getenv", name);
-            return NULL;
-        }
-    }
-    if (strncmp(name, "FRIDA", 5) == 0) {
-        IPFJBHideLogOnce("getenv", name);
-        return NULL;
-    }
-    return orig_getenv ? orig_getenv(name) : NULL;
-}
-
-static BOOL (*orig_fileExists)(id, SEL, NSString *);
-static BOOL stub_fileExists(id self, SEL _cmd, NSString *path) {
-    if (path.length && IPFIsJBPath(path.UTF8String)) {
-        IPFJBHideLogOnce("fileExists", path.UTF8String);
-        return NO;
-    }
-    return orig_fileExists ? orig_fileExists(self, _cmd, path) : NO;
-}
-
-static BOOL (*orig_fileExistsIsDir)(id, SEL, NSString *, BOOL *);
-static BOOL stub_fileExistsIsDir(id self, SEL _cmd, NSString *path, BOOL *isDir) {
-    if (path.length && IPFIsJBPath(path.UTF8String)) {
-        IPFJBHideLogOnce("fileExists:isDir", path.UTF8String);
-        if (isDir) *isDir = NO;
-        return NO;
-    }
-    return orig_fileExistsIsDir ? orig_fileExistsIsDir(self, _cmd, path, isDir) : NO;
-}
+// fopen / getenv / NSFileManager fileExists* live in iPFakerJB.dylib (split stack)
 
 #pragma mark - canOpenURL (JB schemes + WebRTC disable)
 
@@ -1010,15 +961,7 @@ void IPFInstallExtraHooks(void) {
                                  (IMP)stub_attrs, (IMP *)&orig_attrs);
                 IPFExTrace(@"disk hooks OK");
             }
-            if (class_getInstanceMethod(fm, @selector(fileExistsAtPath:))) {
-                pMSHookMessageEx(fm, @selector(fileExistsAtPath:),
-                                 (IMP)stub_fileExists, (IMP *)&orig_fileExists);
-            }
-            if (class_getInstanceMethod(fm, @selector(fileExistsAtPath:isDirectory:))) {
-                pMSHookMessageEx(fm, @selector(fileExistsAtPath:isDirectory:),
-                                 (IMP)stub_fileExistsIsDir, (IMP *)&orig_fileExistsIsDir);
-            }
-            IPFExTrace(@"NSFileManager fileExists JB hide OK");
+            // fileExists* → iPFakerJB (keeps MG lean / AMFI-safe)
         }
 
         Class app = objc_getClass("UIApplication");
@@ -1118,11 +1061,8 @@ void IPFInstallExtraHooks(void) {
         if (st) pMSHookFunction(st, (void *)stub_stat, (void **)&orig_stat);
         void *ls = dlsym(RTLD_DEFAULT, "lstat");
         if (ls) pMSHookFunction(ls, (void *)stub_lstat, (void **)&orig_lstat);
-        void *fo = dlsym(RTLD_DEFAULT, "fopen");
-        if (fo) pMSHookFunction(fo, (void *)stub_fopen, (void **)&orig_fopen);
-        void *ge = dlsym(RTLD_DEFAULT, "getenv");
-        if (ge) pMSHookFunction(ge, (void *)stub_getenv, (void **)&orig_getenv);
-        IPFExTrace(@"access/stat/lstat/fopen/getenv JB hide OK");
+        // fopen/getenv → iPFakerJB.dylib
+        IPFExTrace(@"access/stat/lstat JB hide OK");
 
         // libc network identity (HIOS-class surface)
         void *gif = dlsym(RTLD_DEFAULT, "getifaddrs");

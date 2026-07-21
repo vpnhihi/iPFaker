@@ -8,9 +8,13 @@ export THEOS_PACKAGE_SCHEME := rootless
 
 include $(THEOS)/makefiles/common.mk
 
-TWEAK_NAME = iPFakerMG iPFakerCT
+# Split stack (Dopamine AMFI):
+#   MG = spoof + Extra core (screen/disk/UA/getifaddrs/access-stat)
+#   CT = telephony + deep rewrite
+#   JB = expanded hide (fopen/getenv/fileExists) — optional, fails independently
+TWEAK_NAME = iPFakerMG iPFakerCT iPFakerJB
 
-# MG stays lean (device ldid/opainject was reliable without Deep.m bulk)
+# MG stays lean — no fopen/getenv/fileExists bulk (those → JB)
 iPFakerMG_FILES = TweakMG.x src/IPFConfig.m src/IPFHooksMG.m src/IPFHooksExtra.m src/fishhook.c
 iPFakerMG_CFLAGS = -fobjc-arc -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
 # WebKit used only via runtime (objc_getClass) — hard-link WebKit broke Dopamine code-sign coverage
@@ -24,6 +28,13 @@ iPFakerCT_CFLAGS = -fobjc-arc -Wno-unused-variable -Wno-unused-function -Wno-dep
 iPFakerCT_FRAMEWORKS = UIKit Foundation CoreTelephony
 iPFakerCT_LIBRARIES = substrate
 iPFakerCT_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerCT.dylib
+
+# JB expanded hide — small standalone; same bundle filter as MG
+iPFakerJB_FILES = TweakJB.x src/IPFConfig.m src/IPFHooksJB.m
+iPFakerJB_CFLAGS = -fobjc-arc -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
+iPFakerJB_FRAMEWORKS = Foundation
+iPFakerJB_LIBRARIES = substrate
+iPFakerJB_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerJB.dylib
 
 include $(THEOS_MAKE_PATH)/tweak.mk
 

@@ -143,7 +143,7 @@ for MS in \
   /var/jb/Library/MobileSubstrate/DynamicLibraries
 do
   [ -d "$MS" ] || continue
-  for f in iPFakerMG.dylib iPFakerCT.dylib; do
+  for f in iPFakerMG.dylib iPFakerCT.dylib iPFakerJB.dylib; do
     if [ -f "$MS/$f" ]; then
       chown root:wheel "$MS/$f" 2>/dev/null || true
       chmod 755 "$MS/$f" 2>/dev/null || true
@@ -158,7 +158,7 @@ do
       fi
     fi
   done
-  for f in iPFakerMG.plist iPFakerCT.plist; do
+  for f in iPFakerMG.plist iPFakerCT.plist iPFakerJB.plist; do
     [ -f "$MS/$f" ] && chmod 644 "$MS/$f" 2>/dev/null || true
   done
 done
@@ -392,6 +392,13 @@ def build(version: str, app_path: str | None) -> Path:
         add_file(tar, f"{dest}/iPFakerCT.dylib", track(ct.read_bytes()), 0o755)
         add_file(tar, f"{dest}/iPFakerMG.plist", track(plist), 0o644)
         add_file(tar, f"{dest}/iPFakerCT.plist", track(plist), 0o644)
+        # Optional split-stack JB hide (fopen/getenv/fileExists)
+        for base in (mg.parent, ROOT / "dylibs_ci", ROOT / "theos" / "dist"):
+            jb = base / "iPFakerJB.dylib"
+            if jb.is_file():
+                add_file(tar, f"{dest}/iPFakerJB.dylib", track(jb.read_bytes()), 0o755)
+                add_file(tar, f"{dest}/iPFakerJB.plist", track(plist), 0o644)
+                break
 
         if catalog.exists():
             cdata = track(catalog.read_bytes())
