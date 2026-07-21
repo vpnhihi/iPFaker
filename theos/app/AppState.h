@@ -106,8 +106,12 @@ NS_ASSUME_NONNULL_BEGIN
 /// TCP/HTTP connectivity check through configured proxy.
 - (NSString *)testProxyConnection;
 /// Geo IP (lat/lon/IANA TZ/locale) via proxy egress — sync map/weather/time. Returns summary for UI.
+/// Lat/lon are randomized inside city bounding box (Maps/Weather/spoof apps share same dual-path keys).
 - (NSString *)syncTimeMapWeatherFromProxyProgress:(nullable void (^)(NSString *step))progress
                                       geoKeysOut:(NSDictionary * _Nullable * _Nullable)keysOut;
+
+/// After «Đặt lại…»: if proxy ON, write proxy keys + random-in-city geo to dual-path config.
+- (NSString *)attachProxyGeoRandomInCityProgress:(nullable void (^)(NSString *step))progress;
 
 - (void)postDidChange;
 

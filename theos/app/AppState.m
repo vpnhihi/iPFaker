@@ -703,9 +703,15 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
 }
 
 - (NSString *)killZaloAndRandomizeFromPoolProgress:(void (^)(NSString *))progress {
-    // 1-chạm lab sạch: Apply → Wipe full → Kill → Relaunch (mất đăng nhập)
+    // 1-chạm lab sạch: Apply → Proxy-geo random city → Wipe full → Kill → Relaunch
     if (progress) progress(@"① Chọn ngẫu nhiên máy + iOS + ghi config…");
     NSString *applyMsg = [self applyRandomFromPool];
+    // Proxy bật → luôn gắn geo random trong thành phố proxy (Map/Thời tiết/spoof apps)
+    NSString *geoMsg = @"";
+    if ([self proxyEnabled] && [self proxyHost].length > 0) {
+        if (progress) progress(@"①b Vị trí Map/Thời tiết random theo proxy…");
+        geoMsg = [self attachProxyGeoRandomInCityProgress:progress] ?: @"";
+    }
     NSArray *wipeBids = [self targetsForDataOps];
     if (progress) progress([NSString stringWithFormat:@"② Xóa sạch %lu app (mất đăng nhập)…", (unsigned long)wipeBids.count]);
     NSString *wipeMsg = [ProfileBuilder wipeApps:wipeBids progress:progress];
@@ -716,9 +722,11 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     if (progress) progress(@"④ Mở lại app (nạp spoof mới)…");
     NSString *reMsg = [ProfileBuilder relaunchAppsWithBundleIds:wipeBids];
     self.statusText = [NSString stringWithFormat:
-                       @"Đặt lại dữ liệu app (1 chạm) xong:\n\n%@\n\n%@\n\n%@\n\n"
-                       @"→ Data sạch + hồ sơ máy mới + app đã relaunch.",
-                       applyMsg, wipeMsg, reMsg];
+                       @"Đặt lại dữ liệu app (1 chạm) xong:\n\n%@\n\n%@\n\n%@\n\n%@\n\n"
+                       @"→ Data sạch + hồ sơ máy mới + geo theo proxy + app đã relaunch.",
+                       applyMsg,
+                       geoMsg.length ? geoMsg : @"(không proxy — giữ geo catalog)",
+                       wipeMsg, reMsg];
     [self postDidChange];
     return self.statusText;
 }
@@ -763,19 +771,6 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     BOOL hasProxy = [self proxyEnabled] && self.proxyHost.length > 0;
     if (!hasProxy) {
         [log addObject:@"⚠ Chưa cấu hình proxy — IP/ASN public = mạng máy thật (server-side). Vào tab Proxy để gắn proxy sạch trước khi login Zalo."];
-    } else if ([self syncGeoFromProxyEnabled]) {
-        if (progress) progress(@"③b Geo (lat/TZ/locale) theo proxy egress…");
-        NSDictionary *geo = nil;
-        NSString *geoMsg = [self syncTimeMapWeatherFromProxyProgress:progress geoKeysOut:&geo];
-        if (geo.count) {
-            NSMutableDictionary *keys = [geo mutableCopy];
-            keys[@"FakeLocation"] = @YES;
-            keys[@"FakeLocale"] = @YES;
-            NSString *merge = [ProfileBuilder mergeKeysIntoConfig:keys progress:progress];
-            [log addObject:[NSString stringWithFormat:@"%@\n%@", geoMsg, merge]];
-        } else if (geoMsg.length) {
-            [log addObject:geoMsg];
-        }
     }
 
     if (progress) progress(@"④ Spoof ngẫu nhiên máy+iOS (schema lock)…");
@@ -787,12 +782,16 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     NSMutableDictionary *mit = [NSMutableDictionary dictionary];
     for (NSString *k in flagsOn) mit[k] = @YES;
     mit[@"DisableWebRTC"] = @NO;
-    if (!mit[@"WebRTCLocalIP"]) {
-        // ensure private WebRTC IP present on dual-path
-    }
     mit[@"WebRTCLocalIP"] = @"10.0.0.2";
     NSString *m2 = [ProfileBuilder mergeKeysIntoConfig:mit progress:progress];
     [log addObject:m2 ?: @"merge flags"];
+
+    // Sau Apply: geo random trong thành phố proxy (không bị catalog ghi đè)
+    if (hasProxy) {
+        if (progress) progress(@"⑤b Vị trí Map/Thời tiết random theo proxy…");
+        NSString *geoMsg = [self attachProxyGeoRandomInCityProgress:progress];
+        if (geoMsg.length) [log addObject:geoMsg];
+    }
 
     NSArray *wipeBids = [self targetsForDataOps];
     if (progress) progress([NSString stringWithFormat:@"⑥ Wipe full %lu app (KC+container — mất đăng nhập)…", (unsigned long)wipeBids.count]);
@@ -849,7 +848,7 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
      1) Backup 100% thông số máy + data app (session)
      2) Random máy/iOS + Apply config dual-path + spoof filter + proxy keys
      3) Soft wipe app data (skip keychain) + restore session
-     4) (Optional) Geo theo proxy nếu SyncGeo ON
+     4) Proxy bật → geo random trong thành phố proxy (Map/Thời tiết/spoof apps)
      5) Kill → Relaunch app → nạp spoof + session
      */
     NSArray *apps = [self targetsForDataOps];
@@ -879,22 +878,11 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     NSString *restMsg = [ProfileBuilder restoreApps:apps fromBackupRoot:bak progress:progress];
     [log addObject:restMsg];
 
-    // Optional: geo theo proxy egress — chỉ khi bật proxy + SyncGeo (tránh ghi đè lat/TZ catalog khi không proxy)
-    if ([self proxyEnabled] && [self syncGeoFromProxyEnabled]) {
-        if (progress) progress(@"⑤ Đồng bộ geo (map / TZ) theo proxy…");
-        NSDictionary *geo = nil;
-        NSString *geoMsg = [self syncTimeMapWeatherFromProxyProgress:progress geoKeysOut:&geo];
-        if (geo.count) {
-            NSMutableDictionary *keys = [geo mutableCopy];
-            keys[@"FakeLocation"] = @YES;
-            keys[@"FakeLocale"] = @YES;
-            [self setToggle:YES forKey:@"FakeLocation"];
-            [self setToggle:YES forKey:@"FakeLocale"];
-            NSString *merge = [ProfileBuilder mergeKeysIntoConfig:keys progress:progress];
-            [log addObject:[NSString stringWithFormat:@"%@\n%@", geoMsg, merge]];
-        } else if (geoMsg.length) {
-            [log addObject:geoMsg];
-        }
+    // Proxy bật → luôn random vị trí trong thành phố proxy (Map/Thời tiết/app spoof chung dual-path)
+    if ([self proxyEnabled] && [self proxyHost].length > 0) {
+        if (progress) progress(@"⑤ Vị trí Map/Thời tiết random theo proxy…");
+        NSString *geoMsg = [self attachProxyGeoRandomInCityProgress:progress];
+        if (geoMsg.length) [log addObject:geoMsg];
     }
 
     // Kill so next open loads new MG config + restored session files
@@ -1156,6 +1144,90 @@ static NSString *const kPxSyncGeo = @"ipf.proxy.syncGeo";
     return outData;
 }
 
+/// City bounding box (WGS84). Known VN metros + generic jitter around IP center.
+/// Returns @{ minLat, maxLat, minLon, maxLon, label } — approx metro area for Maps/Weather.
++ (NSDictionary *)boundingBoxForCity:(NSString *)city
+                              region:(NSString *)region
+                         countryCode:(NSString *)cc
+                           centerLat:(double)clat
+                           centerLon:(double)clon {
+    NSString *blob = [NSString stringWithFormat:@"%@ %@ %@",
+                      city ?: @"", region ?: @"", cc ?: @""].lowercaseString;
+    // Normalize Vietnamese / common aliases (ip-api may return Hanoi / Ha Noi / etc.)
+    blob = [blob stringByReplacingOccurrencesOfString:@"à" withString:@"a"];
+    blob = [blob stringByReplacingOccurrencesOfString:@"á" withString:@"a"];
+    blob = [blob stringByReplacingOccurrencesOfString:@"ạ" withString:@"a"];
+    blob = [blob stringByReplacingOccurrencesOfString:@"ả" withString:@"a"];
+    blob = [blob stringByReplacingOccurrencesOfString:@"ã" withString:@"a"];
+    blob = [blob stringByReplacingOccurrencesOfString:@"ă" withString:@"a"];
+    blob = [blob stringByReplacingOccurrencesOfString:@"â" withString:@"a"];
+    blob = [blob stringByReplacingOccurrencesOfString:@"è" withString:@"e"];
+    blob = [blob stringByReplacingOccurrencesOfString:@"é" withString:@"e"];
+    blob = [blob stringByReplacingOccurrencesOfString:@"ê" withString:@"e"];
+    blob = [blob stringByReplacingOccurrencesOfString:@"ì" withString:@"i"];
+    blob = [blob stringByReplacingOccurrencesOfString:@"í" withString:@"i"];
+    blob = [blob stringByReplacingOccurrencesOfString:@"ò" withString:@"o"];
+    blob = [blob stringByReplacingOccurrencesOfString:@"ó" withString:@"o"];
+    blob = [blob stringByReplacingOccurrencesOfString:@"ô" withString:@"o"];
+    blob = [blob stringByReplacingOccurrencesOfString:@"ơ" withString:@"o"];
+    blob = [blob stringByReplacingOccurrencesOfString:@"ù" withString:@"u"];
+    blob = [blob stringByReplacingOccurrencesOfString:@"ú" withString:@"u"];
+    blob = [blob stringByReplacingOccurrencesOfString:@"ư" withString:@"u"];
+    blob = [blob stringByReplacingOccurrencesOfString:@"ỳ" withString:@"y"];
+    blob = [blob stringByReplacingOccurrencesOfString:@"ý" withString:@"y"];
+    blob = [blob stringByReplacingOccurrencesOfString:@"đ" withString:@"d"];
+
+    typedef struct { const char *needle; double minLat, maxLat, minLon, maxLon; const char *label; } Box;
+    // Approximate metro bounds (OpenStreetMap / common geo ranges — lab spoof only)
+    static const Box kBoxes[] = {
+        { "ha noi",      20.96, 21.12, 105.75, 105.92, "Ha Noi metro" },
+        { "hanoi",       20.96, 21.12, 105.75, 105.92, "Ha Noi metro" },
+        { "ho chi minh", 10.72, 10.89, 106.60, 106.85, "Ho Chi Minh metro" },
+        { "thu duc",     10.72, 10.89, 106.60, 106.85, "Ho Chi Minh metro" },
+        { "saigon",      10.72, 10.89, 106.60, 106.85, "Ho Chi Minh metro" },
+        { "da nang",     15.98, 16.12, 108.15, 108.28, "Da Nang metro" },
+        { "danang",      15.98, 16.12, 108.15, 108.28, "Da Nang metro" },
+        { "hai phong",   20.80, 20.92, 106.63, 106.75, "Hai Phong metro" },
+        { "haiphong",    20.80, 20.92, 106.63, 106.75, "Hai Phong metro" },
+        { "can tho",     10.00, 10.08, 105.72, 105.82, "Can Tho metro" },
+        { "cantho",      10.00, 10.08, 105.72, 105.82, "Can Tho metro" },
+        { "bien hoa",    10.90, 11.00, 106.78, 106.90, "Bien Hoa" },
+        { "nha trang",   12.20, 12.30, 109.15, 109.22, "Nha Trang" },
+        { "hue",         16.43, 16.50, 107.55, 107.62, "Hue" },
+        { "vung tau",    10.32, 10.40, 107.05, 107.12, "Vung Tau" },
+        { NULL, 0, 0, 0, 0, NULL }
+    };
+    for (int i = 0; kBoxes[i].needle; i++) {
+        if ([blob containsString:@(kBoxes[i].needle)]) {
+            return @{
+                @"minLat": @(kBoxes[i].minLat), @"maxLat": @(kBoxes[i].maxLat),
+                @"minLon": @(kBoxes[i].minLon), @"maxLon": @(kBoxes[i].maxLon),
+                @"label": @(kBoxes[i].label),
+            };
+        }
+    }
+    // Generic: ~±3–4 km around IP geocode center (≈0.035°)
+    double d = 0.035;
+    return @{
+        @"minLat": @(clat - d), @"maxLat": @(clat + d),
+        @"minLon": @(clon - d), @"maxLon": @(clon + d),
+        @"label": city.length ? [NSString stringWithFormat:@"%@ area", city] : @"proxy area",
+    };
+}
+
++ (void)randomPointInBox:(NSDictionary *)box latOut:(double *)latOut lonOut:(double *)lonOut {
+    double minLat = [box[@"minLat"] doubleValue];
+    double maxLat = [box[@"maxLat"] doubleValue];
+    double minLon = [box[@"minLon"] doubleValue];
+    double maxLon = [box[@"maxLon"] doubleValue];
+    if (maxLat < minLat) { double t = minLat; minLat = maxLat; maxLat = t; }
+    if (maxLon < minLon) { double t = minLon; minLon = maxLon; maxLon = t; }
+    double u1 = (double)arc4random_uniform(100000) / 100000.0;
+    double u2 = (double)arc4random_uniform(100000) / 100000.0;
+    if (latOut) *latOut = minLat + (maxLat - minLat) * u1;
+    if (lonOut) *lonOut = minLon + (maxLon - minLon) * u2;
+}
+
 - (NSString *)syncTimeMapWeatherFromProxyProgress:(void (^)(NSString *))progress
                                       geoKeysOut:(NSDictionary **)keysOut {
     if (progress) progress(@"Lấy geo theo IP (qua proxy nếu bật)…");
@@ -1185,30 +1257,39 @@ static NSString *const kPxSyncGeo = @"ipf.proxy.syncGeo";
         if (keysOut) *keysOut = nil;
         return [NSString stringWithFormat:@"Geo FAIL: %@", j[@"message"] ?: @"status!=success"];
     }
-    double lat = [j[@"lat"] doubleValue];
-    double lon = [j[@"lon"] doubleValue];
+    double centerLat = [j[@"lat"] doubleValue];
+    double centerLon = [j[@"lon"] doubleValue];
     NSString *tz = [j[@"timezone"] description] ?: @"UTC";
     NSString *cc = [j[@"countryCode"] description] ?: @"US";
     NSString *city = [j[@"city"] description] ?: @"";
+    NSString *region = [j[@"regionName"] description] ?: @"";
     NSString *country = [j[@"country"] description] ?: @"";
     NSString *ip = [j[@"query"] description] ?: @"";
     NSString *isp = [j[@"isp"] description] ?: @"";
     NSDictionary *loc = [AppState localeBundleForCountryCode:cc];
 
+    // Random point inside city / metro box (Maps + Weather + spoof apps share dual-path)
+    NSDictionary *box = [AppState boundingBoxForCity:city region:region countryCode:cc
+                                           centerLat:centerLat centerLon:centerLon];
+    double lat = centerLat, lon = centerLon;
+    [AppState randomPointInBox:box latOut:&lat lonOut:&lon];
+    double acc = 8.0 + (double)arc4random_uniform(180) / 10.0; // 8–26 m
+    double alt = 5.0 + (double)arc4random_uniform(40);         // 5–45 m
+
     NSString *bcp = loc[@"bcp"] ?: @"en-US";
     NSString *appleLoc = loc[@"apple"] ?: @"en_US";
+    NSString *boxLabel = box[@"label"] ?: @"area";
     NSDictionary *keys = @{
-        // Location → Maps + Weather (CLLocation hooks, WGS84)
+        // Location → Maps + Weather (CLLocation hooks, WGS84) — random in city
         @"FakeLocation": @YES,
         @"Latitude": @(lat),
         @"Longitude": @(lon),
-        @"LocationAccuracy": @(15.0),
-        @"Altitude": @(10.0),
+        @"LocationAccuracy": @(acc),
+        @"Altitude": @(alt),
         // Timezone → clock / FakeLocale (NSTimeZone IANA)
         @"FakeLocale": @YES,
         @"TimeZoneName": tz,
         @"CountryCode": cc,
-        // Keep carrier ISO separate if already set; locale country for FakeLocale
         @"PreferredLanguage": bcp,
         @"LocaleIdentifier": appleLoc,
         @"AppleLocale": appleLoc,
@@ -1221,29 +1302,54 @@ static NSString *const kPxSyncGeo = @"ipf.proxy.syncGeo";
         @"ProxyGeoCity": city,
         @"ProxyGeoCountry": country,
         @"ProxyGeoISP": isp,
-        @"ProxyGeoRegion": [j[@"regionName"] description] ?: @"",
+        @"ProxyGeoRegion": region,
+        @"ProxyGeoBox": boxLabel,
+        @"ProxyGeoCenterLat": @(centerLat),
+        @"ProxyGeoCenterLon": @(centerLon),
         @"SyncGeoFromProxy": @YES,
+        @"GeoRandomInCity": @YES,
         @"GeoSyncedAtUnix": @((NSInteger)[[NSDate date] timeIntervalSince1970]),
     };
     if (keysOut) *keysOut = keys;
 
-    // Persist last geo summary
+    // Persist last geo summary (dual-path readable)
     @try {
-        NSString *path = @"/var/mobile/Library/iPFaker/proxy_geo.json";
         NSData *json = [NSJSONSerialization dataWithJSONObject:keys options:NSJSONWritingPrettyPrinted error:nil];
-        [json writeToFile:path atomically:YES];
+        [json writeToFile:@"/var/mobile/Library/iPFaker/proxy_geo.json" atomically:YES];
+        [json writeToFile:@"/var/jb/etc/ipfaker/proxy_geo.json" atomically:YES];
     } @catch (__unused NSException *ex) {}
 
     NSString *summary = [NSString stringWithFormat:
-        @"Đã đồng bộ theo proxy/IP:\n"
+        @"Đã đồng bộ theo proxy/IP (random trong thành phố):\n"
         @"• IP: %@\n"
-        @"• Vị trí (Map/Thời tiết): %@, %@ (%.4f, %.4f)\n"
-        @"• Múi giờ (thời gian): %@\n"
-        @"• Ngôn ngữ: %@ · Quốc gia: %@\n"
+        @"• Thành phố proxy: %@, %@ · vùng fake: %@\n"
+        @"• Vị trí Map/Thời tiết (random): %.5f, %.5f (±acc %.0fm)\n"
+        @"• Tâm IP-API: %.4f, %.4f\n"
+        @"• Múi giờ: %@ · Ngôn ngữ: %@ · Quốc gia: %@\n"
         @"• ISP: %@",
-        ip, city, country, lat, lon, tz, loc[@"bcp"] ?: @"?", cc, isp];
+        ip, city, country, boxLabel, lat, lon, acc, centerLat, centerLon,
+        tz, loc[@"bcp"] ?: @"?", cc, isp];
     if (progress) progress(summary);
     return summary;
+}
+
+/// Proxy keys + random-in-city geo → dual-path (called from both Reset buttons).
+- (NSString *)attachProxyGeoRandomInCityProgress:(void (^)(NSString *))progress {
+    [self saveProxyAppAttest];
+    // Force SyncGeo ON for reset flows when proxy is configured
+    [self setSyncGeoFromProxyEnabled:YES];
+    NSMutableDictionary *keys = [[self proxyAppAttestFlatKeys] mutableCopy];
+    NSDictionary *geo = nil;
+    NSString *geoMsg = [self syncTimeMapWeatherFromProxyProgress:progress geoKeysOut:&geo];
+    if (geo.count) {
+        [keys addEntriesFromDictionary:geo];
+        keys[@"FakeLocation"] = @YES;
+        keys[@"FakeLocale"] = @YES;
+        [self setToggle:YES forKey:@"FakeLocation"];
+        [self setToggle:YES forKey:@"FakeLocale"];
+    }
+    NSString *merge = [ProfileBuilder mergeKeysIntoConfig:keys progress:progress];
+    return [NSString stringWithFormat:@"%@\n%@", geoMsg ?: @"", merge ?: @""];
 }
 
 - (NSString *)applyProxyAppAttestToConfigProgress:(void (^)(NSString *))progress {

@@ -69,6 +69,7 @@
             @"FakeWebRTC", @"DisableWebRTC", @"WebRTCLocalIP", @"FakeSensor",
             @"SyncGeoFromProxy", @"ProxyEgressIP", @"ProxyGeoCity", @"ProxyGeoCountry",
             @"ProxyGeoISP", @"ProxyGeoRegion", @"GeoSyncedAtUnix",
+            @"ProxyGeoBox", @"ProxyGeoCenterLat", @"ProxyGeoCenterLon", @"GeoRandomInCity",
             // Nested blobs allowed as-is
             @"jailbreakHide", @"jailbreak_hide",
         ]];
