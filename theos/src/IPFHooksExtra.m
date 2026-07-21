@@ -1,8 +1,14 @@
 // Extra spoof surface for Zalo — gated by config Fake* flags:
 //  FakeScreen / FakeRealScreen, FakeHardware (disk), HideJailbreak,
 //  FakeBrowser (UA), FakeLocale (BCP-47 + IANA TZ), FakeDateTime,
-//  FakeLocation (WGS84), FakeSensor, FakeWebRTC / DisableWebRTC.
+//  FakeLocation (WGS84), FakeSensor, FakeWebRTC / DisableWebRTC,
+//  FakeWifi: getifaddrs MAC; FakeDevice/FakeNetwork: gethostname + NSProcessInfo.hostName.
 // Complements IPFHooksMG / CT. Keep defensive — never crash Zalo.
+//
+// Standards:
+//  - getifaddrs(3) BSD/iOS man — AF_LINK + sockaddr_dl / LLADDR
+//  - gethostname(3) POSIX
+//  - IEEE 802 MAC EUI-48 in ifa_addr when sa_family == AF_LINK
 
 #import "IPFHooksExtra.h"
 #import "IPFConfig.h"
@@ -13,8 +19,15 @@
 #import <dlfcn.h>
 #import <unistd.h>
 #import <sys/stat.h>
+#import <sys/socket.h>
+#import <sys/types.h>
+#import <net/if.h>
+#import <net/if_dl.h>
+#import <ifaddrs.h>
 #import <string.h>
 #import <math.h>
+#import <errno.h>
+#import <ctype.h>
 
 typedef void (*MSHookFunction_t)(void *symbol, void *replace, void **result);
 typedef void (*MSHookMessageEx_t)(Class _class, SEL sel, IMP imp, IMP *result);
@@ -426,6 +439,172 @@ static BOOL stub_isAccelAvailable(id self, SEL _cmd) {
     return orig_isAccelAvailable ? orig_isAccelAvailable(self, _cmd) : YES;
 }
 
+#pragma mark - Hostname + getifaddrs (FakeDevice / FakeWifi)
+
+/// Hostname-safe: ASCII letters, digits, hyphen; max 63 (DNS label / gethostname convention).
+static NSString *IPFHostnameFromConfig(void) {
+    IPFConfig *cfg = [IPFConfig shared];
+    NSString *raw = [cfg stringForKey:@"Hostname"]
+        ?: [cfg stringForKey:@"kern.hostname"]
+        ?: [cfg stringForKey:@"UserAssignedDeviceName"]
+        ?: [cfg stringForKey:@"DeviceName"]
+        ?: @"iPhone";
+    NSMutableString *out = [NSMutableString stringWithCapacity:MIN((NSUInteger)63, raw.length + 4)];
+    for (NSUInteger i = 0; i < raw.length && out.length < 63; i++) {
+        unichar c = [raw characterAtIndex:i];
+        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-') {
+            [out appendFormat:@"%C", c];
+        } else if (c == ' ' || c == '_' || c == '.') {
+            if (out.length && [out characterAtIndex:out.length - 1] != '-')
+                [out appendString:@"-"];
+        }
+    }
+    while (out.length && [out characterAtIndex:0] == '-')
+        [out deleteCharactersInRange:NSMakeRange(0, 1)];
+    while (out.length && [out characterAtIndex:out.length - 1] == '-')
+        [out deleteCharactersInRange:NSMakeRange(out.length - 1, 1)];
+    if (out.length == 0) [out appendString:@"iPhone"];
+    return [out copy];
+}
+
+static BOOL IPFParseMAC6(NSString *mac, uint8_t out[6]) {
+    if (!mac.length || !out) return NO;
+    NSArray *parts = [[mac uppercaseString] componentsSeparatedByString:@":"];
+    if (parts.count != 6) {
+        parts = [[mac uppercaseString] componentsSeparatedByString:@"-"];
+    }
+    if (parts.count != 6) return NO;
+    for (int i = 0; i < 6; i++) {
+        NSString *p = parts[i];
+        if (p.length != 2) return NO;
+        unsigned v = 0;
+        NSScanner *sc = [NSScanner scannerWithString:p];
+        if (![sc scanHexInt:&v] || v > 0xFF) return NO;
+        out[i] = (uint8_t)v;
+    }
+    return YES;
+}
+
+static int (*orig_gethostname)(char *, size_t);
+static int stub_gethostname(char *name, size_t namelen) {
+    // POSIX gethostname — spoof only when FakeDevice or FakeNetwork on
+    IPFConfig *cfg = [IPFConfig shared];
+    BOOL on = [cfg flag:@"FakeDevice" defaultYes:YES] || [cfg flag:@"FakeNetwork" defaultYes:YES];
+    if (!on || !name || namelen == 0)
+        return orig_gethostname ? orig_gethostname(name, namelen) : -1;
+    @autoreleasepool {
+        NSString *hn = IPFHostnameFromConfig();
+        const char *s = hn.UTF8String ?: "iPhone";
+        size_t n = strlen(s);
+        if (n + 1 > namelen) {
+            // ERANGE if buffer too small (POSIX)
+            if (namelen > 0) {
+                memcpy(name, s, namelen - 1);
+                name[namelen - 1] = '\0';
+            }
+            errno = ENAMETOOLONG;
+            return -1;
+        }
+        memcpy(name, s, n + 1);
+        IPFExTrace([NSString stringWithFormat:@"gethostname FAKE %@", hn]);
+        return 0;
+    }
+}
+
+static int (*orig_getifaddrs)(struct ifaddrs **);
+static int stub_getifaddrs(struct ifaddrs **ifap) {
+    int rc = orig_getifaddrs ? orig_getifaddrs(ifap) : -1;
+    if (rc != 0 || !ifap || !*ifap) return rc;
+    IPFConfig *cfg = [IPFConfig shared];
+    // FakeWifi (default YES) — rewrite AF_LINK EUI-48 to config WifiAddress
+    if (![cfg flag:@"FakeWifi" defaultYes:YES] && ![cfg flag:@"FakeNetwork" defaultYes:YES])
+        return rc;
+    @autoreleasepool {
+        NSString *wifi = [cfg stringForKey:@"WifiAddress"]
+            ?: [cfg mgValueForKey:@"WifiAddress"];
+        uint8_t mac[6];
+        if (!IPFParseMAC6(wifi, mac)) {
+            IPFExTrace(@"getifaddrs skip (no valid WifiAddress in config)");
+            return rc;
+        }
+        int patched = 0;
+        for (struct ifaddrs *ifa = *ifap; ifa; ifa = ifa->ifa_next) {
+            if (!ifa->ifa_addr) continue;
+            if (ifa->ifa_addr->sa_family != AF_LINK) continue;
+            struct sockaddr_dl *sdl = (struct sockaddr_dl *)ifa->ifa_addr;
+            // sdl_alen == 6 → Ethernet / Wi‑Fi link-layer address
+            if (sdl->sdl_alen != 6) continue;
+            // LLADDR points past interface name in sdl_data (BSD if_dl.h)
+            unsigned char *ll = (unsigned char *)LLADDR(sdl);
+            if (!ll) continue;
+            memcpy(ll, mac, 6);
+            patched++;
+        }
+        if (patched > 0)
+            IPFExTrace([NSString stringWithFormat:@"getifaddrs FAKE MAC %@ on %d AF_LINK", wifi, patched]);
+    }
+    return rc;
+}
+
+static NSString *(*orig_hostName)(id, SEL);
+static NSString *stub_hostName(id self, SEL _cmd) {
+    IPFConfig *cfg = [IPFConfig shared];
+    if (![cfg flag:@"FakeDevice" defaultYes:YES] && ![cfg flag:@"FakeNetwork" defaultYes:YES])
+        return orig_hostName ? orig_hostName(self, _cmd) : @"iPhone";
+    NSString *hn = IPFHostnameFromConfig();
+    IPFExTrace([NSString stringWithFormat:@"NSProcessInfo.hostName FAKE %@", hn]);
+    return hn;
+}
+
+#pragma mark - CNCopyCurrentNetworkInfo (SSID / BSSID ≡ profile)
+
+// Apple CaptiveNetwork (deprecated but still linked by many apps)
+// https://developer.apple.com — CNCopyCurrentNetworkInfo returns CFDictionary:
+//   kCNNetworkInfoKeySSID, kCNNetworkInfoKeyBSSID, kCNNetworkInfoKeySSIDData
+typedef CFDictionaryRef (*CNCopyCurrentNetworkInfo_t)(CFStringRef interfaceName);
+static CNCopyCurrentNetworkInfo_t orig_CNCopyCurrentNetworkInfo = NULL;
+
+static CFDictionaryRef stub_CNCopyCurrentNetworkInfo(CFStringRef interfaceName) {
+    CFDictionaryRef real = orig_CNCopyCurrentNetworkInfo
+        ? orig_CNCopyCurrentNetworkInfo(interfaceName) : NULL;
+    IPFConfig *cfg = [IPFConfig shared];
+    if (![cfg flag:@"FakeWifi" defaultYes:YES] && ![cfg flag:@"FakeNetwork" defaultYes:YES])
+        return real;
+    @autoreleasepool {
+        NSString *ssid = [cfg stringForKey:@"SSID"] ?: @"Viettel-WiFi";
+        NSString *bssid = [cfg stringForKey:@"BSSID"]
+            ?: [cfg stringForKey:@"WifiAddress"]
+            ?: [cfg mgValueForKey:@"WifiAddress"];
+        if (!bssid.length) {
+            return real; // keep real if profile missing MAC
+        }
+        // CaptiveNetwork keys (historical): SSID, BSSID, SSIDDATA
+        NSMutableDictionary *m = [NSMutableDictionary dictionaryWithCapacity:4];
+        m[@"SSID"] = ssid;
+        m[@"BSSID"] = bssid;
+        NSData *ssidData = [ssid dataUsingEncoding:NSUTF8StringEncoding];
+        if (ssidData) m[@"SSIDDATA"] = ssidData;
+        if (real) CFRelease(real);
+        IPFExTrace([NSString stringWithFormat:@"CNCopyCurrentNetworkInfo FAKE SSID=%@ BSSID=%@", ssid, bssid]);
+        return CFBridgingRetain(m);
+    }
+}
+
+#pragma mark - WKWebView customUserAgent (FakeBrowser) — sync with UserAgent
+
+static NSString *(*orig_customUA)(id, SEL);
+static NSString *stub_customUA(id self, SEL _cmd) {
+    if (![[IPFConfig shared] flag:@"FakeBrowser" defaultYes:YES])
+        return orig_customUA ? orig_customUA(self, _cmd) : nil;
+    NSString *ua = [[IPFConfig shared] stringForKey:@"UserAgent"]
+        ?: [[IPFConfig shared] stringForKey:@"HTTPUserAgent"];
+    if (ua.length) {
+        IPFExTrace(@"WKWebView.customUserAgent FAKE");
+        return ua;
+    }
+    return orig_customUA ? orig_customUA(self, _cmd) : nil;
+}
+
 #pragma mark - WebRTC local IP rewrite (FakeWebRTC)
 
 static NSString *(*orig_description_rtc)(id, SEL);
@@ -569,6 +748,15 @@ void IPFInstallExtraHooks(void) {
         }
     }
 
+    if (pMSHookMessageEx) {
+        // NSProcessInfo.hostName — same value as gethostname / kern.hostname
+        Class nspi = objc_getClass("NSProcessInfo");
+        if (nspi && class_getInstanceMethod(nspi, @selector(hostName))) {
+            pMSHookMessageEx(nspi, @selector(hostName), (IMP)stub_hostName, (IMP *)&orig_hostName);
+            IPFExTrace(@"NSProcessInfo.hostName OK");
+        }
+    }
+
     if (pMSHookFunction) {
         void *a = dlsym(RTLD_DEFAULT, "access");
         if (a) pMSHookFunction(a, (void *)stub_access, (void **)&orig_access);
@@ -577,6 +765,38 @@ void IPFInstallExtraHooks(void) {
         void *ls = dlsym(RTLD_DEFAULT, "lstat");
         if (ls) pMSHookFunction(ls, (void *)stub_lstat, (void **)&orig_lstat);
         IPFExTrace(@"access/stat/lstat JB hide OK");
+
+        // libc network identity (HIOS-class surface)
+        void *gif = dlsym(RTLD_DEFAULT, "getifaddrs");
+        if (gif) {
+            pMSHookFunction(gif, (void *)stub_getifaddrs, (void **)&orig_getifaddrs);
+            IPFExTrace(@"getifaddrs OK");
+        }
+        void *ghn = dlsym(RTLD_DEFAULT, "gethostname");
+        if (ghn) {
+            pMSHookFunction(ghn, (void *)stub_gethostname, (void **)&orig_gethostname);
+            IPFExTrace(@"gethostname OK");
+        }
+
+        // CaptiveNetwork — may live in SystemConfiguration
+        void *cn = dlsym(RTLD_DEFAULT, "CNCopyCurrentNetworkInfo");
+        if (!cn) {
+            void *sc = dlopen("/System/Library/Frameworks/SystemConfiguration.framework/SystemConfiguration", RTLD_NOW);
+            if (sc) cn = dlsym(sc, "CNCopyCurrentNetworkInfo");
+        }
+        if (cn) {
+            pMSHookFunction(cn, (void *)stub_CNCopyCurrentNetworkInfo, (void **)&orig_CNCopyCurrentNetworkInfo);
+            IPFExTrace(@"CNCopyCurrentNetworkInfo OK");
+        }
+    }
+
+    // WKWebView.customUserAgent — same UserAgent string as NSURLRequest
+    if (pMSHookMessageEx) {
+        Class wkw = objc_getClass("WKWebView");
+        if (wkw && class_getInstanceMethod(wkw, @selector(customUserAgent))) {
+            pMSHookMessageEx(wkw, @selector(customUserAgent), (IMP)stub_customUA, (IMP *)&orig_customUA);
+            IPFExTrace(@"WKWebView.customUserAgent OK");
+        }
     }
 
     IPFExTrace(@"IPFInstallExtraHooks done");

@@ -156,17 +156,24 @@ static CFTypeRef IPFMaybeSpoofIOKitValue(CFStringRef key, CFTypeRef value) {
             [kl containsString:@"model"] ||
             [kl containsString:@"product"] ||
             [kl containsString:@"machine"] ||
+            [kl containsString:@"serial"] ||
             [kl isEqualToString:@"hw.model"] ||
             [kl isEqualToString:@"product-name"] ||
-            [kl isEqualToString:@"model-number"];
+            [kl isEqualToString:@"model-number"] ||
+            [kl isEqualToString:@"ioplatformserialnumber"] ||
+            [kl isEqualToString:@"mlb-serial-number"];
         if (!interesting) return value;
 
         NSString *fake = nil;
-        if ([v hasPrefix:@"iPhone"] || [v rangeOfString:@"iPhone"].location != NSNotFound)
+        // Serial family — must match config SerialNumber (identity sync)
+        if ([kl containsString:@"serial"]) {
+            fake = [[IPFConfig shared] mgValueForKey:@"SerialNumber"]
+                ?: [[IPFConfig shared] stringForKey:@"SerialNumber"];
+        } else if ([v hasPrefix:@"iPhone"] || [v rangeOfString:@"iPhone"].location != NSNotFound)
             fake = IPFFakePT();
         else if ([v containsString:@"D331"] || [kl containsString:@"model"])
             fake = IPFFakeHW();
-        if (fake && ![fake isEqualToString:v]) {
+        if (fake.length && ![fake isEqualToString:v]) {
             IPFLog([NSString stringWithFormat:@"IOKit FAKE %@ : %@ => %@", k, v, fake]);
             return CFBridgingRetain(fake);
         }
@@ -234,10 +241,22 @@ void IPFInstallDeepHooks(void) {
     IPFResolve();
     IPFLog(@"IPFInstallDeepHooks begin");
 
-    // IOKit hooks deferred — can crash Zalo on cold path; HTTP rewrite is primary Plan B.
-    (void)pMSHookFunction;
-    (void)stub_IORegCreate;
-    (void)stub_IORegSearch;
+    // IOKit property spoof — only rewrites model/serial keys (see IPFMaybeSpoofIOKitValue).
+    // Fail-soft: if symbols missing, HTTP rewrite still covers Zalo payloads.
+    if (pMSHookFunction) {
+        void *io = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_NOW);
+        if (!io) io = dlopen("/System/Library/Frameworks/IOKit.framework/Versions/A/IOKit", RTLD_NOW);
+        void *c1 = io ? dlsym(io, "IORegistryEntryCreateCFProperty") : dlsym(RTLD_DEFAULT, "IORegistryEntryCreateCFProperty");
+        void *c2 = io ? dlsym(io, "IORegistryEntrySearchCFProperty") : dlsym(RTLD_DEFAULT, "IORegistryEntrySearchCFProperty");
+        if (c1) {
+            pMSHookFunction(c1, (void *)stub_IORegCreate, (void **)&orig_IORegCreate);
+            IPFLog(@"IORegistryEntryCreateCFProperty hooked");
+        }
+        if (c2) {
+            pMSHookFunction(c2, (void *)stub_IORegSearch, (void **)&orig_IORegSearch);
+            IPFLog(@"IORegistryEntrySearchCFProperty hooked");
+        }
+    }
 
     if (pMSHookMessageEx) {
         Class req = objc_getClass("NSMutableURLRequest");

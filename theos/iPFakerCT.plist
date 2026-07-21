@@ -9,6 +9,12 @@
 			<string>vn.com.vng.zingalo</string>
 			<string>com.zing.zalo</string>
 		</array>
+		<key>Executables</key>
+		<array>
+			<string>CommCenter</string>
+			<string>commcenter</string>
+			<string>CoreTelephonyHelper</string>
+		</array>
 		<key>Mode</key>
 		<string>Any</string>
 	</dict>
