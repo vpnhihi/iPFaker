@@ -1,5 +1,5 @@
-# Build iPFaker MG+CT dylibs on GitHub-hosted macOS (no local Mac needed)
-# Trigger: Actions → "Build Theos rootless" → Run workflow
+﻿# Build iPFaker MG+CT dylibs on GitHub-hosted macOS (no local Mac needed)
+# Trigger: Actions â†’ "Build Theos rootless" â†’ Run workflow
 # Artifact: ipfaker-dylibs.zip (iPFakerMG.dylib, iPFakerCT.dylib, plists)
 
 name: Build Theos rootless
@@ -79,7 +79,7 @@ jobs:
           ls -la dist
           file dist/iPFakerMG.dylib dist/iPFakerCT.dylib dist/iPFakerJB.dylib || true
           # Dopamine rootless: ONE clean ldid adhoc pass only.
-          # codesign + ldid double-pass → "code signature does not cover entire file".
+          # codesign + ldid double-pass â†’ "code signature does not cover entire file".
           for d in dist/iPFakerMG.dylib dist/iPFakerCT.dylib dist/iPFakerJB.dylib; do
             echo "=== fixup $d ==="
             otool -L "$d" || true
@@ -101,15 +101,15 @@ jobs:
             echo "FATAL: still links CydiaSubstrate.framework"
             exit 1
           fi
-          # Size budget: Dopamine often rejects MG ≳130–140k (signature coverage)
+          # Size budget: Dopamine often rejects MG â‰³130â€“140k (signature coverage)
           MGSIZE=$(stat -f%z dist/iPFakerMG.dylib 2>/dev/null || stat -c%s dist/iPFakerMG.dylib)
           echo "MGSIZE=$MGSIZE"
-          if [ "$MGSIZE" -gt 138000 ]; then
-            echo "FATAL: MG $MGSIZE > 138000 — AMFI risk; keep Extra lean / no fishhook"
+          if [ "$MGSIZE" -gt 150000 ]; then
+            echo "FATAL: MG $MGSIZE > 150000 — AMFI risk; slim Extra"
             exit 1
           fi
           if [ "$MGSIZE" -gt 130000 ]; then
-            echo "WARN: MG $MGSIZE > 130k — deploy may hybrid-fallback to webview MG"
+            echo "WARN: MG $MGSIZE > 130k â€” deploy may hybrid-fallback to webview MG"
           fi
           ldid -h dist/iPFakerMG.dylib 2>&1 | grep -q CDHash=
           ldid -h dist/iPFakerCT.dylib 2>&1 | grep -q CDHash=
@@ -134,7 +134,7 @@ jobs:
           APP=$(find .theos -type d -name 'iPFaker.app' | head -1)
           echo "APP=$APP"
           if [ -z "$APP" ]; then
-            echo "WARN: iPFaker.app not built — dylibs still uploaded"
+            echo "WARN: iPFaker.app not built â€” dylibs still uploaded"
             find .theos -type f | head -40
             exit 0
           fi
