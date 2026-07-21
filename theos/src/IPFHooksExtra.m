@@ -244,29 +244,63 @@ static int stub_statfs(const char *path, struct statfs *buf) {
 }
 
 #pragma mark - Jailbreak path hide
+// Lab_Environment_Hardening.md + HIOS denylist. Fail = ENOENT / NO / NULL.
+// MUST allow iPFaker config so spoof profile still loads inside Zalo.
+
+#import <stdio.h>
+
+static BOOL IPFIsAllowlistedPath(const char *path) {
+    if (!path) return NO;
+    if (strstr(path, "/var/jb/etc/ipfaker")) return YES;
+    if (strstr(path, "/private/var/jb/etc/ipfaker")) return YES;
+    if (strstr(path, "/var/mobile/Library/iPFaker")) return YES;
+    return NO;
+}
 
 static BOOL IPFIsJBPath(const char *path) {
-    if (path == NULL) return NO;
+    if (path == NULL || path[0] == '\0') return NO;
     if (![[IPFConfig shared] flag:@"HideJailbreak" defaultYes:YES]) return NO;
+    if (IPFIsAllowlistedPath(path)) return NO;
+
     static const char *kDefault[] = {
         "/Applications/Cydia.app",
         "/Applications/Sileo.app",
         "/Applications/Zebra.app",
         "/Applications/Installer.app",
+        "/Applications/Filza.app",
+        "/Applications/NewTerm.app",
         "/Library/MobileSubstrate",
+        "/var/MobileSubstrate",
         "/usr/lib/libsubstrate.dylib",
+        "/usr/lib/substrate",
+        "/usr/libexec/substrate",
+        "/usr/libexec/cydia",
         "/usr/lib/TweakInject",
+        "/usr/lib/libellekit.dylib",
+        "/usr/lib/ellekit",
+        "CydiaSubstrate",
         "/var/jb",
+        "/private/var/jb",
         "/var/LIB",
         "/var/binpack",
+        "/var/lib/cydia",
         "/private/var/lib/cydia",
         "/bin/bash",
         "/usr/sbin/sshd",
         "/etc/apt",
+        "/.bootstrapped",
         "/.bootstrapped_electra",
+        "/.bootstraprc",
+        "/bootstraprc",
         "/usr/lib/frida",
         "/usr/lib/libfrida",
+        "frida-server",
         "FridaGadget",
+        "frida-agent",
+        "/cores/binpack",
+        "palera1n",
+        "checkra1n",
+        "Dopamine",
         "cydia://",
         "sileo://",
         "zbra://",
@@ -283,27 +317,88 @@ static BOOL IPFIsJBPath(const char *path) {
             NSString *p = [NSString stringWithUTF8String:path];
             for (id x in paths) {
                 NSString *s = [x description];
-                if (s.length && [p rangeOfString:s].location != NSNotFound) return YES;
+                if (!s.length) continue;
+                if ([s.lowercaseString containsString:@"ipfaker"]) continue;
+                if ([p rangeOfString:s].location != NSNotFound) return YES;
             }
         }
     } @catch (__unused NSException *ex) {}
     return NO;
 }
 
+static void IPFJBHideLogOnce(const char *api, const char *path) {
+    static int n = 0;
+    if (n >= 16) return;
+    n++;
+    IPFExTrace([NSString stringWithFormat:@"JBhide %s block %s", api, path ? path : "(null)"]);
+}
+
 static int (*orig_access)(const char *, int);
 static int stub_access(const char *path, int mode) {
-    if (IPFIsJBPath(path)) { errno = ENOENT; return -1; }
+    if (IPFIsJBPath(path)) { IPFJBHideLogOnce("access", path); errno = ENOENT; return -1; }
     return orig_access ? orig_access(path, mode) : -1;
 }
 static int (*orig_stat)(const char *, struct stat *);
 static int stub_stat(const char *path, struct stat *buf) {
-    if (IPFIsJBPath(path)) { errno = ENOENT; return -1; }
+    if (IPFIsJBPath(path)) { IPFJBHideLogOnce("stat", path); errno = ENOENT; return -1; }
     return orig_stat ? orig_stat(path, buf) : -1;
 }
 static int (*orig_lstat)(const char *, struct stat *);
 static int stub_lstat(const char *path, struct stat *buf) {
-    if (IPFIsJBPath(path)) { errno = ENOENT; return -1; }
+    if (IPFIsJBPath(path)) { IPFJBHideLogOnce("lstat", path); errno = ENOENT; return -1; }
     return orig_lstat ? orig_lstat(path, buf) : -1;
+}
+
+static FILE *(*orig_fopen)(const char *, const char *);
+static FILE *stub_fopen(const char *path, const char *mode) {
+    if (IPFIsJBPath(path)) { IPFJBHideLogOnce("fopen", path); errno = ENOENT; return NULL; }
+    return orig_fopen ? orig_fopen(path, mode) : NULL;
+}
+
+static char *(*orig_getenv)(const char *);
+static char *stub_getenv(const char *name) {
+    if (!name) return orig_getenv ? orig_getenv(name) : NULL;
+    if (![[IPFConfig shared] flag:@"HideJailbreak" defaultYes:YES])
+        return orig_getenv ? orig_getenv(name) : NULL;
+    static const char *kEnv[] = {
+        "DYLD_INSERT_LIBRARIES",
+        "DYLD_LIBRARY_PATH",
+        "DYLD_FRAMEWORK_PATH",
+        "DYLD_PRINT_TO_FILE",
+        "_MSSafeMode",
+        "SSLKEYLOGFILE",
+        NULL
+    };
+    for (int i = 0; kEnv[i]; i++) {
+        if (strcmp(name, kEnv[i]) == 0) {
+            IPFJBHideLogOnce("getenv", name);
+            return NULL;
+        }
+    }
+    if (strncmp(name, "FRIDA", 5) == 0) {
+        IPFJBHideLogOnce("getenv", name);
+        return NULL;
+    }
+    return orig_getenv ? orig_getenv(name) : NULL;
+}
+
+static BOOL (*orig_fileExists)(id, SEL, NSString *);
+static BOOL stub_fileExists(id self, SEL _cmd, NSString *path) {
+    if (path.length && IPFIsJBPath(path.UTF8String)) {
+        IPFJBHideLogOnce("fileExists", path.UTF8String);
+        return NO;
+    }
+    return orig_fileExists ? orig_fileExists(self, _cmd, path) : NO;
+}
+
+static BOOL (*orig_fileExistsIsDir)(id, SEL, NSString *, BOOL *);
+static BOOL stub_fileExistsIsDir(id self, SEL _cmd, NSString *path, BOOL *isDir) {
+    if (path.length && IPFIsJBPath(path.UTF8String)) {
+        IPFJBHideLogOnce("fileExists:isDir", path.UTF8String);
+        if (isDir) *isDir = NO;
+        return NO;
+    }
+    return orig_fileExistsIsDir ? orig_fileExistsIsDir(self, _cmd, path, isDir) : NO;
 }
 
 #pragma mark - canOpenURL (JB schemes + WebRTC disable)
@@ -314,12 +409,14 @@ static BOOL stub_canOpen(id self, SEL _cmd, NSURL *url) {
     if ([[IPFConfig shared] flag:@"HideJailbreak" defaultYes:YES]) {
         if ([s hasPrefix:@"cydia://"] || [s hasPrefix:@"sileo://"] || [s hasPrefix:@"zbra://"]
             || [s hasPrefix:@"filza://"] || [s hasPrefix:@"undecimus://"] || [s hasPrefix:@"activator://"]
-            || [s hasPrefix:@"dopamine://"] || [s hasPrefix:@"ellekit://"]) {
+            || [s hasPrefix:@"dopamine://"] || [s hasPrefix:@"ellekit://"]
+            || [s hasPrefix:@"ssh://"] || [s hasPrefix:@"newterm://"]
+            || [s hasPrefix:@"santander://"]) {
+            IPFJBHideLogOnce("canOpenURL", s.UTF8String);
             return NO;
         }
     }
     if ([[IPFConfig shared] flag:@"DisableWebRTC" defaultYes:NO]) {
-        // Best-effort block custom WebRTC URL schemes some apps probe
         if ([s containsString:@"webrtc"] || [s hasPrefix:@"rtc:"] || [s hasPrefix:@"stuns:"]
             || [s hasPrefix:@"turns:"]) {
             return NO;
@@ -890,10 +987,21 @@ void IPFInstallExtraHooks(void) {
         }
 
         Class fm = objc_getClass("NSFileManager");
-        if (fm && class_getInstanceMethod(fm, @selector(attributesOfFileSystemForPath:error:))) {
-            pMSHookMessageEx(fm, @selector(attributesOfFileSystemForPath:error:),
-                             (IMP)stub_attrs, (IMP *)&orig_attrs);
-            IPFExTrace(@"disk hooks OK");
+        if (fm) {
+            if (class_getInstanceMethod(fm, @selector(attributesOfFileSystemForPath:error:))) {
+                pMSHookMessageEx(fm, @selector(attributesOfFileSystemForPath:error:),
+                                 (IMP)stub_attrs, (IMP *)&orig_attrs);
+                IPFExTrace(@"disk hooks OK");
+            }
+            if (class_getInstanceMethod(fm, @selector(fileExistsAtPath:))) {
+                pMSHookMessageEx(fm, @selector(fileExistsAtPath:),
+                                 (IMP)stub_fileExists, (IMP *)&orig_fileExists);
+            }
+            if (class_getInstanceMethod(fm, @selector(fileExistsAtPath:isDirectory:))) {
+                pMSHookMessageEx(fm, @selector(fileExistsAtPath:isDirectory:),
+                                 (IMP)stub_fileExistsIsDir, (IMP *)&orig_fileExistsIsDir);
+            }
+            IPFExTrace(@"NSFileManager fileExists JB hide OK");
         }
 
         Class app = objc_getClass("UIApplication");
@@ -993,7 +1101,11 @@ void IPFInstallExtraHooks(void) {
         if (st) pMSHookFunction(st, (void *)stub_stat, (void **)&orig_stat);
         void *ls = dlsym(RTLD_DEFAULT, "lstat");
         if (ls) pMSHookFunction(ls, (void *)stub_lstat, (void **)&orig_lstat);
-        IPFExTrace(@"access/stat/lstat JB hide OK");
+        void *fo = dlsym(RTLD_DEFAULT, "fopen");
+        if (fo) pMSHookFunction(fo, (void *)stub_fopen, (void **)&orig_fopen);
+        void *ge = dlsym(RTLD_DEFAULT, "getenv");
+        if (ge) pMSHookFunction(ge, (void *)stub_getenv, (void **)&orig_getenv);
+        IPFExTrace(@"access/stat/lstat/fopen/getenv JB hide OK");
 
         // libc network identity (HIOS-class surface)
         void *gif = dlsym(RTLD_DEFAULT, "getifaddrs");

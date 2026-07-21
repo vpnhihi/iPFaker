@@ -24,7 +24,7 @@ Do **not** hardcode identity values in binary source.
 | UIScreen | scale / native bounds vs spoofed model |
 | DiskSpace | `NSFileSystemSize` / free |
 | IOKit | `IOPlatformSerialNumber`, `IOPlatformUUID` |
-| JailbreakHide | `access` / `stat` path deny list from `jailbreak_hide` |
+| JailbreakHide | `access`/`stat`/`lstat`/`fopen`/`getenv` + `NSFileManager fileExists` + `canOpenURL` schemes; allowlist `/var/jb/etc/ipfaker` |
 | WebViewUA | WKWebView custom UA from `webview` |
 | BootTime | `kern.boottime` via sysctl |
 | getifaddrs / hostname | `getifaddrs` AF_LINK MAC ← `WifiAddress`; `gethostname` + `NSProcessInfo.hostName` + `uname.nodename` ← `Hostname` (derived device name) |
