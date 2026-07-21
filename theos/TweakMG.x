@@ -6,7 +6,6 @@
 #import "IPFConfig.h"
 #import "IPFHooksMG.h"
 #import "IPFHooksExtra.h"
-#import "IPFHooksEnv.h"
 
 static void IPFMark(const char *msg) {
     // Sandbox-safe first (Zalo Documents/tmp), then jailbreak paths
@@ -72,14 +71,12 @@ static void IPFMark(const char *msg) {
 
         IPFInstallMGHooks();
         IPFInstallExtraHooks();
-        IPFInstallEnvHooks(); // Locale/TZ/Location/Sensor (AMFI-budgeted in MG)
-        // Module cover matrix (MG + Extra + Env co-loaded)
+        // Module cover: MG+Extra here; CT+Deep; JB+Server
         @try {
             NSString *mod = [NSString stringWithFormat:
                 @"MODULE IPFHooksMG: MGCopyAnswer(+Error) sysctl uname UIDevice IDFA/IDFV boottime Fake* gates; MSHook primary (fishhook fallback only if miss)\n"
                 @"MODULE IPFHooksExtra: UIScreen disk path-hide canOpenURL UA getifaddrs hostname WKWebView\n"
-                @"MODULE IPFHooksEnv: Locale/TZ/Date · Location · Sensor availability\n"
-                @"MODULE stack: MG+Extra+Env · CT+Deep · JB+Server · bid=%@\n",
+                @"MODULE stack: MG+Extra · CT+Deep · JB+Server · bid=%@\n",
                 bid];
             NSString *home = NSHomeDirectory();
             if (home.length)

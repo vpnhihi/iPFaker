@@ -17,21 +17,22 @@ TWEAK_NAME = iPFakerMG iPFakerCT iPFakerJB
 # MG = spoof + Extra (screen/disk/UA/getifaddrs/access-stat/WKWebView)
 # fishhook.c OFF by default: keeps MG ~123k AMFI-safe. ElleKit MSHook is primary on Dopamine.
 # Optional: add src/fishhook.c + -DIPF_FISHHOOK_FALLBACK=1 only if MSHook is unavailable.
-# MG: spoof + Extra core + Env (locale/TZ/location/sensor). Target ≤128k AMFI-safe.
-iPFakerMG_FILES = TweakMG.x src/IPFConfig.m src/IPFHooksMG.m src/IPFHooksExtra.m src/IPFHooksEnv.m
+# MG: spoof + Extra core only. Proven inject ≤128k on lab AMFI.
+# Env (locale/location) optional — enable via IPF_WITH_ENV=1 if budget allows.
+iPFakerMG_FILES = TweakMG.x src/IPFConfig.m src/IPFHooksMG.m src/IPFHooksExtra.m
 iPFakerMG_CFLAGS = -fobjc-arc -Os -fvisibility=hidden -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
 iPFakerMG_FRAMEWORKS = UIKit Foundation AdSupport
 iPFakerMG_LIBRARIES = substrate
 iPFakerMG_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerMG.dylib -Wl,-dead_strip
 
-# CT lean: telephony + Deep only (~105k inject OK on lab)
+# CT lean: telephony + Deep (~105k inject OK)
 iPFakerCT_FILES = TweakCT.x src/IPFConfig.m src/IPFHooksCT.m src/IPFHooksDeep.m
 iPFakerCT_CFLAGS = -fobjc-arc -Os -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
 iPFakerCT_FRAMEWORKS = UIKit Foundation CoreTelephony
 iPFakerCT_LIBRARIES = substrate
 iPFakerCT_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerCT.dylib -Wl,-dead_strip
 
-# JB: hide expand + Server mitigations only (Proxy/AA/WebRTC). Keep ≤110k inject OK.
+# JB: hide + Server (Proxy/AppAttest/WebRTC). Keep ~100–106k inject OK.
 iPFakerJB_FILES = TweakJB.x src/IPFConfig.m src/IPFHooksJB.m src/IPFHooksServer.m
 iPFakerJB_CFLAGS = -fobjc-arc -Os -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
 iPFakerJB_FRAMEWORKS = Foundation CFNetwork
