@@ -52,6 +52,8 @@ jobs:
           cp -f layout/Library/MobileSubstrate/DynamicLibraries/iPFakerMG.plist ./iPFakerMG.plist
           cp -f layout/Library/MobileSubstrate/DynamicLibraries/iPFakerCT.plist ./iPFakerCT.plist
           cp -f layout/Library/MobileSubstrate/DynamicLibraries/iPFakerJB.plist ./iPFakerJB.plist
+          cp -f layout/Library/MobileSubstrate/DynamicLibraries/iPFakerMG.plist ./iPFakerAA.plist
+          cp -f ./iPFakerAA.plist layout/Library/MobileSubstrate/DynamicLibraries/iPFakerAA.plist
           make clean || true
           make all FINALPACKAGE=1
           make package FINALPACKAGE=1 || true
@@ -64,8 +66,7 @@ jobs:
           set -e
           mkdir -p dist
           find .theos/obj -name 'iPFaker*.dylib' 2>/dev/null | head -20
-          # Prefer non-debug objects
-          for name in iPFakerMG iPFakerCT iPFakerJB; do
+          for name in iPFakerAA iPFakerMG iPFakerCT iPFakerJB; do
             f=$(find .theos -path '*debug*' -prune -o -name "${name}.dylib" -print 2>/dev/null | head -1)
             if [ -z "$f" ]; then f=$(find .theos -name "${name}.dylib" | head -1); fi
             if [ -z "$f" ]; then
@@ -75,12 +76,11 @@ jobs:
             cp -f "$f" "dist/${name}.dylib"
           done
           cp -f layout/Library/MobileSubstrate/DynamicLibraries/*.plist dist/ 2>/dev/null || true
+          cp -f iPFakerAA.plist dist/ 2>/dev/null || true
           find packages -name '*.deb' -exec cp -f {} dist/ \; 2>/dev/null || true
           ls -la dist
-          file dist/iPFakerMG.dylib dist/iPFakerCT.dylib dist/iPFakerJB.dylib || true
-          # Dopamine rootless: ONE clean ldid adhoc pass only.
-          # codesign + ldid double-pass â†’ "code signature does not cover entire file".
-          for d in dist/iPFakerMG.dylib dist/iPFakerCT.dylib dist/iPFakerJB.dylib; do
+          file dist/iPFaker*.dylib || true
+          for d in dist/iPFakerAA.dylib dist/iPFakerMG.dylib dist/iPFakerCT.dylib dist/iPFakerJB.dylib; do
             echo "=== fixup $d ==="
             otool -L "$d" || true
             install_name_tool -change \
@@ -89,37 +89,33 @@ jobs:
             install_name_tool -change \
               /Library/Frameworks/CydiaSubstrate.framework/CydiaSubstrate \
               /var/jb/usr/lib/libsubstrate.dylib "$d" 2>/dev/null || true
-            # Strip any linker-embedded signature, then single ldid adhoc
             codesign --remove-signature "$d" 2>/dev/null || true
             ldid -S "$d"
             echo "size=$(stat -f%z "$d" 2>/dev/null || stat -c%s "$d")"
-            ldid -h "$d" 2>&1 | head -20
-            otool -l "$d" | grep -A4 LC_CODE_SIGNATURE || true
+            ldid -h "$d" 2>&1 | head -12
             ldid -h "$d" 2>&1 | grep -q CDHash=
           done
           if otool -L dist/iPFakerMG.dylib | grep -q 'CydiaSubstrate.framework'; then
             echo "FATAL: still links CydiaSubstrate.framework"
             exit 1
           fi
-          # Size budget: lab Dopamine rejects MG ~140k (AMFI). Target Extra-only MG ≤130k.
-          # Proxy/AppAttest/WebRTC live in CT (IPFHooksServer) so MG stays lean.
           MGSIZE=$(stat -f%z dist/iPFakerMG.dylib 2>/dev/null || stat -c%s dist/iPFakerMG.dylib)
           CTSIZE=$(stat -f%z dist/iPFakerCT.dylib 2>/dev/null || stat -c%s dist/iPFakerCT.dylib)
-          echo "MGSIZE=$MGSIZE CTSIZE=$CTSIZE"
+          AASIZE=$(stat -f%z dist/iPFakerAA.dylib 2>/dev/null || stat -c%s dist/iPFakerAA.dylib)
+          JBSIZE=$(stat -f%z dist/iPFakerJB.dylib 2>/dev/null || stat -c%s dist/iPFakerJB.dylib)
+          echo "MGSIZE=$MGSIZE CTSIZE=$CTSIZE AASIZE=$AASIZE JBSIZE=$JBSIZE"
           if [ "$MGSIZE" -gt 132000 ]; then
-            echo "FATAL: MG $MGSIZE > 132000 — AMFI lab reject zone; slim Extra further"
+            echo "FATAL: MG $MGSIZE > 132000 — AMFI lab reject zone"
             exit 1
           fi
-          if [ "$MGSIZE" -gt 128000 ]; then
-            echo "WARN: MG $MGSIZE near AMFI edge (prefer ≤125k Extra core)"
-          fi
-          if [ "$CTSIZE" -gt 200000 ]; then
-            echo "FATAL: CT $CTSIZE unexpectedly large"
+          if [ "$AASIZE" -gt 90000 ]; then
+            echo "FATAL: AA $AASIZE too large for lite dylib"
             exit 1
           fi
           ldid -h dist/iPFakerMG.dylib 2>&1 | grep -q CDHash=
           ldid -h dist/iPFakerCT.dylib 2>&1 | grep -q CDHash=
           ldid -h dist/iPFakerJB.dylib 2>&1 | grep -q CDHash=
+          ldid -h dist/iPFakerAA.dylib 2>&1 | grep -q CDHash=
 
 
       - name: Build iPFaker.app

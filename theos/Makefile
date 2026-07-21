@@ -12,11 +12,19 @@ include $(THEOS)/makefiles/common.mk
 #   MG = spoof + Extra core (screen/disk/UA/getifaddrs/access-stat)
 #   CT = telephony + deep rewrite
 #   JB = expanded hide (fopen/getenv/fileExists) — optional, fails independently
-TWEAK_NAME = iPFakerMG iPFakerCT iPFakerJB
+# AA = ServerLite (AppAttest/Proxy/WebRTC) — loads first alphabetically, tiny, no IPFConfig.m
+TWEAK_NAME = iPFakerAA iPFakerMG iPFakerCT iPFakerJB
 
 # MG = spoof + Extra (screen/disk/UA/getifaddrs/access-stat/WKWebView)
 # fishhook.c OFF by default: keeps MG ~123k AMFI-safe. ElleKit MSHook is primary on Dopamine.
 # Optional: add src/fishhook.c + -DIPF_FISHHOOK_FALLBACK=1 only if MSHook is unavailable.
+# AA: server mitigations lite (AppAttest/Proxy/WebRTC) — own dylib, no CFNetwork, no IPFConfig.m
+iPFakerAA_FILES = src/IPFHooksServerLite.m
+iPFakerAA_CFLAGS = -fobjc-arc -Os -fvisibility=hidden -Wno-unused-variable -Wno-unused-function -I$(THEOS_PROJECT_DIR)/src
+iPFakerAA_FRAMEWORKS = Foundation
+iPFakerAA_LIBRARIES = substrate
+iPFakerAA_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerAA.dylib -Wl,-dead_strip
+
 # MG: spoof + Extra core only. Proven inject ≤128k on lab AMFI.
 # Env (locale/location) optional — enable via IPF_WITH_ENV=1 if budget allows.
 iPFakerMG_FILES = TweakMG.x src/IPFConfig.m src/IPFHooksMG.m src/IPFHooksExtra.m
@@ -32,10 +40,9 @@ iPFakerCT_FRAMEWORKS = UIKit Foundation CoreTelephony
 iPFakerCT_LIBRARIES = substrate
 iPFakerCT_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerCT.dylib -Wl,-dead_strip
 
-# JB: hide + Server (Proxy/AppAttest/WebRTC). Keep ~100–106k inject OK.
-iPFakerJB_FILES = TweakJB.x src/IPFConfig.m src/IPFHooksJB.m src/IPFHooksServer.m
+# JB: hide expand only (keep ~88k — proven inject). Server lives in iPFakerAA.
+iPFakerJB_FILES = TweakJB.x src/IPFConfig.m src/IPFHooksJB.m
 iPFakerJB_CFLAGS = -fobjc-arc -Os -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
-# No CFNetwork hard-link (AMFI/signature friendlier); Server uses string proxy keys
 iPFakerJB_FRAMEWORKS = Foundation
 iPFakerJB_LIBRARIES = substrate
 iPFakerJB_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerJB.dylib -Wl,-dead_strip
