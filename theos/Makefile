@@ -24,19 +24,20 @@ iPFakerMG_FRAMEWORKS = UIKit Foundation AdSupport
 iPFakerMG_LIBRARIES = substrate
 iPFakerMG_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerMG.dylib -Wl,-dead_strip
 
-# CT: telephony + Deep + Server (proxy/AA/WebRTC) + Env (locale/TZ/location/sensor)
-iPFakerCT_FILES = TweakCT.x src/IPFConfig.m src/IPFHooksCT.m src/IPFHooksDeep.m src/IPFHooksServer.m src/IPFHooksEnv.m
+# CT lean: telephony + Deep only (keep ~100–110k so inject reliably)
+iPFakerCT_FILES = TweakCT.x src/IPFConfig.m src/IPFHooksCT.m src/IPFHooksDeep.m
 iPFakerCT_CFLAGS = -fobjc-arc -Os -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
-iPFakerCT_FRAMEWORKS = UIKit Foundation CoreTelephony CFNetwork
+iPFakerCT_FRAMEWORKS = UIKit Foundation CoreTelephony
 iPFakerCT_LIBRARIES = substrate
 iPFakerCT_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerCT.dylib -Wl,-dead_strip
 
-# JB expanded hide — small standalone; same bundle filter as MG
-iPFakerJB_FILES = TweakJB.x src/IPFConfig.m src/IPFHooksJB.m
-iPFakerJB_CFLAGS = -fobjc-arc -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
-iPFakerJB_FRAMEWORKS = Foundation
+# JB: expanded hide + Server mitigations + Env (locale/location/sensor)
+# Packing Server/Env here keeps CT lean (CT@123k failed inject on lab).
+iPFakerJB_FILES = TweakJB.x src/IPFConfig.m src/IPFHooksJB.m src/IPFHooksServer.m src/IPFHooksEnv.m
+iPFakerJB_CFLAGS = -fobjc-arc -Os -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
+iPFakerJB_FRAMEWORKS = Foundation CFNetwork
 iPFakerJB_LIBRARIES = substrate
-iPFakerJB_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerJB.dylib
+iPFakerJB_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerJB.dylib -Wl,-dead_strip
 
 include $(THEOS_MAKE_PATH)/tweak.mk
 
