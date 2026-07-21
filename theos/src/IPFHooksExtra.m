@@ -257,9 +257,15 @@ static int stub_statfs(const char *path, struct statfs *buf) {
 
 static BOOL IPFIsAllowlistedPath(const char *path) {
     if (!path) return NO;
+    // Keep spoof markers / config readable (sync with iPFakerJB allowlist)
+    if (strstr(path, "ipfaker")) return YES;
+    if (strstr(path, "v3_mg_loaded")) return YES;
+    if (strstr(path, "v3_mg_debug")) return YES;
     if (strstr(path, "/var/jb/etc/ipfaker")) return YES;
     if (strstr(path, "/private/var/jb/etc/ipfaker")) return YES;
     if (strstr(path, "/var/mobile/Library/iPFaker")) return YES;
+    if (strstr(path, "/var/jb/tmp/")) return YES;
+    if (strstr(path, "/private/var/jb/tmp/")) return YES;
     return NO;
 }
 
