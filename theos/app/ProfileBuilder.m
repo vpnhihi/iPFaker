@@ -268,6 +268,17 @@
 
     return @{
         @"Enabled": @YES,
+        @"FakeDevice": @YES,
+        @"FakeScreen": @YES,
+        @"FakeRealScreen": @YES,
+        @"FakeHardware": @YES,
+        @"FakeAds": @YES,
+        @"FakeWifi": @YES,
+        @"FakeNetwork": @YES,
+        @"FakeSysctl": @YES,
+        @"FakeSysOSVersion": @YES,
+        @"HideJailbreak": @YES,
+        @"FakeBrowser": @YES,
         @"ProductType": device[@"ProductType"] ?: @"iPhone16,1",
         @"MarketingName": device[@"MarketingName"] ?: @"iPhone",
         @"DeviceName": @"iPhone",

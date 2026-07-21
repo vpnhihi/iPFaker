@@ -420,6 +420,28 @@ def validate_identity(flat: dict) -> list[str]:
     for ak in ("IOPlatformSerialNumber", "MLBSerialNumber"):
         if flat.get(ak) and flat.get(ak) != sn:
             errs.append(f"{ak} must equal SerialNumber")
+    # Screen consistency: native ≈ logical * scale
+    try:
+        nw = int(flat.get("main-screen-width") or 0)
+        nh = int(flat.get("main-screen-height") or 0)
+        sc = int(flat.get("main-screen-scale") or 0)
+        lw = int(flat.get("LogicalScreenWidth") or 0)
+        lh = int(flat.get("LogicalScreenHeight") or 0)
+        if nw and nh and sc and lw and lh:
+            if abs(nw - lw * sc) > sc or abs(nh - lh * sc) > sc:
+                errs.append(
+                    f"screen mismatch native {nw}x{nh} vs logical {lw}x{lh}@{sc}"
+                )
+    except (TypeError, ValueError):
+        pass
+    # Disk: free <= total
+    try:
+        tot = int(flat.get("TotalDiskCapacity") or 0)
+        fre = int(flat.get("FreeDiskSpace") or 0)
+        if tot and fre and fre > tot:
+            errs.append("FreeDiskSpace > TotalDiskCapacity")
+    except (TypeError, ValueError):
+        pass
     return errs
 
 
@@ -517,6 +539,18 @@ def build_profile(device: dict, ios_ver: str, ios_meta: dict, name: str | None) 
 
     flat = {
         "Enabled": True,
+        # Surface toggles — FakeScreen spoofs native+logical together (no real-display leak)
+        "FakeDevice": True,
+        "FakeScreen": True,
+        "FakeRealScreen": True,
+        "FakeHardware": True,
+        "FakeAds": True,
+        "FakeWifi": True,
+        "FakeNetwork": True,
+        "FakeSysctl": True,
+        "FakeSysOSVersion": True,
+        "HideJailbreak": True,
+        "FakeBrowser": True,
         "ProductType": device["ProductType"],
         "MarketingName": device["MarketingName"],
         "DeviceName": "iPhone",

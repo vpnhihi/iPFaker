@@ -66,28 +66,67 @@ static void IPFResolve(void) {
         pMSHookMessageEx = (MSHookMessageEx_t)dlsym(RTLD_DEFAULT, "MSHookMessageEx");
 }
 
+// UIScreen (UIKit): bounds=points, nativeBounds=pixels, scale≈nativeScale, maxFPS ProMotion
+// Disk: NSFileManager NSFileSystemSize/FreeSize + statfs(2) — must match catalog storage
+
+static BOOL IPFScreenOn(void) {
+    // Full surface when FakeScreen OR FakeRealScreen (no native leak of XS Max)
+    return [[IPFConfig shared] flag:@"FakeScreen" defaultYes:YES]
+        || [[IPFConfig shared] flag:@"FakeRealScreen" defaultYes:YES];
+}
+
 static CGFloat IPFScale(void) {
-    id v = [[IPFConfig shared] stringForKey:@"main-screen-scale"]
-        ?: [[IPFConfig shared] mgValueForKey:@"main-screen-scale"];
-    if ([v respondsToSelector:@selector(doubleValue)]) return (CGFloat)[v doubleValue];
-    return 3.0;
+    double sc = [[IPFConfig shared] doubleForKey:@"main-screen-scale" fallback:0];
+    if (sc < 1.0) {
+        id v = [[IPFConfig shared] stringForKey:@"main-screen-scale"]
+            ?: [[IPFConfig shared] mgValueForKey:@"main-screen-scale"];
+        if ([v respondsToSelector:@selector(doubleValue)]) sc = [v doubleValue];
+    }
+    return (sc >= 1.0) ? (CGFloat)sc : 3.0;
 }
 
 static CGSize IPFNativeSize(void) {
-    id w = [[IPFConfig shared] stringForKey:@"main-screen-width"]
-        ?: [[IPFConfig shared] mgValueForKey:@"main-screen-width"];
-    id h = [[IPFConfig shared] stringForKey:@"main-screen-height"]
-        ?: [[IPFConfig shared] mgValueForKey:@"main-screen-height"];
-    CGFloat ww = [w respondsToSelector:@selector(doubleValue)] ? [w doubleValue] : 1179;
-    CGFloat hh = [h respondsToSelector:@selector(doubleValue)] ? [h doubleValue] : 2556;
-    return CGSizeMake(ww, hh);
+    double ww = [[IPFConfig shared] doubleForKey:@"main-screen-width" fallback:0];
+    double hh = [[IPFConfig shared] doubleForKey:@"main-screen-height" fallback:0];
+    if (ww < 1 || hh < 1) {
+        id w = [[IPFConfig shared] stringForKey:@"main-screen-width"]
+            ?: [[IPFConfig shared] mgValueForKey:@"main-screen-width"];
+        id h = [[IPFConfig shared] stringForKey:@"main-screen-height"]
+            ?: [[IPFConfig shared] mgValueForKey:@"main-screen-height"];
+        ww = [w respondsToSelector:@selector(doubleValue)] ? [w doubleValue] : 1179;
+        hh = [h respondsToSelector:@selector(doubleValue)] ? [h doubleValue] : 2556;
+    }
+    if (ww < 1 || hh < 1) {
+        double lw = [[IPFConfig shared] doubleForKey:@"LogicalScreenWidth" fallback:0];
+        double lh = [[IPFConfig shared] doubleForKey:@"LogicalScreenHeight" fallback:0];
+        CGFloat sc = IPFScale();
+        if (lw > 0 && lh > 0) {
+            ww = lw * sc;
+            hh = lh * sc;
+        }
+    }
+    return CGSizeMake((CGFloat)ww, (CGFloat)hh);
 }
 
 static NSInteger IPFMaxFPS(void) {
-    id v = [[IPFConfig shared] stringForKey:@"MaxRefreshHz"]
-        ?: [[IPFConfig shared] mgValueForKey:@"MaxRefreshHz"];
-    if ([v respondsToSelector:@selector(integerValue)]) return [v integerValue];
-    return 60;
+    double v = [[IPFConfig shared] doubleForKey:@"MaxRefreshHz" fallback:0];
+    if (v < 1) {
+        id x = [[IPFConfig shared] stringForKey:@"MaxRefreshHz"]
+            ?: [[IPFConfig shared] mgValueForKey:@"MaxRefreshHz"];
+        if ([x respondsToSelector:@selector(integerValue)]) return [x integerValue];
+        return 60;
+    }
+    return (NSInteger)v;
+}
+
+static void IPFLogScreenOnce(CGSize n, CGFloat sc, NSInteger fps) {
+    static int done = 0;
+    if (done) return;
+    done = 1;
+    CGFloat den = sc > 0 ? sc : 1;
+    IPFExTrace([NSString stringWithFormat:
+        @"UIScreen FAKE native=%.0fx%.0f scale=%.1f bounds=%.0fx%.0f fps=%ld",
+        n.width, n.height, sc, n.width / den, n.height / den, (long)fps]);
 }
 
 #pragma mark - UIScreen
@@ -99,40 +138,37 @@ static NSInteger (*orig_maxFPS)(id, SEL);
 static CGRect (*orig_bounds)(id, SEL);
 
 static CGRect stub_nativeBounds(id self, SEL _cmd) {
-    // Fake Real Screen → native pixel bounds (Apple UIScreen.nativeBounds)
-    if (![[IPFConfig shared] flag:@"FakeRealScreen" defaultYes:NO]
-        && ![[IPFConfig shared] flag:@"FakeScreen" defaultYes:YES])
+    // pixels — must match catalog model (do not leave real XS Max native)
+    if (!IPFScreenOn())
         return orig_nativeBounds ? orig_nativeBounds(self, _cmd) : CGRectZero;
-    if (![[IPFConfig shared] flag:@"FakeRealScreen" defaultYes:NO]
-        && [[IPFConfig shared] flag:@"FakeScreen" defaultYes:YES]) {
-        // Logical-only: keep native real if FakeRealScreen off
-        return orig_nativeBounds ? orig_nativeBounds(self, _cmd) : CGRectZero;
-    }
     CGSize s = IPFNativeSize();
+    IPFLogScreenOnce(s, IPFScale(), IPFMaxFPS());
     return CGRectMake(0, 0, s.width, s.height);
 }
 static CGFloat stub_scale(id self, SEL _cmd) {
-    if (![[IPFConfig shared] flag:@"FakeScreen" defaultYes:YES])
+    if (!IPFScreenOn())
         return orig_scale ? orig_scale(self, _cmd) : 3.0;
     return IPFScale();
 }
 static CGFloat stub_nativeScale(id self, SEL _cmd) {
-    if (![[IPFConfig shared] flag:@"FakeRealScreen" defaultYes:NO]
-        && ![[IPFConfig shared] flag:@"FakeScreen" defaultYes:YES])
-        return orig_nativeScale ? orig_nativeScale(self, _cmd) : 3.0;
-    if (![[IPFConfig shared] flag:@"FakeRealScreen" defaultYes:NO])
+    // modern iPhone: nativeScale ≡ scale
+    if (!IPFScreenOn())
         return orig_nativeScale ? orig_nativeScale(self, _cmd) : 3.0;
     return IPFScale();
 }
 static NSInteger stub_maxFPS(id self, SEL _cmd) {
-    if (![[IPFConfig shared] flag:@"FakeScreen" defaultYes:YES])
+    if (!IPFScreenOn())
         return orig_maxFPS ? orig_maxFPS(self, _cmd) : 60;
     return IPFMaxFPS();
 }
 static CGRect stub_bounds(id self, SEL _cmd) {
-    // points = native / scale (Apple UIScreen.bounds)
-    if (![[IPFConfig shared] flag:@"FakeScreen" defaultYes:YES])
+    // points = native / scale (or LogicalScreen* when set)
+    if (!IPFScreenOn())
         return orig_bounds ? orig_bounds(self, _cmd) : CGRectZero;
+    double lw = [[IPFConfig shared] doubleForKey:@"LogicalScreenWidth" fallback:0];
+    double lh = [[IPFConfig shared] doubleForKey:@"LogicalScreenHeight" fallback:0];
+    if (lw > 0 && lh > 0)
+        return CGRectMake(0, 0, (CGFloat)lw, (CGFloat)lh);
     CGSize n = IPFNativeSize();
     CGFloat sc = IPFScale();
     if (sc < 1) sc = 1;
@@ -141,37 +177,69 @@ static CGRect stub_bounds(id self, SEL _cmd) {
 
 #pragma mark - Disk (FakeHardware)
 
+static void IPFDiskBytes(long long *totalOut, long long *freeOut) {
+    long long total = 0, freeb = 0;
+    id t = [[IPFConfig shared] stringForKey:@"TotalDiskCapacity"]
+        ?: [[IPFConfig shared] mgValueForKey:@"TotalDiskCapacity"];
+    id f = [[IPFConfig shared] stringForKey:@"FreeDiskSpace"]
+        ?: [[IPFConfig shared] mgValueForKey:@"FreeDiskSpace"];
+    if ([t respondsToSelector:@selector(longLongValue)]) total = [t longLongValue];
+    if ([f respondsToSelector:@selector(longLongValue)]) freeb = [f longLongValue];
+    if (total <= 0) {
+        double gb = [[IPFConfig shared] doubleForKey:@"DiskCapacityGB" fallback:0];
+        if (gb > 0) total = (long long)(gb * 1000.0 * 1000.0 * 1000.0);
+    }
+    if (freeb < 0) freeb = 0;
+    // Consistency: free never exceeds total
+    if (total > 0 && freeb > total) freeb = (long long)(total * 0.45);
+    if (totalOut) *totalOut = total;
+    if (freeOut) *freeOut = freeb;
+}
+
 static NSDictionary *(*orig_attrs)(id, SEL, NSString *, NSError **);
 static NSDictionary *stub_attrs(id self, SEL _cmd, NSString *path, NSError **err) {
     NSDictionary *real = orig_attrs ? orig_attrs(self, _cmd, path, err) : nil;
     if (!real) return real;
     if (![[IPFConfig shared] flag:@"FakeHardware" defaultYes:YES]) return real;
     @try {
-        id total = [[IPFConfig shared] stringForKey:@"TotalDiskCapacity"]
-            ?: [[IPFConfig shared] mgValueForKey:@"TotalDiskCapacity"];
-        id freev = [[IPFConfig shared] stringForKey:@"FreeDiskSpace"]
-            ?: [[IPFConfig shared] mgValueForKey:@"FreeDiskSpace"];
-        if (!total && !freev) return real;
+        long long total = 0, freeb = 0;
+        IPFDiskBytes(&total, &freeb);
+        if (total <= 0 && freeb <= 0) return real;
         NSMutableDictionary *m = [real mutableCopy];
-        if (total) {
-            long long t = [total longLongValue];
-            if (t > 0) {
-                m[NSFileSystemSize] = @(t);
-                m[@"NSFileSystemSize"] = @(t);
-            }
+        if (total > 0) {
+            m[NSFileSystemSize] = @(total);
+            m[@"NSFileSystemSize"] = @(total);
         }
-        if (freev) {
-            long long fr = [freev longLongValue];
-            if (fr > 0) {
-                m[NSFileSystemFreeSize] = @(fr);
-                m[@"NSFileSystemFreeSize"] = @(fr);
-            }
+        if (freeb > 0) {
+            m[NSFileSystemFreeSize] = @(freeb);
+            m[@"NSFileSystemFreeSize"] = @(freeb);
         }
-        IPFExTrace([NSString stringWithFormat:@"disk FAKE total=%@ free=%@", total, freev]);
+        IPFExTrace([NSString stringWithFormat:@"disk FAKE total=%lld free=%lld", total, freeb]);
         return m;
     } @catch (__unused NSException *ex) {
         return real;
     }
+}
+
+// statfs(2) — apps that skip NSFileManager (POSIX)
+#import <sys/mount.h>
+static int (*orig_statfs)(const char *, struct statfs *);
+static int stub_statfs(const char *path, struct statfs *buf) {
+    int rc = orig_statfs ? orig_statfs(path, buf) : -1;
+    if (rc != 0 || !buf) return rc;
+    if (![[IPFConfig shared] flag:@"FakeHardware" defaultYes:YES]) return rc;
+    long long total = 0, freeb = 0;
+    IPFDiskBytes(&total, &freeb);
+    if (total <= 0) return rc;
+    uint32_t bsize = buf->f_bsize > 0 ? (uint32_t)buf->f_bsize : 4096;
+    buf->f_blocks = (uint64_t)(total / bsize);
+    if (freeb > 0) {
+        uint64_t freen = (uint64_t)(freeb / bsize);
+        buf->f_bfree = freen;
+        buf->f_bavail = freen;
+    }
+    IPFExTrace([NSString stringWithFormat:@"statfs FAKE total=%lld free=%lld bsize=%u", total, freeb, bsize]);
+    return rc;
 }
 
 #pragma mark - Jailbreak path hide
@@ -776,6 +844,11 @@ void IPFInstallExtraHooks(void) {
         if (ghn) {
             pMSHookFunction(ghn, (void *)stub_gethostname, (void **)&orig_gethostname);
             IPFExTrace(@"gethostname OK");
+        }
+        void *sfs = dlsym(RTLD_DEFAULT, "statfs");
+        if (sfs) {
+            pMSHookFunction(sfs, (void *)stub_statfs, (void **)&orig_statfs);
+            IPFExTrace(@"statfs OK");
         }
 
         // CaptiveNetwork — may live in SystemConfiguration
