@@ -167,9 +167,9 @@
                                  [AppState.shared wipeAppsSummary],
                                  (unsigned long)AppCatalog.shared.apps.count];
     self.hintLabel.text = [NSString stringWithFormat:
-        @"• Xóa 1 chạm (tin cậy): kill → script root multi-app → container/group/plugin → kiểm tra sạch (mất đăng nhập).\n"
-        @"• Đặt lại dữ liệu app: máy spoof mới + xóa data (mất đăng nhập).\n"
-        @"• Đặt lại + Lưu: spoof mới nhưng khôi phục data (giữ đăng nhập).\n"
+        @"• Xóa 1 chạm (tin cậy): wipe container/group/KC — không đổi spoof (mất đăng nhập).\n"
+        @"• Đặt lại dữ liệu app (1 chạm): spoof mới + xóa sạch + mở lại (mất đăng nhập).\n"
+        @"• Đặt lại + Lưu (1 chạm): backup session → spoof → restore → kill+mở lại (giữ đăng nhập).\n"
         @"%@\n%@",
         [AppState.shared wipeAppsSummary],
         AppState.shared.statusText ?: @""];
@@ -230,13 +230,13 @@
 }
 
 - (void)resetDataTapped {
-    [self runWithProgressTitle:@"Đang đặt lại dữ liệu app…" work:^NSString *(void (^step)(NSString *)) {
+    [self runWithProgressTitle:@"1 chạm: Đặt lại dữ liệu + Mở app…" work:^NSString *(void (^step)(NSString *)) {
         return [AppState.shared killZaloAndRandomizeFromPoolProgress:step];
     }];
 }
 
 - (void)saveDataTapped {
-    [self runWithProgressTitle:@"Đang đặt lại + lưu dữ liệu…" work:^NSString *(void (^step)(NSString *)) {
+    [self runWithProgressTitle:@"1 chạm: Đặt lại + Lưu + Mở app…" work:^NSString *(void (^step)(NSString *)) {
         return [AppState.shared saveDataThenResetProgress:step];
     }];
 }

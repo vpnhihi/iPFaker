@@ -48,19 +48,27 @@ NS_ASSUME_NONNULL_BEGIN
 - (NSString *)spoofAppsSummary;
 - (void)selectAllSpoofAppsFromCatalog:(NSArray *)items;
 - (void)deselectAllSpoofAppsKeepingZalo:(BOOL)keepZalo;
+/// Lab-core preset: Zalo + Safari + Maps + Weather (+ WebKit helpers auto in filter).
+- (void)applyLabCoreSpoofPreset;
+/// Lab stock system apps (+ Zalo) multi-app list.
+- (void)applyLabStockSpoofPreset;
+/// Lab social multi-app: Zalo + FB/IG/TikTok/Shopee/Telegram + Safari/Maps…
+- (void)applyLabSocialSpoofPreset;
 /// Write ElleKit filter plists for MG/CT/JB from selected spoof apps.
 - (NSString *)applySpoofAppFiltersProgress:(nullable void (^)(NSString *step))progress;
+/// Bundle IDs for Lab-core spoof (synced identity across those apps).
++ (NSArray<NSString *> *)labCoreSpoofBundleIds;
 
 - (NSArray<NSString *> *)compatibleIOSForSelectedDevices;
 - (NSArray<NSString *> *)selectedIOSCompatibleWithDevice:(NSDictionary *)device;
 
 - (NSString *)applyReseedOnly:(BOOL)reseedOnly;
 - (NSString *)applyRandomFromPool;
-/// Random spoof + wipe data (không giữ đăng nhập).
+/// 1 chạm lab sạch: random spoof + wipe full + kill + relaunch (mất đăng nhập).
 - (NSString *)killZaloAndRandomizeFromPool;
 - (NSString *)killZaloAndRandomizeFromPoolProgress:(nullable void (^)(NSString *step))progress;
 
-/// Đặt lại + Lưu: lưu 100% thông số máy + data app (giữ phiên đăng nhập) → random máy → xóa → khôi phục data.
+/// 1 chạm «Đặt lại + Lưu»: backup session → random spoof → soft wipe+restore → geo? → kill+relaunch (giữ đăng nhập).
 - (NSString *)saveDataThenResetProgress:(nullable void (^)(NSString *step))progress;
 
 - (void)killZalo;
@@ -71,7 +79,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (BOOL)toggleForKey:(NSString *)key defaultOn:(BOOL)on;
 - (void)setToggle:(BOOL)on forKey:(NSString *)key;
 
-#pragma mark - Proxy / AppAttest (HIOS-style)
+#pragma mark - Proxy / AppAttest (lab flat)
 - (BOOL)proxyEnabled;
 - (void)setProxyEnabled:(BOOL)on;
 - (NSString *)proxyHost;
@@ -87,10 +95,15 @@ NS_ASSUME_NONNULL_BEGIN
 - (BOOL)disableAppAttest;
 - (void)setDisableAppAttest:(BOOL)on;
 - (void)saveProxyAppAttest;
+- (BOOL)syncGeoFromProxyEnabled;
+- (void)setSyncGeoFromProxyEnabled:(BOOL)on;
 /// Merge proxy/AppAttest keys into config.plist dual-path for dylibs.
 - (NSString *)applyProxyAppAttestToConfigProgress:(nullable void (^)(NSString *step))progress;
 /// TCP/HTTP connectivity check through configured proxy.
 - (NSString *)testProxyConnection;
+/// Geo IP (lat/lon/IANA TZ/locale) via proxy egress — sync map/weather/time. Returns summary for UI.
+- (NSString *)syncTimeMapWeatherFromProxyProgress:(nullable void (^)(NSString *step))progress
+                                      geoKeysOut:(NSDictionary * _Nullable * _Nullable)keysOut;
 
 - (void)postDidChange;
 

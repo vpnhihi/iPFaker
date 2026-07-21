@@ -36,7 +36,7 @@
                                         target:self
                                         action:@selector(applyFilters)];
 
-    UIView *header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 320, 96)];
+    UIView *header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 320, 176)];
     UIButton *all = [UIButton buttonWithType:UIButtonTypeSystem];
     [all setTitle:@"Select All" forState:UIControlStateNormal];
     all.titleLabel.font = AppTheme.sectionFont;
@@ -49,26 +49,72 @@
     none.translatesAutoresizingMaskIntoConstraints = NO;
     [none addTarget:self action:@selector(deselectAllTapped) forControlEvents:UIControlEventTouchUpInside];
 
+    UIButton *core = [UIButton buttonWithType:UIButtonTypeSystem];
+    [core setTitle:@"Lab core" forState:UIControlStateNormal];
+    core.titleLabel.font = AppTheme.sectionFont;
+    core.translatesAutoresizingMaskIntoConstraints = NO;
+    [core addTarget:self action:@selector(labCoreTapped) forControlEvents:UIControlEventTouchUpInside];
+
+    UIButton *stock = [UIButton buttonWithType:UIButtonTypeSystem];
+    [stock setTitle:@"Lab stock" forState:UIControlStateNormal];
+    stock.titleLabel.font = AppTheme.sectionFont;
+    stock.translatesAutoresizingMaskIntoConstraints = NO;
+    [stock addTarget:self action:@selector(labStockTapped) forControlEvents:UIControlEventTouchUpInside];
+
+    UIButton *social = [UIButton buttonWithType:UIButtonTypeSystem];
+    [social setTitle:@"Lab social (FB/IG/TT…)" forState:UIControlStateNormal];
+    social.titleLabel.font = AppTheme.sectionFont;
+    social.translatesAutoresizingMaskIntoConstraints = NO;
+    [social addTarget:self action:@selector(labSocialTapped) forControlEvents:UIControlEventTouchUpInside];
+
     UILabel *hint = [[UILabel alloc] init];
-    hint.text = @"Chọn app nhận spoof (ElleKit inject). Mặc định Zalo. Không inject Settings.";
+    hint.text = @"Lab-core: Zalo+Safari+Maps+Weather · Lab social: +FB/IG/TikTok/Shopee/Telegram. "
+                @"CT inject CommCenter. Apply ghi filter. Không inject Settings.";
     hint.font = AppTheme.captionFont;
     hint.textColor = AppTheme.textSecondary;
-    hint.numberOfLines = 2;
+    hint.numberOfLines = 3;
     hint.translatesAutoresizingMaskIntoConstraints = NO;
 
     [header addSubview:all];
     [header addSubview:none];
+    [header addSubview:core];
+    [header addSubview:stock];
+    [header addSubview:social];
     [header addSubview:hint];
     [NSLayoutConstraint activateConstraints:@[
         [all.topAnchor constraintEqualToAnchor:header.topAnchor constant:10],
         [all.leadingAnchor constraintEqualToAnchor:header.leadingAnchor constant:16],
         [none.centerYAnchor constraintEqualToAnchor:all.centerYAnchor],
         [none.trailingAnchor constraintEqualToAnchor:header.trailingAnchor constant:-16],
-        [hint.topAnchor constraintEqualToAnchor:all.bottomAnchor constant:8],
+        [core.topAnchor constraintEqualToAnchor:all.bottomAnchor constant:8],
+        [core.leadingAnchor constraintEqualToAnchor:header.leadingAnchor constant:16],
+        [stock.centerYAnchor constraintEqualToAnchor:core.centerYAnchor],
+        [stock.trailingAnchor constraintEqualToAnchor:header.trailingAnchor constant:-16],
+        [social.topAnchor constraintEqualToAnchor:core.bottomAnchor constant:6],
+        [social.leadingAnchor constraintEqualToAnchor:header.leadingAnchor constant:16],
+        [hint.topAnchor constraintEqualToAnchor:social.bottomAnchor constant:6],
         [hint.leadingAnchor constraintEqualToAnchor:header.leadingAnchor constant:16],
         [hint.trailingAnchor constraintEqualToAnchor:header.trailingAnchor constant:-16],
     ]];
     self.tableView.tableHeaderView = header;
+}
+
+- (void)labCoreTapped {
+    [AppState.shared applyLabCoreSpoofPreset];
+    [self.tableView reloadData];
+    if (self.onChange) self.onChange();
+}
+
+- (void)labStockTapped {
+    [AppState.shared applyLabStockSpoofPreset];
+    [self.tableView reloadData];
+    if (self.onChange) self.onChange();
+}
+
+- (void)labSocialTapped {
+    [AppState.shared applyLabSocialSpoofPreset];
+    [self.tableView reloadData];
+    if (self.onChange) self.onChange();
 }
 
 - (void)selectAllTapped {

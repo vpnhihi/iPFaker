@@ -1,5 +1,6 @@
 // IPFHooksMG — ElleKit MSHook absolute (stable on Dopamine).
-// fishhook GOT rebind removed: SIGBUS on Zalo DATA_CONST + binary size budget.
+// fishhook: SAFE FALLBACK only when MSHookFunction is missing (not used if ElleKit loads).
+// Full always-on GOT rebind was removed (SIGBUS on Zalo DATA_CONST).
 
 #import "IPFHooksMG.h"
 #import "IPFConfig.h"
@@ -13,6 +14,10 @@
 #import <string.h>
 #import <stdio.h>
 #import <pthread.h>
+
+#if IPF_FISHHOOK_FALLBACK
+#import "fishhook.h"
+#endif
 
 typedef void (*MSHookFunction_t)(void *symbol, void *replace, void **result);
 typedef void (*MSHookMessageEx_t)(Class _class, SEL sel, IMP imp, IMP *result);
@@ -198,8 +203,11 @@ static int stub_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, void
             if (([n hasPrefix:@"hw.mem"] || [n hasPrefix:@"hw.ncpu"] || [n hasPrefix:@"hw.physical"]
                  || [n hasPrefix:@"hw.logical"]) && !allowHW)
                 return orig_sysctlbyname ? orig_sysctlbyname(name, oldp, oldlenp, newp, newlen) : -1;
+            BOOL isSerialCtl = [n isEqualToString:@"hw.serialnumber"]
+                || [n isEqualToString:@"kern.serialnumber"];
             if (!allowSys && ![n isEqualToString:@"kern.boottime"] && ![n hasPrefix:@"kern.os"]
-                && ![n isEqualToString:@"hw.machine"] && ![n isEqualToString:@"hw.model"])
+                && ![n isEqualToString:@"hw.machine"] && ![n isEqualToString:@"hw.model"]
+                && !(isSerialCtl && allowHW))
                 return orig_sysctlbyname ? orig_sysctlbyname(name, oldp, oldlenp, newp, newlen) : -1;
 
             id fake = [cfg sysctlValueForName:n];
@@ -207,6 +215,12 @@ static int stub_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, void
                 fake = [cfg mgValueForKey:@"ProductType"];
             if (!fake && [n isEqualToString:@"hw.model"] && allowDev)
                 fake = [cfg mgValueForKey:@"HWModelStr"];
+            // serial board / hw.serialnumber ≡ SerialNumber (identity sync)
+            if (!fake && allowHW && isSerialCtl) {
+                fake = [cfg mgValueForKey:@"SerialNumber"]
+                    ?: [cfg stringForKey:@"SerialNumber"]
+                    ?: [cfg stringForKey:@"IOPlatformSerialNumber"];
+            }
             if ([fake isKindOfClass:[NSString class]]) {
                 const char *s = [(NSString *)fake UTF8String];
                 size_t need = strlen(s) + 1;
@@ -316,9 +330,12 @@ static int stub_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, vo
 }
 
 #pragma mark - UIDevice
+// Surface matrix: name / model / localizedModel / systemName / systemVersion + IDFV (log spoof)
 
 static NSString *(*orig_name)(id, SEL);
 static NSString *(*orig_model)(id, SEL);
+static NSString *(*orig_localizedModel)(id, SEL);
+static NSString *(*orig_systemName)(id, SEL);
 static NSString *(*orig_systemVersion)(id, SEL);
 static NSUUID *(*orig_idfv)(id, SEL);
 static NSUUID *(*orig_idfa)(id, SEL);
@@ -333,13 +350,27 @@ static NSString *stub_name(id self, SEL _cmd) {
 static NSString *stub_model(id self, SEL _cmd) {
     if (![[IPFConfig shared] flag:@"FakeDevice" defaultYes:YES])
         return orig_model ? orig_model(self, _cmd) : @"iPhone";
+    // Apple API: model is always "iPhone" / "iPad" class string (not ProductType)
     IPFTrace(@"UIDevice.model FAKE iPhone");
     return @"iPhone";
+}
+static NSString *stub_localizedModel(id self, SEL _cmd) {
+    if (![[IPFConfig shared] flag:@"FakeDevice" defaultYes:YES])
+        return orig_localizedModel ? orig_localizedModel(self, _cmd) : @"iPhone";
+    // Keep in sync with model (localized hardware family)
+    return @"iPhone";
+}
+static NSString *stub_systemName(id self, SEL _cmd) {
+    if (![[IPFConfig shared] flag:@"FakeSysOSVersion" defaultYes:YES]
+        && ![[IPFConfig shared] flag:@"FakeDevice" defaultYes:YES])
+        return orig_systemName ? orig_systemName(self, _cmd) : @"iOS";
+    return @"iOS";
 }
 static NSString *stub_systemVersion(id self, SEL _cmd) {
     if (![[IPFConfig shared] flag:@"FakeSysOSVersion" defaultYes:YES])
         return orig_systemVersion ? orig_systemVersion(self, _cmd) : @"17.0";
     NSString *v = [[IPFConfig shared] stringForKey:@"ProductVersion"];
+    if (v.length) IPFTrace([NSString stringWithFormat:@"UIDevice.systemVersion FAKE %@", v]);
     return v ?: (orig_systemVersion ? orig_systemVersion(self, _cmd) : @"17.0");
 }
 static NSUUID *stub_idfv(id self, SEL _cmd) {
@@ -376,7 +407,8 @@ void IPFInstallMGHooks(void) {
     IPFTrace(@"IPFInstallMGHooks begin");
     IPFResolveSubstrate();
 
-    // ElleKit MSHook absolute only (stable when injected on Dopamine)
+    int fishhook_rc = -3; // -3 = not needed (MSHook used) / disabled
+    // ElleKit MSHook absolute preferred (stable when injected on Dopamine)
     if (pMSHookFunction) {
         void *mg = IPFFindMG("MGCopyAnswer");
         if (mg) {
@@ -398,8 +430,30 @@ void IPFInstallMGHooks(void) {
         void *sc = dlsym(RTLD_DEFAULT, "sysctl");
         if (sc)
             pMSHookFunction(sc, (void *)stub_sysctl, (void **)&orig_sysctl);
+        fishhook_rc = -3; // MSHook path — fishhook idle
     } else {
-        IPFTrace(@"WARN no MSHookFunction");
+        // SAFE fishhook fallback: only when MSHook missing (rare on Dopamine+ElleKit).
+        // Do NOT call rebind when MSHook works — avoids prior SIGBUS on DATA_CONST.
+        IPFTrace(@"WARN no MSHookFunction — try fishhook fallback");
+#if IPF_FISHHOOK_FALLBACK
+        struct rebinding rbs[] = {
+            {"MGCopyAnswer", (void *)stub_MGCopyAnswer, (void **)&orig_MGCopyAnswer},
+            {"MGCopyAnswerWithError", (void *)stub_MGCopyAnswerWithError, (void **)&orig_MGCopyAnswerWithError},
+            {"sysctlbyname", (void *)stub_sysctlbyname, (void **)&orig_sysctlbyname},
+            {"uname", (void *)stub_uname, (void **)&orig_uname},
+            {"sysctl", (void *)stub_sysctl, (void **)&orig_sysctl},
+        };
+        @try {
+            fishhook_rc = rebind_symbols(rbs, sizeof(rbs) / sizeof(rbs[0]));
+            IPFTrace([NSString stringWithFormat:@"fishhook fallback rc=%d", fishhook_rc]);
+        } @catch (__unused NSException *ex) {
+            fishhook_rc = -2;
+            IPFTrace(@"fishhook fallback EXCEPTION — spoof C hooks inactive");
+        }
+#else
+        fishhook_rc = -1;
+        IPFTrace(@"WARN fishhook fallback compiled out");
+#endif
     }
 
     if (pMSHookMessageEx) {
@@ -407,32 +461,58 @@ void IPFInstallMGHooks(void) {
         if (uid) {
             pMSHookMessageEx(uid, @selector(name), (IMP)stub_name, (IMP *)&orig_name);
             pMSHookMessageEx(uid, @selector(model), (IMP)stub_model, (IMP *)&orig_model);
+            if (class_getInstanceMethod(uid, @selector(localizedModel)))
+                pMSHookMessageEx(uid, @selector(localizedModel), (IMP)stub_localizedModel, (IMP *)&orig_localizedModel);
+            if (class_getInstanceMethod(uid, @selector(systemName)))
+                pMSHookMessageEx(uid, @selector(systemName), (IMP)stub_systemName, (IMP *)&orig_systemName);
             pMSHookMessageEx(uid, @selector(systemVersion), (IMP)stub_systemVersion, (IMP *)&orig_systemVersion);
             pMSHookMessageEx(uid, @selector(identifierForVendor), (IMP)stub_idfv, (IMP *)&orig_idfv);
-            IPFTrace(@"UIDevice hooks OK");
+            IPFTrace(@"UIDevice hooks OK (name/model/localizedModel/systemName/systemVersion/idfv)");
         }
         Class asid = objc_getClass("ASIdentifierManager");
         if (asid)
             pMSHookMessageEx(asid, @selector(advertisingIdentifier), (IMP)stub_idfa, (IMP *)&orig_idfa);
     }
 
-    // Self-test: what does hooked MG return for ProductType?
+    // Self-test + 7-surface matrix markers (synced with Extra surfaces)
     @autoreleasepool {
-        NSString *cfgPT = [[IPFConfig shared] mgValueForKey:@"ProductType"] ?: @"(nil)";
-        NSString *cfgMK = [[IPFConfig shared] mgValueForKey:@"MarketingName"] ?: @"(nil)";
+        IPFConfig *cfg = [IPFConfig shared];
+        NSString *cfgPT = [cfg mgValueForKey:@"ProductType"] ?: @"(nil)";
+        NSString *cfgMK = [cfg mgValueForKey:@"MarketingName"] ?: @"(nil)";
+        NSString *cfgSN = [cfg mgValueForKey:@"SerialNumber"] ?: @"(nil)";
+        NSString *cfgVer = [cfg stringForKey:@"ProductVersion"] ?: @"(nil)";
+        NSString *cfgBuild = [cfg stringForKey:@"BuildVersion"] ?: @"(nil)";
+        NSString *cfgIDFA = [cfg stringForKey:@"IDFA"] ?: @"(nil)";
         CFStringRef k = CFSTR("ProductType");
         CFTypeRef ans = stub_MGCopyAnswer(k);
         NSString *got = ans ? [(__bridge id)ans description] : @"(null)";
         if (ans) CFRelease(ans);
         IPFTrace([NSString stringWithFormat:@"SELFTEST cfgPT=%@ cfgMK=%@ stubPT=%@", cfgPT, cfgMK, got]);
+        // Dual path: MSHook primary; fishhook only when MSHook miss (rc!=-3)
+        NSString *mspath = pMSHookFunction ? @"MSHook=ON" : @"MSHook=OFF";
+        NSString *fhpath = (fishhook_rc == -3) ? @"fishhook=IDLE(MSHook)"
+            : (fishhook_rc == 0) ? @"fishhook=ON(fallback)"
+            : [NSString stringWithFormat:@"fishhook=FAIL(rc=%d)", fishhook_rc];
         NSString *dbg = [NSString stringWithFormat:
-            @"hooks cfgPT=%@ cfgMK=%@ stubPT=%@ fishhook_rc=-3 MSHook=%p\n",
-            cfgPT, cfgMK, got, pMSHookFunction];
+            @"hooks cfgPT=%@ cfgMK=%@ stubPT=%@ fishhook_rc=%d MSHook=%p\n"
+            @"SURFACE dual_hook: %@ · %@ (ctor log both paths)\n"
+            @"SURFACE MobileGestalt: ProductType=%@ Version=%@ Build=%@ Serial=%@ IDFA=%@\n"
+            @"SURFACE sysctl/uname: hw.machine=%@ FakeSysctl=%d\n"
+            @"SURFACE UIDevice: name/model/systemVersion/idfv (log spoof)\n",
+            cfgPT, cfgMK, got, fishhook_rc, pMSHookFunction,
+            mspath, fhpath,
+            cfgPT, cfgVer, cfgBuild, cfgSN, cfgIDFA,
+            cfgPT, [cfg flag:@"FakeSysctl" defaultYes:YES] ? 1 : 0];
         NSString *home = NSHomeDirectory();
-        if (home.length)
+        if (home.length) {
             [dbg writeToFile:[home stringByAppendingPathComponent:@"Documents/v3_mg_debug.log"]
                   atomically:YES encoding:NSUTF8StringEncoding error:nil];
+            [dbg writeToFile:[home stringByAppendingPathComponent:@"Documents/ipfaker_surfaces.log"]
+                  atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        }
         [dbg writeToFile:@"/var/mobile/Library/iPFaker/v3_mg_debug.log"
+              atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        [dbg writeToFile:@"/var/mobile/Library/iPFaker/ipfaker_surfaces.log"
               atomically:YES encoding:NSUTF8StringEncoding error:nil];
     }
     IPFTrace(@"IPFInstallMGHooks done");

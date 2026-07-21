@@ -3,6 +3,7 @@
 #import "AppState.h"
 #import "Catalog.h"
 #import "ProxyAppAttestController.h"
+#import "VerifyViewController.h"
 
 @interface SettingsViewController ()
 @property (nonatomic, strong) NSArray<NSArray<NSDictionary *> *> *sections;
@@ -49,21 +50,21 @@
 }
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    return self.sections.count + 2; // toggles + proxy entry + info
+    return self.sections.count + 3; // toggles + tools + info
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
     if (section < (NSInteger)self.sections.count)
         return self.sections[section].count;
     if (section == (NSInteger)self.sections.count)
-        return 1; // Proxy / AppAttest
+        return 2; // Proxy / AppAttest + Verify MG
     return 2;
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
     if (section == 0) return @"Lớp giả lập (lab)";
     if (section == 1) return @"Tuỳ chọn nâng cao";
-    if (section == (NSInteger)self.sections.count) return @"IP / Proxy / AppAttest";
+    if (section == (NSInteger)self.sections.count) return @"Công cụ lab";
     return @"Thông tin";
 }
 
@@ -99,21 +100,26 @@
     }
 
     if (indexPath.section == (NSInteger)self.sections.count) {
-        static NSString *cidp = @"proxy";
+        static NSString *cidp = @"tools";
         UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cidp];
         if (!cell)
             cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:cidp];
         cell.backgroundColor = AppTheme.cardAlt;
-        cell.textLabel.text = @"Proxy settings · AppAttest";
         cell.textLabel.textColor = AppTheme.textPrimary;
-        NSString *host = [AppState.shared proxyHost];
-        BOOL en = [AppState.shared proxyEnabled];
-        cell.detailTextLabel.text = en && host.length
-            ? [NSString stringWithFormat:@"ON · %@:%ld · %@", host, (long)[AppState.shared proxyPort], [AppState.shared proxyType]]
-            : ([AppState.shared disableAppAttest] ? @"Proxy off · AppAttest disabled" : @"Tắt · chạm để cấu hình");
         cell.detailTextLabel.textColor = AppTheme.textSecondary;
         cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
         cell.accessoryView = nil;
+        if (indexPath.row == 0) {
+            cell.textLabel.text = @"Proxy settings · AppAttest";
+            NSString *host = [AppState.shared proxyHost];
+            BOOL en = [AppState.shared proxyEnabled];
+            cell.detailTextLabel.text = en && host.length
+                ? [NSString stringWithFormat:@"ON · %@:%ld · %@", host, (long)[AppState.shared proxyPort], [AppState.shared proxyType]]
+                : ([AppState.shared disableAppAttest] ? @"Proxy off · AppAttest disabled" : @"Tắt · chạm để cấu hình");
+        } else {
+            cell.textLabel.text = @"Verify expected vs live MG";
+            cell.detailTextLabel.text = @"So config dual-path với stub MG / CT filter";
+        }
         return cell;
     }
 
@@ -139,8 +145,13 @@
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
     if (indexPath.section == (NSInteger)self.sections.count) {
-        ProxyAppAttestController *vc = [[ProxyAppAttestController alloc] init];
-        [self.navigationController pushViewController:vc animated:YES];
+        if (indexPath.row == 0) {
+            ProxyAppAttestController *vc = [[ProxyAppAttestController alloc] init];
+            [self.navigationController pushViewController:vc animated:YES];
+        } else {
+            VerifyViewController *vc = [[VerifyViewController alloc] init];
+            [self.navigationController pushViewController:vc animated:YES];
+        }
     }
 }
 

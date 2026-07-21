@@ -1,5 +1,6 @@
 #import "ProfileBuilder.h"
 #import <UIKit/UIKit.h>
+#import <objc/message.h>
 #import <spawn.h>
 #import <sys/wait.h>
 #import <unistd.h>
@@ -10,6 +11,100 @@
 
 // Apple-like synthetic identity (match scripts/select_device_profile.py):
 // Serial: no I/O/0/1; pre-2021=12, modern~10; IDFA/IDFV UUID v4; UDID 40 hex; IMEI 8-digit TAC+Luhn
+
+#pragma mark - Schema lock (Apply không ghi key lạ)
+
++ (NSSet<NSString *> *)knownConfigKeySet {
+    static NSSet *s;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        // Keep in sync with select_device_profile.py KNOWN_CONFIG_KEYS + IPFConfig mgKeys + Extra/proxy/geo
+        s = [NSSet setWithArray:@[
+            // Identity / MG
+            @"ProductType", @"HWModelStr", @"HardwareModel", @"DeviceName", @"UserAssignedDeviceName",
+            @"MarketingName", @"SerialNumber", @"UniqueDeviceID", @"UniqueChipID",
+            @"ProductVersion", @"BuildVersion", @"ProductBuildVersion",
+            @"ModelNumber", @"PartNumber", @"RegionInfo", @"RegionCode", @"RegulatoryModelNumber",
+            @"ModelNumberAxxxx", @"PartNumberRegion",
+            @"CPUArchitecture", @"HardwarePlatform", @"DeviceClass", @"ChipName",
+            @"DeviceCatalogId", @"DeviceYear", @"BatteryMah",
+            @"InternationalMobileEquipmentIdentity", @"InternationalMobileEquipmentIdentity2",
+            @"MobileEquipmentIdentifier", @"EID",
+            @"WifiAddress", @"BluetoothAddress", @"EthernetMacAddress",
+            @"BSSID", @"SSID", @"VolumeUUID",
+            @"IOPlatformSerialNumber", @"MLBSerialNumber",
+            @"Hostname", @"kern.hostname",
+            @"DeviceColor", @"DeviceEnclosureColor", @"BasebandVersion",
+            @"IDFA", @"IDFV", @"identifierForVendor", @"advertisingIdentifier",
+            @"serial-number", @"Serial",
+            // Screen
+            @"main-screen-width", @"main-screen-height", @"main-screen-scale", @"main-screen-pitch",
+            @"LogicalScreenWidth", @"LogicalScreenHeight", @"ScreenDiagonalInches", @"MaxRefreshHz",
+            // Memory / CPU / disk
+            @"PhysicalMemoryMB", @"PhysicalMemoryBytes", @"hw.memsize",
+            @"hw.ncpu", @"hw.physicalcpu", @"hw.logicalcpu",
+            @"DiskCapacityGB", @"TotalDiskCapacity", @"FreeDiskSpace",
+            // Boot / time
+            @"BootTimeUnix", @"kern.boottime", @"TimeOffsetSeconds", @"TimeZoneName",
+            // Locale
+            @"PreferredLanguage", @"LocaleIdentifier", @"AppleLocale", @"AppleLanguages",
+            @"LanguageCode", @"CountryCode", @"CurrencyCode", @"CalendarIdentifier",
+            @"ISOCountryCode",
+            // Location
+            @"Latitude", @"Longitude", @"LocationAccuracy", @"Altitude",
+            // Network / UA / WebRTC
+            @"UserAgent", @"HTTPUserAgent", @"WebRTCLocalIP",
+            // Telephony
+            @"carrierName", @"carrierMCC", @"carrierMNC", @"carrierISO", @"carrierRadioAccess",
+            @"CarrierName", @"MobileCountryCode", @"MobileNetworkCode",
+            @"CurrentRadioAccessTechnology", @"RadioAccessTechnology", @"AllowsVOIP",
+            // Flags (Fake*)
+            @"Enabled", @"FakeDevice", @"FakeHardware", @"FakeAds", @"FakeScreen", @"FakeRealScreen",
+            @"FakeBrowser", @"FakeNetwork", @"FakeWifi", @"FakeSysctl", @"FakeSysOSVersion",
+            @"HideJailbreak", @"FakeLocale", @"FakeDateTime", @"FakeLocation", @"FakeSensor",
+            @"FakeWebRTC", @"DisableWebRTC", @"FakeProxy",
+            // Proxy / AppAttest / geo meta
+            @"EnableProxy", @"ProxyHost", @"ProxyPort", @"ProxyType",
+            @"ProxyUsername", @"ProxyPassword", @"DisableAppAttest",
+            @"FakeWebRTC", @"DisableWebRTC", @"WebRTCLocalIP", @"FakeSensor",
+            @"SyncGeoFromProxy", @"ProxyEgressIP", @"ProxyGeoCity", @"ProxyGeoCountry",
+            @"ProxyGeoISP", @"ProxyGeoRegion", @"GeoSyncedAtUnix",
+            // Nested blobs allowed as-is
+            @"jailbreakHide", @"jailbreak_hide",
+        ]];
+    });
+    return s;
+}
+
++ (NSDictionary *)schemaLockedFlat:(NSDictionary *)flat dropped:(NSUInteger *)droppedOut {
+    if (![flat isKindOfClass:[NSDictionary class]] || !flat.count) {
+        if (droppedOut) *droppedOut = 0;
+        return @{};
+    }
+    NSSet *known = [self knownConfigKeySet];
+    NSMutableDictionary *out = [NSMutableDictionary dictionaryWithCapacity:flat.count];
+    __block NSUInteger drop = 0;
+    [flat enumerateKeysAndObjectsUsingBlock:^(id key, id obj, BOOL *stop) {
+        NSString *k = [key description];
+        if (!k.length) { drop++; return; }
+        // Allow Fake* / Enable* toggles dynamically
+        if ([known containsObject:k]
+            || [k hasPrefix:@"Fake"]
+            || [k hasPrefix:@"Enable"]
+            || [k hasPrefix:@"Disable"]
+            || [k hasPrefix:@"Hide"]
+            || [k hasPrefix:@"Proxy"]
+            || [k hasPrefix:@"carrier"]
+            || [k hasPrefix:@"hw."]
+            || [k hasPrefix:@"kern."]) {
+            out[k] = obj;
+        } else {
+            drop++;
+        }
+    }];
+    if (droppedOut) *droppedOut = drop;
+    return [out copy];
+}
 
 + (NSString *)randomSerialForYear:(NSInteger)year {
     static NSString *alpha = @"ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no I,O,0,1
@@ -362,6 +457,8 @@
         @"MobileCountryCode": @"452",
         @"MobileNetworkCode": @"04",
         @"ISOCountryCode": @"vn",
+        @"RadioAccessTechnology": @"CTRadioAccessTechnologyNR",
+        @"CurrentRadioAccessTechnology": @"CTRadioAccessTechnologyNR",
         @"AllowsVOIP": @YES,
         // Display (catalog native + logical + scale) — UIScreen / WK JS / MG same source
         @"main-screen-width": @(w),
@@ -405,10 +502,17 @@
         @"BootTimeUnix": @(bootUnix),
         @"kern.boottime": @(bootUnix),
         @"TimeOffsetSeconds": @0,
-        // Browser UA + WebRTC private IP
+        // Browser UA + WebRTC private IP (lab: avoid leaking public IP via ICE)
         @"UserAgent": ua,
         @"HTTPUserAgent": ua,
-        @"WebRTCLocalIP": webrtcIP,
+        @"WebRTCLocalIP": webrtcIP.length ? webrtcIP : @"10.0.0.2",
+        @"FakeWebRTC": @YES,
+        @"DisableWebRTC": @NO,
+        // Client-side hole mitigations (not Graph/OTP/ASN server)
+        @"DisableAppAttest": @YES,
+        @"FakeSensor": @YES,
+        @"HideJailbreak": @YES,
+        @"FakeWifi": @YES,
     };
 }
 
@@ -429,11 +533,18 @@
 
 + (BOOL)writePlist:(NSDictionary *)flat toPath:(NSString *)path error:(NSError **)err {
     NSFileManager *fm = [NSFileManager defaultManager];
+    // Schema lock — never write unknown keys into config.plist
+    NSUInteger dropped = 0;
+    NSDictionary *locked = [self schemaLockedFlat:flat dropped:&dropped];
+    if (dropped > 0) {
+        NSLog(@"[iPFaker] schema lock dropped %lu unknown key(s) before write %@",
+              (unsigned long)dropped, path.lastPathComponent);
+    }
     // Remove root-owned stale file if we cannot overwrite (best-effort)
     if ([fm fileExistsAtPath:path] && ![fm isWritableFileAtPath:path]) {
         [fm removeItemAtPath:path error:nil];
     }
-    BOOL ok = [flat writeToURL:[NSURL fileURLWithPath:path] error:err];
+    BOOL ok = [locked writeToURL:[NSURL fileURLWithPath:path] error:err];
     if (ok) {
         [fm setAttributes:@{ NSFilePosixPermissions: @0644 } ofItemAtPath:path error:nil];
     }
@@ -450,6 +561,26 @@
     ];
     NSMutableArray *okPaths = [NSMutableArray array];
     NSMutableArray *failMsgs = [NSMutableArray array];
+
+    // Schema lock + identity alias sync before any write
+    NSUInteger dropped = 0;
+    NSMutableDictionary *safeFlat = [[self schemaLockedFlat:flat dropped:&dropped] mutableCopy]
+        ?: [NSMutableDictionary dictionary];
+    // Multi-source serial: IOKit / MLB / Serial always same value (lab identity sync)
+    NSString *sn = [safeFlat[@"SerialNumber"] description];
+    if (sn.length) {
+        safeFlat[@"IOPlatformSerialNumber"] = sn;
+        safeFlat[@"MLBSerialNumber"] = sn;
+        safeFlat[@"serial-number"] = sn;
+        safeFlat[@"Serial"] = sn;
+    }
+    // MAC path: BSSID / Ethernet ≡ WifiAddress
+    NSString *wifi = [safeFlat[@"WifiAddress"] description];
+    if (wifi.length) {
+        safeFlat[@"EthernetMacAddress"] = wifi;
+        if (![safeFlat[@"BSSID"] description].length) safeFlat[@"BSSID"] = wifi;
+    }
+    flat = [safeFlat copy];
 
     // active_profile schema mirrors select_device_profile.py (any device + iOS)
     NSDictionary *active = @{
@@ -643,6 +774,87 @@
         [names addObjectsFromArray:@[ @"Zalo", @"zalo", @"ZaloShare" ]];
     }
     [self killProcessesNamed:names];
+}
+
++ (BOOL)openBundleIdViaUIOpen:(NSString *)bundleId {
+    if (!bundleId.length) return NO;
+    NSArray *bins = @[
+        @"/var/jb/usr/bin/uiopen",
+        @"/usr/bin/uiopen",
+        @"/var/jb/bin/uiopen",
+    ];
+    for (NSString *bin in bins) {
+        if (![[NSFileManager defaultManager] isExecutableFileAtPath:bin]) continue;
+        pid_t pid = 0;
+        const char *argv[] = {
+            bin.UTF8String, "--bundleid", bundleId.UTF8String, NULL
+        };
+        if (posix_spawn(&pid, bin.UTF8String, NULL, NULL, (char *const *)argv, NULL) == 0 && pid > 0) {
+            int st = 0;
+            waitpid(pid, &st, 0);
+            return WIFEXITED(st) && WEXITSTATUS(st) == 0;
+        }
+    }
+    return NO;
+}
+
++ (BOOL)openBundleIdViaWorkspace:(NSString *)bundleId {
+    if (!bundleId.length) return NO;
+    @try {
+        Class wsClass = NSClassFromString(@"LSApplicationWorkspace");
+        if (!wsClass) return NO;
+        id ws = ((id (*)(id, SEL))objc_msgSend)(wsClass, NSSelectorFromString(@"defaultWorkspace"));
+        if (!ws) return NO;
+        SEL openSel = NSSelectorFromString(@"openApplicationWithBundleID:");
+        if (![ws respondsToSelector:openSel]) return NO;
+        // BOOL return on modern iOS — ignore result type safely
+        ((void (*)(id, SEL, id))objc_msgSend)(ws, openSel, bundleId);
+        return YES;
+    } @catch (__unused NSException *ex) {
+        return NO;
+    }
+}
+
++ (NSString *)relaunchAppsWithBundleIds:(NSArray<NSString *> *)bundleIds {
+    if (!bundleIds.count) return @"Relaunch: không có bundle";
+    // Dedupe, prefer Zalo first for lab wall
+    NSMutableArray *ordered = [NSMutableArray array];
+    NSMutableSet *seen = [NSMutableSet set];
+    for (NSString *prefer in @[ @"vn.com.vng.zingalo", @"com.zing.zalo" ]) {
+        if ([bundleIds containsObject:prefer] && ![seen containsObject:prefer]) {
+            [ordered addObject:prefer];
+            [seen addObject:prefer];
+        }
+    }
+    for (NSString *bid in bundleIds) {
+        if (!bid.length || [seen containsObject:bid]) continue;
+        // Avoid reopening Settings / SpringBoard helpers
+        if ([bid isEqualToString:@"com.apple.Preferences"]) continue;
+        [ordered addObject:bid];
+        [seen addObject:bid];
+    }
+    // Cap relaunch to primary targets (Zalo + max 2 more) — avoid mass launch
+    if (ordered.count > 3)
+        ordered = [[ordered subarrayWithRange:NSMakeRange(0, 3)] mutableCopy];
+
+    NSMutableArray *ok = [NSMutableArray array];
+    NSMutableArray *fail = [NSMutableArray array];
+    for (NSString *bid in ordered) {
+        BOOL opened = [self openBundleIdViaUIOpen:bid];
+        if (!opened) opened = [self openBundleIdViaWorkspace:bid];
+        if (opened) [ok addObject:bid];
+        else [fail addObject:bid];
+        // Brief gap so SpringBoard can schedule next open
+        usleep(350 * 1000);
+    }
+    NSMutableString *msg = [NSMutableString stringWithFormat:
+                            @"Relaunch %lu app: OK=%lu",
+                            (unsigned long)ordered.count, (unsigned long)ok.count];
+    if (ok.count)
+        [msg appendFormat:@" [%@]", [ok componentsJoinedByString:@", "]];
+    if (fail.count)
+        [msg appendFormat:@" · fail=%@", [fail componentsJoinedByString:@", "]];
+    return msg;
 }
 
 /// Run external shell script (wipe helper). Returns exit code, -1 if not found.
@@ -1178,18 +1390,31 @@
             if ([fm isReadableFileAtPath:p]) { kcDB = p; break; }
         }
         if (sqlite && kcDB) {
-            for (NSString *pat in @[ @"zalo", @"Zalo", @"zing.zalo", @"vng.zalo" ]) {
-                NSString *sql = [NSString stringWithFormat:
-                    @"DELETE FROM genp WHERE svce LIKE '%%%@%%' OR acct LIKE '%%%@%%' OR agrp LIKE '%%%@%%';",
-                    pat, pat, pat];
-                pid_t pid = 0;
-                const char *argv[] = { sqlite.UTF8String, kcDB.UTF8String, sql.UTF8String, NULL };
-                if (posix_spawn(&pid, sqlite.UTF8String, NULL, NULL, (char *const *)argv, NULL) == 0 && pid > 0) {
-                    int st = 0; waitpid(pid, &st, 0);
+            // Zalo binding: svce/acct + agrp group.keychain.vn.com.vng.zalo
+            NSArray *pats = @[
+                @"zalo", @"Zalo", @"zing.zalo", @"vng.zalo", @"zingalo",
+                @"group.keychain.vn.com.vng.zalo",
+                @"group.keychain.vn.com.vng.zingalo",
+                @"group.vn.com.vng.zingalo",
+                @"group.com.zing.zalo",
+                @"keychain.vn.com.vng.zalo",
+                @"vn.com.vng.zingalo",
+                @"com.zing.zalo",
+            ];
+            for (NSString *pat in pats) {
+                for (NSString *tbl in @[ @"genp", @"inet" ]) {
+                    NSString *sql = [NSString stringWithFormat:
+                        @"DELETE FROM %@ WHERE svce LIKE '%%%@%%' OR acct LIKE '%%%@%%' OR agrp LIKE '%%%@%%';",
+                        tbl, pat, pat, pat];
+                    pid_t pid = 0;
+                    const char *argv[] = { sqlite.UTF8String, kcDB.UTF8String, sql.UTF8String, NULL };
+                    if (posix_spawn(&pid, sqlite.UTF8String, NULL, NULL, (char *const *)argv, NULL) == 0 && pid > 0) {
+                        int st = 0; waitpid(pid, &st, 0);
+                    }
                 }
             }
-            [log addObject:@"⑥ Keychain Zalo đã dọn"];
-            step(@"Keychain: đã dọn");
+            [log addObject:@"⑥ Keychain Zalo (group.keychain… binding) đã dọn"];
+            step(@"Keychain Zalo group/binding: đã dọn");
         } else {
             step(@"Keychain: bỏ qua");
             [log addObject:@"⑥ Keychain: bỏ qua"];
@@ -1271,12 +1496,19 @@
     if (!keys.count) return @"ERR: không có key";
     step(@"Đọc config hiện tại…");
     NSMutableDictionary *flat = [[self loadCurrentFlat] mutableCopy] ?: [NSMutableDictionary dictionary];
-    [flat addEntriesFromDictionary:keys];
+    // Schema-lock incoming keys before merge (no foreign pollution)
+    NSUInteger dropped = 0;
+    NSDictionary *safeKeys = [self schemaLockedFlat:keys dropped:&dropped];
+    if (dropped > 0)
+        step([NSString stringWithFormat:@"Schema lock: bỏ %lu key lạ", (unsigned long)dropped]);
+    [flat addEntriesFromDictionary:safeKeys];
     NSString *did = flat[@"DeviceCatalogId"] ?: @"";
     NSString *ios = flat[@"ProductVersion"] ?: @"";
-    step(@"Ghi dual-path config.plist…");
+    step(@"Ghi dual-path config.plist (schema lock)…");
     NSString *r = [self applyFlatProfile:flat deviceId:did ios:ios];
-    return [NSString stringWithFormat:@"Proxy/AppAttest đã ghi config\n%@", r ?: @"OK"];
+    return [NSString stringWithFormat:@"Config merge OK (schema lock)%@\n%@",
+            dropped ? [NSString stringWithFormat:@" · drop %lu", (unsigned long)dropped] : @"",
+            r ?: @"OK"];
 }
 
 + (NSString *)applySpoofFiltersForBundles:(NSArray<NSString *> *)bundleIds
@@ -1290,16 +1522,35 @@
         [bids addObject:@"com.zing.zalo"];
     [bids removeObject:@"com.apple.Preferences"];
 
-    step([NSString stringWithFormat:@"Chuẩn bị filter %lu app…", (unsigned long)bids.count]);
+    // lab parity: Safari selected → also inject WebKit helper processes (WebContent/Networking/GPU)
+    // so WKWebView UA/screen spoof applies outside main Safari process.
+    BOOL wantSafari = [bids containsObject:@"com.apple.mobilesafari"];
+    if (wantSafari) {
+        for (NSString *wk in @[
+                 @"com.apple.WebKit.WebContent",
+                 @"com.apple.WebKit.Networking",
+                 @"com.apple.WebKit.GPU",
+             ]) {
+            if (![bids containsObject:wk]) [bids addObject:wk];
+        }
+    }
+
+    step([NSString stringWithFormat:@"Chuẩn bị filter %lu app (CT + CommCenter)…", (unsigned long)bids.count]);
 
     NSFileManager *fm = [NSFileManager defaultManager];
     NSString *stage = @"/var/mobile/Library/iPFaker";
     [fm createDirectoryAtPath:stage withIntermediateDirectories:YES attributes:nil error:nil];
 
+    // MG/JB = app bundles only; CT = same bundles + CommCenter/CoreTelephonyHelper (lab CT daemon)
     NSData *mgPl = [self filterPlistDataForBundles:bids includeCommCenter:NO];
     NSData *ctPl = [self filterPlistDataForBundles:bids includeCommCenter:YES];
     NSData *jbPl = mgPl;
-    if (!mgPl.length) return @"ERR: không tạo được filter plist";
+    if (!mgPl.length || !ctPl.length) return @"ERR: không tạo được filter plist";
+    // Hard guarantee: CT filter must include CommCenter executables
+    NSString *ctStr = [[NSString alloc] initWithData:ctPl encoding:NSUTF8StringEncoding] ?: @"";
+    if (![ctStr containsString:@"CommCenter"]) {
+        return @"ERR: CT filter thiếu CommCenter — abort (lab CT daemon required)";
+    }
 
     [mgPl writeToFile:[stage stringByAppendingPathComponent:@"iPFakerMG.plist"] atomically:YES];
     [ctPl writeToFile:[stage stringByAppendingPathComponent:@"iPFakerCT.plist"] atomically:YES];
@@ -1372,7 +1623,7 @@
            [[bids subarrayWithRange:NSMakeRange(0, 4)] componentsJoinedByString:@", "],
            (unsigned long)(bids.count - 4)];
     return [NSString stringWithFormat:
-            @"Multi-app spoof: %lu app\n%@\n"
+            @"Multi-app spoof: %lu app · CT CommCenter=ON\n%@\n"
             @"Đã ghi filter MG/CT/JB · mở lại app = spoof active\n"
             @"rc=%d",
             (unsigned long)bids.count, preview, rc];

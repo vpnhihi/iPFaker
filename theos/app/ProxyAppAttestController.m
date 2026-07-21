@@ -12,6 +12,7 @@
 @property (nonatomic, strong) UISegmentedControl *typeSeg;
 @property (nonatomic, strong) UISwitch *enableProxySw;
 @property (nonatomic, strong) UISwitch *disableAttestSw;
+@property (nonatomic, strong) UISwitch *syncGeoSw;
 @property (nonatomic, strong) UILabel *testResultLabel;
 @end
 
@@ -66,10 +67,12 @@
     self.enableProxySw.onTintColor = AppTheme.success;
     self.disableAttestSw = [[UISwitch alloc] init];
     self.disableAttestSw.onTintColor = AppTheme.success;
+    self.syncGeoSw = [[UISwitch alloc] init];
+    self.syncGeoSw.onTintColor = AppTheme.success;
     self.testResultLabel = [[UILabel alloc] init];
     self.testResultLabel.font = AppTheme.captionFont;
     self.testResultLabel.textColor = AppTheme.textSecondary;
-    self.testResultLabel.numberOfLines = 3;
+    self.testResultLabel.numberOfLines = 0;
     self.testResultLabel.text = @" ";
 }
 
@@ -84,6 +87,7 @@
     self.typeSeg.selectedSegmentIndex = [type.uppercaseString containsString:@"SOCKS"] ? 1 : 0;
     self.enableProxySw.on = [st proxyEnabled];
     self.disableAttestSw.on = [st disableAppAttest];
+    self.syncGeoSw.on = [st syncGeoFromProxyEnabled];
 }
 
 - (void)saveToState {
@@ -95,7 +99,18 @@
     [st setProxyType:self.typeSeg.selectedSegmentIndex == 1 ? @"SOCKS5" : @"HTTP"];
     [st setProxyEnabled:self.enableProxySw.on];
     [st setDisableAppAttest:self.disableAttestSw.on];
+    [st setSyncGeoFromProxyEnabled:self.syncGeoSw.on];
     [st saveProxyAppAttest];
+}
+
+/// On-screen notification (UIAlert) after geo / proxy ops.
+- (void)showScreenAlertTitle:(NSString *)title message:(NSString *)message {
+    if (!message.length) message = @"(empty)";
+    UIAlertController *a = [UIAlertController alertControllerWithTitle:title
+                                                               message:message
+                                                        preferredStyle:UIAlertControllerStyleAlert];
+    [a addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+    [self presentViewController:a animated:YES completion:nil];
 }
 
 - (void)saveTapped {
@@ -109,9 +124,15 @@
         }];
         dispatch_async(dispatch_get_main_queue(), ^{
             [ov finishWithTitle:@"Đã lưu" detail:msg];
-            [ov dismissAfter:1.5 completion:nil];
-            self.testResultLabel.text = msg;
-            [self.tableView reloadData];
+            [ov dismissAfter:1.2 completion:^{
+                self.testResultLabel.text = msg;
+                [self.tableView reloadData];
+                // Thông báo ra màn hình (IP / city / TZ / lat-lon)
+                NSString *title = [msg containsString:@"Đã đồng bộ"]
+                    ? @"Đồng bộ thời gian / Map / Thời tiết"
+                    : @"Proxy / AppAttest";
+                [self showScreenAlertTitle:title message:msg];
+            }];
         });
     });
 }
@@ -121,28 +142,64 @@
     [self saveToState];
     self.testResultLabel.text = @"Đang test proxy…";
     [self.tableView reloadData];
+    UIView *host = self.navigationController.view ?: self.view;
+    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Test proxy…"];
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         NSString *res = [AppState.shared testProxyConnection];
         dispatch_async(dispatch_get_main_queue(), ^{
-            self.testResultLabel.text = res;
-            [self.tableView reloadData];
+            [ov finishWithTitle:[res hasPrefix:@"OK"] ? @"Proxy OK" : @"Proxy FAIL" detail:res];
+            [ov dismissAfter:1.0 completion:^{
+                self.testResultLabel.text = res;
+                [self.tableView reloadData];
+                [self showScreenAlertTitle:@"Test proxy + geo" message:res];
+            }];
+        });
+    });
+}
+
+- (void)syncGeoNowTapped {
+    [self.view endEditing:YES];
+    [self saveToState];
+    // Force geo ON for this action (user tapped "Đồng bộ ngay")
+    BOOL prev = [AppState.shared syncGeoFromProxyEnabled];
+    [AppState.shared setSyncGeoFromProxyEnabled:YES];
+    self.syncGeoSw.on = YES;
+    UIView *host = self.navigationController.view ?: self.view;
+    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Đồng bộ geo theo proxy…"];
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        // applyProxyAppAttest = proxy keys + geo (lat/lon/TZ/locale) + dual-path config
+        NSString *full = [AppState.shared applyProxyAppAttestToConfigProgress:^(NSString *s) {
+            [ov appendStep:s];
+        }];
+        // Keep toggle ON after explicit sync (user intent)
+        (void)prev;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            BOOL ok = [full containsString:@"Đã đồng bộ"];
+            [ov finishWithTitle:ok ? @"Đã đồng bộ geo" : @"Geo / lưu xong" detail:full];
+            [ov dismissAfter:1.0 completion:^{
+                self.testResultLabel.text = full;
+                [self.tableView reloadData];
+                [self showScreenAlertTitle:@"Đồng bộ thời gian / Map / Thời tiết" message:full];
+            }];
         });
     });
 }
 
 #pragma mark - Table
 
-- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView { return 3; }
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView { return 4; }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
     if (section == 0) return 7; // host port type user pass enable test
     if (section == 1) return 1; // appattest
+    if (section == 2) return 2; // sync geo switch + sync now
     return 1; // result
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
     if (section == 0) return @"Proxy settings";
     if (section == 1) return @"AppAttest";
+    if (section == 2) return @"Thời gian / Map / Thời tiết";
     return @"Trạng thái";
 }
 
@@ -151,6 +208,8 @@
         return @"Bật Enable proxy + Lưu để ghi vào config.plist (dylib đọc khi inject). HTTP hoặc SOCKS5.";
     if (section == 1)
         return @"Tắt App Attest / DeviceCheck assertion trong app spoof (lab). Không bypass server-side trust.";
+    if (section == 2)
+        return @"Lấy lat/lon/IANA TZ/locale theo IP egress (qua proxy nếu bật) → FakeLocation + FakeLocale. Maps & Weather đọc GPS; đồng hồ/app đọc múi giờ. Sau Lưu / Test / Đồng bộ sẽ có thông báo màn hình.";
     return nil;
 }
 
@@ -164,6 +223,7 @@
         cell.textLabel.textColor = AppTheme.textPrimary;
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
         cell.accessoryView = nil;
+        cell.accessoryType = UITableViewCellAccessoryNone;
         cell.detailTextLabel.text = nil;
         switch (indexPath.row) {
             case 0:
@@ -210,6 +270,28 @@
         cell.textLabel.textColor = AppTheme.textPrimary;
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
         cell.accessoryView = self.disableAttestSw;
+        cell.accessoryType = UITableViewCellAccessoryNone;
+        return cell;
+    }
+    if (indexPath.section == 2) {
+        static NSString *cid = @"geo";
+        UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cid];
+        if (!cell)
+            cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault reuseIdentifier:cid];
+        cell.backgroundColor = AppTheme.cardAlt;
+        cell.accessoryView = nil;
+        cell.accessoryType = UITableViewCellAccessoryNone;
+        if (indexPath.row == 0) {
+            cell.textLabel.text = @"Đồng bộ geo theo proxy";
+            cell.textLabel.textColor = AppTheme.textPrimary;
+            cell.selectionStyle = UITableViewCellSelectionStyleNone;
+            cell.accessoryView = self.syncGeoSw;
+        } else {
+            cell.textLabel.text = @"Đồng bộ ngay (Map / TZ / Weather)";
+            cell.textLabel.textColor = AppTheme.accent;
+            cell.selectionStyle = UITableViewCellSelectionStyleDefault;
+            cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+        }
         return cell;
     }
     static NSString *cid = @"st";
@@ -223,6 +305,7 @@
     cell.textLabel.textColor = AppTheme.textSecondary;
     cell.textLabel.text = self.testResultLabel.text.length ? self.testResultLabel.text : @"Chưa test / chưa lưu";
     cell.accessoryView = nil;
+    cell.accessoryType = UITableViewCellAccessoryNone;
     return cell;
 }
 
@@ -230,6 +313,8 @@
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
     if (indexPath.section == 0 && indexPath.row == 6)
         [self testProxyTapped];
+    if (indexPath.section == 2 && indexPath.row == 1)
+        [self syncGeoNowTapped];
 }
 
 - (BOOL)textFieldShouldReturn:(UITextField *)textField {

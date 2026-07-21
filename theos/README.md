@@ -1,81 +1,49 @@
-# iPFaker Theos — package giống ChangeInfoIos (HIOS Faker v3)
+# iPFaker Theos — rootless dual/triple dylib stack (lab)
 
-Deb tham chiếu: `ChangeInfoIos-v3_4.2.0_iphoneos-arm64.deb`
-
-| ChangeInfo | iPFaker |
+| Thành phần | Vai trò |
 |------------|---------|
-| `ChangeInfoIosMG.dylib` | `iPFakerMG.dylib` |
-| `ChangeInfoIosCT.dylib` | `iPFakerCT.dylib` |
-| `/var/jb/etc/changeinfoios/` | `/var/jb/etc/ipfaker/` |
-| HIOSFakerV3.app | *(chưa — dùng deploy Windows)* |
-| `Architecture: iphoneos-arm64` | same (rootless) |
-| `ellekit \| mobilesubstrate` | same |
+| `iPFakerMG.dylib` | Identity spoof (MG / sysctl / UIDevice / Extra) |
+| `iPFakerCT.dylib` | Telephony + Deep rewrite + CommCenter filter |
+| `iPFakerJB.dylib` | JB hide expand (fopen/getenv/open/fileExists) |
+| Config | `/var/jb/etc/ipfaker/` + mirror `/var/mobile/Library/iPFaker/` |
+| App | `iPFaker.app` (Main / Devices / Wipe / Settings) |
+| Inject | ElleKit (TweakInject) |
+| Arch | `iphoneos-arm64` rootless (Dopamine) |
 
 ## Cấu trúc
 
 ```
 theos/
-├── Makefile              # 2 library + THEOS_PACKAGE_SCHEME=rootless
-├── control               # deb metadata
-├── TweakMG.x / TweakCT.x
-├── src/                  # IPFConfig, IPFHooksMG, IPFHooksCT
+├── Makefile              # MG + CT + JB, THEOS_PACKAGE_SCHEME=rootless
+├── control
+├── TweakMG.x / TweakCT.x / TweakJB.x
+├── src/                  # IPFConfig, IPFHooks*
+├── app/                  # iPFaker.app
 └── layout/
     ├── DEBIAN/postinst
     ├── etc/ipfaker/
     └── Library/MobileSubstrate/DynamicLibraries/
         ├── iPFakerMG.plist
-        └── iPFakerCT.plist
+        ├── iPFakerCT.plist
+        └── iPFakerJB.plist
 ```
 
-## Build (macOS only)
+## Build (macOS + Theos)
 
 ```bash
 export THEOS=~/theos
-cd /path/to/iPFaker/theos
+cd theos
 make clean
 make package
 ```
 
-Output:
+## Filter mặc định (Lab-core)
 
-```text
-packages/com.ipfaker.tweak_<ver>_iphoneos-arm64.deb
-```
+- **MG/JB:** Zalo + Safari + Maps + Weather + WebKit helpers  
+- **CT:** same bundles + Executables `CommCenter` / `commcenter` / `CoreTelephonyHelper`  
+- Không inject Settings  
 
-Cài trên RootHide:
+## Ghi chú
 
-```bash
-dpkg -i packages/com.ipfaker.tweak_*.deb
-# hoặc copy deb → Sileo
-```
-
-Copy dylib ra Windows tree (optional deploy.ps1):
-
-```bash
-cp .theos/obj/debug/iPFakerMG.dylib ../dylibs/
-cp .theos/obj/debug/iPFakerCT.dylib ../dylibs/
-```
-
-## Sau khi cài deb
-
-1. Windows: deploy profile  
-   `deploy.ps1 -DeviceHost <IP> -Layout roothide -RebuildProfile -SkipDylib -KillZalo`  
-2. RootHide Manager: **App Inject ON** cho Zalo  
-3. Mở Zalo / Frida `rpc.exports.verify()`
-
-## Filter Zalo
-
-Cả hai bundle (như filter HIOS có `vn.com.vng.zingalo`):
-
-- `com.zing.zalo`
-- `vn.com.vng.zingalo`
-
-CT còn inject: `CommCenter`, `CoreTelephonyHelper`.
-
-## Không làm
-
-- Không copy binary / logic proprietary từ ChangeInfo deb  
-- Chỉ bắt chước **kiến trúc package + split MG/CT**
-
-# CI build target
-
+- Không copy binary proprietary từ gói spoof bên thứ ba  
+- MG giữ size AMFI-safe (~≤130k)  

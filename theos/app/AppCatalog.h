@@ -15,8 +15,12 @@ NS_ASSUME_NONNULL_BEGIN
 + (instancetype)shared;
 /// Refresh wipe list (third-party + Maps/Weather/Safari).
 - (void)reload;
-/// HIOS-style Multi-app spoof catalog (stock + third-party).
+/// lab flat Multi-app spoof catalog (stock + third-party).
 - (void)reloadSpoofCatalog;
+/// Stock rows: @[ bundleId, name ] (lab Multi-app list, no Preferences).
++ (NSArray<NSArray *> *)labStockSpoofApps;
+/// FB/IG/TikTok/Shopee/Telegram + Zalo multi-app rows.
++ (NSArray<NSArray *> *)labSocialSpoofApps;
 @property (nonatomic, readonly) NSArray<AppCatalogItem *> *apps;
 @property (nonatomic, readonly) NSArray<AppCatalogItem *> *spoofApps;
 - (nullable AppCatalogItem *)itemWithBundleId:(NSString *)bid;

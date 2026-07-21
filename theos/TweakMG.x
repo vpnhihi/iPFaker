@@ -1,4 +1,4 @@
-// iPFakerMG — HIOS ChangeInfoIosMG style entry
+// iPFakerMG — lab reference-stackMG style entry
 // Marker written FIRST so we can detect load vs config failure.
 
 #import <Foundation/Foundation.h>
@@ -24,7 +24,6 @@ static void IPFMark(const char *msg) {
     [paths addObjectsFromArray:@[
         @"/var/mobile/Library/iPFaker/v3_mg_loaded.txt",
         @"/var/jb/etc/ipfaker/v3_mg_loaded.txt",
-        @"/var/jb/etc/changeinfoios/v3_mg_loaded.txt",
         @"/var/jb/tmp/v3_mg_loaded.txt",
         @"/tmp/v3_mg_loaded.txt",
     ]];
@@ -66,12 +65,26 @@ static void IPFMark(const char *msg) {
               atomically:YES encoding:NSUTF8StringEncoding error:nil];
 
         if (!ok) {
-            // HIOS always has config.plist; still install embedded fallback hooks
+            // lab always has config.plist; still install embedded fallback hooks
             IPFMark("CTOR_NO_FILE_CONFIG_USE_EMBED");
         }
 
         IPFInstallMGHooks();
         IPFInstallExtraHooks();
+        // Module cover matrix (MG + Extra always co-loaded in this dylib)
+        @try {
+            NSString *mod = [NSString stringWithFormat:
+                @"MODULE IPFHooksMG: MGCopyAnswer(+Error) sysctl uname UIDevice IDFA/IDFV boottime Fake* gates; MSHook primary (fishhook fallback only if miss)\n"
+                @"MODULE IPFHooksExtra: UIScreen disk path-hide canOpenURL UA locale/TZ location getifaddrs hostname WKWebView\n"
+                @"MODULE stack: MG+Extra in iPFakerMG.dylib · CT+Deep in iPFakerCT · JB hide in iPFakerJB · bid=%@\n",
+                bid];
+            NSString *home = NSHomeDirectory();
+            if (home.length)
+                [mod writeToFile:[home stringByAppendingPathComponent:@"Documents/ipfaker_modules.log"]
+                      atomically:YES encoding:NSUTF8StringEncoding error:nil];
+            [mod writeToFile:@"/var/mobile/Library/iPFaker/ipfaker_modules.log"
+                  atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        } @catch (__unused NSException *ex) {}
         IPFMark("CTOR_HOOKS_DONE");
     }
 }

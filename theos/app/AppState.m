@@ -1,7 +1,9 @@
 #import "AppState.h"
 #import "Catalog.h"
+#import "AppCatalog.h"
 #import "ProfileBuilder.h"
 #import <CFNetwork/CFNetwork.h>
+#import <unistd.h>
 
 NSNotificationName const AppStateDidChangeNotification = @"AppStateDidChangeNotification";
 
@@ -158,12 +160,30 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
             [self savePools];
         }
     }
-    // Multi-app spoof default: Zalo only (lab wall). Settings never injected.
+    // Multi-app spoof default = Lab-core (Zalo + Safari + Maps + Weather).
+    // Settings never injected. CT filter always adds CommCenter separately.
+    [self.selectedSpoofBundleIds removeObject:@"com.apple.Preferences"];
     if (self.selectedSpoofBundleIds.count == 0) {
-        [self.selectedSpoofBundleIds addObject:@"vn.com.vng.zingalo"];
-        [self.selectedSpoofBundleIds addObject:@"com.zing.zalo"];
+        [self.selectedSpoofBundleIds addObjectsFromArray:[AppState labCoreSpoofBundleIds]];
     } else {
-        [self.selectedSpoofBundleIds removeObject:@"com.apple.Preferences"];
+        // Migrate classic Zalo-only default → Lab-core once (parity với lab filter surface)
+        NSSet *cur = [NSSet setWithArray:self.selectedSpoofBundleIds];
+        NSSet *zaloOnly = [NSSet setWithArray:@[ @"vn.com.vng.zingalo", @"com.zing.zalo" ]];
+        if ([cur isEqualToSet:zaloOnly] ||
+            (self.selectedSpoofBundleIds.count <= 2
+             && [self.selectedSpoofBundleIds containsObject:@"vn.com.vng.zingalo"])) {
+            BOOL onlyZalo = YES;
+            for (NSString *b in self.selectedSpoofBundleIds) {
+                NSString *l = b.lowercaseString;
+                if (![l containsString:@"zalo"] && ![l containsString:@"zing"]) {
+                    onlyZalo = NO; break;
+                }
+            }
+            if (onlyZalo) {
+                [self.selectedSpoofBundleIds removeAllObjects];
+                [self.selectedSpoofBundleIds addObjectsFromArray:[AppState labCoreSpoofBundleIds]];
+            }
+        }
         BOOL hasZalo = NO;
         for (NSString *b in self.selectedSpoofBundleIds) {
             if ([b.lowercaseString containsString:@"zalo"] || [b.lowercaseString containsString:@"zing"]) {
@@ -176,6 +196,53 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
         }
     }
     [self savePools];
+}
+
++ (NSArray<NSString *> *)labCoreSpoofBundleIds {
+    // Align with lab filter surface (scoped lab): Zalo + Safari/Maps/Weather
+    return @[
+        @"vn.com.vng.zingalo",
+        @"com.zing.zalo",
+        @"com.apple.mobilesafari",
+        @"com.apple.Maps",
+        @"com.apple.weather",
+    ];
+}
+
+- (void)applyLabCoreSpoofPreset {
+    [self.selectedSpoofBundleIds removeAllObjects];
+    [self.selectedSpoofBundleIds addObjectsFromArray:[AppState labCoreSpoofBundleIds]];
+    [self savePools];
+    [self postDidChange];
+}
+
+- (void)applyLabStockSpoofPreset {
+    [self.selectedSpoofBundleIds removeAllObjects];
+    for (NSArray *row in [AppCatalog labStockSpoofApps]) {
+        NSString *bid = row.firstObject;
+        if (!bid.length || [bid isEqualToString:@"com.apple.Preferences"]) continue;
+        if (![self.selectedSpoofBundleIds containsObject:bid])
+            [self.selectedSpoofBundleIds addObject:bid];
+    }
+    if (self.selectedSpoofBundleIds.count == 0)
+        [self.selectedSpoofBundleIds addObjectsFromArray:[AppState labCoreSpoofBundleIds]];
+    [self savePools];
+    [self postDidChange];
+}
+
+- (void)applyLabSocialSpoofPreset {
+    // Multi-app: social/commerce + core Safari/Maps/Weather + Zalo (no Settings)
+    [self.selectedSpoofBundleIds removeAllObjects];
+    NSMutableArray *all = [NSMutableArray array];
+    [all addObjectsFromArray:[AppState labCoreSpoofBundleIds]];
+    for (NSArray *row in [AppCatalog labSocialSpoofApps]) {
+        NSString *bid = row.firstObject;
+        if (!bid.length || [bid isEqualToString:@"com.apple.Preferences"]) continue;
+        if (![all containsObject:bid]) [all addObject:bid];
+    }
+    [self.selectedSpoofBundleIds addObjectsFromArray:all];
+    [self savePools];
+    [self postDidChange];
 }
 
 - (NSDictionary *)currentDevice {
@@ -561,9 +628,14 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     setFlag(@"FakeLocale", YES);
     setFlag(@"FakeDateTime", NO);
     setFlag(@"FakeLocation", YES);
-    setFlag(@"FakeSensor", YES);
-    setFlag(@"FakeWebRTC", YES);
+    setFlag(@"FakeSensor", YES);       // sensor availability (real samples still used)
+    setFlag(@"FakeWebRTC", YES);       // private WebRTC local IP — reduce public IP leak
     setFlag(@"DisableWebRTC", NO);
+    // Lab mitigations for client holes (not server Graph/OTP/ASN)
+    setFlag(@"DisableAppAttest", YES); // block App Attest / DeviceCheck client path
+    setFlag(@"HideJailbreak", YES);
+    setFlag(@"FakeWifi", YES);
+    setFlag(@"FakeProxy", [self proxyEnabled]); // align with EnableProxy if set
     // Pool metadata for lab debug
     mflat[@"SelectedDevicePool"] = [self.selectedDeviceIds copy];
     mflat[@"SelectedIOSPool"] = [self.selectedIOSList copy];
@@ -631,25 +703,34 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
 }
 
 - (NSString *)killZaloAndRandomizeFromPoolProgress:(void (^)(NSString *))progress {
-    if (progress) progress(@"Đang chọn ngẫu nhiên máy + iOS…");
+    // 1-chạm lab sạch: Apply → Wipe full → Kill → Relaunch (mất đăng nhập)
+    if (progress) progress(@"① Chọn ngẫu nhiên máy + iOS + ghi config…");
     NSString *applyMsg = [self applyRandomFromPool];
     NSArray *wipeBids = [self targetsForDataOps];
-    if (progress) progress([NSString stringWithFormat:@"Đang xóa %lu app (không giữ đăng nhập)…", (unsigned long)wipeBids.count]);
+    if (progress) progress([NSString stringWithFormat:@"② Xóa sạch %lu app (mất đăng nhập)…", (unsigned long)wipeBids.count]);
     NSString *wipeMsg = [ProfileBuilder wipeApps:wipeBids progress:progress];
+    if (progress) progress(@"③ Đóng app…");
+    for (NSString *bid in wipeBids)
+        [ProfileBuilder killAppBundleId:bid executable:nil];
+    usleep(400 * 1000);
+    if (progress) progress(@"④ Mở lại app (nạp spoof mới)…");
+    NSString *reMsg = [ProfileBuilder relaunchAppsWithBundleIds:wipeBids];
     self.statusText = [NSString stringWithFormat:
-                       @"%@\n\n%@\n\n→ Mở lại app = dữ liệu sạch + hồ sơ máy mới.",
-                       applyMsg, wipeMsg];
+                       @"Đặt lại dữ liệu app (1 chạm) xong:\n\n%@\n\n%@\n\n%@\n\n"
+                       @"→ Data sạch + hồ sơ máy mới + app đã relaunch.",
+                       applyMsg, wipeMsg, reMsg];
     [self postDidChange];
     return self.statusText;
 }
 
 - (NSString *)saveDataThenResetProgress:(void (^)(NSString *))progress {
     /**
-     Luồng «Đặt lại + Lưu dữ liệu»:
-     1) Lưu 100% thông số máy hiện tại + full data app đã chọn (kèm phiên đăng nhập)
-     2) Random máy/iOS mới + ghi config
-     3) Xóa data app (bỏ keychain wipe để không mất token nếu nằm ngoài file)
-     4) Khôi phục data app → giữ đăng nhập, spoof máy mới
+     «Đặt lại + Lưu dữ liệu» = 1 chạm lab wall (giữ đăng nhập):
+     1) Backup 100% thông số máy + data app (session)
+     2) Random máy/iOS + Apply config dual-path + spoof filter + proxy keys
+     3) Soft wipe app data (skip keychain) + restore session
+     4) (Optional) Geo theo proxy nếu SyncGeo ON
+     5) Kill → Relaunch app → nạp spoof + session
      */
     NSArray *apps = [self targetsForDataOps];
     NSMutableArray *log = [NSMutableArray array];
@@ -664,11 +745,11 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     }
     [log addObject:[NSString stringWithFormat:@"Đã lưu backup: %@", bak]];
 
-    if (progress) progress(@"② Đặt lại hồ sơ máy (ngẫu nhiên trong pool)…");
+    if (progress) progress(@"② Đặt lại hồ sơ máy (ngẫu nhiên trong pool) + filter spoof…");
     NSString *applyMsg = [self applyRandomFromPool];
     [log addObject:applyMsg];
 
-    if (progress) progress(@"③ Xóa data app (chuẩn bị khôi phục)…");
+    if (progress) progress(@"③ Xóa data app (chuẩn bị khôi phục session)…");
     NSString *wipeMsg = [ProfileBuilder wipeApps:apps
                                         progress:progress
                                          options:@{ @"skipKeychain": @YES, @"skipScript": @YES }];
@@ -678,15 +759,69 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     NSString *restMsg = [ProfileBuilder restoreApps:apps fromBackupRoot:bak progress:progress];
     [log addObject:restMsg];
 
+    // Optional: geo theo proxy egress — chỉ khi bật proxy + SyncGeo (tránh ghi đè lat/TZ catalog khi không proxy)
+    if ([self proxyEnabled] && [self syncGeoFromProxyEnabled]) {
+        if (progress) progress(@"⑤ Đồng bộ geo (map / TZ) theo proxy…");
+        NSDictionary *geo = nil;
+        NSString *geoMsg = [self syncTimeMapWeatherFromProxyProgress:progress geoKeysOut:&geo];
+        if (geo.count) {
+            NSMutableDictionary *keys = [geo mutableCopy];
+            keys[@"FakeLocation"] = @YES;
+            keys[@"FakeLocale"] = @YES;
+            [self setToggle:YES forKey:@"FakeLocation"];
+            [self setToggle:YES forKey:@"FakeLocale"];
+            NSString *merge = [ProfileBuilder mergeKeysIntoConfig:keys progress:progress];
+            [log addObject:[NSString stringWithFormat:@"%@\n%@", geoMsg, merge]];
+        } else if (geoMsg.length) {
+            [log addObject:geoMsg];
+        }
+    }
+
     // Kill so next open loads new MG config + restored session files
-    if (progress) progress(@"⑤ Đóng app để nạp spoof + session…");
+    if (progress) progress(@"⑥ Đóng app để nạp spoof + session…");
     for (NSString *bid in apps)
         [ProfileBuilder killAppBundleId:bid executable:nil];
+    usleep(450 * 1000);
+
+    // Relaunch — 1 chạm hoàn chỉnh (không cần mở tay)
+    if (progress) progress(@"⑦ Mở lại app (1 chạm: nạp spoof + session)…");
+    // Prefer spoof targets if set, else wipe targets (Zalo default)
+    NSArray *relaunch = self.selectedSpoofBundleIds.count
+        ? [self.selectedSpoofBundleIds copy]
+        : apps;
+    // Always ensure Zalo in relaunch list for lab wall
+    NSMutableArray *reList = [relaunch mutableCopy] ?: [NSMutableArray array];
+    for (NSString *z in @[ @"vn.com.vng.zingalo", @"com.zing.zalo" ]) {
+        if (![reList containsObject:z] && [apps containsObject:z])
+            [reList addObject:z];
+    }
+    if (![reList containsObject:@"vn.com.vng.zingalo"] && ![reList containsObject:@"com.zing.zalo"])
+        [reList insertObject:@"vn.com.vng.zingalo" atIndex:0];
+    NSString *reMsg = [ProfileBuilder relaunchAppsWithBundleIds:reList];
+    [log addObject:reMsg];
+
+    // Snapshot for Verify panel
+    @try {
+        NSDictionary *flat = [ProfileBuilder loadCurrentFlat] ?: @{};
+        NSDictionary *snap = @{
+            @"schema": @"ipfaker.one_tap_save/1",
+            @"ts": @((NSInteger)[[NSDate date] timeIntervalSince1970]),
+            @"ProductType": flat[@"ProductType"] ?: @"",
+            @"MarketingName": flat[@"MarketingName"] ?: @"",
+            @"ProductVersion": flat[@"ProductVersion"] ?: @"",
+            @"SerialNumber": flat[@"SerialNumber"] ?: @"",
+            @"backup": bak ?: @"",
+            @"relaunch": reMsg ?: @"",
+        };
+        NSData *json = [NSJSONSerialization dataWithJSONObject:snap options:NSJSONWritingPrettyPrinted error:nil];
+        [json writeToFile:@"/var/mobile/Library/iPFaker/last_one_tap.json" atomically:YES];
+    } @catch (__unused NSException *ex) {}
 
     self.statusText = [NSString stringWithFormat:
-                       @"Đặt lại + Lưu dữ liệu xong:\n\n%@\n\n"
-                       @"→ Đã lưu 100%% thông số máy + data app.\n"
-                       @"→ Máy spoof mới + phiên đăng nhập được khôi phục.\n"
+                       @"Đặt lại + Lưu dữ liệu (1 chạm) xong:\n\n%@\n\n"
+                       @"→ Backup máy + data (giữ đăng nhập)\n"
+                       @"→ Spoof mới + dual-path config\n"
+                       @"→ Kill + Relaunch app (nạp spoof)\n"
                        @"→ Backup: %@",
                        [log componentsJoinedByString:@"\n---\n"], bak];
     [self postDidChange];
@@ -739,6 +874,7 @@ static NSString *const kPxType = @"ipf.proxy.type";
 static NSString *const kPxUser = @"ipf.proxy.user";
 static NSString *const kPxPass = @"ipf.proxy.pass";
 static NSString *const kAADisable = @"ipf.appattest.disable";
+static NSString *const kPxSyncGeo = @"ipf.proxy.syncGeo";
 
 - (BOOL)proxyEnabled {
     return [NSUserDefaults.standardUserDefaults boolForKey:kPxEnable];
@@ -783,6 +919,14 @@ static NSString *const kAADisable = @"ipf.appattest.disable";
 - (void)setDisableAppAttest:(BOOL)on {
     [NSUserDefaults.standardUserDefaults setBool:on forKey:kAADisable];
 }
+- (BOOL)syncGeoFromProxyEnabled {
+    NSUserDefaults *ud = NSUserDefaults.standardUserDefaults;
+    if ([ud objectForKey:kPxSyncGeo] == nil) return YES; // default ON
+    return [ud boolForKey:kPxSyncGeo];
+}
+- (void)setSyncGeoFromProxyEnabled:(BOOL)on {
+    [NSUserDefaults.standardUserDefaults setBool:on forKey:kPxSyncGeo];
+}
 - (void)saveProxyAppAttest {
     [NSUserDefaults.standardUserDefaults synchronize];
     // Mirror JSON for PC tools
@@ -796,6 +940,7 @@ static NSString *const kAADisable = @"ipf.appattest.disable";
             @"ProxyUsername": [self proxyUsername] ?: @"",
             @"ProxyPassword": [self proxyPassword] ?: @"",
             @"DisableAppAttest": @([self disableAppAttest]),
+            @"SyncGeoFromProxy": @([self syncGeoFromProxyEnabled]),
         };
         NSData *json = [NSJSONSerialization dataWithJSONObject:d options:NSJSONWritingPrettyPrinted error:nil];
         if (json) [json writeToFile:[dir stringByAppendingPathComponent:@"proxy_appattest.json"] atomically:YES];
@@ -812,24 +957,15 @@ static NSString *const kAADisable = @"ipf.appattest.disable";
         @"ProxyPassword": [self proxyPassword] ?: @"",
         @"DisableAppAttest": @([self disableAppAttest]),
         @"FakeProxy": @([self proxyEnabled]),
+        @"SyncGeoFromProxy": @([self syncGeoFromProxyEnabled]),
     };
 }
 
-- (NSString *)applyProxyAppAttestToConfigProgress:(void (^)(NSString *))progress {
-    [self saveProxyAppAttest];
-    if (progress) progress(@"Gộp Proxy / AppAttest vào config.plist…");
-    NSString *msg = [ProfileBuilder mergeKeysIntoConfig:[self proxyAppAttestFlatKeys] progress:progress];
-    self.statusText = msg;
-    [self postDidChange];
-    return msg;
-}
-
-- (NSString *)testProxyConnection {
+/// Build CFNetwork proxy dictionary for NSURLSession (shared by test + geo).
+- (NSDictionary *)proxySessionDictionary {
     NSString *host = [self proxyHost];
     NSInteger port = [self proxyPort];
-    if (!host.length || port <= 0 || port > 65535)
-        return @"ERR: Host/Port không hợp lệ";
-
+    if (!host.length || port <= 0 || port > 65535) return nil;
     BOOL socks = [[self proxyType].uppercaseString containsString:@"SOCKS"];
     NSMutableDictionary *proxy = [NSMutableDictionary dictionary];
     if (socks) {
@@ -847,6 +983,185 @@ static NSString *const kAADisable = @"ipf.appattest.disable";
         proxy[(NSString *)kCFNetworkProxiesHTTPSProxy] = host;
         proxy[(NSString *)kCFNetworkProxiesHTTPSPort] = @(port);
     }
+    return proxy;
+}
+
+/// Locale BCP-47 / Apple locale from ISO country (lab heuristic).
++ (NSDictionary *)localeBundleForCountryCode:(NSString *)cc {
+    NSString *c = (cc ?: @"").uppercaseString;
+    NSDictionary *map = @{
+        @"VN": @{ @"bcp": @"vi-VN", @"apple": @"vi_VN", @"lang": @"vi", @"cur": @"VND" },
+        @"US": @{ @"bcp": @"en-US", @"apple": @"en_US", @"lang": @"en", @"cur": @"USD" },
+        @"GB": @{ @"bcp": @"en-GB", @"apple": @"en_GB", @"lang": @"en", @"cur": @"GBP" },
+        @"JP": @{ @"bcp": @"ja-JP", @"apple": @"ja_JP", @"lang": @"ja", @"cur": @"JPY" },
+        @"KR": @{ @"bcp": @"ko-KR", @"apple": @"ko_KR", @"lang": @"ko", @"cur": @"KRW" },
+        @"CN": @{ @"bcp": @"zh-CN", @"apple": @"zh_CN", @"lang": @"zh", @"cur": @"CNY" },
+        @"TW": @{ @"bcp": @"zh-TW", @"apple": @"zh_TW", @"lang": @"zh", @"cur": @"TWD" },
+        @"TH": @{ @"bcp": @"th-TH", @"apple": @"th_TH", @"lang": @"th", @"cur": @"THB" },
+        @"SG": @{ @"bcp": @"en-SG", @"apple": @"en_SG", @"lang": @"en", @"cur": @"SGD" },
+        @"DE": @{ @"bcp": @"de-DE", @"apple": @"de_DE", @"lang": @"de", @"cur": @"EUR" },
+        @"FR": @{ @"bcp": @"fr-FR", @"apple": @"fr_FR", @"lang": @"fr", @"cur": @"EUR" },
+        @"AU": @{ @"bcp": @"en-AU", @"apple": @"en_AU", @"lang": @"en", @"cur": @"AUD" },
+        @"IN": @{ @"bcp": @"en-IN", @"apple": @"en_IN", @"lang": @"en", @"cur": @"INR" },
+        @"ID": @{ @"bcp": @"id-ID", @"apple": @"id_ID", @"lang": @"id", @"cur": @"IDR" },
+        @"MY": @{ @"bcp": @"ms-MY", @"apple": @"ms_MY", @"lang": @"ms", @"cur": @"MYR" },
+        @"PH": @{ @"bcp": @"en-PH", @"apple": @"en_PH", @"lang": @"en", @"cur": @"PHP" },
+        @"RU": @{ @"bcp": @"ru-RU", @"apple": @"ru_RU", @"lang": @"ru", @"cur": @"RUB" },
+    };
+    return map[c] ?: @{ @"bcp": @"en-US", @"apple": @"en_US", @"lang": @"en", @"cur": @"USD" };
+}
+
+- (NSData *)httpGET:(NSString *)urlString throughProxy:(BOOL)useProxy error:(NSError **)errOut {
+    NSURL *url = [NSURL URLWithString:urlString];
+    if (!url) return nil;
+    NSURLSessionConfiguration *cfg = [NSURLSessionConfiguration ephemeralSessionConfiguration];
+    cfg.timeoutIntervalForRequest = 14;
+    cfg.timeoutIntervalForResource = 16;
+    if (useProxy) {
+        NSDictionary *px = [self proxySessionDictionary];
+        if (px) cfg.connectionProxyDictionary = px;
+    }
+    NSURLSession *session = [NSURLSession sessionWithConfiguration:cfg];
+    dispatch_semaphore_t sem = dispatch_semaphore_create(0);
+    __block NSData *outData = nil;
+    __block NSError *outErr = nil;
+    [[session dataTaskWithURL:url completionHandler:^(NSData *data, NSURLResponse *resp, NSError *err) {
+        outData = data;
+        outErr = err;
+        dispatch_semaphore_signal(sem);
+    }] resume];
+    dispatch_semaphore_wait(sem, dispatch_time(DISPATCH_TIME_NOW, 18 * NSEC_PER_SEC));
+    [session invalidateAndCancel];
+    if (errOut) *errOut = outErr;
+    return outData;
+}
+
+- (NSString *)syncTimeMapWeatherFromProxyProgress:(void (^)(NSString *))progress
+                                      geoKeysOut:(NSDictionary **)keysOut {
+    if (progress) progress(@"Lấy geo theo IP (qua proxy nếu bật)…");
+    BOOL usePx = [self proxyEnabled] && [self proxySessionDictionary] != nil;
+    // ip-api.com free JSON (HTTP) — fields: lat, lon, timezone, countryCode, city, query
+    // Standard WGS84 + IANA TZ for FakeLocation / FakeLocale / Maps / Weather
+    NSError *err = nil;
+    NSData *data = [self httpGET:@"http://ip-api.com/json/?fields=status,message,country,countryCode,regionName,city,lat,lon,timezone,query,isp"
+                    throughProxy:usePx error:&err];
+    if (!data.length) {
+        // Fallback without proxy
+        data = [self httpGET:@"http://ip-api.com/json/?fields=status,message,country,countryCode,regionName,city,lat,lon,timezone,query,isp"
+                throughProxy:NO error:&err];
+    }
+    if (!data.length) {
+        NSString *m = [NSString stringWithFormat:@"Geo FAIL: %@", err.localizedDescription ?: @"no data"];
+        if (keysOut) *keysOut = nil;
+        return m;
+    }
+    id obj = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+    if (![obj isKindOfClass:[NSDictionary class]]) {
+        if (keysOut) *keysOut = nil;
+        return @"Geo FAIL: JSON không hợp lệ";
+    }
+    NSDictionary *j = (NSDictionary *)obj;
+    if (![[j[@"status"] description] isEqualToString:@"success"]) {
+        if (keysOut) *keysOut = nil;
+        return [NSString stringWithFormat:@"Geo FAIL: %@", j[@"message"] ?: @"status!=success"];
+    }
+    double lat = [j[@"lat"] doubleValue];
+    double lon = [j[@"lon"] doubleValue];
+    NSString *tz = [j[@"timezone"] description] ?: @"UTC";
+    NSString *cc = [j[@"countryCode"] description] ?: @"US";
+    NSString *city = [j[@"city"] description] ?: @"";
+    NSString *country = [j[@"country"] description] ?: @"";
+    NSString *ip = [j[@"query"] description] ?: @"";
+    NSString *isp = [j[@"isp"] description] ?: @"";
+    NSDictionary *loc = [AppState localeBundleForCountryCode:cc];
+
+    NSString *bcp = loc[@"bcp"] ?: @"en-US";
+    NSString *appleLoc = loc[@"apple"] ?: @"en_US";
+    NSDictionary *keys = @{
+        // Location → Maps + Weather (CLLocation hooks, WGS84)
+        @"FakeLocation": @YES,
+        @"Latitude": @(lat),
+        @"Longitude": @(lon),
+        @"LocationAccuracy": @(15.0),
+        @"Altitude": @(10.0),
+        // Timezone → clock / FakeLocale (NSTimeZone IANA)
+        @"FakeLocale": @YES,
+        @"TimeZoneName": tz,
+        @"CountryCode": cc,
+        // Keep carrier ISO separate if already set; locale country for FakeLocale
+        @"PreferredLanguage": bcp,
+        @"LocaleIdentifier": appleLoc,
+        @"AppleLocale": appleLoc,
+        @"AppleLanguages": @[ bcp ],
+        @"LanguageCode": loc[@"lang"] ?: @"en",
+        @"CurrencyCode": loc[@"cur"] ?: @"USD",
+        @"CalendarIdentifier": @"gregorian",
+        // Meta for UI / lab / dual-path audit
+        @"ProxyEgressIP": ip,
+        @"ProxyGeoCity": city,
+        @"ProxyGeoCountry": country,
+        @"ProxyGeoISP": isp,
+        @"ProxyGeoRegion": [j[@"regionName"] description] ?: @"",
+        @"SyncGeoFromProxy": @YES,
+        @"GeoSyncedAtUnix": @((NSInteger)[[NSDate date] timeIntervalSince1970]),
+    };
+    if (keysOut) *keysOut = keys;
+
+    // Persist last geo summary
+    @try {
+        NSString *path = @"/var/mobile/Library/iPFaker/proxy_geo.json";
+        NSData *json = [NSJSONSerialization dataWithJSONObject:keys options:NSJSONWritingPrettyPrinted error:nil];
+        [json writeToFile:path atomically:YES];
+    } @catch (__unused NSException *ex) {}
+
+    NSString *summary = [NSString stringWithFormat:
+        @"Đã đồng bộ theo proxy/IP:\n"
+        @"• IP: %@\n"
+        @"• Vị trí (Map/Thời tiết): %@, %@ (%.4f, %.4f)\n"
+        @"• Múi giờ (thời gian): %@\n"
+        @"• Ngôn ngữ: %@ · Quốc gia: %@\n"
+        @"• ISP: %@",
+        ip, city, country, lat, lon, tz, loc[@"bcp"] ?: @"?", cc, isp];
+    if (progress) progress(summary);
+    return summary;
+}
+
+- (NSString *)applyProxyAppAttestToConfigProgress:(void (^)(NSString *))progress {
+    [self saveProxyAppAttest];
+    if (progress) progress(@"Gộp Proxy / AppAttest vào config.plist…");
+    NSMutableDictionary *keys = [[self proxyAppAttestFlatKeys] mutableCopy];
+    NSString *geoMsg = @"";
+    // Sync geo when toggle ON: through proxy if enabled, else direct egress IP.
+    if ([self syncGeoFromProxyEnabled]) {
+        if (progress) progress(@"Đồng bộ thời gian / map / thời tiết theo proxy…");
+        NSDictionary *geo = nil;
+        geoMsg = [self syncTimeMapWeatherFromProxyProgress:progress geoKeysOut:&geo];
+        if (geo.count) [keys addEntriesFromDictionary:geo];
+    }
+    // Always enable location/locale flags when geo present
+    if (keys[@"Latitude"]) {
+        keys[@"FakeLocation"] = @YES;
+        keys[@"FakeLocale"] = @YES;
+        [self setToggle:YES forKey:@"FakeLocation"];
+        [self setToggle:YES forKey:@"FakeLocale"];
+    }
+    NSString *msg = [ProfileBuilder mergeKeysIntoConfig:keys progress:progress];
+    NSString *full = geoMsg.length
+        ? [NSString stringWithFormat:@"%@\n\n%@", geoMsg, msg]
+        : msg;
+    self.statusText = full;
+    [self postDidChange];
+    return full;
+}
+
+- (NSString *)testProxyConnection {
+    NSString *host = [self proxyHost];
+    NSInteger port = [self proxyPort];
+    if (!host.length || port <= 0 || port > 65535)
+        return @"ERR: Host/Port không hợp lệ";
+
+    NSDictionary *proxy = [self proxySessionDictionary];
+    if (!proxy) return @"ERR: không tạo được proxy dict";
 
     NSURLSessionConfiguration *cfg = [NSURLSessionConfiguration ephemeralSessionConfiguration];
     cfg.connectionProxyDictionary = proxy;
@@ -855,7 +1170,6 @@ static NSString *const kAADisable = @"ipf.appattest.disable";
     NSURLSession *session = [NSURLSession sessionWithConfiguration:cfg];
     dispatch_semaphore_t sem = dispatch_semaphore_create(0);
     __block NSString *result = @"ERR: timeout";
-    // Public IP check through proxy (lab)
     NSURL *url = [NSURL URLWithString:@"https://api.ipify.org?format=text"];
     [[session dataTaskWithURL:url completionHandler:^(NSData *data, NSURLResponse *resp, NSError *err) {
         if (err) {
@@ -870,6 +1184,22 @@ static NSString *const kAADisable = @"ipf.appattest.disable";
     }] resume];
     dispatch_semaphore_wait(sem, dispatch_time(DISPATCH_TIME_NOW, 16 * NSEC_PER_SEC));
     [session invalidateAndCancel];
+
+    // Auto geo sync after successful test
+    if ([result hasPrefix:@"OK"] && [self syncGeoFromProxyEnabled]) {
+        NSDictionary *geo = nil;
+        NSString *geoMsg = [self syncTimeMapWeatherFromProxyProgress:nil geoKeysOut:&geo];
+        if (geo.count) {
+            NSMutableDictionary *keys = [[self proxyAppAttestFlatKeys] mutableCopy];
+            [keys addEntriesFromDictionary:geo];
+            keys[@"FakeLocation"] = @YES;
+            keys[@"FakeLocale"] = @YES;
+            [ProfileBuilder mergeKeysIntoConfig:keys progress:nil];
+            result = [NSString stringWithFormat:@"%@\n\n%@", result, geoMsg];
+        } else {
+            result = [NSString stringWithFormat:@"%@\n\n%@", result, geoMsg];
+        }
+    }
     return result;
 }
 

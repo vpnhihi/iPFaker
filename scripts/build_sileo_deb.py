@@ -68,8 +68,21 @@ def find_app(explicit: str | None) -> Path | None:
     return None
 
 
+def lab_core_bundles_xml() -> str:
+    """Lab-core inject surface (Zalo + Safari/Maps/Weather/WebKit; not mass multi-acc)."""
+    return """			<string>vn.com.vng.zingalo</string>
+			<string>com.zing.zalo</string>
+			<string>com.apple.mobilesafari</string>
+			<string>com.apple.Maps</string>
+			<string>com.apple.weather</string>
+			<string>com.apple.WebKit.WebContent</string>
+			<string>com.apple.WebKit.Networking</string>
+			<string>com.apple.WebKit.GPU</string>"""
+
+
 def zalo_only_plist() -> bytes:
-    return b"""<?xml version="1.0" encoding="UTF-8"?>
+    """MG/JB filter: Lab-core bundles (no CommCenter executables)."""
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
@@ -77,15 +90,55 @@ def zalo_only_plist() -> bytes:
 	<dict>
 		<key>Bundles</key>
 		<array>
-			<string>vn.com.vng.zingalo</string>
-			<string>com.zing.zalo</string>
+{lab_core_bundles_xml()}
 		</array>
 		<key>Mode</key>
 		<string>Any</string>
 	</dict>
 </dict>
 </plist>
-"""
+""".encode("utf-8")
+
+
+def ct_filter_plist() -> bytes:
+    """CT filter: Lab-core bundles + CommCenter executables (lab CT daemon)."""
+    # Prefer theos CT if it already has CommCenter; else generate full Lab-core+CT
+    for p in (
+        ROOT / "theos" / "iPFakerCT.plist",
+        ROOT / "dylibs" / "iPFakerCT.plist",
+        ROOT / "theos" / "layout" / "Library" / "MobileSubstrate" / "DynamicLibraries" / "iPFakerCT.plist",
+    ):
+        if p.is_file():
+            data = p.read_bytes()
+            if b"CommCenter" in data and b"mobilesafari" in data:
+                return data
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Filter</key>
+	<dict>
+		<key>Bundles</key>
+		<array>
+{lab_core_bundles_xml()}
+		</array>
+		<key>Executables</key>
+		<array>
+			<string>CommCenter</string>
+			<string>commcenter</string>
+			<string>CoreTelephonyHelper</string>
+		</array>
+		<key>Mode</key>
+		<string>Any</string>
+	</dict>
+</dict>
+</plist>
+""".encode("utf-8")
+
+
+# Dopamine AMFI: MG over this size often fails "signature does not cover entire file"
+MG_SAFE_MAX = 138_000
+MG_HYBRID_HINT = 130_000
 
 
 def preinst_script() -> str:
@@ -295,7 +348,7 @@ def make_tar_gz(members_builder) -> bytes:
 
 
 def make_tar_lzma(members_builder) -> bytes:
-    """data.tar.lzma — same as classic Theos/HIOS debs (max iOS dpkg compatibility)."""
+    """data.tar.lzma — same as classic Theos/lab debs (max iOS dpkg compatibility)."""
     raw = io.BytesIO()
     with tarfile.open(fileobj=raw, mode="w", format=tarfile.GNU_FORMAT) as tar:
         members_builder(tar)
@@ -364,7 +417,7 @@ def build(version: str, app_path: str | None) -> Path:
             size_bytes += len(data)
             return data
 
-        # Full paths under /var/jb (HIOS-style).
+        # Full paths under /var/jb (lab flat).
         # NOTE: On Dopamine, DynamicLibraries -> symlink to TweakInject.
         # Package ONLY TweakInject to avoid dpkg double-extract failure.
         for d in (
@@ -388,18 +441,37 @@ def build(version: str, app_path: str | None) -> Path:
             info.gid = 0
             tar.addfile(info)
 
-        plist = zalo_only_plist()
+        # Distinct filters: MG/JB = bundles only; CT = bundles + CommCenter executables
+        pl_mg = zalo_only_plist()
+        pl_ct = ct_filter_plist()
+        if b"CommCenter" not in pl_ct:
+            raise SystemExit("FATAL: CT filter missing CommCenter — refuse package")
         dest = "var/jb/usr/lib/TweakInject"
-        add_file(tar, f"{dest}/iPFakerMG.dylib", track(mg.read_bytes()), 0o755)
-        add_file(tar, f"{dest}/iPFakerCT.dylib", track(ct.read_bytes()), 0o755)
-        add_file(tar, f"{dest}/iPFakerMG.plist", track(plist), 0o644)
-        add_file(tar, f"{dest}/iPFakerCT.plist", track(plist), 0o644)
+        mg_bytes = mg.read_bytes()
+        ct_bytes = ct.read_bytes()
+        # Size gate: Extra (MG) must stay AMFI-safe; CT carries Deep
+        if len(mg_bytes) > MG_SAFE_MAX:
+            raise SystemExit(
+                f"FATAL: iPFakerMG.dylib {len(mg_bytes)} > {MG_SAFE_MAX} "
+                f"(Dopamine AMFI risk). Split more or strip before packaging."
+            )
+        if len(mg_bytes) > MG_HYBRID_HINT:
+            print(
+                f"WARN: MG size {len(mg_bytes)} > {MG_HYBRID_HINT} "
+                f"— deploy may hybrid-fallback; Extra still packaged."
+            )
+        print(f"pack MG={len(mg_bytes)} CT={len(ct_bytes)} (Extra+Deep always co-packaged)")
+        add_file(tar, f"{dest}/iPFakerMG.dylib", track(mg_bytes), 0o755)
+        add_file(tar, f"{dest}/iPFakerCT.dylib", track(ct_bytes), 0o755)
+        add_file(tar, f"{dest}/iPFakerMG.plist", track(pl_mg), 0o644)
+        add_file(tar, f"{dest}/iPFakerCT.plist", track(pl_ct), 0o644)
         # Optional split-stack JB hide (fopen/getenv/fileExists)
-        for base in (mg.parent, ROOT / "dylibs_ci", ROOT / "theos" / "dist"):
+        for base in (mg.parent, ROOT / "dylibs_ci", ROOT / "theos" / "dist", ROOT / "dylibs"):
             jb = base / "iPFakerJB.dylib"
             if jb.is_file():
                 add_file(tar, f"{dest}/iPFakerJB.dylib", track(jb.read_bytes()), 0o755)
-                add_file(tar, f"{dest}/iPFakerJB.plist", track(plist), 0o644)
+                add_file(tar, f"{dest}/iPFakerJB.plist", track(pl_mg), 0o644)
+                print(f"pack JB from {base.name}")
                 break
 
         if catalog.exists():

@@ -12,6 +12,8 @@
 #import <string.h>
 #import <errno.h>
 #import <unistd.h>
+#import <fcntl.h>
+#import <sys/types.h>
 
 typedef void (*MSHookFunction_t)(void *symbol, void *replace, void **result);
 typedef void (*MSHookMessageEx_t)(Class _class, SEL sel, IMP imp, IMP *result);
@@ -100,6 +102,13 @@ static BOOL IPFJBIsJBPath(const char *path) {
         "/.bootstrapped_electra",
         "/.bootstraprc",
         "/bootstraprc",
+        "/bootstrap",
+        "/electra",
+        "/jb/",
+        "unc0ver",
+        "taurine",
+        "odyssey",
+        "chimera",
         "/usr/lib/frida",
         "/usr/lib/libfrida",
         "frida-server",
@@ -198,6 +207,31 @@ static BOOL stub_fileExistsIsDir(id self, SEL _cmd, NSString *path, BOOL *isDir)
     return orig_fileExistsIsDir ? orig_fileExistsIsDir(self, _cmd, path, isDir) : NO;
 }
 
+// POSIX open / openat — second path after access/stat for JB probes.
+// ARM64: third arg (mode) always in register — use fixed 3-arg form (substrate-safe).
+typedef int (*open_fn_t)(const char *, int, mode_t);
+typedef int (*openat_fn_t)(int, const char *, int, mode_t);
+static open_fn_t orig_open = NULL;
+static openat_fn_t orig_openat = NULL;
+
+static int stub_open(const char *path, int flags, mode_t mode) {
+    if (IPFJBIsJBPath(path)) {
+        IPFJBHideLogOnce("open", path);
+        errno = ENOENT;
+        return -1;
+    }
+    return orig_open ? orig_open(path, flags, mode) : -1;
+}
+
+static int stub_openat(int fd, const char *path, int flags, mode_t mode) {
+    if (IPFJBIsJBPath(path)) {
+        IPFJBHideLogOnce("openat", path);
+        errno = ENOENT;
+        return -1;
+    }
+    return orig_openat ? orig_openat(fd, path, flags, mode) : -1;
+}
+
 void IPFInstallJBHooks(void) {
     IPFJBResolve();
     if (![[IPFConfig shared] flag:@"HideJailbreak" defaultYes:YES]) {
@@ -226,7 +260,11 @@ void IPFInstallJBHooks(void) {
         if (fo) pMSHookFunction(fo, (void *)stub_fopen, (void **)&orig_fopen);
         void *ge = dlsym(RTLD_DEFAULT, "getenv");
         if (ge) pMSHookFunction(ge, (void *)stub_getenv, (void **)&orig_getenv);
-        IPFJBTrace(@"fopen/getenv JB hide OK");
+        void *op = dlsym(RTLD_DEFAULT, "open");
+        if (op) pMSHookFunction(op, (void *)stub_open, (void **)&orig_open);
+        void *oa = dlsym(RTLD_DEFAULT, "openat");
+        if (oa) pMSHookFunction(oa, (void *)stub_openat, (void **)&orig_openat);
+        IPFJBTrace(@"fopen/getenv/open/openat JB hide OK");
     }
 
     IPFJBTrace(@"IPFInstallJBHooks done");

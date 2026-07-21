@@ -28,6 +28,7 @@ iPFaker_FILES = \
 	AppListController.m \
 	SpoofAppsController.m \
 	ProxyAppAttestController.m \
+	VerifyViewController.m \
 	AboutLabController.m \
 	RootViewController.m
 

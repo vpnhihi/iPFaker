@@ -174,9 +174,23 @@ static CFTypeRef IPFMaybeSpoofIOKitValue(CFStringRef key, CFTypeRef value) {
         if (!interesting) return value;
 
         NSString *fake = nil;
-        // Serial family — must match config SerialNumber (identity sync)
-        if ([kl containsString:@"serial"]) {
-            fake = [[IPFConfig shared] mgValueForKey:@"SerialNumber"]
+        // Multi-source serial (identity sync):
+        //  - IOPlatformSerialNumber / serial-number → SerialNumber
+        //  - mlb-serial-number / MLBSerialNumber → MLBSerialNumber (≡ Serial in lab schema)
+        //  - generic *serial* → SerialNumber
+        if ([kl isEqualToString:@"mlb-serial-number"] || [kl isEqualToString:@"mlbserialnumber"]
+            || [kl containsString:@"mlb"]) {
+            fake = [[IPFConfig shared] mgValueForKey:@"MLBSerialNumber"]
+                ?: [[IPFConfig shared] stringForKey:@"MLBSerialNumber"]
+                ?: [[IPFConfig shared] mgValueForKey:@"SerialNumber"]
+                ?: [[IPFConfig shared] stringForKey:@"SerialNumber"];
+        } else if ([kl isEqualToString:@"ioplatformserialnumber"]
+                   || [kl isEqualToString:@"serial-number"]
+                   || [kl isEqualToString:@"serialnumber"]
+                   || [kl containsString:@"serial"]) {
+            fake = [[IPFConfig shared] mgValueForKey:@"IOPlatformSerialNumber"]
+                ?: [[IPFConfig shared] stringForKey:@"IOPlatformSerialNumber"]
+                ?: [[IPFConfig shared] mgValueForKey:@"SerialNumber"]
                 ?: [[IPFConfig shared] stringForKey:@"SerialNumber"];
         } else if ([v hasPrefix:@"iPhone"] || [v rangeOfString:@"iPhone"].location != NSNotFound)
             fake = IPFFakePT();
@@ -204,10 +218,60 @@ static CFTypeRef stub_IORegSearch(io_registry_entry_t entry, const io_name_t pla
     return s;
 }
 
-#pragma mark - NSURLRequest body
+#pragma mark - NSURLRequest body + URL query rewrite (ProductType / HW)
+
+static NSURL *IPFRewriteURL(NSURL *url) {
+    if (!url) return url;
+    @try {
+        NSString *s = url.absoluteString;
+        if (!s.length) return url;
+        NSData *d = [s dataUsingEncoding:NSUTF8StringEncoding];
+        NSData *nd = IPFRewritePayload(d);
+        if (!nd || nd == d) return url;
+        NSString *ns = [[NSString alloc] initWithData:nd encoding:NSUTF8StringEncoding];
+        if (!ns.length) return url;
+        NSURL *nu = [NSURL URLWithString:ns];
+        if (nu && ![nu.absoluteString isEqualToString:s]) {
+            IPFLog([NSString stringWithFormat:@"NET rewrite URL query/path → fake model"]);
+            return nu;
+        }
+    } @catch (__unused NSException *ex) {}
+    return url;
+}
+
+static id IPFRewriteRequest(id req) {
+    if (!req) return req;
+    @try {
+        if ([req isKindOfClass:[NSMutableURLRequest class]]) {
+            NSMutableURLRequest *m = (NSMutableURLRequest *)req;
+            NSURL *u = IPFRewriteURL(m.URL);
+            if (u) m.URL = u;
+            NSData *b = m.HTTPBody;
+            NSData *nb = IPFRewritePayload(b);
+            if (nb != b && nb) m.HTTPBody = nb;
+            return m;
+        }
+        if ([req isKindOfClass:[NSURLRequest class]]) {
+            NSURLRequest *r = (NSURLRequest *)req;
+            NSURL *u = IPFRewriteURL(r.URL);
+            NSData *b = r.HTTPBody;
+            NSData *nb = IPFRewritePayload(b);
+            BOOL urlCh = u && ![u.absoluteString isEqualToString:r.URL.absoluteString];
+            BOOL bodyCh = nb && nb != b;
+            if (urlCh || bodyCh) {
+                NSMutableURLRequest *m = [r mutableCopy];
+                if (urlCh) m.URL = u;
+                if (bodyCh) m.HTTPBody = nb;
+                return m;
+            }
+        }
+    } @catch (__unused NSException *ex) {}
+    return req;
+}
 
 static void (*orig_setHTTPBody)(id, SEL, NSData *);
 static NSData *(*orig_HTTPBody)(id, SEL);
+static void (*orig_setURL)(id, SEL, NSURL *);
 
 static void stub_setHTTPBody(id self, SEL _cmd, NSData *body) {
     NSData *b = IPFRewritePayload(body);
@@ -219,30 +283,20 @@ static NSData *stub_HTTPBody(id self, SEL _cmd) {
     return IPFRewritePayload(b);
 }
 
+static void stub_setURL(id self, SEL _cmd, NSURL *url) {
+    if (orig_setURL) orig_setURL(self, _cmd, IPFRewriteURL(url));
+}
+
 // NSURLSession uploadTaskWithRequest:fromData:
 static id (*orig_uploadFromData)(id, SEL, id, NSData *, id);
 static id stub_uploadFromData(id self, SEL _cmd, id req, NSData *data, id comp) {
+    req = IPFRewriteRequest(req);
     return orig_uploadFromData ? orig_uploadFromData(self, _cmd, req, IPFRewritePayload(data), comp) : nil;
 }
 
 static id (*orig_dataTaskReq)(id, SEL, id, id);
 static id stub_dataTaskReq(id self, SEL _cmd, id req, id comp) {
-    // request may already have body; try rewrite via mutable copy if possible
-    @try {
-        if ([req isKindOfClass:[NSMutableURLRequest class]]) {
-            NSData *b = [(NSMutableURLRequest *)req HTTPBody];
-            NSData *nb = IPFRewritePayload(b);
-            if (nb != b && nb) [(NSMutableURLRequest *)req setHTTPBody:nb];
-        } else if ([req isKindOfClass:[NSURLRequest class]]) {
-            NSData *b = [(NSURLRequest *)req HTTPBody];
-            NSData *nb = IPFRewritePayload(b);
-            if (nb != b && nb) {
-                NSMutableURLRequest *m = [(NSURLRequest *)req mutableCopy];
-                [m setHTTPBody:nb];
-                req = m;
-            }
-        }
-    } @catch (__unused NSException *ex) {}
+    req = IPFRewriteRequest(req);
     return orig_dataTaskReq ? orig_dataTaskReq(self, _cmd, req, comp) : nil;
 }
 
@@ -271,7 +325,9 @@ void IPFInstallDeepHooks(void) {
         Class req = objc_getClass("NSMutableURLRequest");
         if (req) {
             pMSHookMessageEx(req, @selector(setHTTPBody:), (IMP)stub_setHTTPBody, (IMP *)&orig_setHTTPBody);
-            IPFLog(@"NSMutableURLRequest setHTTPBody hooked");
+            if (class_getInstanceMethod(req, @selector(setURL:)))
+                pMSHookMessageEx(req, @selector(setURL:), (IMP)stub_setURL, (IMP *)&orig_setURL);
+            IPFLog(@"NSMutableURLRequest body+URL rewrite hooked");
         }
         Class ureq = objc_getClass("NSURLRequest");
         if (ureq) {
@@ -285,8 +341,22 @@ void IPFInstallDeepHooks(void) {
                 pMSHookMessageEx(sess, s1, (IMP)stub_dataTaskReq, (IMP *)&orig_dataTaskReq);
             if (class_getInstanceMethod(sess, s2))
                 pMSHookMessageEx(sess, s2, (IMP)stub_uploadFromData, (IMP *)&orig_uploadFromData);
-            IPFLog(@"NSURLSession task hooks OK");
+            IPFLog(@"NSURLSession task hooks OK (body+query)");
         }
     }
+    // Module cover marker
+    @try {
+        NSString *line =
+            @"MODULE IPFHooksDeep: HTTP body/query ProductType/HW rewrite + IOKit serial/model\n";
+        NSString *home = NSHomeDirectory();
+        if (home.length) {
+            NSString *p = [home stringByAppendingPathComponent:@"Documents/ipfaker_modules.log"];
+            NSFileHandle *h = [NSFileHandle fileHandleForWritingAtPath:p];
+            if (h) { [h seekToEndOfFile]; [h writeData:[line dataUsingEncoding:NSUTF8StringEncoding]]; [h closeFile]; }
+            else [line writeToFile:p atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        }
+        [line writeToFile:@"/var/mobile/Library/iPFaker/ipfaker_modules.log"
+               atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    } @catch (__unused NSException *ex) {}
     IPFLog(@"IPFInstallDeepHooks done");
 }

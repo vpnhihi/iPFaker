@@ -233,8 +233,8 @@
         @"Tập chọn: %lu máy × iOS → %lu cặp tương thích.\n"
         @"Multi-app spoof: %lu app · Hợp iOS: %lu bản · Mã: %@\n"
         @"Màn hình: %@×%@ @%@\n"
-        @"Đặt lại dữ liệu app = máy mới + xóa data (mất đăng nhập).\n"
-        @"Đặt lại + Lưu = lưu data/máy → máy mới → khôi phục data (giữ đăng nhập).\n%@",
+        @"Đặt lại dữ liệu app (1 chạm) = spoof + xóa sạch + mở lại (mất đăng nhập).\n"
+        @"Đặt lại + Lưu (1 chạm) = backup session → spoof → restore → kill+mở lại (giữ đăng nhập).\n%@",
         (unsigned long)st.selectedDeviceIds.count,
         (unsigned long)nPairs,
         (unsigned long)st.selectedSpoofBundleIds.count,
@@ -276,7 +276,7 @@
 
 - (void)applyTapped {
     UIView *host = self.tabBarController.view ?: self.navigationController.view ?: self.view;
-    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Đang đặt lại + lưu dữ liệu…"];
+    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"1 chạm: Đặt lại + Lưu + Mở app…"];
     self.view.userInteractionEnabled = NO;
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         NSString *msg = [AppState.shared saveDataThenResetProgress:^(NSString *step) {
@@ -284,10 +284,10 @@
         }];
         dispatch_async(dispatch_get_main_queue(), ^{
             self.view.userInteractionEnabled = YES;
-            [ov finishWithTitle:@"Hoàn tất" detail:msg];
+            [ov finishWithTitle:@"Hoàn tất (1 chạm)" detail:msg];
             [self refreshUI];
             [ov dismissAfter:1.8 completion:^{
-                [self alert:@"Đặt lại + Lưu dữ liệu" msg:msg];
+                [self alert:@"Đặt lại + Lưu dữ liệu (1 chạm)" msg:msg];
             }];
         });
     });
@@ -295,7 +295,7 @@
 
 - (void)killRandomTapped {
     UIView *host = self.tabBarController.view ?: self.navigationController.view ?: self.view;
-    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Đang đặt lại dữ liệu app…"];
+    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"1 chạm: Đặt lại dữ liệu + Mở app…"];
     self.view.userInteractionEnabled = NO;
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         NSString *msg = [AppState.shared killZaloAndRandomizeFromPoolProgress:^(NSString *step) {
@@ -303,10 +303,10 @@
         }];
         dispatch_async(dispatch_get_main_queue(), ^{
             self.view.userInteractionEnabled = YES;
-            [ov finishWithTitle:@"Hoàn tất" detail:msg];
+            [ov finishWithTitle:@"Hoàn tất (1 chạm)" detail:msg];
             [self refreshUI];
             [ov dismissAfter:1.6 completion:^{
-                [self alert:@"Đặt lại dữ liệu app" msg:msg];
+                [self alert:@"Đặt lại dữ liệu app (1 chạm)" msg:msg];
             }];
         });
     });

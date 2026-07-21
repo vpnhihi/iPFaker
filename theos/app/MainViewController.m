@@ -133,7 +133,7 @@
     contact.translatesAutoresizingMaskIntoConstraints = NO;
     [card addSubview:contact];
 
-    // Nút: Đặt lại dữ liệu app | Đặt lại + Lưu dữ liệu
+    // 1 chạm lab wall (cùng flow trong AppState)
     UIButton *resetDataBtn = [AppTheme primaryButtonWithTitle:@"Đặt lại dữ liệu app"
                                                        target:self
                                                        action:@selector(killTapped)];
@@ -365,9 +365,9 @@
 }
 
 - (void)applyTapped {
-    // Đặt lại + Lưu: lưu data app (giữ đăng nhập) + 100% thông số máy → random máy → xóa → khôi phục data
+    // 1 chạm: backup session → spoof mới → restore → kill → relaunch (giữ đăng nhập)
     UIView *host = self.tabBarController.view ?: self.navigationController.view ?: self.view;
-    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Đang đặt lại + lưu dữ liệu…"];
+    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"1 chạm: Đặt lại + Lưu + Mở app…"];
     self.view.userInteractionEnabled = NO;
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         NSString *msg = [AppState.shared saveDataThenResetProgress:^(NSString *step) {
@@ -375,19 +375,19 @@
         }];
         dispatch_async(dispatch_get_main_queue(), ^{
             self.view.userInteractionEnabled = YES;
-            [ov finishWithTitle:@"Hoàn tất" detail:msg];
+            [ov finishWithTitle:@"Hoàn tất (1 chạm)" detail:msg];
             [self refreshUI];
             [ov dismissAfter:1.8 completion:^{
-                [self showAlertTitle:@"Đặt lại + Lưu dữ liệu" message:msg];
+                [self showAlertTitle:@"Đặt lại + Lưu dữ liệu (1 chạm)" message:msg];
             }];
         });
     });
 }
 
 - (void)killTapped {
-    // Đặt lại dữ liệu app: random spoof + xóa data
+    // 1 chạm sạch: spoof + wipe full + kill + relaunch (mất đăng nhập)
     UIView *host = self.tabBarController.view ?: self.navigationController.view ?: self.view;
-    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Đang đặt lại dữ liệu app…"];
+    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"1 chạm: Đặt lại dữ liệu + Mở app…"];
     self.view.userInteractionEnabled = NO;
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         NSString *msg = [AppState.shared killZaloAndRandomizeFromPoolProgress:^(NSString *step) {
@@ -395,10 +395,10 @@
         }];
         dispatch_async(dispatch_get_main_queue(), ^{
             self.view.userInteractionEnabled = YES;
-            [ov finishWithTitle:@"Hoàn tất" detail:msg];
+            [ov finishWithTitle:@"Hoàn tất (1 chạm)" detail:msg];
             [self refreshUI];
             [ov dismissAfter:1.6 completion:^{
-                [self showAlertTitle:@"Đặt lại dữ liệu app" message:msg];
+                [self showAlertTitle:@"Đặt lại dữ liệu app (1 chạm)" message:msg];
             }];
         });
     });

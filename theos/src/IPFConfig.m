@@ -1,4 +1,4 @@
-// IPFConfig.m — load order mirrors HIOS ChangeInfoIos:
+// IPFConfig.m — load order mirrors lab reference-stack:
 //   1) /var/jb/etc/ipfaker/config.plist  (flat keys, dictionaryWithContentsOfFile)
 //   2) active_profile.json fallback
 
@@ -11,7 +11,6 @@ static NSArray<NSString *> *IPFPlistCandidates(void) {
         @"/var/jb/etc/ipfaker/config.plist",
         @"/var/mobile/Library/iPFaker/config.plist",
         @"/var/mobile/Library/Preferences/com.ipfaker.config.plist",
-        @"/var/jb/etc/changeinfoios/config.plist",
     ];
 }
 
@@ -36,7 +35,7 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
 @property (nonatomic, strong, readwrite, nullable) NSDictionary *sysctlMap;
 @property (nonatomic, strong, readwrite, nullable) NSDictionary *jailbreakHide;
 @property (nonatomic, strong, readwrite, nullable) NSDictionary *webview;
-@property (nonatomic, strong, readwrite, nullable) NSDictionary *flat; // HIOS-style flat map
+@property (nonatomic, strong, readwrite, nullable) NSDictionary *flat; // lab flat flat map
 @property (nonatomic, copy, readwrite, nullable) NSString *profilePath;
 @property (nonatomic, assign, readwrite) BOOL loaded;
 @property (nonatomic, assign, readwrite) BOOL enabled;
@@ -61,7 +60,7 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
     self.flat = flat;
     self.root = flat;
     self.profilePath = path;
-    // Build mgMap / sysctl from flat HIOS keys
+    // Build mgMap / sysctl from flat lab keys
     NSMutableDictionary *mg = [NSMutableDictionary dictionary];
     NSMutableDictionary *sys = [NSMutableDictionary dictionary];
     NSArray *mgKeys = @[
@@ -84,7 +83,7 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
         id v = flat[k];
         if (v) mg[k] = v;
     }
-    // Aliases HIOS uses
+    // Aliases lab uses
     if (flat[@"ProductType"]) {
         sys[@"hw.machine"] = flat[@"ProductType"];
         mg[@"ProductType"] = flat[@"ProductType"];
@@ -233,15 +232,43 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
         @"IDFA": flat[@"IDFA"] ?: @"",
         @"IDFV": flat[@"IDFV"] ?: @"",
     };
+    // Carrier (CommCenter + CTCarrier) — always fill radio for FakeNetwork spoof
+    NSString *cname = flat[@"CarrierName"] ?: flat[@"carrierName"] ?: @"Viettel";
+    NSString *mcc = flat[@"MobileCountryCode"] ?: flat[@"carrierMCC"] ?: @"452";
+    NSString *mnc = flat[@"MobileNetworkCode"] ?: flat[@"carrierMNC"] ?: @"04";
+    NSString *iso = flat[@"ISOCountryCode"] ?: flat[@"carrierISO"] ?: @"vn";
+    iso = iso.lowercaseString;
+    NSString *radio = flat[@"CurrentRadioAccessTechnology"]
+        ?: flat[@"RadioAccessTechnology"]
+        ?: flat[@"carrierRadioAccess"]
+        ?: @"CTRadioAccessTechnologyNR";
+    // Apple CTRadioAccessTechnology* full constant if short form
+    if (radio.length && ![radio hasPrefix:@"CTRadioAccessTechnology"])
+        radio = [@"CTRadioAccessTechnology" stringByAppendingString:radio];
     self.telephony = @{
-        @"CarrierName": flat[@"carrierName"] ?: flat[@"CarrierName"] ?: @"",
-        @"MobileCountryCode": flat[@"carrierMCC"] ?: flat[@"MobileCountryCode"] ?: @"",
-        @"MobileNetworkCode": flat[@"carrierMNC"] ?: flat[@"MobileNetworkCode"] ?: @"",
-        @"ISOCountryCode": flat[@"carrierISO"] ?: flat[@"ISOCountryCode"] ?: @"",
-        @"RadioAccessTechnology": flat[@"carrierRadioAccess"] ?: flat[@"RadioAccessTechnology"] ?: @"",
-        @"CurrentRadioAccessTechnology": flat[@"carrierRadioAccess"] ?: flat[@"CurrentRadioAccessTechnology"] ?: @"",
+        @"CarrierName": cname,
+        @"MobileCountryCode": mcc,
+        @"MobileNetworkCode": mnc,
+        @"ISOCountryCode": iso,
+        @"RadioAccessTechnology": radio,
+        @"CurrentRadioAccessTechnology": radio,
         @"AllowsVOIP": flat[@"AllowsVOIP"] ?: @YES,
     };
+    // Mirror back into flat so dual-path config always has canonical keys
+    if ([flat isKindOfClass:[NSMutableDictionary class]]) {
+        NSMutableDictionary *mf = (NSMutableDictionary *)flat;
+        mf[@"CarrierName"] = cname;
+        mf[@"MobileCountryCode"] = mcc;
+        mf[@"MobileNetworkCode"] = mnc;
+        mf[@"ISOCountryCode"] = iso;
+        mf[@"carrierName"] = cname;
+        mf[@"carrierMCC"] = mcc;
+        mf[@"carrierMNC"] = mnc;
+        mf[@"carrierISO"] = iso;
+        mf[@"carrierRadioAccess"] = radio;
+        mf[@"RadioAccessTechnology"] = radio;
+        mf[@"CurrentRadioAccessTechnology"] = radio;
+    }
     self.enabled = YES;
     if (flat[@"Enabled"] != nil) self.enabled = [flat[@"Enabled"] boolValue];
     self.loaded = YES;

@@ -5,7 +5,7 @@ NS_ASSUME_NONNULL_BEGIN
 typedef void (^IPFWipeProgress)(NSString *step);
 
 @interface ProfileBuilder : NSObject
-/// Build flat HIOS-style config dict for MG/CT dylibs.
+/// Build flat lab flat config dict for MG/CT dylibs.
 + (NSDictionary *)flatProfileForDevice:(NSDictionary *)device
                                    ios:(NSString *)iosVer
                                iosMeta:(NSDictionary *)iosMeta
@@ -19,6 +19,9 @@ typedef void (^IPFWipeProgress)(NSString *step);
 + (void)killZalo;
 /// Kill process(es) for a bundle id (best-effort by name / executable).
 + (void)killAppBundleId:(NSString *)bundleId executable:(nullable NSString *)exe;
+
+/// Relaunch apps after wipe/apply (uiopen + LSApplicationWorkspace). Returns short log.
++ (NSString *)relaunchAppsWithBundleIds:(NSArray<NSString *> *)bundleIds;
 
 /// Full wipe for one or many apps. progress may be called off-main (caller dispatches UI).
 + (NSString *)wipeApps:(NSArray<NSString *> *)bundleIds
@@ -56,6 +59,11 @@ typedef void (^IPFWipeProgress)(NSString *step);
 /// Merge flat keys into existing config.plist (both dual paths) without regenerating identity.
 + (NSString *)mergeKeysIntoConfig:(NSDictionary *)keys
                          progress:(nullable IPFWipeProgress)progress;
+
+/// Schema lock: only known config keys (no random/unknown plist pollution).
++ (NSSet<NSString *> *)knownConfigKeySet;
+/// Filter flat dict to known keys only (drops unknown).
++ (NSDictionary *)schemaLockedFlat:(NSDictionary *)flat dropped:(NSUInteger *)droppedOut;
 @end
 
 NS_ASSUME_NONNULL_END

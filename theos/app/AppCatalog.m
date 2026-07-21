@@ -127,8 +127,8 @@
     return nil;
 }
 
-/// Stock apps shown in HIOS Multi-app spoof (exclude Preferences — inject crash).
-+ (NSArray<NSArray *> *)hiosStockSpoofApps {
+/// Stock apps shown in lab Multi-app spoof (exclude Preferences — inject crash).
++ (NSArray<NSArray *> *)labStockSpoofApps {
     return @[
         @[ @"com.apple.AppStore", @"App Store" ],
         @[ @"com.apple.calculator", @"Calculator" ],
@@ -166,16 +166,54 @@
     ];
 }
 
+/// FB / IG / TikTok / Shopee / Telegram + common device-info tools (+ Zalo).
++ (NSArray<NSArray *> *)labSocialSpoofApps {
+    return @[
+        @[ @"vn.com.vng.zingalo", @"Zalo" ],
+        @[ @"com.zing.zalo", @"Zalo (alt)" ],
+        @[ @"com.facebook.Facebook", @"Facebook" ],
+        @[ @"com.facebook.Messenger", @"Messenger" ],
+        @[ @"com.burbn.instagram", @"Instagram" ],
+        @[ @"com.zhiliaoapp.musically", @"TikTok" ],
+        @[ @"com.ss.iphone.ugc.Ame", @"TikTok (Asia)" ],
+        @[ @"com.ss.iphone.ugc.tiktok.lite", @"TikTok Lite" ],
+        @[ @"vn.shopee.app", @"Shopee VN" ],
+        @[ @"com.shopee.ShopeeVN", @"Shopee VN (alt)" ],
+        @[ @"com.shopee.id", @"Shopee ID" ],
+        @[ @"ph.telegra.Telegraph", @"Telegram" ],
+        @[ @"net.whatsapp.WhatsApp", @"WhatsApp" ],
+        @[ @"com.google.ios.youtube", @"YouTube" ],
+        @[ @"com.toyopagroup.picaboo", @"Snapchat" ],
+        @[ @"com.apple.mobilesafari", @"Safari" ],
+        @[ @"com.apple.Maps", @"Maps" ],
+        @[ @"com.apple.weather", @"Weather" ],
+        // Device-info / fingerprint tools often used in lab
+        @[ @"com.apple.AppStore", @"App Store" ],
+        // Preferences intentionally omitted — inject Settings crashes
+    ];
+}
+
 - (void)reloadSpoofCatalog {
     NSMutableDictionary<NSString *, AppCatalogItem *> *map = [NSMutableDictionary dictionary];
 
-    // 1) Stock HIOS-like list
-    for (NSArray *row in [AppCatalog hiosStockSpoofApps]) {
+    // 1) Stock system list
+    for (NSArray *row in [AppCatalog labStockSpoofApps]) {
         AppCatalogItem *it = [[AppCatalogItem alloc] init];
         it.bundleId = row[0];
         it.name = row[1];
         it.systemApp = ![it.bundleId containsString:@"zalo"] && ![it.bundleId containsString:@"zing"];
         map[it.bundleId] = it;
+    }
+    // 1b) Social / commerce multi-app (FB IG TikTok Shopee Telegram…)
+    for (NSArray *row in [AppCatalog labSocialSpoofApps]) {
+        NSString *bid = row[0];
+        if ([bid isEqualToString:@"com.apple.Preferences"]) continue; // never inject Settings
+        if (map[bid]) continue;
+        AppCatalogItem *it = [[AppCatalogItem alloc] init];
+        it.bundleId = bid;
+        it.name = row[1];
+        it.systemApp = [bid hasPrefix:@"com.apple."];
+        map[bid] = it;
     }
 
     // 2) Merge third-party from LS (reuse wipe scan via temporary reload of apps)

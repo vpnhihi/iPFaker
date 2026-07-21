@@ -1,4 +1,4 @@
-// IPFConfig — HIOS-compatible: prefer config.plist flat keys at /var/jb/etc/ipfaker/config.plist
+// IPFConfig — lab dual-path: prefer config.plist flat keys at /var/jb/etc/ipfaker/config.plist
 
 #import <Foundation/Foundation.h>
 
@@ -21,7 +21,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy, readonly, nullable) NSString *profilePath;
 @property (nonatomic, assign, readonly) BOOL loaded;
 @property (nonatomic, assign, readonly) BOOL enabled;
-/// Flat HIOS-style map (includes Fake* flags + locale/location extras).
+/// Flat lab flat map (includes Fake* flags + locale/location extras).
 @property (nonatomic, strong, readonly, nullable) NSDictionary *flat;
 
 + (instancetype)shared;

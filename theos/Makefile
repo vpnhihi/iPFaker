@@ -1,4 +1,4 @@
-# HIOS-style dual tweak (ChangeInfoIosMG + ChangeInfoIosCT)
+# iPFaker split stack: MG (spoof+Extra) + CT (telephony+Deep) + JB (hide expand)
 # Link libsubstrate.dylib (ElleKit), NOT CydiaSubstrate.framework (missing on Dopamine)
 
 export TARGET := iphone:clang:latest:14.0
@@ -14,9 +14,10 @@ include $(THEOS)/makefiles/common.mk
 #   JB = expanded hide (fopen/getenv/fileExists) — optional, fails independently
 TWEAK_NAME = iPFakerMG iPFakerCT iPFakerJB
 
-# MG stays lean — no fopen/getenv/fileExists (→ JB); no fishhook (disabled/unstable, size cost)
-iPFakerMG_FILES = TweakMG.x src/IPFConfig.m src/IPFHooksMG.m src/IPFHooksExtra.m
-iPFakerMG_CFLAGS = -fobjc-arc -Os -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
+# MG = spoof + Extra (screen/disk/UA/getifaddrs/access-stat/WKWebView)
+# fishhook.c: LAST-RESORT only when MSHookFunction missing (not used when ElleKit present)
+iPFakerMG_FILES = TweakMG.x src/IPFConfig.m src/IPFHooksMG.m src/IPFHooksExtra.m src/fishhook.c
+iPFakerMG_CFLAGS = -fobjc-arc -Os -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src -DIPF_FISHHOOK_FALLBACK=1
 # WebKit used only via runtime (objc_getClass) — hard-link WebKit broke Dopamine code-sign coverage
 iPFakerMG_FRAMEWORKS = UIKit Foundation AdSupport CFNetwork
 iPFakerMG_LIBRARIES = substrate
