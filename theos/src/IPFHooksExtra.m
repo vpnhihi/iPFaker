@@ -14,6 +14,7 @@
 #import "IPFConfig.h"
 
 #import <UIKit/UIKit.h>
+#import <WebKit/WebKit.h>
 #import <objc/runtime.h>
 #import <objc/message.h>
 #import <dlfcn.h>
@@ -658,19 +659,179 @@ static CFDictionaryRef stub_CNCopyCurrentNetworkInfo(CFStringRef interfaceName) 
     }
 }
 
-#pragma mark - WKWebView customUserAgent (FakeBrowser) — sync with UserAgent
+#pragma mark - WKWebView UA + JS screen spoof (FakeBrowser)
+// Apple WebKit: WKWebView.customUserAgent, WKUserScript atDocumentStart
+// MDN: screen.width/height, window.devicePixelRatio, navigator.userAgent
+// Values MUST match UIScreen / catalog (LogicalScreen* + scale + UserAgent)
+
+static NSString *IPFWebUA(void) {
+    NSString *ua = [[IPFConfig shared] stringForKey:@"UserAgent"]
+        ?: [[IPFConfig shared] stringForKey:@"HTTPUserAgent"];
+    if (ua.length) return ua;
+    // Fallback from ProductVersion — Safari Mobile form (WebView_Surface.md)
+    NSString *pv = [[IPFConfig shared] stringForKey:@"ProductVersion"] ?: @"18.5";
+    NSString *osUnd = [pv stringByReplacingOccurrencesOfString:@"." withString:@"_"];
+    NSArray *parts = [pv componentsSeparatedByString:@"."];
+    NSString *maj = parts.count ? parts[0] : @"18";
+    NSString *min = parts.count > 1 ? parts[1] : @"0";
+    return [NSString stringWithFormat:
+        @"Mozilla/5.0 (iPhone; CPU iPhone OS %@ like Mac OS X) "
+        @"AppleWebKit/605.1.15 (KHTML, like Gecko) Version/%@.%@ "
+        @"Mobile/15E148 Safari/604.1",
+        osUnd, maj, min];
+}
+
+static NSString *IPFJSEscape(NSString *s) {
+    if (!s) return @"";
+    NSString *o = s;
+    o = [o stringByReplacingOccurrencesOfString:@"\\" withString:@"\\\\"];
+    o = [o stringByReplacingOccurrencesOfString:@"'" withString:@"\\'"];
+    o = [o stringByReplacingOccurrencesOfString:@"\n" withString:@"\\n"];
+    o = [o stringByReplacingOccurrencesOfString:@"\r" withString:@""];
+    return o;
+}
+
+/// JS spoof: navigator.userAgent + screen metrics + devicePixelRatio (sync catalog)
+static NSString *IPFWebSpoofJS(void) {
+    NSString *ua = IPFJSEscape(IPFWebUA());
+    // Logical CSS pixels (points) — same as UIScreen.bounds
+    double lw = [[IPFConfig shared] doubleForKey:@"LogicalScreenWidth" fallback:0];
+    double lh = [[IPFConfig shared] doubleForKey:@"LogicalScreenHeight" fallback:0];
+    double sc = [[IPFConfig shared] doubleForKey:@"main-screen-scale" fallback:0];
+    double nw = [[IPFConfig shared] doubleForKey:@"main-screen-width" fallback:0];
+    double nh = [[IPFConfig shared] doubleForKey:@"main-screen-height" fallback:0];
+    if (sc < 1) sc = IPFScale();
+    if (lw < 1 && nw > 0 && sc > 0) lw = nw / sc;
+    if (lh < 1 && nh > 0 && sc > 0) lh = nh / sc;
+    if (lw < 1) lw = 430;
+    if (lh < 1) lh = 932;
+    // devicePixelRatio ≡ scale (MDN / CSS pixels vs device pixels)
+    int sw = (int)llround(lw);
+    int sh = (int)llround(lh);
+    // availHeight slightly less than height (status bar lab ~ never 0)
+    int availH = sh > 44 ? sh - 0 : sh;
+    return [NSString stringWithFormat:
+        @"(function(){try{"
+        @"var ua='%@';"
+        @"var sw=%d,sh=%d,dpr=%g;"
+        @"var d=function(o,k,v){try{Object.defineProperty(o,k,{get:function(){return v},configurable:true});}catch(e){}};"
+        @"try{d(Navigator.prototype,'userAgent',ua);}catch(e){}"
+        @"try{d(navigator,'userAgent',ua);}catch(e){}"
+        @"try{d(Navigator.prototype,'appVersion',ua.replace(/^Mozilla\\//,''));}catch(e){}"
+        @"try{d(navigator,'platform','iPhone');}catch(e){}"
+        @"try{d(navigator,'vendor','Apple Computer, Inc.');}catch(e){}"
+        @"d(screen,'width',sw);d(screen,'height',sh);"
+        @"d(screen,'availWidth',sw);d(screen,'availHeight',%d);"
+        @"d(screen,'colorDepth',24);d(screen,'pixelDepth',24);"
+        @"d(window,'devicePixelRatio',dpr);"
+        @"d(window,'innerWidth',sw);d(window,'innerHeight',sh);"
+        @"d(window,'outerWidth',sw);d(window,'outerHeight',sh);"
+        @"}catch(e){}})();",
+        ua, sw, sh, sc, availH];
+}
+
+static void IPFAttachWebSpoofToConfig(WKWebViewConfiguration *cfg) {
+    if (!cfg) return;
+    if (![[IPFConfig shared] flag:@"FakeBrowser" defaultYes:YES]) return;
+    @try {
+        WKUserContentController *ucc = cfg.userContentController;
+        if (!ucc) {
+            ucc = [[WKUserContentController alloc] init];
+            cfg.userContentController = ucc;
+        }
+        NSString *js = IPFWebSpoofJS();
+        if (!js.length) return;
+        // atDocumentStart — before page scripts (Apple WKUserScript)
+        WKUserScript *script = [[WKUserScript alloc]
+            initWithSource:js
+             injectionTime:WKUserScriptInjectionTimeAtDocumentStart
+          forMainFrameOnly:NO];
+        [ucc addUserScript:script];
+        // also atDocumentEnd — re-apply if page overwrote properties
+        WKUserScript *script2 = [[WKUserScript alloc]
+            initWithSource:js
+             injectionTime:WKUserScriptInjectionTimeAtDocumentEnd
+          forMainFrameOnly:NO];
+        [ucc addUserScript:script2];
+    } @catch (__unused NSException *ex) {}
+}
+
+static void IPFApplyWebViewUA(WKWebView *web) {
+    if (!web) return;
+    if (![[IPFConfig shared] flag:@"FakeBrowser" defaultYes:YES]) return;
+    NSString *ua = IPFWebUA();
+    if (!ua.length) return;
+    @try {
+        if ([web respondsToSelector:@selector(setCustomUserAgent:)])
+            [web setCustomUserAgent:ua];
+    } @catch (__unused NSException *ex) {}
+}
 
 static NSString *(*orig_customUA)(id, SEL);
 static NSString *stub_customUA(id self, SEL _cmd) {
     if (![[IPFConfig shared] flag:@"FakeBrowser" defaultYes:YES])
         return orig_customUA ? orig_customUA(self, _cmd) : nil;
-    NSString *ua = [[IPFConfig shared] stringForKey:@"UserAgent"]
-        ?: [[IPFConfig shared] stringForKey:@"HTTPUserAgent"];
-    if (ua.length) {
-        IPFExTrace(@"WKWebView.customUserAgent FAKE");
-        return ua;
-    }
+    NSString *ua = IPFWebUA();
+    if (ua.length) return ua;
     return orig_customUA ? orig_customUA(self, _cmd) : nil;
+}
+
+static void (*orig_setCustomUA)(id, SEL, NSString *);
+static void stub_setCustomUA(id self, SEL _cmd, NSString *ua) {
+    // Force profile UA — app cannot set conflicting custom UA
+    if ([[IPFConfig shared] flag:@"FakeBrowser" defaultYes:YES]) {
+        NSString *forced = IPFWebUA();
+        if (forced.length) {
+            if (orig_setCustomUA) orig_setCustomUA(self, _cmd, forced);
+            return;
+        }
+    }
+    if (orig_setCustomUA) orig_setCustomUA(self, _cmd, ua);
+}
+
+static id (*orig_wkInitFrameConfig)(id, SEL, CGRect, id);
+static id stub_wkInitFrameConfig(id self, SEL _cmd, CGRect frame, id configuration) {
+    WKWebViewConfiguration *cfg = configuration;
+    if (![cfg isKindOfClass:[WKWebViewConfiguration class]])
+        cfg = [[WKWebViewConfiguration alloc] init];
+    else {
+        // Copy so we don't mutate a shared frozen config unexpectedly
+        @try {
+            cfg = [cfg copy];
+        } @catch (__unused NSException *ex) {
+            cfg = configuration;
+        }
+    }
+    IPFAttachWebSpoofToConfig(cfg);
+    id web = orig_wkInitFrameConfig ? orig_wkInitFrameConfig(self, _cmd, frame, cfg) : nil;
+    if ([web isKindOfClass:[WKWebView class]]) {
+        IPFApplyWebViewUA((WKWebView *)web);
+        static int once = 0;
+        if (!once) {
+            once = 1;
+            double lw = [[IPFConfig shared] doubleForKey:@"LogicalScreenWidth" fallback:430];
+            double sc = [[IPFConfig shared] doubleForKey:@"main-screen-scale" fallback:3];
+            IPFExTrace([NSString stringWithFormat:
+                @"WKWebView UA+JS injected sw=%.0f dpr=%.1f", lw, sc]);
+        }
+    }
+    return web;
+}
+
+static id (*orig_wkInitCoder)(id, SEL, id);
+static id stub_wkInitCoder(id self, SEL _cmd, id coder) {
+    id web = orig_wkInitCoder ? orig_wkInitCoder(self, _cmd, coder) : nil;
+    if ([web isKindOfClass:[WKWebView class]]) {
+        IPFApplyWebViewUA((WKWebView *)web);
+        // Storyboard init: inject via evaluateJavaScript when possible later
+        @try {
+            WKWebView *w = (WKWebView *)web;
+            NSString *js = IPFWebSpoofJS();
+            if (js.length)
+                [w evaluateJavaScript:js completionHandler:nil];
+        } @catch (__unused NSException *ex) {}
+    }
+    return web;
 }
 
 #pragma mark - WebRTC local IP rewrite (FakeWebRTC)
@@ -863,12 +1024,20 @@ void IPFInstallExtraHooks(void) {
         }
     }
 
-    // WKWebView.customUserAgent — same UserAgent string as NSURLRequest
+    // WKWebView: customUserAgent + init inject WKUserScript (UA + screen JS)
     if (pMSHookMessageEx) {
         Class wkw = objc_getClass("WKWebView");
-        if (wkw && class_getInstanceMethod(wkw, @selector(customUserAgent))) {
-            pMSHookMessageEx(wkw, @selector(customUserAgent), (IMP)stub_customUA, (IMP *)&orig_customUA);
-            IPFExTrace(@"WKWebView.customUserAgent OK");
+        if (wkw) {
+            if (class_getInstanceMethod(wkw, @selector(customUserAgent)))
+                pMSHookMessageEx(wkw, @selector(customUserAgent), (IMP)stub_customUA, (IMP *)&orig_customUA);
+            if (class_getInstanceMethod(wkw, @selector(setCustomUserAgent:)))
+                pMSHookMessageEx(wkw, @selector(setCustomUserAgent:), (IMP)stub_setCustomUA, (IMP *)&orig_setCustomUA);
+            SEL initCfg = @selector(initWithFrame:configuration:);
+            if (class_getInstanceMethod(wkw, initCfg))
+                pMSHookMessageEx(wkw, initCfg, (IMP)stub_wkInitFrameConfig, (IMP *)&orig_wkInitFrameConfig);
+            if (class_getInstanceMethod(wkw, @selector(initWithCoder:)))
+                pMSHookMessageEx(wkw, @selector(initWithCoder:), (IMP)stub_wkInitCoder, (IMP *)&orig_wkInitCoder);
+            IPFExTrace(@"WKWebView UA+JS hooks OK");
         }
     }
 

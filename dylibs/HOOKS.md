@@ -29,7 +29,8 @@ Do **not** hardcode identity values in binary source.
 | BootTime | `kern.boottime` via sysctl |
 | getifaddrs / hostname | `getifaddrs` AF_LINK MAC ← `WifiAddress`; `gethostname` + `NSProcessInfo.hostName` + `uname.nodename` ← `Hostname` (derived device name) |
 | CNCopyCurrentNetworkInfo | SSID + BSSID (**BSSID ≡ WifiAddress**) |
-| WKWebView.customUserAgent | ≡ `UserAgent` / HTTPUserAgent |
+| WKWebView.customUserAgent + setCustomUserAgent | ≡ `UserAgent` / HTTPUserAgent |
+| WKUserScript (atDocumentStart/End) | `navigator.userAgent`, `screen.*`, `devicePixelRatio` ≡ LogicalScreen + scale |
 | IOKit serial | `IOPlatformSerialNumber` / MLB ≡ `SerialNumber` (Deep) |
 | CommCenter (CT filter) | CT dylib inject `CommCenter` + `CoreTelephonyHelper` (HIOS-style) |
 | VolumeUUID | Class B field in profile (disk volume id lab) |
