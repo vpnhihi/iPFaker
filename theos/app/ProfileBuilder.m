@@ -557,15 +557,32 @@
 }
 
 + (NSDictionary *)loadCurrentFlat {
+    // Same source-of-truth rule as IPFConfig: newest mtime wins; jb preferred on tie
+    // so app UI matches what Zalo dylib actually loads.
     NSArray *paths = @[
-        @"/var/mobile/Library/iPFaker/config.plist",
         @"/var/jb/etc/ipfaker/config.plist",
+        @"/var/mobile/Library/iPFaker/config.plist",
     ];
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSString *bestPath = nil;
+    NSDictionary *best = nil;
+    NSDate *bestDate = [NSDate distantPast];
     for (NSString *p in paths) {
+        if (![fm isReadableFileAtPath:p]) continue;
+        NSDictionary *attrs = [fm attributesOfItemAtPath:p error:nil];
+        NSDate *mod = attrs[NSFileModificationDate] ?: [NSDate distantPast];
         NSDictionary *d = [NSDictionary dictionaryWithContentsOfFile:p];
-        if (d.count) return d;
+        if (!d.count) continue;
+        BOOL newer = [mod compare:bestDate] == NSOrderedDescending;
+        BOOL sameTimePreferJb = [mod isEqualToDate:bestDate] && [p containsString:@"/var/jb/"];
+        if (!best || newer || sameTimePreferJb) {
+            best = d;
+            bestPath = p;
+            bestDate = mod;
+        }
     }
-    return nil;
+    (void)bestPath;
+    return best;
 }
 
 + (void)killProcessesNamed:(NSArray<NSString *> *)names {

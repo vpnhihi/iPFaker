@@ -3,6 +3,7 @@
 @interface Catalog ()
 @property (nonatomic, strong) NSArray<NSDictionary *> *devices;
 @property (nonatomic, strong) NSDictionary<NSString *, NSDictionary *> *iosReleases;
+@property (nonatomic, strong) NSDictionary *deviceToIOS; // ios_device_compat.device_to_ios
 @end
 
 @implementation Catalog
@@ -15,6 +16,27 @@
         [s reload];
     });
     return s;
+}
+
+- (void)loadCompatMatrix {
+    NSArray *paths = @[
+        [[NSBundle mainBundle] pathForResource:@"ios_device_compat" ofType:@"json"] ?: @"",
+        @"/var/mobile/Library/iPFaker/ios_device_compat.json",
+        @"/var/jb/etc/ipfaker/ios_device_compat.json",
+    ];
+    for (NSString *p in paths) {
+        if (p.length == 0) continue;
+        NSData *data = [NSData dataWithContentsOfFile:p];
+        if (!data) continue;
+        id obj = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+        if (![obj isKindOfClass:[NSDictionary class]]) continue;
+        NSDictionary *map = obj[@"device_to_ios"];
+        if ([map isKindOfClass:[NSDictionary class]]) {
+            self.deviceToIOS = map;
+            return;
+        }
+    }
+    self.deviceToIOS = @{};
 }
 
 - (BOOL)reload {
@@ -36,11 +58,13 @@
         if ([devs isKindOfClass:[NSArray class]] && [ios isKindOfClass:[NSDictionary class]]) {
             self.devices = devs;
             self.iosReleases = ios;
+            [self loadCompatMatrix];
             return YES;
         }
     }
     self.devices = @[];
     self.iosReleases = @{};
+    self.deviceToIOS = @{};
     return NO;
 }
 
@@ -58,9 +82,16 @@
 }
 
 - (NSArray<NSString *> *)supportedIOSForDevice:(NSDictionary *)device {
+    // Prefer embedded supportedIOS (full wall); fallback compatInherit / id map
     id arr = device[@"supportedIOS"];
     if ([arr isKindOfClass:[NSArray class]] && [arr count] > 0)
         return arr;
+    NSString *did = device[@"id"] ?: @"";
+    NSString *inherit = device[@"compatInherit"] ?: did;
+    if (!self.deviceToIOS.count) [self loadCompatMatrix];
+    id fromMap = self.deviceToIOS[inherit] ?: self.deviceToIOS[did];
+    if ([fromMap isKindOfClass:[NSArray class]])
+        return fromMap;
     return @[];
 }
 

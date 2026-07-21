@@ -900,17 +900,22 @@ def build_profile(device: dict, ios_ver: str, ios_meta: dict, name: str | None) 
             "EthernetMacAddress": wifi,
         },
         "telephony": {
-            "CarrierName": "Viettel",
-            "MobileCountryCode": "452",
-            "MobileNetworkCode": "04",
-            "ISOCountryCode": "vn",
-            "CurrentRadioAccessTechnology": "CTRadioAccessTechnologyNR",
+            # Must mirror flat (random carrier) — no fixed Viettel split-brain
+            "CarrierName": c_name,
+            "MobileCountryCode": c_mcc,
+            "MobileNetworkCode": c_mnc,
+            "ISOCountryCode": c_iso,
+            "CurrentRadioAccessTechnology": radio,
         },
         "hooks": {
             "mobilegestalt": {
                 "ProductType": device["ProductType"],
                 "MarketingName": device["MarketingName"],
                 "HWModelStr": device["HWModelStr"],
+                "SerialNumber": serial,
+                "UniqueDeviceID": udid,
+                "ProductVersion": ios_meta["ProductVersion"],
+                "BuildVersion": ios_meta["BuildVersion"],
             },
             "sysctl": {
                 "hw.machine": device["ProductType"],

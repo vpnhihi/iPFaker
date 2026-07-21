@@ -101,11 +101,15 @@ jobs:
             echo "FATAL: still links CydiaSubstrate.framework"
             exit 1
           fi
-          # Size guard: MG should stay near webview-class (~130k) not 140k+ bulk
+          # Size budget: Dopamine often rejects MG ≳130–140k (signature coverage)
           MGSIZE=$(stat -f%z dist/iPFakerMG.dylib 2>/dev/null || stat -c%s dist/iPFakerMG.dylib)
           echo "MGSIZE=$MGSIZE"
-          if [ "$MGSIZE" -gt 135000 ]; then
-            echo "WARN: MG larger than 135k — AMFI risk on Dopamine (split may have failed)"
+          if [ "$MGSIZE" -gt 138000 ]; then
+            echo "FATAL: MG $MGSIZE > 138000 — AMFI risk; keep Extra lean / no fishhook"
+            exit 1
+          fi
+          if [ "$MGSIZE" -gt 130000 ]; then
+            echo "WARN: MG $MGSIZE > 130k — deploy may hybrid-fallback to webview MG"
           fi
           ldid -h dist/iPFakerMG.dylib 2>&1 | grep -q CDHash=
           ldid -h dist/iPFakerCT.dylib 2>&1 | grep -q CDHash=

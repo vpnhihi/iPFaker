@@ -14,9 +14,9 @@ include $(THEOS)/makefiles/common.mk
 #   JB = expanded hide (fopen/getenv/fileExists) — optional, fails independently
 TWEAK_NAME = iPFakerMG iPFakerCT iPFakerJB
 
-# MG stays lean — no fopen/getenv/fileExists bulk (those → JB)
-iPFakerMG_FILES = TweakMG.x src/IPFConfig.m src/IPFHooksMG.m src/IPFHooksExtra.m src/fishhook.c
-iPFakerMG_CFLAGS = -fobjc-arc -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
+# MG stays lean — no fopen/getenv/fileExists (→ JB); no fishhook (disabled/unstable, size cost)
+iPFakerMG_FILES = TweakMG.x src/IPFConfig.m src/IPFHooksMG.m src/IPFHooksExtra.m
+iPFakerMG_CFLAGS = -fobjc-arc -Os -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
 # WebKit used only via runtime (objc_getClass) — hard-link WebKit broke Dopamine code-sign coverage
 iPFakerMG_FRAMEWORKS = UIKit Foundation AdSupport
 iPFakerMG_LIBRARIES = substrate

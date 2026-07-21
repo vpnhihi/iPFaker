@@ -1,61 +1,62 @@
 #!/bin/sh
-# iPFaker postinst — rootless (/var/jb prefix applied by dpkg on RootHide)
+# iPFaker postinst — rootless Dopamine / RootHide wall (MG+CT+JB)
 set -e
 
 ROOT="${JBROOT:-/var/jb}"
-# Some package managers already extract relative to jbroot; try both.
-MS=""
+
+# Prefer TweakInject (ElleKit); DynamicLibraries may symlink there
 for d in \
+  "$ROOT/usr/lib/TweakInject" \
+  "/var/jb/usr/lib/TweakInject" \
   "$ROOT/Library/MobileSubstrate/DynamicLibraries" \
   "/var/jb/Library/MobileSubstrate/DynamicLibraries" \
   "/Library/MobileSubstrate/DynamicLibraries"
 do
-  if [ -d "$d" ]; then MS="$d"; break; fi
+  [ -d "$d" ] || continue
+  for f in iPFakerMG.dylib iPFakerCT.dylib iPFakerJB.dylib \
+           iPFakerMG.plist iPFakerCT.plist iPFakerJB.plist; do
+    p="$d/$f"
+    [ -e "$p" ] || continue
+    chown root:wheel "$p" 2>/dev/null || true
+    case "$f" in
+      *.dylib) chmod 0755 "$p" 2>/dev/null || true ;;
+      *)       chmod 0644 "$p" 2>/dev/null || true ;;
+    esac
+    # trustcache when available
+    if [ -x /var/jb/basebin/jbctl ] && command -v ldid >/dev/null 2>&1 && [ "${f##*.}" = "dylib" ]; then
+      H=$(ldid -h "$p" 2>/dev/null | sed -n 's/.*CDHash=//p' | head -1 | tr 'A-F' 'a-f' | cut -c1-40)
+      if [ ${#H} -eq 40 ]; then
+        /var/jb/basebin/jbctl trustcache add "$H" 2>/dev/null || true
+      fi
+    fi
+  done
 done
 
-ETC=""
-for d in \
+# Config dirs: mobile-writable so app Apply can write without root
+for ETC in \
   "$ROOT/etc/ipfaker" \
   "/var/jb/etc/ipfaker" \
   "/etc/ipfaker"
 do
-  mkdir -p "$d" 2>/dev/null || true
-  if [ -d "$d" ]; then ETC="$d"; break; fi
+  mkdir -p "$ETC" 2>/dev/null || true
+  if [ -d "$ETC" ]; then
+    chown -R mobile:mobile "$ETC" 2>/dev/null || true
+    chmod 0775 "$ETC" 2>/dev/null || true
+    if [ ! -f "$ETC/README.txt" ]; then
+      cat > "$ETC/README.txt" <<'EOF'
+iPFaker config directory (lab wall)
+- config.plist + active_profile.json written by iPFaker.app or PC select_device_profile.py
+- Dylibs: iPFakerMG (spoof) + iPFakerCT (telephony) + iPFakerJB (hide expand)
+- Mirror: /var/mobile/Library/iPFaker/
+EOF
+    fi
+  fi
 done
 
-if [ -n "$MS" ]; then
-  for f in "$MS/iPFakerMG.dylib" "$MS/iPFakerMG.plist" \
-           "$MS/iPFakerCT.dylib" "$MS/iPFakerCT.plist"; do
-    [ -e "$f" ] || continue
-    chown root:wheel "$f" 2>/dev/null || true
-    case "$f" in
-      *.dylib) chmod 0755 "$f" 2>/dev/null || true ;;
-      *)       chmod 0644 "$f" 2>/dev/null || true ;;
-    esac
-  done
-fi
-
-if [ -n "$ETC" ]; then
-  chmod 0777 "$ETC" 2>/dev/null || true
-  # Seed README if empty
-  if [ ! -f "$ETC/README.txt" ]; then
-    cat > "$ETC/README.txt" <<'EOF'
-iPFaker config directory
-Place active_profile.json here (or use Windows deploy.ps1).
-Also mirrored at /var/mobile/Library/iPFaker/ for RootHide app readability.
-EOF
-  fi
-fi
-
-# mobile-readable mirror (RootHide: apps may not see /var/jb)
 MOB="/var/mobile/Library/iPFaker"
 mkdir -p "$MOB" 2>/dev/null || true
 chown mobile:mobile "$MOB" 2>/dev/null || true
 chmod 0755 "$MOB" 2>/dev/null || true
 
-# Soft-kill targets so next launch reloads dylibs
 killall -9 Zalo 2>/dev/null || true
-# CommCenter restart is heavier — optional; uncomment if CT spoof stale
-# killall -9 CommCenter 2>/dev/null || true
-
 exit 0

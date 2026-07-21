@@ -1,11 +1,8 @@
-// IPFHooksMG — HIOS-style dual path:
-//   1) fishhook rebind GOT (catches Zalo imports of MG/sysctl/uname)
-//   2) MSHookFunction absolute (ElleKit)
-// Plus per-call trace log for lab analysis (nông → sâu).
+// IPFHooksMG — ElleKit MSHook absolute (stable on Dopamine).
+// fishhook GOT rebind removed: SIGBUS on Zalo DATA_CONST + binary size budget.
 
 #import "IPFHooksMG.h"
 #import "IPFConfig.h"
-#import "fishhook.h"
 
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
@@ -379,8 +376,7 @@ void IPFInstallMGHooks(void) {
     IPFTrace(@"IPFInstallMGHooks begin");
     IPFResolveSubstrate();
 
-    // --- MSHook absolute FIRST (ElleKit) — safe, was stable before fishhook ---
-    int frc = -1;
+    // ElleKit MSHook absolute only (stable when injected on Dopamine)
     if (pMSHookFunction) {
         void *mg = IPFFindMG("MGCopyAnswer");
         if (mg) {
@@ -406,11 +402,6 @@ void IPFInstallMGHooks(void) {
         IPFTrace(@"WARN no MSHookFunction");
     }
 
-    // fishhook disabled for now — still SIGBUS/crash on Zalo DATA_CONST despite vm_protect.
-    // Rely on ElleKit MSHook absolute symbols (stable when injected).
-    frc = -3;
-    IPFTrace(@"fishhook skipped (stability)");
-
     if (pMSHookMessageEx) {
         Class uid = objc_getClass("UIDevice");
         if (uid) {
@@ -435,8 +426,8 @@ void IPFInstallMGHooks(void) {
         if (ans) CFRelease(ans);
         IPFTrace([NSString stringWithFormat:@"SELFTEST cfgPT=%@ cfgMK=%@ stubPT=%@", cfgPT, cfgMK, got]);
         NSString *dbg = [NSString stringWithFormat:
-            @"hooks cfgPT=%@ cfgMK=%@ stubPT=%@ fishhook_rc=%d MSHook=%p\n",
-            cfgPT, cfgMK, got, frc, pMSHookFunction];
+            @"hooks cfgPT=%@ cfgMK=%@ stubPT=%@ fishhook_rc=-3 MSHook=%p\n",
+            cfgPT, cfgMK, got, pMSHookFunction];
         NSString *home = NSHomeDirectory();
         if (home.length)
             [dbg writeToFile:[home stringByAppendingPathComponent:@"Documents/v3_mg_debug.log"]

@@ -46,11 +46,11 @@ static void IPFMark(const char *msg) {
 
         NSString *bid = [[NSBundle mainBundle] bundleIdentifier] ?: @"";
         // Filter scopes inject; allow Zalo + Settings (About / Giới thiệu).
+        // Product wall: Zalo only (Settings inject crashed historically — filter plists match)
         if (bid.length > 0) {
             BOOL ok =
                 [bid isEqualToString:@"vn.com.vng.zingalo"]
-                || [bid isEqualToString:@"com.zing.zalo"]
-                || [bid isEqualToString:@"com.apple.Preferences"];
+                || [bid isEqualToString:@"com.zing.zalo"];
             if (!ok) {
                 IPFMark("CTOR_SKIP_BID");
                 return;
