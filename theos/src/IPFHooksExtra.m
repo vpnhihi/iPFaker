@@ -30,6 +30,7 @@
 #import <math.h>
 #import <errno.h>
 #import <ctype.h>
+#import <CFNetwork/CFNetwork.h>
 
 typedef void (*MSHookFunction_t)(void *symbol, void *replace, void **result);
 typedef void (*MSHookMessageEx_t)(Class _class, SEL sel, IMP imp, IMP *result);
@@ -937,6 +938,124 @@ static NSString *stub_iceCandidate(id self, SEL _cmd) {
     return out;
 }
 
+#pragma mark - Proxy (EnableProxy + ProxyHost/Port/Type)
+
+static BOOL IPFProxyOn(void) {
+    return [[IPFConfig shared] flag:@"EnableProxy" defaultYes:NO]
+        || [[IPFConfig shared] flag:@"FakeProxy" defaultYes:NO];
+}
+
+static NSDictionary *IPFProxyDictionary(void) {
+    if (!IPFProxyOn()) return nil;
+    NSString *host = [[IPFConfig shared] stringForKey:@"ProxyHost"];
+    if (!host.length) return nil;
+    double portD = [[IPFConfig shared] doubleForKey:@"ProxyPort" fallback:0];
+    NSInteger port = (NSInteger)portD;
+    if (port <= 0) {
+        NSString *ps = [[IPFConfig shared] stringForKey:@"ProxyPort"];
+        port = ps.integerValue;
+    }
+    if (port <= 0 || port > 65535) return nil;
+    NSString *type = ([[IPFConfig shared] stringForKey:@"ProxyType"] ?: @"HTTP").uppercaseString;
+    NSString *user = [[IPFConfig shared] stringForKey:@"ProxyUsername"] ?: @"";
+    NSString *pass = [[IPFConfig shared] stringForKey:@"ProxyPassword"] ?: @"";
+    NSMutableDictionary *d = [NSMutableDictionary dictionary];
+    if ([type containsString:@"SOCKS"]) {
+        d[(NSString *)kCFStreamPropertySOCKSProxyHost] = host;
+        d[(NSString *)kCFStreamPropertySOCKSProxyPort] = @(port);
+        if (user.length) {
+            d[(NSString *)kCFStreamPropertySOCKSUser] = user;
+            d[(NSString *)kCFStreamPropertySOCKSPassword] = pass;
+        }
+    } else {
+        d[(NSString *)kCFNetworkProxiesHTTPEnable] = @YES;
+        d[(NSString *)kCFNetworkProxiesHTTPProxy] = host;
+        d[(NSString *)kCFNetworkProxiesHTTPPort] = @(port);
+        d[(NSString *)kCFNetworkProxiesHTTPSEnable] = @YES;
+        d[(NSString *)kCFNetworkProxiesHTTPSProxy] = host;
+        d[(NSString *)kCFNetworkProxiesHTTPSPort] = @(port);
+        // CFNetwork auth keys (when supported)
+        if (user.length) {
+            d[@"HTTPProxyUsername"] = user;
+            d[@"HTTPProxyPassword"] = pass;
+            d[@"HTTPSProxyUsername"] = user;
+            d[@"HTTPSProxyPassword"] = pass;
+        }
+    }
+    return d;
+}
+
+static NSDictionary *(*orig_connectionProxyDictionary)(id, SEL);
+static NSDictionary *stub_connectionProxyDictionary(id self, SEL _cmd) {
+    NSDictionary *forced = IPFProxyDictionary();
+    if (forced) return forced;
+    return orig_connectionProxyDictionary ? orig_connectionProxyDictionary(self, _cmd) : nil;
+}
+
+static void (*orig_setConnectionProxyDictionary)(id, SEL, NSDictionary *);
+static void stub_setConnectionProxyDictionary(id self, SEL _cmd, NSDictionary *dict) {
+    NSDictionary *forced = IPFProxyDictionary();
+    if (forced) {
+        if (orig_setConnectionProxyDictionary)
+            orig_setConnectionProxyDictionary(self, _cmd, forced);
+        return;
+    }
+    if (orig_setConnectionProxyDictionary)
+        orig_setConnectionProxyDictionary(self, _cmd, dict);
+}
+
+#pragma mark - App Attest disable (DCAppAttestService)
+
+static BOOL IPFDisableAppAttest(void) {
+    return [[IPFConfig shared] flag:@"DisableAppAttest" defaultYes:NO];
+}
+
+static void (*orig_attestGenerateKey)(id, SEL, id);
+static void stub_attestGenerateKey(id self, SEL _cmd, id completion) {
+    if (IPFDisableAppAttest()) {
+        IPFExTrace(@"AppAttest generateKey blocked");
+        if (completion) {
+            // completion(NSString *keyId, NSError *error)
+            void (^cb)(id, id) = completion;
+            NSError *err = [NSError errorWithDomain:@"DCErrorDomain" code:2
+                                           userInfo:@{ NSLocalizedDescriptionKey: @"App Attest disabled (iPFaker lab)" }];
+            cb(nil, err);
+        }
+        return;
+    }
+    if (orig_attestGenerateKey) orig_attestGenerateKey(self, _cmd, completion);
+}
+
+static void (*orig_attestKey)(id, SEL, id, id, id);
+static void stub_attestKey(id self, SEL _cmd, id keyId, id hash, id completion) {
+    if (IPFDisableAppAttest()) {
+        IPFExTrace(@"AppAttest attestKey blocked");
+        if (completion) {
+            void (^cb)(id, id) = completion;
+            NSError *err = [NSError errorWithDomain:@"DCErrorDomain" code:2
+                                           userInfo:@{ NSLocalizedDescriptionKey: @"App Attest disabled (iPFaker lab)" }];
+            cb(nil, err);
+        }
+        return;
+    }
+    if (orig_attestKey) orig_attestKey(self, _cmd, keyId, hash, completion);
+}
+
+static void (*orig_attestAssertion)(id, SEL, id, id, id);
+static void stub_attestAssertion(id self, SEL _cmd, id keyId, id hash, id completion) {
+    if (IPFDisableAppAttest()) {
+        IPFExTrace(@"AppAttest generateAssertion blocked");
+        if (completion) {
+            void (^cb)(id, id) = completion;
+            NSError *err = [NSError errorWithDomain:@"DCErrorDomain" code:2
+                                           userInfo:@{ NSLocalizedDescriptionKey: @"App Attest disabled (iPFaker lab)" }];
+            cb(nil, err);
+        }
+        return;
+    }
+    if (orig_attestAssertion) orig_attestAssertion(self, _cmd, keyId, hash, completion);
+}
+
 #pragma mark - Install
 
 void IPFInstallExtraHooks(void) {
@@ -1113,6 +1232,39 @@ void IPFInstallExtraHooks(void) {
             if (class_getInstanceMethod(wkw, @selector(initWithCoder:)))
                 pMSHookMessageEx(wkw, @selector(initWithCoder:), (IMP)stub_wkInitCoder, (IMP *)&orig_wkInitCoder);
             IPFExTrace(@"WKWebView UA+JS hooks OK");
+        }
+
+        // Proxy: NSURLSessionConfiguration.connectionProxyDictionary
+        Class usc = objc_getClass("NSURLSessionConfiguration");
+        if (usc) {
+            if (class_getInstanceMethod(usc, @selector(connectionProxyDictionary)))
+                pMSHookMessageEx(usc, @selector(connectionProxyDictionary),
+                                 (IMP)stub_connectionProxyDictionary, (IMP *)&orig_connectionProxyDictionary);
+            if (class_getInstanceMethod(usc, @selector(setConnectionProxyDictionary:)))
+                pMSHookMessageEx(usc, @selector(setConnectionProxyDictionary:),
+                                 (IMP)stub_setConnectionProxyDictionary, (IMP *)&orig_setConnectionProxyDictionary);
+            // Default/ephemeral sessions pick up proxy via getter
+            IPFExTrace(@"NSURLSessionConfiguration proxy hooks OK");
+        }
+
+        // App Attest (DeviceCheck) — lab disable
+        Class aas = objc_getClass("DCAppAttestService");
+        if (aas) {
+            Class aasMeta = object_getClass(aas);
+            if (class_getClassMethod(aas, @selector(sharedService))) {
+                // instance methods on shared service
+            }
+            SEL genKey = NSSelectorFromString(@"generateKeyWithCompletionHandler:");
+            SEL attest = NSSelectorFromString(@"attestKey:clientDataHash:completionHandler:");
+            SEL assertSel = NSSelectorFromString(@"generateAssertion:clientDataHash:completionHandler:");
+            if (class_getInstanceMethod(aas, genKey))
+                pMSHookMessageEx(aas, genKey, (IMP)stub_attestGenerateKey, (IMP *)&orig_attestGenerateKey);
+            if (class_getInstanceMethod(aas, attest))
+                pMSHookMessageEx(aas, attest, (IMP)stub_attestKey, (IMP *)&orig_attestKey);
+            if (class_getInstanceMethod(aas, assertSel))
+                pMSHookMessageEx(aas, assertSel, (IMP)stub_attestAssertion, (IMP *)&orig_attestAssertion);
+            IPFExTrace(@"DCAppAttestService hooks OK");
+            (void)aasMeta;
         }
     }
 

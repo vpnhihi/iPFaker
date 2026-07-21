@@ -52,6 +52,10 @@ typedef void (^IPFWipeProgress)(NSString *step);
 /// Multi-app spoof: write ElleKit filter plists for MG/CT/JB from selected bundle IDs.
 + (NSString *)applySpoofFiltersForBundles:(NSArray<NSString *> *)bundleIds
                                  progress:(nullable IPFWipeProgress)progress;
+
+/// Merge flat keys into existing config.plist (both dual paths) without regenerating identity.
++ (NSString *)mergeKeysIntoConfig:(NSDictionary *)keys
+                         progress:(nullable IPFWipeProgress)progress;
 @end
 
 NS_ASSUME_NONNULL_END

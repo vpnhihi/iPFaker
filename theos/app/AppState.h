@@ -71,6 +71,27 @@ NS_ASSUME_NONNULL_BEGIN
 - (BOOL)toggleForKey:(NSString *)key defaultOn:(BOOL)on;
 - (void)setToggle:(BOOL)on forKey:(NSString *)key;
 
+#pragma mark - Proxy / AppAttest (HIOS-style)
+- (BOOL)proxyEnabled;
+- (void)setProxyEnabled:(BOOL)on;
+- (NSString *)proxyHost;
+- (void)setProxyHost:(NSString *)host;
+- (NSInteger)proxyPort;
+- (void)setProxyPort:(NSInteger)port;
+- (NSString *)proxyType; // HTTP | SOCKS5
+- (void)setProxyType:(NSString *)type;
+- (NSString *)proxyUsername;
+- (void)setProxyUsername:(NSString *)user;
+- (NSString *)proxyPassword;
+- (void)setProxyPassword:(NSString *)pass;
+- (BOOL)disableAppAttest;
+- (void)setDisableAppAttest:(BOOL)on;
+- (void)saveProxyAppAttest;
+/// Merge proxy/AppAttest keys into config.plist dual-path for dylibs.
+- (NSString *)applyProxyAppAttestToConfigProgress:(nullable void (^)(NSString *step))progress;
+/// TCP/HTTP connectivity check through configured proxy.
+- (NSString *)testProxyConnection;
+
 - (void)postDidChange;
 
 - (NSString *)devicePoolSummary;

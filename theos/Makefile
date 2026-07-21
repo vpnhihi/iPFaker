@@ -18,7 +18,7 @@ TWEAK_NAME = iPFakerMG iPFakerCT iPFakerJB
 iPFakerMG_FILES = TweakMG.x src/IPFConfig.m src/IPFHooksMG.m src/IPFHooksExtra.m
 iPFakerMG_CFLAGS = -fobjc-arc -Os -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
 # WebKit used only via runtime (objc_getClass) — hard-link WebKit broke Dopamine code-sign coverage
-iPFakerMG_FRAMEWORKS = UIKit Foundation AdSupport
+iPFakerMG_FRAMEWORKS = UIKit Foundation AdSupport CFNetwork
 iPFakerMG_LIBRARIES = substrate
 iPFakerMG_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerMG.dylib
 

@@ -2,6 +2,7 @@
 #import "AppTheme.h"
 #import "AppState.h"
 #import "Catalog.h"
+#import "ProxyAppAttestController.h"
 
 @interface SettingsViewController ()
 @property (nonatomic, strong) NSArray<NSArray<NSDictionary *> *> *sections;
@@ -48,18 +49,21 @@
 }
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    return self.sections.count + 1;
+    return self.sections.count + 2; // toggles + proxy entry + info
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
     if (section < (NSInteger)self.sections.count)
         return self.sections[section].count;
+    if (section == (NSInteger)self.sections.count)
+        return 1; // Proxy / AppAttest
     return 2;
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
     if (section == 0) return @"Lớp giả lập (lab)";
     if (section == 1) return @"Tuỳ chọn nâng cao";
+    if (section == (NSInteger)self.sections.count) return @"IP / Proxy / AppAttest";
     return @"Thông tin";
 }
 
@@ -94,6 +98,25 @@
         return cell;
     }
 
+    if (indexPath.section == (NSInteger)self.sections.count) {
+        static NSString *cidp = @"proxy";
+        UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cidp];
+        if (!cell)
+            cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:cidp];
+        cell.backgroundColor = AppTheme.cardAlt;
+        cell.textLabel.text = @"Proxy settings · AppAttest";
+        cell.textLabel.textColor = AppTheme.textPrimary;
+        NSString *host = [AppState.shared proxyHost];
+        BOOL en = [AppState.shared proxyEnabled];
+        cell.detailTextLabel.text = en && host.length
+            ? [NSString stringWithFormat:@"ON · %@:%ld · %@", host, (long)[AppState.shared proxyPort], [AppState.shared proxyType]]
+            : ([AppState.shared disableAppAttest] ? @"Proxy off · AppAttest disabled" : @"Tắt · chạm để cấu hình");
+        cell.detailTextLabel.textColor = AppTheme.textSecondary;
+        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+        cell.accessoryView = nil;
+        return cell;
+    }
+
     static NSString *cid2 = @"info";
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cid2];
     if (!cell)
@@ -102,6 +125,7 @@
     cell.textLabel.textColor = AppTheme.textPrimary;
     cell.detailTextLabel.textColor = AppTheme.textSecondary;
     cell.selectionStyle = UITableViewCellSelectionStyleNone;
+    cell.accessoryType = UITableViewCellAccessoryNone;
     if (indexPath.row == 0) {
         cell.textLabel.text = @"Số đời máy trong danh mục";
         cell.detailTextLabel.text = [NSString stringWithFormat:@"%lu", (unsigned long)Catalog.shared.devices.count];
@@ -110,6 +134,14 @@
         cell.detailTextLabel.text = [NSString stringWithFormat:@"%lu", (unsigned long)Catalog.shared.iosReleases.count];
     }
     return cell;
+}
+
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
+    [tableView deselectRowAtIndexPath:indexPath animated:YES];
+    if (indexPath.section == (NSInteger)self.sections.count) {
+        ProxyAppAttestController *vc = [[ProxyAppAttestController alloc] init];
+        [self.navigationController pushViewController:vc animated:YES];
+    }
 }
 
 - (void)switchChanged:(UISwitch *)sw {

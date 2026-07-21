@@ -1266,6 +1266,19 @@
                                                        error:nil];
 }
 
++ (NSString *)mergeKeysIntoConfig:(NSDictionary *)keys progress:(IPFWipeProgress)progress {
+    void (^step)(NSString *) = ^(NSString *s) { if (progress) progress(s); };
+    if (!keys.count) return @"ERR: không có key";
+    step(@"Đọc config hiện tại…");
+    NSMutableDictionary *flat = [[self loadCurrentFlat] mutableCopy] ?: [NSMutableDictionary dictionary];
+    [flat addEntriesFromDictionary:keys];
+    NSString *did = flat[@"DeviceCatalogId"] ?: @"";
+    NSString *ios = flat[@"ProductVersion"] ?: @"";
+    step(@"Ghi dual-path config.plist…");
+    NSString *r = [self applyFlatProfile:flat deviceId:did ios:ios];
+    return [NSString stringWithFormat:@"Proxy/AppAttest đã ghi config\n%@", r ?: @"OK"];
+}
+
 + (NSString *)applySpoofFiltersForBundles:(NSArray<NSString *> *)bundleIds
                                  progress:(IPFWipeProgress)progress {
     void (^step)(NSString *) = ^(NSString *s) { if (progress) progress(s); };

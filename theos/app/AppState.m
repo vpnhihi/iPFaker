@@ -1,6 +1,7 @@
 #import "AppState.h"
 #import "Catalog.h"
 #import "ProfileBuilder.h"
+#import <CFNetwork/CFNetwork.h>
 
 NSNotificationName const AppStateDidChangeNotification = @"AppStateDidChangeNotification";
 
@@ -569,8 +570,12 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     flat = mflat;
 
     NSString *result = [ProfileBuilder applyFlatProfile:flat deviceId:dev[@"id"] ios:ios];
-    // Keep Multi-app spoof filters in sync with wall (identity + inject targets)
+    // Keep Multi-app spoof filters + proxy/AppAttest in sync with wall
     NSString *filt = [ProfileBuilder applySpoofFiltersForBundles:self.selectedSpoofBundleIds progress:nil];
+    NSMutableDictionary *m2 = [flat mutableCopy];
+    [m2 addEntriesFromDictionary:[self proxyAppAttestFlatKeys]];
+    flat = m2;
+    (void)[ProfileBuilder applyFlatProfile:flat deviceId:dev[@"id"] ios:ios];
     self.lastFlat = flat;
     self.statusText = [NSString stringWithFormat:@"%@ · %@ / iOS %@\n%@",
                        result ?: @"OK",
@@ -723,6 +728,149 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
 - (void)setToggle:(BOOL)on forKey:(NSString *)key {
     NSString *k = [@"ipf.toggle." stringByAppendingString:key];
     [NSUserDefaults.standardUserDefaults setBool:on forKey:k];
+}
+
+#pragma mark - Proxy / AppAttest
+
+static NSString *const kPxEnable = @"ipf.proxy.enabled";
+static NSString *const kPxHost = @"ipf.proxy.host";
+static NSString *const kPxPort = @"ipf.proxy.port";
+static NSString *const kPxType = @"ipf.proxy.type";
+static NSString *const kPxUser = @"ipf.proxy.user";
+static NSString *const kPxPass = @"ipf.proxy.pass";
+static NSString *const kAADisable = @"ipf.appattest.disable";
+
+- (BOOL)proxyEnabled {
+    return [NSUserDefaults.standardUserDefaults boolForKey:kPxEnable];
+}
+- (void)setProxyEnabled:(BOOL)on {
+    [NSUserDefaults.standardUserDefaults setBool:on forKey:kPxEnable];
+}
+- (NSString *)proxyHost {
+    return [NSUserDefaults.standardUserDefaults stringForKey:kPxHost] ?: @"";
+}
+- (void)setProxyHost:(NSString *)host {
+    [NSUserDefaults.standardUserDefaults setObject:host ?: @"" forKey:kPxHost];
+}
+- (NSInteger)proxyPort {
+    return [NSUserDefaults.standardUserDefaults integerForKey:kPxPort];
+}
+- (void)setProxyPort:(NSInteger)port {
+    [NSUserDefaults.standardUserDefaults setInteger:port forKey:kPxPort];
+}
+- (NSString *)proxyType {
+    NSString *t = [NSUserDefaults.standardUserDefaults stringForKey:kPxType];
+    return t.length ? t : @"HTTP";
+}
+- (void)setProxyType:(NSString *)type {
+    [NSUserDefaults.standardUserDefaults setObject:type ?: @"HTTP" forKey:kPxType];
+}
+- (NSString *)proxyUsername {
+    return [NSUserDefaults.standardUserDefaults stringForKey:kPxUser] ?: @"";
+}
+- (void)setProxyUsername:(NSString *)user {
+    [NSUserDefaults.standardUserDefaults setObject:user ?: @"" forKey:kPxUser];
+}
+- (NSString *)proxyPassword {
+    return [NSUserDefaults.standardUserDefaults stringForKey:kPxPass] ?: @"";
+}
+- (void)setProxyPassword:(NSString *)pass {
+    [NSUserDefaults.standardUserDefaults setObject:pass ?: @"" forKey:kPxPass];
+}
+- (BOOL)disableAppAttest {
+    return [NSUserDefaults.standardUserDefaults boolForKey:kAADisable];
+}
+- (void)setDisableAppAttest:(BOOL)on {
+    [NSUserDefaults.standardUserDefaults setBool:on forKey:kAADisable];
+}
+- (void)saveProxyAppAttest {
+    [NSUserDefaults.standardUserDefaults synchronize];
+    // Mirror JSON for PC tools
+    @try {
+        NSString *dir = @"/var/mobile/Library/iPFaker";
+        NSDictionary *d = @{
+            @"EnableProxy": @([self proxyEnabled]),
+            @"ProxyHost": [self proxyHost] ?: @"",
+            @"ProxyPort": @([self proxyPort]),
+            @"ProxyType": [self proxyType] ?: @"HTTP",
+            @"ProxyUsername": [self proxyUsername] ?: @"",
+            @"ProxyPassword": [self proxyPassword] ?: @"",
+            @"DisableAppAttest": @([self disableAppAttest]),
+        };
+        NSData *json = [NSJSONSerialization dataWithJSONObject:d options:NSJSONWritingPrettyPrinted error:nil];
+        if (json) [json writeToFile:[dir stringByAppendingPathComponent:@"proxy_appattest.json"] atomically:YES];
+    } @catch (__unused NSException *ex) {}
+}
+
+- (NSDictionary *)proxyAppAttestFlatKeys {
+    return @{
+        @"EnableProxy": @([self proxyEnabled]),
+        @"ProxyHost": [self proxyHost] ?: @"",
+        @"ProxyPort": @([self proxyPort]),
+        @"ProxyType": [self proxyType] ?: @"HTTP",
+        @"ProxyUsername": [self proxyUsername] ?: @"",
+        @"ProxyPassword": [self proxyPassword] ?: @"",
+        @"DisableAppAttest": @([self disableAppAttest]),
+        @"FakeProxy": @([self proxyEnabled]),
+    };
+}
+
+- (NSString *)applyProxyAppAttestToConfigProgress:(void (^)(NSString *))progress {
+    [self saveProxyAppAttest];
+    if (progress) progress(@"Gộp Proxy / AppAttest vào config.plist…");
+    NSString *msg = [ProfileBuilder mergeKeysIntoConfig:[self proxyAppAttestFlatKeys] progress:progress];
+    self.statusText = msg;
+    [self postDidChange];
+    return msg;
+}
+
+- (NSString *)testProxyConnection {
+    NSString *host = [self proxyHost];
+    NSInteger port = [self proxyPort];
+    if (!host.length || port <= 0 || port > 65535)
+        return @"ERR: Host/Port không hợp lệ";
+
+    BOOL socks = [[self proxyType].uppercaseString containsString:@"SOCKS"];
+    NSMutableDictionary *proxy = [NSMutableDictionary dictionary];
+    if (socks) {
+        proxy[(NSString *)kCFStreamPropertySOCKSProxyHost] = host;
+        proxy[(NSString *)kCFStreamPropertySOCKSProxyPort] = @(port);
+        if ([self proxyUsername].length) {
+            proxy[(NSString *)kCFStreamPropertySOCKSUser] = [self proxyUsername];
+            proxy[(NSString *)kCFStreamPropertySOCKSPassword] = [self proxyPassword] ?: @"";
+        }
+    } else {
+        proxy[(NSString *)kCFNetworkProxiesHTTPEnable] = @YES;
+        proxy[(NSString *)kCFNetworkProxiesHTTPProxy] = host;
+        proxy[(NSString *)kCFNetworkProxiesHTTPPort] = @(port);
+        proxy[(NSString *)kCFNetworkProxiesHTTPSEnable] = @YES;
+        proxy[(NSString *)kCFNetworkProxiesHTTPSProxy] = host;
+        proxy[(NSString *)kCFNetworkProxiesHTTPSPort] = @(port);
+    }
+
+    NSURLSessionConfiguration *cfg = [NSURLSessionConfiguration ephemeralSessionConfiguration];
+    cfg.connectionProxyDictionary = proxy;
+    cfg.timeoutIntervalForRequest = 12;
+    cfg.timeoutIntervalForResource = 15;
+    NSURLSession *session = [NSURLSession sessionWithConfiguration:cfg];
+    dispatch_semaphore_t sem = dispatch_semaphore_create(0);
+    __block NSString *result = @"ERR: timeout";
+    // Public IP check through proxy (lab)
+    NSURL *url = [NSURL URLWithString:@"https://api.ipify.org?format=text"];
+    [[session dataTaskWithURL:url completionHandler:^(NSData *data, NSURLResponse *resp, NSError *err) {
+        if (err) {
+            result = [NSString stringWithFormat:@"FAIL: %@", err.localizedDescription];
+        } else {
+            NSHTTPURLResponse *http = (NSHTTPURLResponse *)resp;
+            NSString *body = data.length ? [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] : @"";
+            result = [NSString stringWithFormat:@"OK HTTP %ld · IP qua proxy: %@",
+                      (long)http.statusCode, body.length ? body : @"(empty)"];
+        }
+        dispatch_semaphore_signal(sem);
+    }] resume];
+    dispatch_semaphore_wait(sem, dispatch_time(DISPATCH_TIME_NOW, 16 * NSEC_PER_SEC));
+    [session invalidateAndCancel];
+    return result;
 }
 
 - (void)postDidChange {
