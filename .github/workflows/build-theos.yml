@@ -120,35 +120,38 @@ jobs:
 
       - name: Build iPFaker.app
         working-directory: theos/app
-        continue-on-error: true
         id: build_app
         run: |
           set -e
           export THEOS=$HOME/theos
           export PATH="/usr/local/bin:$PATH"
           chmod 755 layout/DEBIAN/postinst 2>/dev/null || true
-          # Keep catalog fresh
+          # control file next to Makefile (Theos application packaging)
+          cp -f control layout/DEBIAN/control 2>/dev/null || mkdir -p layout/DEBIAN && cp -f control layout/DEBIAN/control || true
           cp -f ../../config/device_catalog.json Resources/device_catalog.json || true
           make clean || true
           make all FINALPACKAGE=1
           make package FINALPACKAGE=1 || true
           mkdir -p ../dist/app
-          APP=$(find .theos -type d -name 'iPFaker.app' | head -1)
+          APP=$(find .theos -type d -name 'iPFaker.app' 2>/dev/null | head -1)
           echo "APP=$APP"
-          if [ -z "$APP" ]; then
-            echo "WARN: iPFaker.app not built â€” dylibs still uploaded"
-            find .theos -type f | head -40
-            exit 0
+          if [ -z "$APP" ] || [ ! -f "$APP/iPFaker" ]; then
+            echo "FATAL: iPFaker.app missing after make"
+            find .theos -type f 2>/dev/null | head -50
+            exit 1
           fi
-          cp -a "$APP" ../dist/app/
-          # ensure catalog inside bundle
+          rm -rf ../dist/app/iPFaker.app
+          cp -a "$APP" ../dist/app/iPFaker.app
           cp -f Resources/device_catalog.json ../dist/app/iPFaker.app/device_catalog.json || true
           BIN="../dist/app/iPFaker.app/iPFaker"
           codesign --remove-signature "$BIN" 2>/dev/null || true
           ldid -Sentitlements.plist "$BIN" || ldid -S "$BIN"
           ldid -h "$BIN" 2>&1 | head -15 || true
           file "$BIN" || true
+          # prove new geo-proxy strings linked
+          strings "$BIN" | grep -E 'GeoRandomInCity|attachProxyGeo|Vượt Zalo|random trong' | head -10 || true
           ls -laR ../dist/app
+          echo "APP_SIZE=$(stat -f%z "$BIN" 2>/dev/null || stat -c%s "$BIN")"
 
       - name: Build Sileo .deb (dylibs + app)
         working-directory: .

@@ -1084,12 +1084,13 @@ static NSString *const kPxSyncGeo = @"ipf.proxy.syncGeo";
             proxy[(NSString *)kCFStreamPropertySOCKSPassword] = [self proxyPassword] ?: @"";
         }
     } else {
+        // HTTPS* CF constants are macOS-only in SDK — use string keys (same as iPFakerAA ServerLite)
         proxy[(NSString *)kCFNetworkProxiesHTTPEnable] = @YES;
         proxy[(NSString *)kCFNetworkProxiesHTTPProxy] = host;
         proxy[(NSString *)kCFNetworkProxiesHTTPPort] = @(port);
-        proxy[(NSString *)kCFNetworkProxiesHTTPSEnable] = @YES;
-        proxy[(NSString *)kCFNetworkProxiesHTTPSProxy] = host;
-        proxy[(NSString *)kCFNetworkProxiesHTTPSPort] = @(port);
+        proxy[@"HTTPSEnable"] = @YES;
+        proxy[@"HTTPSProxy"] = host;
+        proxy[@"HTTPSPort"] = @(port);
     }
     return proxy;
 }
