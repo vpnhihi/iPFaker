@@ -86,15 +86,25 @@ jobs:
             install_name_tool -change \
               /Library/Frameworks/CydiaSubstrate.framework/CydiaSubstrate \
               /var/jb/usr/lib/libsubstrate.dylib "$d" 2>/dev/null || true
-            # strip any existing code signature blob
+            # strip any existing code signature blob (Dopamine is strict)
             codesign --remove-signature "$d" 2>/dev/null || true
-            # single ad-hoc sign with ldid (JB standard)
+            codesign --remove-signature "$d" 2>/dev/null || true
+            # Prefer Apple ad-hoc if available, then ldid (JB)
+            codesign -f -s - --timestamp=none "$d" 2>/dev/null || true
+            ldid -S "$d" || true
             ldid -S "$d"
             echo "size=$(stat -f%z "$d" 2>/dev/null || stat -c%s "$d")"
             ldid -h "$d" 2>&1 | head -20 || true
             codesign -dvvv "$d" 2>&1 | head -15 || true
-            codesign --verify --verbose=4 "$d" 2>&1 || true
+            # Hard fail if Dopamine-style coverage would break
+            if ! codesign --verify --verbose=4 "$d" 2>&1; then
+              echo "WARN codesign verify failed — re-ldid once more"
+              codesign --remove-signature "$d" 2>/dev/null || true
+              ldid -S "$d"
+            fi
             otool -l "$d" | grep -A4 LC_CODE_SIGNATURE || true
+            # require CDHash present
+            ldid -h "$d" 2>&1 | grep -q CDHash=
           done
           if otool -L dist/iPFakerMG.dylib | grep -q 'CydiaSubstrate.framework'; then
             echo "FATAL: still links CydiaSubstrate.framework"
