@@ -17,23 +17,22 @@ TWEAK_NAME = iPFakerMG iPFakerCT iPFakerJB
 # MG = spoof + Extra (screen/disk/UA/getifaddrs/access-stat/WKWebView)
 # fishhook.c OFF by default: keeps MG ~123k AMFI-safe. ElleKit MSHook is primary on Dopamine.
 # Optional: add src/fishhook.c + -DIPF_FISHHOOK_FALLBACK=1 only if MSHook is unavailable.
-iPFakerMG_FILES = TweakMG.x src/IPFConfig.m src/IPFHooksMG.m src/IPFHooksExtra.m
+# MG: spoof + Extra core + Env (locale/TZ/location/sensor). Target ≤128k AMFI-safe.
+iPFakerMG_FILES = TweakMG.x src/IPFConfig.m src/IPFHooksMG.m src/IPFHooksExtra.m src/IPFHooksEnv.m
 iPFakerMG_CFLAGS = -fobjc-arc -Os -fvisibility=hidden -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
-# WebKit/CL/CM via runtime only. No CFNetwork in MG (proxy lives in CT Server).
 iPFakerMG_FRAMEWORKS = UIKit Foundation AdSupport
 iPFakerMG_LIBRARIES = substrate
 iPFakerMG_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerMG.dylib -Wl,-dead_strip
 
-# CT lean: telephony + Deep only (keep ~100–110k so inject reliably)
+# CT lean: telephony + Deep only (~105k inject OK on lab)
 iPFakerCT_FILES = TweakCT.x src/IPFConfig.m src/IPFHooksCT.m src/IPFHooksDeep.m
 iPFakerCT_CFLAGS = -fobjc-arc -Os -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
 iPFakerCT_FRAMEWORKS = UIKit Foundation CoreTelephony
 iPFakerCT_LIBRARIES = substrate
 iPFakerCT_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerCT.dylib -Wl,-dead_strip
 
-# JB: expanded hide + Server mitigations + Env (locale/location/sensor)
-# Packing Server/Env here keeps CT lean (CT@123k failed inject on lab).
-iPFakerJB_FILES = TweakJB.x src/IPFConfig.m src/IPFHooksJB.m src/IPFHooksServer.m src/IPFHooksEnv.m
+# JB: hide expand + Server mitigations only (Proxy/AA/WebRTC). Keep ≤110k inject OK.
+iPFakerJB_FILES = TweakJB.x src/IPFConfig.m src/IPFHooksJB.m src/IPFHooksServer.m
 iPFakerJB_CFLAGS = -fobjc-arc -Os -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
 iPFakerJB_FRAMEWORKS = Foundation CFNetwork
 iPFakerJB_LIBRARIES = substrate
