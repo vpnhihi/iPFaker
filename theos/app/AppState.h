@@ -106,6 +106,8 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)saveProxyAppAttest;
 - (BOOL)syncGeoFromProxyEnabled;
 - (void)setSyncGeoFromProxyEnabled:(BOOL)on;
+/// Flat keys written to dual-path config (EnableProxy/Host/Port/User/Pass/AA/…).
+- (NSDictionary *)proxyAppAttestFlatKeys;
 /// Merge proxy/AppAttest keys into config.plist dual-path for dylibs.
 - (NSString *)applyProxyAppAttestToConfigProgress:(nullable void (^)(NSString *step))progress;
 /// TCP/HTTP connectivity check through configured proxy.
