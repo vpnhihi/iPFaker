@@ -54,15 +54,19 @@ static void IPFJBResolve(void) {
 
 static BOOL IPFJBAllowlisted(const char *path) {
     if (!path) return NO;
-    // iPFaker config + constructor markers must never be blocked
-    if (strstr(path, "ipfaker")) return YES;
+    // iPFaker config + our own dylibs/plists + constructor markers must never be blocked.
+    // CRITICAL: strstr("ipfaker") does NOT match "iPFaker" (case). If JB loads before MG
+    // alphabetically, open() hide would block TweakInject/iPFakerMG.dylib and kill MG inject.
+    if (strstr(path, "ipfaker") || strstr(path, "iPFaker") || strstr(path, "IPFaker")) return YES;
     if (strstr(path, "v3_mg_loaded")) return YES;
     if (strstr(path, "v3_mg_debug")) return YES;
-    if (strstr(path, "/var/jb/etc/ipfaker")) return YES;
+    if (strstr(path, "/var/jb/etc/ipfaker") || strstr(path, "/var/jb/etc/iPFaker")) return YES;
     if (strstr(path, "/private/var/jb/etc/ipfaker")) return YES;
     if (strstr(path, "/var/mobile/Library/iPFaker")) return YES;
     if (strstr(path, "/var/jb/tmp/")) return YES;
     if (strstr(path, "/private/var/jb/tmp/")) return YES;
+    // Own inject payloads (even if product rename changes case again)
+    if (strstr(path, "TweakInject/") && strstr(path, "iPF")) return YES;
     return NO;
 }
 
