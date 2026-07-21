@@ -269,12 +269,15 @@ static int stub_uname(struct utsname *buf) {
         IPFConfig *cfg = [IPFConfig shared];
         if ([cfg flag:@"FakeDevice" defaultYes:YES]) {
             NSString *machine = [cfg mgValueForKey:@"ProductType"];
-            NSString *node = [cfg stringForKey:@"UserAssignedDeviceName"];
+            // nodename ≡ gethostname ≡ Hostname (must match Extra hooks)
+            NSString *node = [cfg stringForKey:@"Hostname"]
+                ?: [cfg stringForKey:@"kern.hostname"]
+                ?: [cfg stringForKey:@"UserAssignedDeviceName"];
             if ([machine isKindOfClass:[NSString class]]) {
                 strlcpy(buf->machine, machine.UTF8String, sizeof(buf->machine));
                 IPFTrace([NSString stringWithFormat:@"uname FAKE machine=%@", machine]);
             }
-            if (node)
+            if (node.length)
                 strlcpy(buf->nodename, node.UTF8String, sizeof(buf->nodename));
         }
         if ([cfg flag:@"FakeSysOSVersion" defaultYes:YES]) {

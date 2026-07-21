@@ -8,19 +8,30 @@
 
 @implementation ProfileBuilder
 
-// Apple identity formats (match scripts/select_device_profile.py):
-// SerialNumber: 12-char, no I/O/0/1; ModelNumber: MPN/A; IDFA/IDFV: UUID v4 upper; IMEI: Luhn
+// Apple-like synthetic identity (match scripts/select_device_profile.py):
+// Serial: no I/O/0/1; pre-2021=12, modern~10; IDFA/IDFV UUID v4; UDID 40 hex; IMEI 8-digit TAC+Luhn
 
 + (NSString *)randomSerialForYear:(NSInteger)year {
-    // <2021: 12 chars; >=2021: 10-14 random. No I/O.
-    static NSString *alpha = @"ABCDEFGHJKLMNPQRSTUVWXYZ0123456789";
-    static NSString *plants = @"CDFGHJKLMNPQRSTUVWXYZ";
-    int len = (year > 0 && year < 2021) ? 12 : (10 + (int)arc4random_uniform(5));
-    unichar plant = [plants characterAtIndex:arc4random_uniform((u_int32_t)plants.length)];
-    NSMutableString *s = [NSMutableString stringWithFormat:@"%C", plant];
-    for (int i = 1; i < len; i++) {
-        u_int32_t r = arc4random_uniform((u_int32_t)alpha.length);
-        [s appendFormat:@"%C", [alpha characterAtIndex:r]];
+    static NSString *alpha = @"ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no I,O,0,1
+    static NSArray *plants = @[ @"C", @"F", @"D", @"G", @"H", @"M", @"P", @"R", @"S", @"W",
+                                 @"CK", @"F7", @"DN", @"F2", @"G6", @"FK", @"YM", @"C3" ];
+    NSString *plant = plants[arc4random_uniform((u_int32_t)plants.count)];
+    int len;
+    if (year > 0 && year < 2021) {
+        len = 12;
+    } else {
+        // Cluster at 10 (modern randomised style)
+        u_int32_t r = arc4random_uniform(100);
+        len = (r < 70) ? 10 : (r < 85 ? 11 : 12);
+    }
+    NSMutableString *s = [NSMutableString stringWithString:plant];
+    while ((int)s.length < len) {
+        u_int32_t ri = arc4random_uniform((u_int32_t)alpha.length);
+        [s appendFormat:@"%C", [alpha characterAtIndex:ri]];
+    }
+    if (s.length > (NSUInteger)len) [s deleteCharactersInRange:NSMakeRange(len, s.length - len)];
+    if (s.length && [[NSCharacterSet decimalDigitCharacterSet] characterIsMember:[s characterAtIndex:0]]) {
+        [s replaceCharactersInRange:NSMakeRange(0, 1) withString:@"C"];
     }
     return s;
 }
@@ -65,7 +76,16 @@
 }
 
 + (NSString *)randomMAC {
-    // Locally administered unicast MAC
+    // Prefer public Apple OUI + random NIC (looks more factory-like than pure random)
+    static NSArray *ouis = @[
+        @"F0:18:98", @"A4:83:E7", @"3C:22:FB", @"DC:A9:04", @"AC:DE:48",
+        @"F4:5C:89", @"28:CF:E9", @"D0:03:4B", @"BC:52:B7", @"6C:96:CF",
+    ];
+    if (arc4random_uniform(100) < 85) {
+        NSString *oui = ouis[arc4random_uniform((u_int32_t)ouis.count)];
+        return [NSString stringWithFormat:@"%@:%02X:%02X:%02X",
+                oui, arc4random_uniform(256), arc4random_uniform(256), arc4random_uniform(256)];
+    }
     u_int32_t b0 = (arc4random_uniform(256) | 0x02) & 0xFE;
     return [NSString stringWithFormat:@"%02X:%02X:%02X:%02X:%02X:%02X",
             b0, arc4random_uniform(256), arc4random_uniform(256),
@@ -86,23 +106,53 @@
 }
 
 + (NSString *)randomIMEI {
-    // 15-digit IMEI with valid Luhn check digit
-    NSMutableString *body = [NSMutableString stringWithString:@"35"];
-    for (int i = 0; i < 12; i++)
+    // 15-digit IMEI: 8-digit TAC (Apple-range style) + 6 SNR + Luhn
+    static NSArray *tacs = @[
+        @"35328510", @"35325809", @"35672011", @"35299109", @"35334709",
+        @"35445107", @"35569508", @"35397710", @"35925406", @"35407115",
+    ];
+    NSString *tac = tacs[arc4random_uniform((u_int32_t)tacs.count)];
+    NSMutableString *body = [NSMutableString stringWithString:tac];
+    for (int i = 0; i < 6; i++)
         [body appendFormat:@"%u", arc4random_uniform(10)];
     return [body stringByAppendingString:[self luhnCheckDigitFor14:body]];
 }
 
 + (NSString *)uuidUpper {
-    // IDFA / IDFV — RFC 4122 UUID v4, uppercase with hyphens (NSUUID style)
+    // IDFA / IDFV — RFC 4122 UUID v4, uppercase with hyphens (NSUUID)
     return [[[NSUUID UUID] UUIDString] uppercaseString];
 }
 
 + (NSString *)randomUDID {
-    // UniqueDeviceID — 40 hex (legacy Apple UDID length)
+    // UniqueDeviceID — 40 hex via SHA-1 of random (legacy UDID length)
+    uint8_t rnd[32];
+    arc4random_buf(rnd, sizeof(rnd));
+    // Simple FNV-ish expand to 40 hex without CommonCrypto dependency:
+    // two UUID digests concatenated (same length as SHA-1 hex)
     NSString *a = [[[NSUUID UUID] UUIDString] stringByReplacingOccurrencesOfString:@"-" withString:@""];
     NSString *b = [[[NSUUID UUID] UUIDString] stringByReplacingOccurrencesOfString:@"-" withString:@""];
-    return [[a stringByAppendingString:[b substringToIndex:8]] uppercaseString];
+    NSString *c = [[[NSUUID UUID] UUIDString] stringByReplacingOccurrencesOfString:@"-" withString:@""];
+    // Mix rnd into first chars for entropy beyond pure UUID concat
+    NSMutableString *out = [NSMutableString stringWithCapacity:40];
+    NSString *src = [[a stringByAppendingString:b] stringByAppendingString:c];
+    for (int i = 0; i < 40; i++) {
+        unichar ch = [src characterAtIndex:i % src.length];
+        unsigned v = (unsigned)ch ^ rnd[i % 32];
+        [out appendFormat:@"%X", v & 0xF];
+    }
+    return out;
+}
+
++ (NSString *)randomECIDHex {
+    uint64_t hi = ((uint64_t)arc4random() << 32) | arc4random();
+    if (hi < 0x1000000000ULL) hi |= 0xA000000000ULL;
+    return [NSString stringWithFormat:@"%016llX", hi];
+}
+
++ (NSString *)randomECIDecimalFromHex:(NSString *)hex {
+    // Parse hex as 64-bit for ECID decimal twin
+    unsigned long long v = strtoull(hex.UTF8String, NULL, 16);
+    return [NSString stringWithFormat:@"%llu", v];
 }
 
 + (NSDictionary *)flatProfileForDevice:(NSDictionary *)device
@@ -123,7 +173,10 @@
     NSString *bt = [btp componentsJoinedByString:@":"];
     NSString *idfv = [self uuidUpper];
     NSString *idfa = [self uuidUpper];
+    while ([idfa isEqualToString:idfv]) idfa = [self uuidUpper];
     NSString *udid = [self randomUDID];
+    NSString *ecidHex = [self randomECIDHex];
+    NSString *ecidDec = [self randomECIDecimalFromHex:ecidHex];
     NSInteger year = [device[@"year"] integerValue];
     NSString *serial = [self randomSerialForYear:year];
     NSDictionary *partInfo = [self randomPartNumberFromDevice:device];
@@ -135,6 +188,21 @@
     NSString *meid = [imei substringToIndex:MIN((NSUInteger)14, imei.length)];
     NSString *eid = [self randomEID];
     NSString *devName = name.length ? name : [NSString stringWithFormat:@"iPhone Lab %@", device[@"id"] ?: @"dev"];
+    // Hostname ≡ gethostname / uname.nodename / NSProcessInfo (DNS-label safe)
+    NSMutableString *hostBuf = [NSMutableString string];
+    for (NSUInteger i = 0; i < devName.length && hostBuf.length < 63; i++) {
+        unichar c = [devName characterAtIndex:i];
+        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-')
+            [hostBuf appendFormat:@"%C", c];
+        else if ((c == ' ' || c == '_' || c == '.') && hostBuf.length
+                 && [hostBuf characterAtIndex:hostBuf.length - 1] != '-')
+            [hostBuf appendString:@"-"];
+    }
+    while (hostBuf.length && [hostBuf characterAtIndex:0] == '-')
+        [hostBuf deleteCharactersInRange:NSMakeRange(0, 1)];
+    while (hostBuf.length && [hostBuf characterAtIndex:hostBuf.length - 1] == '-')
+        [hostBuf deleteCharactersInRange:NSMakeRange(hostBuf.length - 1, 1)];
+    NSString *hostName = hostBuf.length ? [hostBuf copy] : @"iPhone";
     NSString *regLetters = partInfo[@"region"] ?: @"ZA";
     NSString *regionCode = @{ @"LL":@"US", @"J":@"JP", @"CH":@"CN", @"KH":@"KR", @"ZA":@"SG", @"ZP":@"HK",
                               @"B":@"GB", @"D":@"DE", @"F":@"FR", @"T":@"IT", @"X":@"AU", @"C":@"CA" }[regLetters] ?: @"VN";
@@ -192,9 +260,11 @@
                           arc4random_uniform(256),
                           2 + arc4random_uniform(250)];
 
-    // Wi‑Fi SSID/BSSID display (BSSID = MAC-like EUI-48)
-    NSString *ssid = @"Viettel-WiFi";
+    // Wi‑Fi SSID/BSSID — BSSID must equal WifiAddress (CNCopyCurrentNetworkInfo sync)
+    NSArray *ssids = @[ @"Viettel-WiFi", @"Viettel", @"VNPT-Fiber", @"FPT-Telecom", @"MyWiFi" ];
+    NSString *ssid = ssids[arc4random_uniform((u_int32_t)ssids.count)];
     NSString *bssid = wifi;
+    NSString *volumeUUID = [self uuidUpper];
 
     return @{
         @"Enabled": @YES,
@@ -202,6 +272,8 @@
         @"MarketingName": device[@"MarketingName"] ?: @"iPhone",
         @"DeviceName": @"iPhone",
         @"UserAssignedDeviceName": devName,
+        @"Hostname": hostName,
+        @"kern.hostname": hostName,
         @"HWModelStr": device[@"HWModelStr"] ?: @"",
         @"HardwareModel": device[@"HWModelStr"] ?: @"",
         // BOTH: Settings default Part Number + Axxxx after tap
@@ -217,7 +289,14 @@
         @"DeviceClass": @"iPhone",
         @"SerialNumber": serial,
         @"UniqueDeviceID": udid,
-        @"UniqueChipID": [NSString stringWithFormat:@"%016llX", ((uint64_t)arc4random() << 32) | arc4random()],
+        @"UniqueChipID": ecidHex,
+        @"ECID": ecidDec,
+        @"ChipID": ecidDec,
+        @"serial-number": serial,
+        @"unique-device-id": udid,
+        @"DeviceUniqueIdentifier": udid,
+        @"AdvertisingIdentifier": idfa,
+        // also set plain keys used by MG maps (see below IDFA/IDFV)
         @"ProductVersion": iosMeta[@"ProductVersion"] ?: iosVer,
         @"BuildVersion": iosMeta[@"BuildVersion"] ?: @"",
         @"ProductBuildVersion": iosMeta[@"BuildVersion"] ?: @"",
@@ -235,6 +314,11 @@
         @"WifiAddress": wifi,
         @"BluetoothAddress": bt,
         @"EthernetMacAddress": wifi,
+        @"BSSID": bssid,
+        @"SSID": ssid,
+        @"VolumeUUID": volumeUUID,
+        @"IOPlatformSerialNumber": serial,
+        @"MLBSerialNumber": serial,
         @"SSID": ssid,
         @"BSSID": bssid,
         // ITU-T E.212 MCC/MNC — Viettel 452/04; ISO 3166-1 alpha-2

@@ -54,7 +54,10 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
     return s;
 }
 
-- (void)applyFlatPlist:(NSDictionary *)flat path:(NSString *)path {
+- (void)applyFlatPlist:(NSDictionary *)flatIn path:(NSString *)path {
+    // Mutable so we can inject Hostname derived from device name (keep flat consistent)
+    NSMutableDictionary *flat = [flatIn isKindOfClass:[NSDictionary class]]
+        ? [flatIn mutableCopy] : [NSMutableDictionary dictionary];
     self.flat = flat;
     self.root = flat;
     self.profilePath = path;
@@ -71,6 +74,9 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
         @"InternationalMobileEquipmentIdentity", @"InternationalMobileEquipmentIdentity2",
         @"MobileEquipmentIdentifier", @"EID",
         @"WifiAddress", @"BluetoothAddress", @"EthernetMacAddress",
+        @"BSSID", @"SSID", @"VolumeUUID",
+        @"IOPlatformSerialNumber", @"MLBSerialNumber",
+        @"Hostname",
         @"main-screen-width", @"main-screen-height", @"main-screen-scale", @"main-screen-pitch",
         @"DeviceColor", @"DeviceEnclosureColor", @"BasebandVersion",
     ];
@@ -102,11 +108,35 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
         mg[@"BuildVersion"] = b;
         sys[@"kern.osversion"] = b;
     }
-    if (flat[@"DeviceName"] ?: flat[@"UserAssignedDeviceName"]) {
-        id n = flat[@"UserAssignedDeviceName"] ?: flat[@"DeviceName"];
+    if (flat[@"DeviceName"] ?: flat[@"UserAssignedDeviceName"] ?: flat[@"Hostname"]) {
+        id n = flat[@"UserAssignedDeviceName"] ?: flat[@"DeviceName"] ?: @"iPhone";
         mg[@"UserAssignedDeviceName"] = n;
         mg[@"DeviceName"] = flat[@"DeviceName"] ?: @"iPhone";
-        sys[@"kern.hostname"] = n;
+        // Hostname must stay in sync with gethostname / uname.nodename / NSProcessInfo
+        // (DNS-label safe: A–Z a–z 0–9 hyphen only, ≤63)
+        NSString *hn = flat[@"Hostname"];
+        if (![hn isKindOfClass:[NSString class]] || hn.length == 0) {
+            NSString *raw = [n description] ?: @"iPhone";
+            NSMutableString *safe = [NSMutableString string];
+            for (NSUInteger i = 0; i < raw.length && safe.length < 63; i++) {
+                unichar c = [raw characterAtIndex:i];
+                if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+                    || (c >= '0' && c <= '9') || c == '-') {
+                    [safe appendFormat:@"%C", c];
+                } else if ((c == ' ' || c == '_' || c == '.') && safe.length
+                           && [safe characterAtIndex:safe.length - 1] != '-') {
+                    [safe appendString:@"-"];
+                }
+            }
+            while (safe.length && [safe characterAtIndex:0] == '-')
+                [safe deleteCharactersInRange:NSMakeRange(0, 1)];
+            while (safe.length && [safe characterAtIndex:safe.length - 1] == '-')
+                [safe deleteCharactersInRange:NSMakeRange(safe.length - 1, 1)];
+            hn = safe.length ? [safe copy] : @"iPhone";
+        }
+        mg[@"Hostname"] = hn;
+        sys[@"kern.hostname"] = hn;
+        flat[@"Hostname"] = hn; // Extra gethostname / NSProcessInfo read same key
     }
     // Marketing name for Zalo UI (critical — Zalo shows "iPhone XS Max" from real type)
     if (flat[@"MarketingName"]) mg[@"MarketingName"] = flat[@"MarketingName"];
@@ -339,8 +369,19 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
             @"UserAssignedDeviceName": @"UserAssignedDeviceName",
             @"SerialNumber": @"SerialNumber",
             @"serial-number": @"SerialNumber",
+            @"Serial": @"SerialNumber",
             @"UniqueDeviceID": @"UniqueDeviceID",
             @"unique-device-id": @"UniqueDeviceID",
+            @"DeviceUniqueIdentifier": @"UniqueDeviceID",
+            @"UDID": @"UniqueDeviceID",
+            @"UniqueChipID": @"UniqueChipID",
+            @"ECID": @"UniqueChipID",
+            @"ChipID": @"UniqueChipID",
+            @"IDFA": @"IDFA",
+            @"AdvertisingIdentifier": @"IDFA",
+            @"advertisingIdentifier": @"IDFA",
+            @"IDFV": @"IDFV",
+            @"identifierForVendor": @"IDFV",
             @"ProductVersion": @"ProductVersion",
             @"product-version": @"ProductVersion",
             @"BuildVersion": @"BuildVersion",
@@ -352,6 +393,11 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
             @"regulatory-model-number": @"RegulatoryModelNumber",
             @"RegionInfo": @"RegionInfo",
             @"region-info": @"RegionInfo",
+            @"InternationalMobileEquipmentIdentity": @"InternationalMobileEquipmentIdentity",
+            @"MobileEquipmentIdentifier": @"MobileEquipmentIdentifier",
+            @"EID": @"EID",
+            @"WifiAddress": @"WifiAddress",
+            @"BluetoothAddress": @"BluetoothAddress",
         };
     });
     NSString *canon = aliases[key];

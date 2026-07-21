@@ -17,7 +17,9 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
 import random
 import re
 import string
@@ -121,9 +123,21 @@ def list_ios(cat: dict, device: dict | None = None) -> None:
 
 # Identity: BOTH Part Number (Settings default) + Axxxx (tap) + max random pool.
 # Hardware/catalog (ProductType, display, RAM, iOS matrix) left untouched.
+#
+# Formats (lab-synthetic, Apple-like — not real device dumps):
+#   Serial:  no I/O/0/1; pre-2021 = 12 chars; 2021+ mostly 10 (randomised style)
+#   IDFA/IDFV: RFC 4122 UUID v4 uppercase with hyphens
+#   UniqueDeviceID: 40 hex (legacy UDID length / SHA-1 style)
+#   UniqueChipID / ECID: 64-bit as decimal + hex alias
+#   IMEI: 15 digits, real-length TAC + Luhn
+#   EID: 32 decimal digits (eSIM)
 
-_SERIAL_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ0123456789"  # no I, O
-_SERIAL_PLANTS = tuple("CDFGHJKLMNPQRSTUVWXYZ")
+_SERIAL_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no I,O,0,1
+# Common factory / plant-style prefixes (public knowledge patterns, not secrets)
+_SERIAL_PLANTS = (
+    "C", "F", "D", "G", "H", "M", "P", "R", "S", "W",
+    "CK", "F7", "DN", "F2", "G6", "FK", "YM", "C3",
+)
 # Part Number region codes (Settings: MU783KH/A, MT6T2J/A, LL/A, CH/A…)
 _PART_REGIONS = (
     "LL",  # USA
@@ -152,7 +166,19 @@ _PART_REGION_TO_CODE = {
     "QN": "DK", "C": "CA", "HN": "IN", "PP": "PH", "TH": "TH",
     "TU": "TR", "RU": "RU",
 }
-_IMEI_TAC = ("35", "01", "86", "91", "99", "35", "01", "86")
+# 8-digit Type Allocation Codes (lab pool — Apple-range style 35xxxxxx, not a real unit dump)
+_IMEI_TAC = (
+    "35328510", "35325809", "35672011", "35299109", "35334709",
+    "35445107", "35569508", "35397710", "35925406", "35407115",
+    "35316606", "35881507", "35613307", "35397711", "35407116",
+    "35260908", "35328511", "35728909", "35876108", "35929006",
+)
+# Public Apple Ethernet/Wi‑Fi OUI prefixes (IEEE/public) — NIC random
+_APPLE_OUI = (
+    "F0:18:98", "A4:83:E7", "3C:22:FB", "DC:A9:04", "AC:DE:48",
+    "F4:5C:89", "28:CF:E9", "D0:03:4B", "BC:52:B7", "6C:96:CF",
+    "88:66:5A", "B8:63:4D", "F0:D1:A9", "A8:86:DD", "C8:69:CD",
+)
 _DEVICE_NAME_POOL = (
     "iPhone", "My iPhone", "iPhone Lab", "iPhone {}", "Lab {}", "{} iPhone",
 )
@@ -172,14 +198,25 @@ _CARRIERS = (
 
 
 def random_serial(year: int | None = None) -> str:
-    """Serial: 12 chars if year<2021; else 10-14 random (new Apple style)."""
+    """
+    Synthetic Apple-like serial.
+    - Pre-2021 hardware: classic **12** chars (factory prefix + body).
+    - 2021+: randomised style, mostly **10** chars (also 11–12 rarely).
+    Alphabet excludes I, O, 0, 1 (Apple serial convention).
+    """
+    plant = random.choice(_SERIAL_PLANTS)
     if year is not None and int(year) < 2021:
         length = 12
     else:
-        length = random.choice((10, 11, 12, 13, 14))
-    plant = random.choice(_SERIAL_PLANTS)
-    body = "".join(random.choice(_SERIAL_ALPHABET) for _ in range(length - 1))
-    return plant + body
+        # Observed modern lengths cluster at 10; avoid silly 13–14
+        length = random.choices((10, 10, 10, 11, 12), weights=(55, 55, 55, 15, 10))[0]
+    need = max(1, length - len(plant))
+    body = "".join(random.choice(_SERIAL_ALPHABET) for _ in range(need))
+    serial = (plant + body)[:length]
+    # Never all-numeric / never start with digit-only noise
+    if serial[0].isdigit():
+        serial = random.choice("CDFGHJKLMNPQRSTUVWXYZ") + serial[1:]
+    return serial
 
 
 def format_part_number(device: dict | None = None) -> tuple:
@@ -231,22 +268,58 @@ def format_model_number(device: dict | str | None, region: str = "other") -> str
 
 
 def apple_uuid() -> str:
-    return str(uuid.uuid4()).upper()
+    """IDFA / IDFV — RFC 4122 UUID version 4, uppercase with hyphens (NSUUID style)."""
+    u = uuid.uuid4()
+    # Force version=4 and RFC variant bits even if platform UUID differs
+    b = bytearray(u.bytes)
+    b[6] = (b[6] & 0x0F) | 0x40
+    b[8] = (b[8] & 0x3F) | 0x80
+    return str(uuid.UUID(bytes=bytes(b))).upper()
 
 
 def random_udid() -> str:
-    return (uuid.uuid4().hex + uuid.uuid4().hex[:8]).upper()
+    """
+    UniqueDeviceID — 40 hex chars (legacy iOS UDID / SHA-1 digest length).
+    Uppercase hex as commonly seen in MG dumps.
+    """
+    return hashlib.sha1(os.urandom(32)).hexdigest().upper()
+
+
+def random_ecid() -> tuple[str, str]:
+    """
+    UniqueChipID / ECID-like 64-bit id.
+    Returns (decimal_string, hex16_upper) — lockdown often shows decimal.
+    """
+    n = random.randint(0x10_0000_0000, 0xFFFF_FFFF_FFFF_FFFF)
+    return str(n), f"{n:016X}"
 
 
 def random_mac() -> str:
+    """
+    Wi‑Fi MAC: public Apple OUI + random NIC (lab).
+    Unicast; not forced local-admin bit so it looks like factory OUI traffic.
+    """
+    if random.random() < 0.85:
+        oui = random.choice(_APPLE_OUI)
+        nic = [random.randint(0, 255) for _ in range(3)]
+        return oui + ":" + ":".join(f"{b:02X}" for b in nic)
     b0 = (random.randint(0, 255) | 0x02) & 0xFE
     parts = [b0] + [random.randint(0, 255) for _ in range(5)]
     return ":".join(f"{b:02X}" for b in parts)
 
 
 def random_eid() -> str:
-    """eSIM EID — 32 digits (lab)."""
-    return "".join(str(random.randint(0, 9)) for _ in range(32))
+    """eSIM EID — 32 decimal digits with Luhn-style check on 31-digit body."""
+    body31 = "".join(str(random.randint(0, 9)) for _ in range(31))
+    total = 0
+    for i, ch in enumerate(body31[::-1]):
+        n = int(ch)
+        if i % 2 == 0:
+            n *= 2
+            if n > 9:
+                n -= 9
+        total += n
+    return body31 + str((10 - (total % 10)) % 10)
 
 
 def random_device_name(marketing: str, device_id: str) -> str:
@@ -254,6 +327,22 @@ def random_device_name(marketing: str, device_id: str) -> str:
     if "{}" in tpl:
         return tpl.format(random.choice((marketing.split()[-1], device_id, "Lab", "Pro")))
     return tpl
+
+
+def hostname_from_name(name: str) -> str:
+    """
+    DNS-label / gethostname-safe hostname derived from device name.
+    Keep identical to IPFConfig sanitize + uname.nodename / NSProcessInfo.hostName.
+    """
+    raw = (name or "iPhone").strip()
+    out = []
+    for ch in raw:
+        if ch.isalnum() or ch == "-":
+            out.append(ch)
+        elif ch in " _." and out and out[-1] != "-":
+            out.append("-")
+    s = "".join(out).strip("-")[:63]
+    return s or "iPhone"
 
 
 def random_capacity_gb(device: dict):
@@ -276,10 +365,62 @@ def _luhn_check_digit(digits14: str) -> str:
 
 
 def random_imei() -> str:
+    """15-digit IMEI: 8-digit TAC + SNR + Luhn check digit."""
     tac = random.choice(_IMEI_TAC)
-    need = 14 - len(tac)
-    body14 = tac + "".join(str(random.randint(0, 9)) for _ in range(need))
+    assert len(tac) == 8 and tac.isdigit()
+    body14 = tac + "".join(str(random.randint(0, 9)) for _ in range(6))
     return body14 + _luhn_check_digit(body14)
+
+
+def validate_identity(flat: dict) -> list[str]:
+    """Return list of problems (empty = OK). Lab format + cross-field consistency."""
+    errs: list[str] = []
+    sn = str(flat.get("SerialNumber") or "")
+    if not re.fullmatch(r"[A-Z2-9]{10,12}", sn):
+        errs.append(f"SerialNumber bad len/charset: {sn!r}")
+    if any(c in sn for c in "IO01"):
+        errs.append(f"SerialNumber forbidden I/O/0/1: {sn!r}")
+    for k in ("IDFA", "IDFV", "identifierForVendor", "advertisingIdentifier"):
+        v = str(flat.get(k) or "")
+        if v and not re.fullmatch(
+            r"[0-9A-F]{8}-[0-9A-F]{4}-4[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12}",
+            v,
+        ):
+            errs.append(f"{k} not UUID v4 upper: {v!r}")
+    if flat.get("IDFA") and flat.get("IDFV") and flat["IDFA"] == flat["IDFV"]:
+        errs.append("IDFA must differ from IDFV")
+    udid = str(flat.get("UniqueDeviceID") or "")
+    if not re.fullmatch(r"[0-9A-F]{40}", udid):
+        errs.append(f"UniqueDeviceID not 40 hex: {udid!r}")
+    imei = str(flat.get("InternationalMobileEquipmentIdentity") or "")
+    if imei:
+        if not re.fullmatch(r"\d{15}", imei):
+            errs.append(f"IMEI not 15 digits: {imei!r}")
+        elif _luhn_check_digit(imei[:14]) != imei[14]:
+            errs.append(f"IMEI Luhn fail: {imei!r}")
+    eid = str(flat.get("EID") or "")
+    if eid and not re.fullmatch(r"\d{32}", eid):
+        errs.append(f"EID not 32 digits: {eid!r}")
+    # Consistency: MAC family
+    wifi = str(flat.get("WifiAddress") or "")
+    eth = str(flat.get("EthernetMacAddress") or "")
+    bssid = str(flat.get("BSSID") or "")
+    mac_re = r"^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$"
+    if wifi and not re.fullmatch(mac_re, wifi):
+        errs.append(f"WifiAddress bad MAC: {wifi!r}")
+    if wifi and eth and wifi.upper() != eth.upper():
+        errs.append("EthernetMacAddress must equal WifiAddress")
+    if wifi and bssid and wifi.upper() != bssid.upper():
+        errs.append("BSSID must equal WifiAddress")
+    # Hostname ↔ device name derive
+    hn = str(flat.get("Hostname") or "")
+    if hn and not re.fullmatch(r"[A-Za-z0-9-]{1,63}", hn):
+        errs.append(f"Hostname not DNS-safe: {hn!r}")
+    # Serial aliases
+    for ak in ("IOPlatformSerialNumber", "MLBSerialNumber"):
+        if flat.get(ak) and flat.get(ak) != sn:
+            errs.append(f"{ak} must equal SerialNumber")
+    return errs
 
 
 def clamp_ios(
@@ -339,7 +480,11 @@ def build_profile(device: dict, ios_ver: str, ios_meta: dict, name: str | None) 
     # Identity — BOTH Part Number + Axxxx; max random (hardware untouched)
     idfv = apple_uuid()
     idfa = apple_uuid()
+    # IDFA ≠ IDFV (different identifiers in real iOS)
+    while idfa == idfv:
+        idfa = apple_uuid()
     udid = random_udid()
+    ecid_dec, ecid_hex = random_ecid()
     year = device.get("year")
     try:
         year_i = int(year) if year is not None else None
@@ -353,9 +498,10 @@ def build_profile(device: dict, ios_ver: str, ios_meta: dict, name: str | None) 
     imei2 = random_imei()
     while imei2 == imei:
         imei2 = random_imei()
-    meid = imei[:14]
+    meid = imei[:14]  # MEID-like: 14 decimal from IMEI body
     eid = random_eid()
     dev_name = name or random_device_name(device.get("MarketingName") or "iPhone", device["id"])
+    host_name = hostname_from_name(dev_name)
     capacity = random_capacity_gb(device)
     carrier = random.choice(_CARRIERS)
     c_name, c_mcc, c_mnc, c_iso = carrier
@@ -375,6 +521,8 @@ def build_profile(device: dict, ios_ver: str, ios_meta: dict, name: str | None) 
         "MarketingName": device["MarketingName"],
         "DeviceName": "iPhone",
         "UserAssignedDeviceName": dev_name,
+        "Hostname": host_name,
+        "kern.hostname": host_name,
         "HWModelStr": device["HWModelStr"],
         "HardwareModel": device["HWModelStr"],
         # BOTH numbers (Settings toggles ModelNumber ↔ Regulatory):
@@ -390,7 +538,9 @@ def build_profile(device: dict, ios_ver: str, ios_meta: dict, name: str | None) 
         "DeviceClass": "iPhone",
         "SerialNumber": serial,
         "UniqueDeviceID": udid,
-        "UniqueChipID": f"{random.randint(0, 0xFFFFFFFFFFFFFFFF):016X}",
+        "UniqueChipID": ecid_hex,
+        "ECID": ecid_dec,
+        "ChipID": ecid_dec,
         "ProductVersion": ios_meta["ProductVersion"],
         "BuildVersion": ios_meta["BuildVersion"],
         "ProductBuildVersion": ios_meta["BuildVersion"],
@@ -398,13 +548,26 @@ def build_profile(device: dict, ios_ver: str, ios_meta: dict, name: str | None) 
         "IDFV": idfv,
         "identifierForVendor": idfv,
         "advertisingIdentifier": idfa,
+        "AdvertisingIdentifier": idfa,
         "InternationalMobileEquipmentIdentity": imei,
         "InternationalMobileEquipmentIdentity2": imei2,
         "MobileEquipmentIdentifier": meid,
         "EID": eid,
+        # MG / IOKit-style aliases (same values)
+        "serial-number": serial,
+        "Serial": serial,
+        "unique-device-id": udid,
+        "DeviceUniqueIdentifier": udid,
         "WifiAddress": wifi,
         "BluetoothAddress": bluetooth,
-        "EthernetMacAddress": wifi,
+        "EthernetMacAddress": wifi,  # must == WifiAddress
+        "BSSID": wifi,               # CNCopyCurrentNetworkInfo ≡ Wifi MAC
+        "SSID": random.choice(
+            ("Viettel-WiFi", "Viettel", "VNPT-Fiber", "FPT-Telecom", "iPhone", "MyWiFi")
+        ),
+        "VolumeUUID": apple_uuid(),  # Class B — disk volume id lab
+        "IOPlatformSerialNumber": serial,  # IOKit alias ≡ SerialNumber
+        "MLBSerialNumber": serial,
         "carrierName": c_name,
         "carrierMCC": c_mcc,
         "carrierMNC": c_mnc,
@@ -541,6 +704,8 @@ def build_profile(device: dict, ios_ver: str, ios_meta: dict, name: str | None) 
             "RegulatoryModelNumber": axxxx,
             "ModelNumberAxxxx": axxxx,
             "UniqueDeviceID": udid,
+            "UniqueChipID": ecid_hex,
+            "ECID": ecid_dec,
             "IDFA": idfa,
             "IDFV": idfv,
             "IMEI": imei,
@@ -550,12 +715,15 @@ def build_profile(device: dict, ios_ver: str, ios_meta: dict, name: str | None) 
             "formats": {
                 "ModelNumber": "Part Number Settings default e.g. MU783KH/A",
                 "RegulatoryModelNumber": "Axxxx after tap e.g. A3106",
-                "SerialNumber": "10-14 modern / 12 older; no I/O",
+                "SerialNumber": "12 pre-2021 / ~10 post-2021; no I/O/0/1",
+                "UniqueDeviceID": "40 hex SHA-1 style (UDID length)",
+                "UniqueChipID": "16 hex ECID; ECID decimal twin",
                 "PartNumberRegion": "LL/J/CH/KH/ZA/…",
-                "IDFA": "UUID v4 uppercase",
-                "IDFV": "UUID v4 uppercase",
-                "IMEI": "15 digits Luhn",
-                "EID": "32 digits eSIM",
+                "IDFA": "UUID v4 uppercase (version nibble 4)",
+                "IDFV": "UUID v4 uppercase ≠ IDFA",
+                "IMEI": "8-digit TAC + 6 SNR + Luhn",
+                "EID": "32 digits eSIM + Luhn-style check",
+                "WifiAddress": "Apple OUI + random NIC",
             },
             "model_number_source": "config/iPhone_Model_Lookup.xlsx + Apple 108044",
         },
@@ -723,9 +891,15 @@ def main() -> int:
 
     ios_ver, ios_meta = clamp_ios(device, args.ios, cat, force=args.force)
     built = build_profile(device, ios_ver, ios_meta, args.name)
-    write_plist(built["flat"], OUT_PLIST)
-    OUT_ACTIVE.write_text(json.dumps(built["active"], indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     flat = built["flat"]
+    id_errs = validate_identity(flat)
+    if id_errs:
+        print("IDENTITY CONSISTENCY FAIL — not writing:", file=sys.stderr)
+        for e in id_errs:
+            print(" ", e, file=sys.stderr)
+        return 1
+    write_plist(flat, OUT_PLIST)
+    OUT_ACTIVE.write_text(json.dumps(built["active"], indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     OUT_SELECTED.write_text(
         json.dumps(
             {
@@ -771,9 +945,17 @@ def main() -> int:
     print(f"  Serial : {flat.get('SerialNumber')}  ({len(flat.get('SerialNumber') or '')} chars)")
     print(f"  So may : {flat.get('ModelNumber')}  (Part Number — Settings default)")
     print(f"  Axxxx  : {flat.get('RegulatoryModelNumber')}  (tap So may)")
+    print(f"  UDID   : {flat.get('UniqueDeviceID')}")
+    print(f"  ECID   : {flat.get('ECID')}  (hex {flat.get('UniqueChipID')})")
     print(f"  IDFA   : {flat.get('IDFA')}")
     print(f"  IDFV   : {flat.get('IDFV')}")
     print(f"  IMEI   : {flat.get('InternationalMobileEquipmentIdentity')}")
+    print(f"  WiFi   : {flat.get('WifiAddress')}")
+    id_errs = validate_identity(flat)
+    if id_errs:
+        print("  IDENTITY WARN:", "; ".join(id_errs))
+    else:
+        print("  Identity formats: OK (serial/UUID/UDID/IMEI/EID)")
     print(f"  EID    : {(flat.get('EID') or '')[:16]}…")
     if flat.get("DiskCapacityGB"):
         print(f"  Storage: {flat.get('DiskCapacityGB')} GB")

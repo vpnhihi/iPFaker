@@ -27,7 +27,12 @@ Do **not** hardcode identity values in binary source.
 | JailbreakHide | `access` / `stat` path deny list from `jailbreak_hide` |
 | WebViewUA | WKWebView custom UA from `webview` |
 | BootTime | `kern.boottime` via sysctl |
-| VolumeUUID | if Zalo reads volume attributes |
+| getifaddrs / hostname | `getifaddrs` AF_LINK MAC ← `WifiAddress`; `gethostname` + `NSProcessInfo.hostName` + `uname.nodename` ← `Hostname` (derived device name) |
+| CNCopyCurrentNetworkInfo | SSID + BSSID (**BSSID ≡ WifiAddress**) |
+| WKWebView.customUserAgent | ≡ `UserAgent` / HTTPUserAgent |
+| IOKit serial | `IOPlatformSerialNumber` / MLB ≡ `SerialNumber` (Deep) |
+| CommCenter (CT filter) | CT dylib inject `CommCenter` + `CoreTelephonyHelper` (HIOS-style) |
+| VolumeUUID | Class B field in profile (disk volume id lab) |
 
 ## Priority P2 (lab later)
 
