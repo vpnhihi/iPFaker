@@ -64,16 +64,21 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (NSString *)applyReseedOnly:(BOOL)reseedOnly;
 - (NSString *)applyRandomFromPool;
-/// 1 chạm lab sạch: random spoof + wipe full + kill + relaunch (mất đăng nhập).
+/// «Đặt lại dữ liệu app» (1 chạm đầy đủ): Lab-core filter + mitigation flags + proxy/geo
+/// random-in-city + spoof random + wipe full + kill + relaunch (mất đăng nhập).
 - (NSString *)killZaloAndRandomizeFromPool;
 - (NSString *)killZaloAndRandomizeFromPoolProgress:(nullable void (^)(NSString *step))progress;
 
-/// 1 chạm «Đặt lại + Lưu»: backup session → random spoof → soft wipe+restore → geo? → kill+relaunch (giữ đăng nhập).
+/// 1 chạm «Đặt lại + Lưu»: backup session → random spoof → soft wipe+restore → geo → kill+relaunch (giữ đăng nhập).
 - (NSString *)saveDataThenResetProgress:(nullable void (^)(NSString *step))progress;
 
-/// Thương mại 1 nút «Vượt Zalo»: Lab-core + flags server-mitigation + proxy/geo + spoof + wipe full + relaunch.
-/// Mất đăng nhập — identity sạch; không bypass Graph/OTP server (cần proxy sạch + hành vi).
+/// Alias lịch sử → cùng «Đặt lại dữ liệu app» (full wall).
 - (NSString *)vuotZaloOneTapProgress:(nullable void (^)(NSString *step))progress;
+
+/// Parse paste `host:port:user:pass` (user/pass optional). Returns YES if host+port valid.
+- (BOOL)applyProxyPasteLine:(NSString *)line error:(NSString * _Nullable * _Nullable)errOut;
+/// Sync NSUserDefaults proxy fields from dual-path config.plist (device wall).
+- (void)loadProxyFromDualPathConfig;
 
 - (void)killZalo;
 - (NSString *)wipeZaloLab;

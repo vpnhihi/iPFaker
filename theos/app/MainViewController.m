@@ -133,37 +133,28 @@
     contact.translatesAutoresizingMaskIntoConstraints = NO;
     [card addSubview:contact];
 
-    // Thương mại 1 nút lớn (flow Vượt Zalo) + 2 nút lab phụ
-    UIButton *vuotBtn = [AppTheme primaryButtonWithTitle:@"Vượt Zalo 1 chạm"
-                                                  target:self
-                                                  action:@selector(vuotZaloTapped)];
-    vuotBtn.backgroundColor = [UIColor colorWithRed:0.12 green:0.55 blue:0.32 alpha:1.0];
-    vuotBtn.titleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
-    vuotBtn.translatesAutoresizingMaskIntoConstraints = NO;
-    [content addSubview:vuotBtn];
-
-    UILabel *vuotHint = [[UILabel alloc] init];
-    vuotHint.text = @"1 nút: Lab-core + spoof + wipe sạch + mở Zalo · Gắn proxy trước khi login";
-    vuotHint.font = AppTheme.captionFont;
-    vuotHint.textColor = AppTheme.textSecondary;
-    vuotHint.numberOfLines = 2;
-    vuotHint.translatesAutoresizingMaskIntoConstraints = NO;
-    [content addSubview:vuotHint];
-
+    // Primary wall: full reset (filter+flags+proxy/geo+spoof+wipe+relaunch)
     UIButton *resetDataBtn = [AppTheme primaryButtonWithTitle:@"Đặt lại dữ liệu app"
                                                        target:self
                                                        action:@selector(killTapped)];
-    resetDataBtn.backgroundColor = [UIColor colorWithRed:0.85 green:0.35 blue:0.1 alpha:1.0];
+    resetDataBtn.backgroundColor = [UIColor colorWithRed:0.12 green:0.55 blue:0.32 alpha:1.0];
+    resetDataBtn.titleLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
+    resetDataBtn.translatesAutoresizingMaskIntoConstraints = NO;
+    [content addSubview:resetDataBtn];
+
+    UILabel *resetHint = [[UILabel alloc] init];
+    resetHint.text = @"Full wall: filter + spoof + geo theo proxy + xóa data app + mở lại (mất đăng nhập)";
+    resetHint.font = AppTheme.captionFont;
+    resetHint.textColor = AppTheme.textSecondary;
+    resetHint.numberOfLines = 2;
+    resetHint.translatesAutoresizingMaskIntoConstraints = NO;
+    [content addSubview:resetHint];
+
     UIButton *applyBtn = [AppTheme primaryButtonWithTitle:@"Đặt lại + Lưu dữ liệu"
                                                    target:self
                                                    action:@selector(applyTapped)];
-
-    UIStackView *btnRow = [[UIStackView alloc] initWithArrangedSubviews:@[resetDataBtn, applyBtn]];
-    btnRow.axis = UILayoutConstraintAxisHorizontal;
-    btnRow.spacing = 12;
-    btnRow.distribution = UIStackViewDistributionFillEqually;
-    btnRow.translatesAutoresizingMaskIntoConstraints = NO;
-    [content addSubview:btnRow];
+    applyBtn.translatesAutoresizingMaskIntoConstraints = NO;
+    [content addSubview:applyBtn];
 
     // Quick toggles (subset)
     UIView *toggleCard = [AppTheme roundedCardIn:content];
@@ -240,22 +231,21 @@
         [contact.trailingAnchor constraintEqualToAnchor:cols.trailingAnchor],
         [contact.bottomAnchor constraintEqualToAnchor:card.bottomAnchor constant:-14],
 
-        [vuotBtn.topAnchor constraintEqualToAnchor:card.bottomAnchor constant:14],
-        [vuotBtn.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:pad],
-        [vuotBtn.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-pad],
-        [vuotBtn.heightAnchor constraintEqualToConstant:58],
+        [resetDataBtn.topAnchor constraintEqualToAnchor:card.bottomAnchor constant:14],
+        [resetDataBtn.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:pad],
+        [resetDataBtn.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-pad],
+        [resetDataBtn.heightAnchor constraintEqualToConstant:56],
 
-        [vuotHint.topAnchor constraintEqualToAnchor:vuotBtn.bottomAnchor constant:6],
-        [vuotHint.leadingAnchor constraintEqualToAnchor:vuotBtn.leadingAnchor],
-        [vuotHint.trailingAnchor constraintEqualToAnchor:vuotBtn.trailingAnchor],
+        [resetHint.topAnchor constraintEqualToAnchor:resetDataBtn.bottomAnchor constant:6],
+        [resetHint.leadingAnchor constraintEqualToAnchor:resetDataBtn.leadingAnchor],
+        [resetHint.trailingAnchor constraintEqualToAnchor:resetDataBtn.trailingAnchor],
 
-        [btnRow.topAnchor constraintEqualToAnchor:vuotHint.bottomAnchor constant:12],
-        [btnRow.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:pad],
-        [btnRow.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-pad],
-        [resetDataBtn.heightAnchor constraintEqualToConstant:48],
+        [applyBtn.topAnchor constraintEqualToAnchor:resetHint.bottomAnchor constant:12],
+        [applyBtn.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:pad],
+        [applyBtn.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-pad],
         [applyBtn.heightAnchor constraintEqualToConstant:48],
 
-        [toggleCard.topAnchor constraintEqualToAnchor:btnRow.bottomAnchor constant:16],
+        [toggleCard.topAnchor constraintEqualToAnchor:applyBtn.bottomAnchor constant:16],
         [toggleCard.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:pad],
         [toggleCard.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-pad],
 
@@ -389,38 +379,6 @@
     [self presentViewController:ac animated:YES completion:nil];
 }
 
-- (void)vuotZaloTapped {
-    UIAlertController *ac = [UIAlertController
-        alertControllerWithTitle:@"Vượt Zalo 1 chạm?"
-                         message:@"Spoof máy mới + xóa sạch data/KC Zalo + mở lại.\nMất đăng nhập.\nGắn proxy sạch (tab Proxy) trước khi login."
-                  preferredStyle:UIAlertControllerStyleAlert];
-    [ac addAction:[UIAlertAction actionWithTitle:@"Hủy" style:UIAlertActionStyleCancel handler:nil]];
-    __weak typeof(self) weakSelf = self;
-    [ac addAction:[UIAlertAction actionWithTitle:@"Chạy 1 chạm" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *a) {
-        [weakSelf runVuotZalo];
-    }]];
-    [self presentViewController:ac animated:YES completion:nil];
-}
-
-- (void)runVuotZalo {
-    UIView *host = self.tabBarController.view ?: self.navigationController.view ?: self.view;
-    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Vượt Zalo 1 chạm…"];
-    self.view.userInteractionEnabled = NO;
-    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-        NSString *msg = [AppState.shared vuotZaloOneTapProgress:^(NSString *step) {
-            [ov appendStep:step];
-        }];
-        dispatch_async(dispatch_get_main_queue(), ^{
-            self.view.userInteractionEnabled = YES;
-            [ov finishWithTitle:@"Vượt Zalo xong" detail:msg];
-            [self refreshUI];
-            [ov dismissAfter:1.6 completion:^{
-                [self showAlertTitle:@"Vượt Zalo 1 chạm" message:msg];
-            }];
-        });
-    });
-}
-
 - (void)applyTapped {
     // 1 chạm: backup session → spoof mới → restore → kill → relaunch (giữ đăng nhập)
     UIView *host = self.tabBarController.view ?: self.navigationController.view ?: self.view;
@@ -442,9 +400,22 @@
 }
 
 - (void)killTapped {
-    // 1 chạm sạch: spoof + wipe full + kill + relaunch (mất đăng nhập)
+    // Full wall: filter + flags + proxy/geo + spoof + wipe + relaunch (mất đăng nhập)
+    UIAlertController *ac = [UIAlertController
+        alertControllerWithTitle:@"Đặt lại dữ liệu app?"
+                         message:@"Spoof máy mới + geo theo proxy + xóa sạch data app đã chọn + mở lại.\nMất đăng nhập.\nBật proxy (tab IP/Proxy) nếu cần IP ảo."
+                  preferredStyle:UIAlertControllerStyleAlert];
+    [ac addAction:[UIAlertAction actionWithTitle:@"Hủy" style:UIAlertActionStyleCancel handler:nil]];
+    __weak typeof(self) weakSelf = self;
+    [ac addAction:[UIAlertAction actionWithTitle:@"Chạy" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *a) {
+        [weakSelf runResetAppData];
+    }]];
+    [self presentViewController:ac animated:YES completion:nil];
+}
+
+- (void)runResetAppData {
     UIView *host = self.tabBarController.view ?: self.navigationController.view ?: self.view;
-    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"1 chạm: Đặt lại dữ liệu + Mở app…"];
+    ProgressOverlay *ov = [ProgressOverlay showOn:host title:@"Đặt lại dữ liệu app…"];
     self.view.userInteractionEnabled = NO;
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         NSString *msg = [AppState.shared killZaloAndRandomizeFromPoolProgress:^(NSString *step) {
@@ -452,10 +423,10 @@
         }];
         dispatch_async(dispatch_get_main_queue(), ^{
             self.view.userInteractionEnabled = YES;
-            [ov finishWithTitle:@"Hoàn tất (1 chạm)" detail:msg];
+            [ov finishWithTitle:@"Hoàn tất" detail:msg];
             [self refreshUI];
             [ov dismissAfter:1.6 completion:^{
-                [self showAlertTitle:@"Đặt lại dữ liệu app (1 chạm)" message:msg];
+                [self showAlertTitle:@"Đặt lại dữ liệu app" message:msg];
             }];
         });
     });

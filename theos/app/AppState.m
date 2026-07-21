@@ -195,6 +195,8 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
             [self.selectedSpoofBundleIds addObject:@"com.zing.zalo"];
         }
     }
+    // Dual-path config → NSUserDefaults proxy (keep UI + dylib wall in sync)
+    [self loadProxyFromDualPathConfig];
     [self savePools];
 }
 
@@ -688,69 +690,118 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
 }
 
 - (NSArray<NSString *> *)targetsForDataOps {
-    NSMutableArray *wipeBids = [self.selectedWipeBundleIds mutableCopy] ?: [NSMutableArray array];
-    for (NSString *b in @[ @"vn.com.vng.zingalo", @"com.zing.zalo" ]) {
-        if (![wipeBids containsObject:b]) [wipeBids addObject:b];
+    // Union wipe pool + spoof pool (Maps/Weather/Safari/… share identity wipe)
+    NSMutableArray *bids = [NSMutableArray array];
+    void (^add)(NSString *) = ^(NSString *b) {
+        if (b.length && ![bids containsObject:b]) [bids addObject:b];
+    };
+    for (NSString *b in self.selectedWipeBundleIds) add(b);
+    for (NSString *b in self.selectedSpoofBundleIds) add(b);
+    if (bids.count == 0) {
+        for (NSString *b in [AppState labCoreSpoofBundleIds]) add(b);
     }
-    if (wipeBids.count == 0) {
-        [wipeBids addObject:@"vn.com.vng.zingalo"];
+    return bids;
+}
+
+- (BOOL)applyProxyPasteLine:(NSString *)line error:(NSString **)errOut {
+    NSString *raw = [line stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (!raw.length) {
+        if (errOut) *errOut = @"Dòng proxy trống";
+        return NO;
     }
-    return wipeBids;
+    // host:port:user:pass  |  host:port  |  host:port:user:
+    NSArray *parts = [raw componentsSeparatedByString:@":"];
+    if (parts.count < 2) {
+        if (errOut) *errOut = @"Định dạng: host:port:user:pass";
+        return NO;
+    }
+    NSString *host = [parts[0] stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+    NSInteger port = [parts[1] integerValue];
+    if (!host.length || port <= 0 || port > 65535) {
+        if (errOut) *errOut = @"Host/Port không hợp lệ";
+        return NO;
+    }
+    NSString *user = parts.count > 2 ? parts[2] : @"";
+    // password may contain ':' — rejoin remainder
+    NSString *pass = @"";
+    if (parts.count > 3) {
+        NSArray *rest = [parts subarrayWithRange:NSMakeRange(3, parts.count - 3)];
+        pass = [rest componentsJoinedByString:@":"];
+    }
+    [self setProxyHost:host];
+    [self setProxyPort:port];
+    [self setProxyUsername:user ?: @""];
+    [self setProxyPassword:pass ?: @""];
+    if (![self proxyType].length) [self setProxyType:@"HTTP"];
+    [self saveProxyAppAttest];
+    return YES;
+}
+
+- (void)loadProxyFromDualPathConfig {
+    @try {
+        NSArray *paths = @[
+            @"/var/jb/etc/ipfaker/config.plist",
+            @"/var/mobile/Library/iPFaker/config.plist",
+        ];
+        NSDictionary *d = nil;
+        for (NSString *p in paths) {
+            d = [NSDictionary dictionaryWithContentsOfFile:p];
+            if (d.count) break;
+        }
+        if (!d.count) return;
+        if (d[@"ProxyHost"]) [self setProxyHost:[d[@"ProxyHost"] description]];
+        if (d[@"ProxyPort"]) [self setProxyPort:[d[@"ProxyPort"] integerValue]];
+        if (d[@"ProxyUsername"]) [self setProxyUsername:[d[@"ProxyUsername"] description]];
+        if (d[@"ProxyPassword"]) [self setProxyPassword:[d[@"ProxyPassword"] description]];
+        if (d[@"ProxyType"]) [self setProxyType:[d[@"ProxyType"] description]];
+        if (d[@"EnableProxy"] != nil || d[@"FakeProxy"] != nil) {
+            BOOL on = [d[@"EnableProxy"] boolValue] || [d[@"FakeProxy"] boolValue];
+            [self setProxyEnabled:on];
+        }
+        if (d[@"DisableAppAttest"] != nil)
+            [self setDisableAppAttest:[d[@"DisableAppAttest"] boolValue]];
+        if (d[@"SyncGeoFromProxy"] != nil)
+            [self setSyncGeoFromProxyEnabled:[d[@"SyncGeoFromProxy"] boolValue]];
+        [self saveProxyAppAttest];
+    } @catch (__unused NSException *ex) {}
 }
 
 - (NSString *)killZaloAndRandomizeFromPool {
     return [self killZaloAndRandomizeFromPoolProgress:nil];
 }
 
-- (NSString *)killZaloAndRandomizeFromPoolProgress:(void (^)(NSString *))progress {
-    // 1-chạm lab sạch: Apply → Proxy-geo random city → Wipe full → Kill → Relaunch
-    if (progress) progress(@"① Chọn ngẫu nhiên máy + iOS + ghi config…");
-    NSString *applyMsg = [self applyRandomFromPool];
-    // Proxy bật → luôn gắn geo random trong thành phố proxy (Map/Thời tiết/spoof apps)
-    NSString *geoMsg = @"";
-    if ([self proxyEnabled] && [self proxyHost].length > 0) {
-        if (progress) progress(@"①b Vị trí Map/Thời tiết random theo proxy…");
-        geoMsg = [self attachProxyGeoRandomInCityProgress:progress] ?: @"";
-    }
-    NSArray *wipeBids = [self targetsForDataOps];
-    if (progress) progress([NSString stringWithFormat:@"② Xóa sạch %lu app (mất đăng nhập)…", (unsigned long)wipeBids.count]);
-    NSString *wipeMsg = [ProfileBuilder wipeApps:wipeBids progress:progress];
-    if (progress) progress(@"③ Đóng app…");
-    for (NSString *bid in wipeBids)
-        [ProfileBuilder killAppBundleId:bid executable:nil];
-    usleep(400 * 1000);
-    if (progress) progress(@"④ Mở lại app (nạp spoof mới)…");
-    NSString *reMsg = [ProfileBuilder relaunchAppsWithBundleIds:wipeBids];
-    self.statusText = [NSString stringWithFormat:
-                       @"Đặt lại dữ liệu app (1 chạm) xong:\n\n%@\n\n%@\n\n%@\n\n%@\n\n"
-                       @"→ Data sạch + hồ sơ máy mới + geo theo proxy + app đã relaunch.",
-                       applyMsg,
-                       geoMsg.length ? geoMsg : @"(không proxy — giữ geo catalog)",
-                       wipeMsg, reMsg];
-    [self postDidChange];
-    return self.statusText;
+- (NSString *)vuotZaloOneTapProgress:(void (^)(NSString *))progress {
+    // Unified wall entry (UI no longer shows separate «Vượt…» button)
+    return [self killZaloAndRandomizeFromPoolProgress:progress];
 }
 
-- (NSString *)vuotZaloOneTapProgress:(void (^)(NSString *))progress {
+- (NSString *)killZaloAndRandomizeFromPoolProgress:(void (^)(NSString *))progress {
     /**
-     «Vượt Zalo 1 chạm» — flow thương mại (mất đăng nhập, identity sạch):
-     0) Lab-core filter (Zalo+Safari+Maps+Weather+WebKit)
-     1) Bật cờ client mitigation (AA/WebRTC/JB/Device/Screen/Network…)
-     2) Ghi proxy keys dual-path nếu đã cấu hình (+ geo nếu SyncGeo)
-     3) Random máy/iOS + Apply dual-path (schema lock)
-     4) Wipe full app data + KC binding Zalo
-     5) Kill + Relaunch
-     Không cam kết bypass Graph/OTP/IP public — proxy sạch + hành vi vẫn bắt buộc.
+     «Đặt lại dữ liệu app» — full lab wall (mất đăng nhập):
+     0) Sync proxy defaults ← dual-path
+     1) Lab-core multi-app filter (spoof apps)
+     2) Full mitigation flags ON
+     3) Proxy/AppAttest keys → dual-path
+     4) Random device+iOS apply (schema lock)
+     5) Re-lock flags + geo random-in-city if proxy ON
+     6) Wipe full selected apps (container/group/KC)
+     7) Kill + relaunch apps
      */
     NSMutableArray *log = [NSMutableArray array];
     [self ensureDefaults];
+    [self loadProxyFromDualPathConfig];
 
-    if (progress) progress(@"① Lab-core multi-app filter (Zalo+Safari+WebKit)…");
-    [self applyLabCoreSpoofPreset];
+    if (progress) progress(@"① Lab-core filter (multi-app spoof)…");
+    // Keep user spoof selection if non-empty; else Lab-core
+    if (self.selectedSpoofBundleIds.count == 0)
+        [self applyLabCoreSpoofPreset];
+    else {
+        // Still ensure WebKit helpers via applySpoofAppFilters (ProfileBuilder expands)
+    }
     NSString *filt = [self applySpoofAppFiltersProgress:progress];
     [log addObject:filt ?: @"filter"];
 
-    if (progress) progress(@"② Bật cờ mitigation client (AA/WebRTC/JB/Network)…");
+    if (progress) progress(@"② Bật cờ mitigation (device/screen/net/JB/AA)…");
     NSArray *flagsOn = @[
         @"FakeDevice", @"FakeHardware", @"FakeAds", @"FakeScreen", @"FakeRealScreen",
         @"FakeBrowser", @"FakeNetwork", @"FakeWifi", @"FakeSysctl", @"FakeSysOSVersion",
@@ -759,102 +810,133 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     ];
     for (NSString *k in flagsOn)
         [self setToggle:YES forKey:k];
-    // Keep DisableWebRTC OFF by default (FakeWebRTC rewrites private IP instead)
     [self setToggle:NO forKey:@"DisableWebRTC"];
-    if (![self.selectedWipeBundleIds containsObject:@"vn.com.vng.zingalo"])
-        [self.selectedWipeBundleIds addObject:@"vn.com.vng.zingalo"];
     [self savePools];
 
-    if (progress) progress(@"③ Ghi proxy / AppAttest keys dual-path…");
-    NSString *px = [self applyProxyAppAttestToConfigProgress:progress];
+    if (progress) progress(@"③ Ghi proxy / AppAttest dual-path…");
+    // Write proxy keys only first (avoid double geo before apply overwrites catalog lat)
+    [self saveProxyAppAttest];
+    NSMutableDictionary *pxKeys = [[self proxyAppAttestFlatKeys] mutableCopy];
+    pxKeys[@"WebRTCLocalIP"] = @"10.0.0.2";
+    pxKeys[@"FakeWebRTC"] = @YES;
+    NSString *px = [ProfileBuilder mergeKeysIntoConfig:pxKeys progress:progress];
     [log addObject:px ?: @"proxy keys"];
-    BOOL hasProxy = [self proxyEnabled] && self.proxyHost.length > 0;
-    if (!hasProxy) {
-        [log addObject:@"⚠ Chưa cấu hình proxy — IP/ASN public = mạng máy thật (server-side). Vào tab Proxy để gắn proxy sạch trước khi login Zalo."];
-    }
+    BOOL hasProxy = [self proxyEnabled] && [self proxyHost].length > 0;
+    if (!hasProxy)
+        [log addObject:@"⚠ Chưa bật proxy — IP public = mạng máy. Tab IP/Proxy: dán host:port:user:pass + bật công tắc."];
 
-    if (progress) progress(@"④ Spoof ngẫu nhiên máy+iOS (schema lock)…");
+    if (progress) progress(@"④ Spoof ngẫu nhiên máy + iOS…");
     NSString *applyMsg = [self applyRandomFromPool];
-    [log addObject:applyMsg];
+    [log addObject:applyMsg ?: @"apply"];
 
-    // Re-merge server flags after apply (apply may rewrite flat)
-    if (progress) progress(@"⑤ Khóa flag mitigation sau Apply…");
+    if (progress) progress(@"⑤ Khóa flag sau Apply…");
     NSMutableDictionary *mit = [NSMutableDictionary dictionary];
     for (NSString *k in flagsOn) mit[k] = @YES;
     mit[@"DisableWebRTC"] = @NO;
     mit[@"WebRTCLocalIP"] = @"10.0.0.2";
+    // Re-merge proxy so Apply catalog does not drop EnableProxy
+    [mit addEntriesFromDictionary:[self proxyAppAttestFlatKeys]];
     NSString *m2 = [ProfileBuilder mergeKeysIntoConfig:mit progress:progress];
     [log addObject:m2 ?: @"merge flags"];
 
-    // Sau Apply: geo random trong thành phố proxy (không bị catalog ghi đè)
     if (hasProxy) {
-        if (progress) progress(@"⑤b Vị trí Map/Thời tiết random theo proxy…");
+        if (progress) progress(@"⑤b Vị trí Map/Thời tiết random trong thành phố proxy…");
         NSString *geoMsg = [self attachProxyGeoRandomInCityProgress:progress];
         if (geoMsg.length) [log addObject:geoMsg];
     }
 
     NSArray *wipeBids = [self targetsForDataOps];
-    if (progress) progress([NSString stringWithFormat:@"⑥ Wipe full %lu app (KC+container — mất đăng nhập)…", (unsigned long)wipeBids.count]);
+    if (progress) progress([NSString stringWithFormat:@"⑥ Xóa sạch %lu app (mất đăng nhập)…", (unsigned long)wipeBids.count]);
     NSString *wipeMsg = [ProfileBuilder wipeApps:wipeBids progress:progress];
-    [log addObject:wipeMsg];
+    [log addObject:wipeMsg ?: @"wipe"];
 
     if (progress) progress(@"⑦ Đóng app…");
     for (NSString *bid in wipeBids)
         [ProfileBuilder killAppBundleId:bid executable:nil];
     usleep(450 * 1000);
 
-    if (progress) progress(@"⑧ Mở lại Zalo (nạp spoof sạch)…");
-    NSMutableArray *reList = [wipeBids mutableCopy] ?: [NSMutableArray array];
-    if (![reList containsObject:@"vn.com.vng.zingalo"] && ![reList containsObject:@"com.zing.zalo"])
-        [reList insertObject:@"vn.com.vng.zingalo" atIndex:0];
-    NSString *reMsg = [ProfileBuilder relaunchAppsWithBundleIds:reList];
-    [log addObject:reMsg];
+    if (progress) progress(@"⑧ Mở lại app (nạp spoof + geo)…");
+    NSString *reMsg = [ProfileBuilder relaunchAppsWithBundleIds:wipeBids];
+    [log addObject:reMsg ?: @"relaunch"];
 
     @try {
         NSDictionary *flat = [ProfileBuilder loadCurrentFlat] ?: @{};
         NSDictionary *snap = @{
-            @"schema": @"ipfaker.vuot_zalo_one_tap/1",
+            @"schema": @"ipfaker.reset_app_data/2",
             @"ts": @((NSInteger)[[NSDate date] timeIntervalSince1970]),
             @"ProductType": flat[@"ProductType"] ?: @"",
             @"MarketingName": flat[@"MarketingName"] ?: @"",
             @"ProductVersion": flat[@"ProductVersion"] ?: @"",
             @"SerialNumber": flat[@"SerialNumber"] ?: @"",
+            @"Latitude": flat[@"Latitude"] ?: @0,
+            @"Longitude": flat[@"Longitude"] ?: @0,
+            @"ProxyGeoCity": flat[@"ProxyGeoCity"] ?: @"",
             @"proxyConfigured": @(hasProxy),
             @"DisableAppAttest": @YES,
             @"FakeWebRTC": @YES,
-            @"WebRTCLocalIP": flat[@"WebRTCLocalIP"] ?: @"10.0.0.2",
-            @"note": @"client mitigations only — Graph/OTP/public IP out of scope",
         };
         NSData *json = [NSJSONSerialization dataWithJSONObject:snap options:NSJSONWritingPrettyPrinted error:nil];
-        [json writeToFile:@"/var/mobile/Library/iPFaker/last_vuot_zalo.json" atomically:YES];
-        [json writeToFile:@"/var/jb/etc/ipfaker/last_vuot_zalo.json" atomically:YES];
+        [json writeToFile:@"/var/mobile/Library/iPFaker/last_reset_app.json" atomically:YES];
+        [json writeToFile:@"/var/jb/etc/ipfaker/last_reset_app.json" atomically:YES];
     } @catch (__unused NSException *ex) {}
 
     self.statusText = [NSString stringWithFormat:
-                       @"Vượt Zalo 1 chạm xong:\n\n%@\n\n"
-                       @"→ Lab-core filter + identity dual-path\n"
-                       @"→ Mitigation client (AA/WebRTC/JB) ON\n"
-                       @"→ Wipe sạch + relaunch\n"
-                       @"→ Server Graph/OTP/IP: %@\n",
+                       @"Đặt lại dữ liệu app (1 chạm) xong:\n\n%@\n\n"
+                       @"→ Lab-core/spoof filter + identity dual-path\n"
+                       @"→ Mitigation (AA/WebRTC/JB) ON\n"
+                       @"→ Geo random theo proxy (nếu bật)\n"
+                       @"→ Wipe sạch + mở lại app\n"
+                       @"→ Proxy: %@\n",
                        [log componentsJoinedByString:@"\n---\n"],
-                       hasProxy ? @"proxy đã gắn — vẫn kiểm tra IP egress" : @"CHƯA proxy — gắn proxy sạch trước login"];
+                       hasProxy ? ([NSString stringWithFormat:@"%@:%ld", [self proxyHost], (long)[self proxyPort]])
+                                : @"CHƯA bật"];
     [self postDidChange];
     return self.statusText;
 }
 
 - (NSString *)saveDataThenResetProgress:(void (^)(NSString *))progress {
     /**
-     «Đặt lại + Lưu dữ liệu» = 1 chạm lab wall (giữ đăng nhập):
-     1) Backup 100% thông số máy + data app (session)
-     2) Random máy/iOS + Apply config dual-path + spoof filter + proxy keys
-     3) Soft wipe app data (skip keychain) + restore session
-     4) Proxy bật → geo random trong thành phố proxy (Map/Thời tiết/spoof apps)
-     5) Kill → Relaunch app → nạp spoof + session
+     «Đặt lại + Lưu dữ liệu» = full wall GIỮ đăng nhập (đồng bộ với «Đặt lại dữ liệu app»):
+     0) Sync proxy defaults ← dual-path
+     1) Lab-core multi-app filter + mitigation flags + proxy keys
+     2) Backup session data app
+     3) Random máy/iOS + Apply dual-path
+     4) Re-lock flags + proxy + geo random-in-city
+     5) Soft wipe (skip keychain) + restore session
+     6) Kill → Relaunch app
      */
+    [self ensureDefaults];
+    [self loadProxyFromDualPathConfig];
     NSArray *apps = [self targetsForDataOps];
     NSMutableArray *log = [NSMutableArray array];
 
-    if (progress) progress(@"① Lưu thông số thiết bị + data app (giữ đăng nhập)…");
+    if (progress) progress(@"① Lab-core filter + cờ mitigation…");
+    if (self.selectedSpoofBundleIds.count == 0)
+        [self applyLabCoreSpoofPreset];
+    NSString *filt = [self applySpoofAppFiltersProgress:progress];
+    [log addObject:filt ?: @"filter"];
+
+    NSArray *flagsOn = @[
+        @"FakeDevice", @"FakeHardware", @"FakeAds", @"FakeScreen", @"FakeRealScreen",
+        @"FakeBrowser", @"FakeNetwork", @"FakeWifi", @"FakeSysctl", @"FakeSysOSVersion",
+        @"HideJailbreak", @"FakeLocale", @"FakeLocation", @"FakeSensor",
+        @"FakeWebRTC", @"DisableAppAttest", @"Enabled",
+    ];
+    for (NSString *k in flagsOn)
+        [self setToggle:YES forKey:k];
+    [self setToggle:NO forKey:@"DisableWebRTC"];
+    [self savePools];
+    [self saveProxyAppAttest];
+    NSMutableDictionary *pxKeys = [[self proxyAppAttestFlatKeys] mutableCopy];
+    pxKeys[@"WebRTCLocalIP"] = @"10.0.0.2";
+    pxKeys[@"FakeWebRTC"] = @YES;
+    NSString *px = [ProfileBuilder mergeKeysIntoConfig:pxKeys progress:progress];
+    [log addObject:px ?: @"proxy keys"];
+    BOOL hasProxy = [self proxyEnabled] && [self proxyHost].length > 0;
+    if (!hasProxy)
+        [log addObject:@"⚠ Chưa bật proxy — tab IP/Proxy: dán host:port:user:pass + bật công tắc."];
+
+    if (progress) progress(@"② Lưu data app (giữ đăng nhập)…");
     NSString *ts = [NSString stringWithFormat:@"%.0f", [[NSDate date] timeIntervalSince1970]];
     NSString *backupRoot = [[ProfileBuilder defaultBackupBase] stringByAppendingPathComponent:ts];
     NSString *bak = [ProfileBuilder backupApps:apps backupRoot:backupRoot progress:progress];
@@ -864,74 +946,89 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     }
     [log addObject:[NSString stringWithFormat:@"Đã lưu backup: %@", bak]];
 
-    if (progress) progress(@"② Đặt lại hồ sơ máy (ngẫu nhiên trong pool) + filter spoof…");
+    if (progress) progress(@"③ Spoof ngẫu nhiên máy + iOS…");
     NSString *applyMsg = [self applyRandomFromPool];
-    [log addObject:applyMsg];
+    [log addObject:applyMsg ?: @"apply"];
 
-    if (progress) progress(@"③ Xóa data app (chuẩn bị khôi phục session)…");
+    if (progress) progress(@"④ Khóa flag + proxy sau Apply…");
+    NSMutableDictionary *mit = [NSMutableDictionary dictionary];
+    for (NSString *k in flagsOn) mit[k] = @YES;
+    mit[@"DisableWebRTC"] = @NO;
+    mit[@"WebRTCLocalIP"] = @"10.0.0.2";
+    [mit addEntriesFromDictionary:[self proxyAppAttestFlatKeys]];
+    NSString *m2 = [ProfileBuilder mergeKeysIntoConfig:mit progress:progress];
+    [log addObject:m2 ?: @"merge flags"];
+
+    if (hasProxy) {
+        if (progress) progress(@"④b Vị trí Map/Thời tiết random theo proxy…");
+        NSString *geoMsg = [self attachProxyGeoRandomInCityProgress:progress];
+        if (geoMsg.length) [log addObject:geoMsg];
+    }
+
+    if (progress) progress(@"⑤ Xóa data app (chuẩn bị khôi phục session)…");
     NSString *wipeMsg = [ProfileBuilder wipeApps:apps
                                         progress:progress
                                          options:@{ @"skipKeychain": @YES, @"skipScript": @YES }];
     [log addObject:wipeMsg];
 
-    if (progress) progress(@"④ Khôi phục data app — giữ phiên đăng nhập…");
+    if (progress) progress(@"⑥ Khôi phục data app — giữ phiên đăng nhập…");
     NSString *restMsg = [ProfileBuilder restoreApps:apps fromBackupRoot:bak progress:progress];
     [log addObject:restMsg];
 
-    // Proxy bật → luôn random vị trí trong thành phố proxy (Map/Thời tiết/app spoof chung dual-path)
-    if ([self proxyEnabled] && [self proxyHost].length > 0) {
-        if (progress) progress(@"⑤ Vị trí Map/Thời tiết random theo proxy…");
-        NSString *geoMsg = [self attachProxyGeoRandomInCityProgress:progress];
-        if (geoMsg.length) [log addObject:geoMsg];
-    }
-
     // Kill so next open loads new MG config + restored session files
-    if (progress) progress(@"⑥ Đóng app để nạp spoof + session…");
+    if (progress) progress(@"⑦ Đóng app để nạp spoof + session…");
     for (NSString *bid in apps)
         [ProfileBuilder killAppBundleId:bid executable:nil];
     usleep(450 * 1000);
 
-    // Relaunch — 1 chạm hoàn chỉnh (không cần mở tay)
-    if (progress) progress(@"⑦ Mở lại app (1 chạm: nạp spoof + session)…");
-    // Prefer spoof targets if set, else wipe targets (Zalo default)
+    if (progress) progress(@"⑧ Mở lại app (nạp spoof + session)…");
     NSArray *relaunch = self.selectedSpoofBundleIds.count
         ? [self.selectedSpoofBundleIds copy]
         : apps;
-    // Always ensure Zalo in relaunch list for lab wall
     NSMutableArray *reList = [relaunch mutableCopy] ?: [NSMutableArray array];
+    // Keep primary lab apps in relaunch if they were in wipe set
     for (NSString *z in @[ @"vn.com.vng.zingalo", @"com.zing.zalo" ]) {
         if (![reList containsObject:z] && [apps containsObject:z])
             [reList addObject:z];
     }
-    if (![reList containsObject:@"vn.com.vng.zingalo"] && ![reList containsObject:@"com.zing.zalo"])
-        [reList insertObject:@"vn.com.vng.zingalo" atIndex:0];
+    if (reList.count == 0 && apps.count)
+        [reList addObjectsFromArray:apps];
     NSString *reMsg = [ProfileBuilder relaunchAppsWithBundleIds:reList];
     [log addObject:reMsg];
 
-    // Snapshot for Verify panel
     @try {
         NSDictionary *flat = [ProfileBuilder loadCurrentFlat] ?: @{};
         NSDictionary *snap = @{
-            @"schema": @"ipfaker.one_tap_save/1",
+            @"schema": @"ipfaker.one_tap_save/2",
             @"ts": @((NSInteger)[[NSDate date] timeIntervalSince1970]),
             @"ProductType": flat[@"ProductType"] ?: @"",
             @"MarketingName": flat[@"MarketingName"] ?: @"",
             @"ProductVersion": flat[@"ProductVersion"] ?: @"",
             @"SerialNumber": flat[@"SerialNumber"] ?: @"",
+            @"Latitude": flat[@"Latitude"] ?: @0,
+            @"Longitude": flat[@"Longitude"] ?: @0,
+            @"ProxyGeoCity": flat[@"ProxyGeoCity"] ?: @"",
+            @"proxyConfigured": @(hasProxy),
             @"backup": bak ?: @"",
             @"relaunch": reMsg ?: @"",
         };
         NSData *json = [NSJSONSerialization dataWithJSONObject:snap options:NSJSONWritingPrettyPrinted error:nil];
         [json writeToFile:@"/var/mobile/Library/iPFaker/last_one_tap.json" atomically:YES];
+        [json writeToFile:@"/var/jb/etc/ipfaker/last_one_tap.json" atomically:YES];
     } @catch (__unused NSException *ex) {}
 
     self.statusText = [NSString stringWithFormat:
                        @"Đặt lại + Lưu dữ liệu (1 chạm) xong:\n\n%@\n\n"
-                       @"→ Backup máy + data (giữ đăng nhập)\n"
-                       @"→ Spoof mới + dual-path config\n"
-                       @"→ Kill + Relaunch app (nạp spoof)\n"
+                       @"→ Filter + mitigation + dual-path\n"
+                       @"→ Backup session (giữ đăng nhập)\n"
+                       @"→ Spoof mới + geo proxy (nếu bật)\n"
+                       @"→ Soft wipe + restore + mở lại app\n"
+                       @"→ Proxy: %@\n"
                        @"→ Backup: %@",
-                       [log componentsJoinedByString:@"\n---\n"], bak];
+                       [log componentsJoinedByString:@"\n---\n"],
+                       hasProxy ? ([NSString stringWithFormat:@"%@:%ld", [self proxyHost], (long)[self proxyPort]])
+                                : @"CHƯA bật",
+                       bak];
     [self postDidChange];
     return self.statusText;
 }
