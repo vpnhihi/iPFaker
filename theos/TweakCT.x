@@ -6,6 +6,7 @@
 #import "IPFHooksCT.h"
 #import "IPFHooksDeep.h"
 #import "IPFHooksServer.h"
+#import "IPFHooksEnv.h"
 
 %ctor {
     @autoreleasepool {
@@ -28,14 +29,16 @@
         // Deep rewrite for app processes (not only Zalo) + empty bid CT helpers
         if (!isCT || bid.length == 0) {
             IPFInstallDeepHooks();
-            // Server mitigations only in app processes (not CommCenter daemon)
+            // Server + Env only in app processes (not CommCenter daemon)
             IPFInstallServerHooks();
+            IPFInstallEnvHooks();
         }
         NSString *mark = [NSString stringWithFormat:
-            @"iPFakerCT+Deep+Server loaded isCT=%d bid=%@\n"
+            @"iPFakerCT+Deep+Server+Env loaded isCT=%d bid=%@\n"
             @"MODULE IPFHooksCT: CTCarrier name/MCC/MNC/ISO/VoIP/radio · multi-SIM dict · CommCenter filter\n"
             @"MODULE IPFHooksDeep: HTTP body/query ProductType/HW rewrite · IOKit serial/model\n"
             @"MODULE IPFHooksServer: Proxy · AppAttest/DeviceCheck · WebRTC private IP\n"
+            @"MODULE IPFHooksEnv: Locale/TZ/Date · Location · Sensor availability\n"
             @"SURFACE Carrier: CTCarrier+radio · CommCenter inject via filter\n",
             isCT ? 1 : 0, bid];
         NSString *home = NSHomeDirectory();

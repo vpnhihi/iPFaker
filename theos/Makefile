@@ -18,19 +18,18 @@ TWEAK_NAME = iPFakerMG iPFakerCT iPFakerJB
 # fishhook.c OFF by default: keeps MG ~123k AMFI-safe. ElleKit MSHook is primary on Dopamine.
 # Optional: add src/fishhook.c + -DIPF_FISHHOOK_FALLBACK=1 only if MSHook is unavailable.
 iPFakerMG_FILES = TweakMG.x src/IPFConfig.m src/IPFHooksMG.m src/IPFHooksExtra.m
-iPFakerMG_CFLAGS = -fobjc-arc -Os -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
-# WebKit used only via runtime (objc_getClass) — hard-link WebKit broke Dopamine code-sign coverage
-iPFakerMG_FRAMEWORKS = UIKit Foundation AdSupport CFNetwork
+iPFakerMG_CFLAGS = -fobjc-arc -Os -fvisibility=hidden -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
+# WebKit/CL/CM via runtime only. No CFNetwork in MG (proxy lives in CT Server).
+iPFakerMG_FRAMEWORKS = UIKit Foundation AdSupport
 iPFakerMG_LIBRARIES = substrate
-iPFakerMG_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerMG.dylib
+iPFakerMG_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerMG.dylib -Wl,-dead_strip
 
-# CT always loaded cleanly on Dopamine — telephony + Deep + Server mitigations
-# (Proxy/AppAttest/WebRTC moved out of MG Extra for AMFI ≤130k budget)
-iPFakerCT_FILES = TweakCT.x src/IPFConfig.m src/IPFHooksCT.m src/IPFHooksDeep.m src/IPFHooksServer.m
-iPFakerCT_CFLAGS = -fobjc-arc -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
+# CT: telephony + Deep + Server (proxy/AA/WebRTC) + Env (locale/TZ/location/sensor)
+iPFakerCT_FILES = TweakCT.x src/IPFConfig.m src/IPFHooksCT.m src/IPFHooksDeep.m src/IPFHooksServer.m src/IPFHooksEnv.m
+iPFakerCT_CFLAGS = -fobjc-arc -Os -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
 iPFakerCT_FRAMEWORKS = UIKit Foundation CoreTelephony CFNetwork
 iPFakerCT_LIBRARIES = substrate
-iPFakerCT_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerCT.dylib
+iPFakerCT_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerCT.dylib -Wl,-dead_strip
 
 # JB expanded hide — small standalone; same bundle filter as MG
 iPFakerJB_FILES = TweakJB.x src/IPFConfig.m src/IPFHooksJB.m
