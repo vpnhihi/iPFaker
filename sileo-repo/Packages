@@ -1,34 +1,17 @@
 Package: com.ipfaker
 Name: iPFaker
 Depends: firmware (>= 14.0)
-Version: 2.7.0
+Version: 2.8.0
 Architecture: iphoneos-arm64
 Maintainer: iPFaker Lab
 Author: iPFaker Lab
 Section: Tweaks
 Priority: optional
-Homepage: https://github.com/vpnhihi/iPFaker
-Description: Lab device identity + iPFaker.app (rootless Dopamine). Sheet license. No Settings inject.
-Installed-Size: 223
-Filename: debs/com.ipfaker_2.7.0_iphoneos-arm64.deb
-Size: 228594
-MD5sum: 07306da3c1d147fef91ba54bbd55d8db
-SHA256: 79dd96676d2e24db2563b8969fbcc54042fbd1260fbb25b2791a8bda54f9cc38
-
-Package: com.ipfaker
-Name: iPFaker
-Depends: firmware (>= 14.0)
-Version: 2.4.1
-Architecture: iphoneos-arm64
-Maintainer: iPFaker Lab
-Author: iPFaker Lab
-Section: Tweaks
-Priority: optional
-Homepage: https://github.com/vpnhihi/iPFaker
-Description: Lab device identity + iPFaker.app (rootless Dopamine). Sheet license. No Settings inject.
-Installed-Size: 47
-Filename: debs/com.ipfaker_2.4.1_iphoneos-arm64.deb
-Size: 48900
-MD5sum: e7896c1e9886902e6e76bb4f705859d7
-SHA256: c18b1fa60efc5348bd1f2645961a5c309fe418cf2aa3e7a73c45737b1e794c4c
+Homepage: https://github.com/vpnhihi/ipfaker
+Description: Full lab stack: MG+CT+JB+About+AboutUI+AboutVer+AA + iPFaker.app (pool, multi-app wipe, Save session). Rootless Dopamine. One install = same as lab machine.
+Installed-Size: 1981
+Filename: debs/com.ipfaker_2.8.0_iphoneos-arm64.deb
+Size: 328768
+MD5sum: 9cb5e4492820821099335b2c08ef7491
+SHA256: bf5c54d4b46b90c6777b096bc21a759c9793159978e33562c8fdf36c112760c1
 

@@ -16,8 +16,13 @@ __pycache__/
 frida/node_modules/
 node_modules/
 
-# ── Local lab artifacts (NEVER publish) ─────────────────
+# ── CI / local lab artifacts (NEVER publish) ────────────
+_ci_art/
+_ci_art*/
+_ci_stable*/
+_prefs_scan/
 _ref/
+analyzer/
 ci_artifact/
 dist/
 deploy_pack/
@@ -27,15 +32,24 @@ dylibs_ci/
 dylibs_new/
 logs/
 logs/**
+lab/
+lab/**
+
+# Frida temp / gadget blobs
 frida/_run_full_tmp.js
 frida/*.bundle.js
 frida/FridaGadget*
-# Allow sileo-repo/debs for GitHub Pages customer source (only current packages)
-# Ignore very old bulk if needed:
+frida/lab_*.js
+
+# Allow sileo-repo current customer packages only
 sileo-repo/debs/com.ipfaker_2.3.*
+sileo-repo/debs/com.ipfaker_2.4.*
+sileo-repo/debs/com.ipfaker_2.5.*
+sileo-repo/debs/com.ipfaker_2.6.*
 
 # ── Generated device identity ───────────────────────────
 config/active_profile.json
+config/active_profile.*.json
 config/selected_profile.json
 config/device_profile.json
 config/config.plist
@@ -43,9 +57,10 @@ config/apply.json
 config/main.plist
 config/*.xlsx
 
-# ── Temp / lab-only scripts (secrets risk) ──────────────
+# ── Temp / lab-only scripts (secrets + one-off deploy) ──
 scripts/_tmp_*
 scripts/__pycache__/
+scripts/_*
 scripts/cold_start_*.py
 scripts/deep_wipe_*.py
 scripts/e2e_full_device.py
@@ -62,9 +77,6 @@ scripts/scan_zalo*.py
 scripts/thin_macho.py
 scripts/wipe_and_ready.py
 scripts/zalo_lab_run.py
-scripts/_audit_*.py
-scripts/_device_live_check.py
-scripts/_scrub_secrets.py
 scripts/rebuild_apple_matrix.py
 scripts/update_device_specs.py
 scripts/deploy_*.py
@@ -72,6 +84,19 @@ scripts/install_app_now.py
 scripts/run_wipe_*.py
 scripts/open_zalo_clean.py
 scripts/macho_cdhash.py
+scripts/lab_wall_e2e.py
+scripts/e2e_frida_*.py
+scripts/e2e_frida_*.ps1
+scripts/regression_vuot_zalo.py
+scripts/vuot_zalo_cli.py
+scripts/deploy_arm64e_b.py
+scripts/deploy_gadget.py
+scripts/deploy_native_dylibs.py
+scripts/deploy_prefs_about.py
+scripts/deploy_split_verify.py
+scripts/deploy_ssh_mobile.py
+scripts/deploy_thin_ready.py
+scripts/deploy_app.py
 SILEO_SOURCE.txt
 
 # ── Secrets ─────────────────────────────────────────────
@@ -93,6 +118,17 @@ docs/IDENTITY_AUDIT_REPORT.*
 docs/E2E_FRIDA_ROOTHIDE.md
 docs/WAITING_FOR_ROOTLESS.md
 docs/WHY_STILL_XSMAX.md
+docs/CHAT_SESSION_*
+docs/GAP_FILL_STATUS.md
+docs/LAB_HOLES.md
+docs/LAB_PLUS_ROADMAP.md
+docs/LAB_SERVER_MITIGATIONS.md
+docs/LAB_STACK_COMPARE.md
+docs/LAB_WALL.md
+docs/COMPARE_CHANGEINFO.md
+docs/HIOS_PLUS_ROADMAP.md
+docs/SURFACE_MATRIX.md
+docs/MODULE_COVER.md
 
 # ── PC app runtime ──────────────────────────────────────
 pc_app/last_error.txt
@@ -100,3 +136,4 @@ pc_app/startup.log
 pc_app/_stderr.txt
 pc_app/last_captcha.png
 pc_app/workflow_data/config.json
+pc_app/__pycache__/

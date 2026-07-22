@@ -26,14 +26,17 @@ https://vpnhihi.github.io/ipfaker/
 1. **Sileo** → tab **Nguồn** → **+**
 2. Dán URL trên → **Add**
 3. **Làm mới nguồn** (kéo refresh)
-4. Tìm **iPFaker** → **Cài** / **Get** (gói `com.ipfaker`, version **2.7.0+**)
+4. Tìm **iPFaker** → **Cài** / **Get** (gói `com.ipfaker`, version **2.8.0+**)
 5. Respring nếu Sileo yêu cầu
 
 ### Tải file `.deb` trực tiếp (không cần nguồn)
 
 ```
-https://vpnhihi.github.io/ipfaker/debs/com.ipfaker_2.7.0_iphoneos-arm64.deb
+https://vpnhihi.github.io/ipfaker/debs/com.ipfaker_2.8.0_iphoneos-arm64.deb
 ```
+
+Bản **2.8.0** = full stack như máy lab (app + 7 dylib + wipe multi-app + catalog).  
+Cài **một lần** là đủ; không cần copy file tay.
 
 AirDrop / Safari / Filza → chạm file → **Install**.
 

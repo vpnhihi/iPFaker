@@ -14,12 +14,17 @@ for d in \
 do
   [ -d "$d" ] || continue
   for f in iPFakerMG.dylib iPFakerCT.dylib iPFakerJB.dylib \
-           iPFakerMG.plist iPFakerCT.plist iPFakerJB.plist; do
+           iPFakerAbout.dylib iPFakerAboutUI.dylib iPFakerAboutVer.dylib iPFakerAA.dylib \
+           iPFakerMG.plist iPFakerCT.plist iPFakerJB.plist \
+           iPFakerAbout.plist iPFakerAboutUI.plist iPFakerAboutVer.plist iPFakerAA.plist; do
     p="$d/$f"
     [ -e "$p" ] || continue
     chown root:wheel "$p" 2>/dev/null || true
     case "$f" in
       *.dylib) chmod 0755 "$p" 2>/dev/null || true ;;
+      # Filter plists: mobile-writable so Fake can update inject list without root
+      # (Telegram/FB/… must be written live — package default is Zalo-only)
+      *.plist) chmod 0666 "$p" 2>/dev/null || true ;;
       *)       chmod 0644 "$p" 2>/dev/null || true ;;
     esac
     # trustcache when available
@@ -30,6 +35,18 @@ do
       fi
     fi
   done
+done
+
+# Wipe helpers (multi-app Zalo-depth)
+for w in \
+  /var/jb/usr/libexec/ipfaker-wipe-apps /var/jb/etc/ipfaker/wipe_apps.sh /var/mobile/Library/iPFaker/wipe_apps.sh \
+  /var/jb/usr/libexec/ipfaker-wipe-zalo /var/jb/etc/ipfaker/wipe_zalo.sh /var/mobile/Library/iPFaker/wipe_zalo.sh \
+  /var/jb/usr/libexec/ipfaker-wipe-zalo-session /var/jb/etc/ipfaker/wipe_zalo_session.sh /var/mobile/Library/iPFaker/wipe_zalo_session.sh
+do
+  if [ -f "$w" ]; then
+    chmod 755 "$w" 2>/dev/null || true
+    chown root:wheel "$w" 2>/dev/null || true
+  fi
 done
 
 # Config dirs: mobile-writable so app Apply can write without root

@@ -31,23 +31,86 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION_DEFAULT = "2.7.0"
+VERSION_DEFAULT = "2.8.0"
 PKG = "com.ipfaker"
 ARCH = "iphoneos-arm64"
 
+# Full lab stack shipped to new devices (ElleKit TweakInject)
+STACK_MODULES = (
+    "iPFakerMG",
+    "iPFakerCT",
+    "iPFakerJB",
+    "iPFakerAbout",
+    "iPFakerAboutUI",
+    "iPFakerAboutVer",
+    "iPFakerAA",
+)
 
-def find_dylibs() -> tuple[Path | None, Path | None]:
-    for base in (ROOT / "dylibs_ci", ROOT / "dylibs", ROOT / "theos" / "dist"):
+
+def _ci_dist_bases() -> list[Path]:
+    """Prefer newest CI/lab artifacts, then local build dirs."""
+    bases: list[Path] = []
+    # Newest first among known lab snapshots
+    for name in (
+        "_ci_art_ui",
+        "_ci_art_swver2",
+        "_ci_art_swver",
+        "_ci_art_aboutver_ok",
+        "_ci_art_open",
+        "_ci_art21011b",
+        "_ci_art21011",
+        "_ci_art21010",
+    ):
+        for sub in (
+            ROOT / name / "ipfaker-sileo" / "theos" / "dist",
+            ROOT / name / "theos" / "dist",
+        ):
+            if sub.is_dir():
+                bases.append(sub)
+    for base in (
+        ROOT / "theos" / "dist",
+        ROOT / "dylibs_ci",
+        ROOT / "dylibs",
+    ):
+        if base.is_dir():
+            bases.append(base)
+    return bases
+
+
+def find_stack_dir() -> Path | None:
+    """Directory containing at least MG+CT (full stack preferred)."""
+    best: Path | None = None
+    best_n = -1
+    for base in _ci_dist_bases():
         mg = base / "iPFakerMG.dylib"
         ct = base / "iPFakerCT.dylib"
-        if mg.exists() and ct.exists():
-            return mg, ct
-    # arm64e named
-    for base in (ROOT / "dylibs", ROOT / "dylibs_ci"):
-        mg = base / "iPFakerMG.arm64e.dylib"
-        ct = base / "iPFakerCT.arm64e.dylib"
-        if mg.exists() and ct.exists():
-            return mg, ct
+        if not (mg.is_file() and ct.is_file()):
+            # arm64e names
+            mg = base / "iPFakerMG.arm64e.dylib"
+            ct = base / "iPFakerCT.arm64e.dylib"
+            if not (mg.is_file() and ct.is_file()):
+                continue
+        n = sum(1 for m in STACK_MODULES if (base / f"{m}.dylib").is_file() or (base / f"{m}.arm64e.dylib").is_file())
+        if n > best_n:
+            best_n = n
+            best = base
+            if n >= len(STACK_MODULES):
+                break
+    return best
+
+
+def find_dylibs() -> tuple[Path | None, Path | None]:
+    base = find_stack_dir()
+    if not base:
+        return None, None
+    mg = base / "iPFakerMG.dylib"
+    ct = base / "iPFakerCT.dylib"
+    if mg.is_file() and ct.is_file():
+        return mg, ct
+    mg = base / "iPFakerMG.arm64e.dylib"
+    ct = base / "iPFakerCT.arm64e.dylib"
+    if mg.is_file() and ct.is_file():
+        return mg, ct
     return None, None
 
 
@@ -56,10 +119,16 @@ def find_app(explicit: str | None) -> Path | None:
         p = Path(explicit)
         return p if p.is_dir() else None
     for p in [
+        ROOT / "_ci_art_ui" / "ipfaker-sileo" / "theos" / "dist" / "app" / "iPFaker.app",
+        ROOT / "_ci_art_ui" / "theos" / "dist" / "app" / "iPFaker.app",
         ROOT / "theos" / "dist" / "app" / "iPFaker.app",
         ROOT / "theos" / "app" / ".theos" / "obj" / "debug" / "iPFaker.app",
         ROOT / "theos" / "app" / ".theos" / "obj" / "iPFaker.app",
     ]:
+        if p.is_dir() and (p / "iPFaker").exists():
+            return p
+    for base in _ci_dist_bases():
+        p = base / "app" / "iPFaker.app"
         if p.is_dir() and (p / "iPFaker").exists():
             return p
     for p in (ROOT / "theos").rglob("iPFaker.app"):
@@ -81,7 +150,7 @@ def lab_core_bundles_xml() -> str:
 
 
 def zalo_only_plist() -> bytes:
-    """MG/JB filter: Lab-core bundles (no CommCenter executables)."""
+    """MG/JB/AA filter: Lab-core bundles (no CommCenter executables)."""
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -98,6 +167,26 @@ def zalo_only_plist() -> bytes:
 </dict>
 </plist>
 """.encode("utf-8")
+
+
+def about_prefs_only_plist() -> bytes:
+    """About / AboutUI / AboutVer: Settings.app only (never Zalo)."""
+    return b"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Filter</key>
+	<dict>
+		<key>Bundles</key>
+		<array>
+			<string>com.apple.Preferences</string>
+		</array>
+		<key>Mode</key>
+		<string>Any</string>
+	</dict>
+</dict>
+</plist>
+"""
 
 
 def ct_filter_plist() -> bytes:
@@ -136,8 +225,8 @@ def ct_filter_plist() -> bytes:
 """.encode("utf-8")
 
 
-# Dopamine AMFI: MG over this size often fails "signature does not cover entire file"
-MG_SAFE_MAX = 138_000
+# Soft size hint only — full lab MG is ~155KB and is shipped intentionally
+MG_SAFE_MAX = 200_000
 MG_HYBRID_HINT = 130_000
 
 
@@ -200,7 +289,8 @@ for MS in \
   /var/jb/Library/MobileSubstrate/DynamicLibraries
 do
   [ -d "$MS" ] || continue
-  for f in iPFakerMG.dylib iPFakerCT.dylib iPFakerJB.dylib; do
+  for f in iPFakerMG.dylib iPFakerCT.dylib iPFakerJB.dylib \
+           iPFakerAbout.dylib iPFakerAboutUI.dylib iPFakerAboutVer.dylib iPFakerAA.dylib; do
     if [ -f "$MS/$f" ]; then
       chown root:wheel "$MS/$f" 2>/dev/null || true
       chmod 755 "$MS/$f" 2>/dev/null || true
@@ -215,8 +305,10 @@ do
       fi
     fi
   done
-  for f in iPFakerMG.plist iPFakerCT.plist iPFakerJB.plist; do
-    [ -f "$MS/$f" ] && chmod 644 "$MS/$f" 2>/dev/null || true
+  for f in iPFakerMG.plist iPFakerCT.plist iPFakerJB.plist \
+           iPFakerAbout.plist iPFakerAboutUI.plist iPFakerAboutVer.plist iPFakerAA.plist; do
+    # mobile-writable so Fake can extend inject list live (Zalo-depth multi-app)
+    [ -f "$MS/$f" ] && chmod 666 "$MS/$f" 2>/dev/null || true
   done
 done
 
@@ -268,10 +360,10 @@ exit 0
 
 
 def control_text(version: str, installed_size_kb: int, has_app: bool, has_dylibs: bool) -> str:
-    desc = "Lab device identity tools (MG+CT dylibs)"
+    desc = "Full lab stack: MG+CT+JB+About+AboutUI+AboutVer+AA"
     if has_app:
-        desc += " + iPFaker.app (device/iOS pool, Reset Data / Save)"
-    desc += ". Rootless Dopamine. Synthetic profiles only. Does not inject Settings."
+        desc += " + iPFaker.app (pool, multi-app wipe, Save session)"
+    desc += ". Rootless Dopamine. One install = same as lab machine."
     return f"""Package: {PKG}
 Name: iPFaker
 Depends: firmware (>= 14.0)
@@ -393,22 +485,38 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
+def _resolve_dylib(base: Path, name: str) -> Path | None:
+    for cand in (base / f"{name}.dylib", base / f"{name}.arm64e.dylib"):
+        if cand.is_file():
+            return cand
+    return None
+
+
+def _filter_for_module(name: str, pl_mg: bytes, pl_ct: bytes, pl_about: bytes) -> bytes:
+    if name == "iPFakerCT":
+        return pl_ct
+    if name in ("iPFakerAbout", "iPFakerAboutUI", "iPFakerAboutVer"):
+        return pl_about
+    return pl_mg
+
+
 def build(version: str, app_path: str | None) -> Path:
+    stack = find_stack_dir()
     mg, ct = find_dylibs()
     app = find_app(app_path)
     catalog = ROOT / "config" / "device_catalog.json"
     if not catalog.exists():
         catalog = ROOT / "theos" / "app" / "Resources" / "device_catalog.json"
 
-    if not mg or not ct:
-        raise SystemExit("Missing iPFakerMG/CT dylibs (dylibs_ci/ or dylibs/)")
+    if not mg or not ct or not stack:
+        raise SystemExit("Missing iPFakerMG/CT dylibs (_ci_art_ui/theos/dist, dylibs_ci/, or theos/dist)")
 
     out_dir = ROOT / "dist" / "sileo"
     repo_dir = out_dir / "repo" / "debs"
     out_dir.mkdir(parents=True, exist_ok=True)
     repo_dir.mkdir(parents=True, exist_ok=True)
 
-    # --- data.tar.gz ---
+    # --- data.tar ---
     size_bytes = 0
 
     def data_builder(tar: tarfile.TarFile) -> None:
@@ -428,6 +536,7 @@ def build(version: str, app_path: str | None) -> Path:
             "var/jb/usr/",
             "var/jb/usr/lib/",
             "var/jb/usr/lib/TweakInject/",
+            "var/jb/usr/libexec/",
             "var/jb/etc/",
             "var/jb/etc/ipfaker/",
             "var/jb/Applications/",
@@ -443,49 +552,59 @@ def build(version: str, app_path: str | None) -> Path:
             info.gid = 0
             tar.addfile(info)
 
-        # Distinct filters: MG/JB = bundles only; CT = bundles + CommCenter executables
+        # Distinct filters: MG/JB/AA = lab-core; CT = +CommCenter; About* = Preferences only
         pl_mg = zalo_only_plist()
         pl_ct = ct_filter_plist()
+        pl_about = about_prefs_only_plist()
         if b"CommCenter" not in pl_ct:
             raise SystemExit("FATAL: CT filter missing CommCenter — refuse package")
         dest = "var/jb/usr/lib/TweakInject"
         mg_bytes = mg.read_bytes()
-        ct_bytes = ct.read_bytes()
-        # Size gate: Extra (MG) must stay AMFI-safe; CT carries Deep
         if len(mg_bytes) > MG_SAFE_MAX:
             raise SystemExit(
                 f"FATAL: iPFakerMG.dylib {len(mg_bytes)} > {MG_SAFE_MAX} "
-                f"(Dopamine AMFI risk). Split more or strip before packaging."
+                f"(refuse package)."
             )
         if len(mg_bytes) > MG_HYBRID_HINT:
             print(
                 f"WARN: MG size {len(mg_bytes)} > {MG_HYBRID_HINT} "
-                f"— deploy may hybrid-fallback; Extra still packaged."
+                f"— full lab stack still packaged (trustcache postinst)."
             )
-        print(f"pack MG={len(mg_bytes)} CT={len(ct_bytes)} (Extra+Deep always co-packaged)")
-        add_file(tar, f"{dest}/iPFakerMG.dylib", track(mg_bytes), 0o755)
-        add_file(tar, f"{dest}/iPFakerCT.dylib", track(ct_bytes), 0o755)
-        add_file(tar, f"{dest}/iPFakerMG.plist", track(pl_mg), 0o644)
-        add_file(tar, f"{dest}/iPFakerCT.plist", track(pl_ct), 0o644)
-        # Optional split-stack JB hide (fopen/getenv/fileExists)
-        for base in (mg.parent, ROOT / "dylibs_ci", ROOT / "theos" / "dist", ROOT / "dylibs"):
-            jb = base / "iPFakerJB.dylib"
-            if jb.is_file():
-                add_file(tar, f"{dest}/iPFakerJB.dylib", track(jb.read_bytes()), 0o755)
-                add_file(tar, f"{dest}/iPFakerJB.plist", track(pl_mg), 0o644)
-                print(f"pack JB from {base.name}")
-                break
+
+        packed: list[str] = []
+        for mod in STACK_MODULES:
+            dy = _resolve_dylib(stack, mod)
+            if not dy:
+                # allow missing optional only if not MG/CT
+                if mod in ("iPFakerMG", "iPFakerCT"):
+                    raise SystemExit(f"FATAL: missing required {mod}.dylib in {stack}")
+                print(f"skip optional {mod} (not in {stack.name})")
+                continue
+            raw = track(dy.read_bytes())
+            add_file(tar, f"{dest}/{mod}.dylib", raw, 0o755)
+            filt = _filter_for_module(mod, pl_mg, pl_ct, pl_about)
+            add_file(tar, f"{dest}/{mod}.plist", track(filt), 0o644)
+            packed.append(f"{mod}={len(raw)}")
+        print(f"stack dir: {stack}")
+        print("pack " + " ".join(packed))
 
         if catalog.exists():
             cdata = track(catalog.read_bytes())
             add_file(tar, "var/jb/etc/ipfaker/device_catalog.json", cdata, 0o644)
             add_file(tar, "var/mobile/Library/iPFaker/device_catalog.json", cdata, 0o644)
 
-        readme = b"iPFaker lab config dir. Apply profile from iPFaker.app or PC scripts.\n"
+        readme = (
+            b"iPFaker lab config dir (new device = same as dev).\n"
+            b"- config.plist + active_profile.json from iPFaker.app Apply\n"
+            b"- Stack: MG CT JB About AboutUI AboutVer AA + wipe_apps.sh\n"
+            b"- Mirror: /var/mobile/Library/iPFaker/\n"
+        )
         add_file(tar, "var/jb/etc/ipfaker/README.txt", track(readme), 0o644)
 
         # Multi-app wipe (1-tap trusted) + legacy Zalo-only helper
         wipe_apps = ROOT / "injector" / "wipe_apps.sh"
+        if not wipe_apps.is_file():
+            wipe_apps = ROOT / "theos" / "layout" / "etc" / "ipfaker" / "wipe_apps.sh"
         if wipe_apps.is_file():
             wdata = track(wipe_apps.read_bytes())
             add_file(tar, "var/jb/usr/libexec/ipfaker-wipe-apps", wdata, 0o755)
@@ -498,6 +617,8 @@ def build(version: str, app_path: str | None) -> Path:
             add_file(tar, "var/jb/etc/ipfaker/wipe_zalo.sh", wdata, 0o755)
             add_file(tar, "var/mobile/Library/iPFaker/wipe_zalo.sh", wdata, 0o755)
         sess_src = ROOT / "injector" / "wipe_zalo_session.sh"
+        if not sess_src.is_file():
+            sess_src = ROOT / "theos" / "layout" / "etc" / "ipfaker" / "wipe_zalo_session.sh"
         if sess_src.is_file():
             sdata = track(sess_src.read_bytes())
             add_file(tar, "var/jb/usr/libexec/ipfaker-wipe-zalo-session", sdata, 0o755)

@@ -5,7 +5,7 @@
 | Cách | Fake model (XS Max → 15 Pro) | Cần Mac nhà? |
 |------|------------------------------|--------------|
 | Frida Gadget + ElleKit | **Không ổn** (đã thử, Zalo vẫn XS Max) | Không |
-| **GitHub Actions build Theos** | **Có** (dylib native như HIOS) | **Không** |
+| **GitHub Actions build Theos** | **Có** (dylib native như lab) | **Không** |
 | Mượn/thuê Mac 1 giờ | Có | Có (tạm) |
 | Chỉ wipe + config | Không spoof hardware | Không |
 

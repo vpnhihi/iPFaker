@@ -38,7 +38,7 @@ python scripts/select_device_profile.py -d iphone17-pro-max -i 26.5.2 --deploy
 
 Output:
 
-- `config/config.plist` — flat HIOS (dùng bởi iPFakerMG/CT)
+- `config/config.plist` — flat lab (dùng bởi iPFakerMG/CT)
 - `config/active_profile.json`
 - `config/selected_profile.json`
 

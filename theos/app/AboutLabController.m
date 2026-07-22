@@ -39,6 +39,11 @@
     NSString *ptype = f[@"ProductType"] ?: d[@"ProductType"] ?: @"—";
     NSString *hw = f[@"HWModelStr"] ?: d[@"HWModelStr"] ?: @"—";
     NSString *reg = f[@"RegulatoryModelNumber"] ?: d[@"RegulatoryModelNumber"] ?: @"—";
+    NSString *wifi = f[@"WifiAddress"] ?: @"—";
+    NSString *bt = f[@"BluetoothAddress"] ?: @"—";
+    NSString *eid = f[@"EID"] ?: @"—";
+    NSString *seid = f[@"SEID"] ?: f[@"SecureElementID"] ?: @"—";
+    NSString *bb = f[@"BasebandVersion"] ?: @"—";
 
     return @[
         @[
@@ -64,11 +69,19 @@
             @[ @"RAM", ram ],
             @[ @"Màn hình", screen ],
         ],
+        // Network / eSIM / modem — same SoT as Settings → Giới thiệu
+        @[
+            @[ @"Địa chỉ Wi-Fi", wifi ],
+            @[ @"Bluetooth", bt ],
+            @[ @"EID", eid ],
+            @[ @"SEID", seid ],
+            @[ @"Vi c.trình modem", bb ],
+        ],
     ];
 }
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    return 5; // account + 4 profile
+    return 6; // account + 5 profile (incl. network/eSIM/modem)
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
@@ -78,6 +91,7 @@
 
 - (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
     if (section == 0) return @"Key / Tài khoản";
+    if (section == 5) return @"Mạng / eSIM / Modem (SoT)";
     if (section == 1) return @"Hồ sơ lab";
     if (section == 2) return @"IDFA / IDFV";
     if (section == 3) return @"Hệ điều hành & mã máy";

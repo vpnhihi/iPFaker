@@ -296,11 +296,13 @@
             @"DeviceCatalogId", @"DeviceYear", @"BatteryMah",
             @"InternationalMobileEquipmentIdentity", @"InternationalMobileEquipmentIdentity2",
             @"MobileEquipmentIdentifier", @"EID",
+            @"SEID", @"SecureElementID",
             @"WifiAddress", @"BluetoothAddress", @"EthernetMacAddress",
             @"BSSID", @"SSID", @"VolumeUUID",
             @"IOPlatformSerialNumber", @"MLBSerialNumber",
             @"Hostname", @"kern.hostname",
-            @"DeviceColor", @"DeviceEnclosureColor", @"BasebandVersion",
+            @"DeviceColor", @"DeviceEnclosureColor",
+            @"BasebandVersion", @"BasebandStatus", @"BasebandChipId", @"BasebandSerialNumber",
             @"IDFA", @"IDFV", @"identifierForVendor", @"advertisingIdentifier",
             @"serial-number", @"Serial",
             // Screen
@@ -501,6 +503,28 @@
     return s;
 }
 
+/// Secure Element ID (Settings → About → SEID) — 40 hex uppercase (lab synthetic).
++ (NSString *)randomSEID {
+    static const char *hex = "0123456789ABCDEF";
+    NSMutableString *s = [NSMutableString stringWithCapacity:40];
+    for (int i = 0; i < 40; i++)
+        [s appendFormat:@"%c", hex[arc4random_uniform(16)]];
+    return s;
+}
+
+/// Cellular baseband firmware string (Settings → About → "Vi c.trình modem").
+/// Format like Apple: major.minor.patch e.g. 1.70.01 / 2.50.07 / 4.04.02
++ (NSString *)randomBasebandVersionForDeviceYear:(NSInteger)year {
+    // Newer silicon tends to higher major; keep lab-plausible ranges
+    NSInteger major = 1;
+    if (year >= 2024) major = 2 + (NSInteger)(arc4random_uniform(3));      // 2–4
+    else if (year >= 2021) major = 1 + (NSInteger)(arc4random_uniform(3)); // 1–3
+    else major = 1 + (NSInteger)(arc4random_uniform(2));                   // 1–2
+    NSInteger minor = (NSInteger)(arc4random_uniform(90) + 1);             // 1–90
+    NSInteger patch = (NSInteger)(arc4random_uniform(20));                 // 0–19
+    return [NSString stringWithFormat:@"%ld.%02ld.%02ld", (long)major, (long)minor, (long)patch];
+}
+
 + (NSString *)randomMAC {
     // Prefer public Apple OUI + random NIC (looks more factory-like than pure random)
     static NSArray *ouis = @[
@@ -613,6 +637,8 @@
     while ([imei2 isEqualToString:imei]) imei2 = [self randomIMEI];
     NSString *meid = [imei substringToIndex:MIN((NSUInteger)14, imei.length)];
     NSString *eid = [self randomEID];
+    NSString *seid = [self randomSEID];
+    NSString *baseband = [self randomBasebandVersionForDeviceYear:year];
     // Settings → About "Tên": pool human names (not "iPhone Lab <catalog-id>")
     NSString *devName = name.length ? name : [self randomUserDeviceName];
     // Hostname ≡ gethostname / uname.nodename / NSProcessInfo (DNS-label safe)
@@ -780,6 +806,12 @@
         @"InternationalMobileEquipmentIdentity2": imei2,
         @"MobileEquipmentIdentifier": meid,
         @"EID": eid,
+        // Secure Element (Settings → About → SEID)
+        @"SEID": seid,
+        @"SecureElementID": seid,
+        // Cellular modem firmware (Settings → About)
+        @"BasebandVersion": baseband,
+        @"BasebandStatus": @"BBUpdateStatusSuccess",
         // IEEE 802 EUI-48 MAC
         @"WifiAddress": wifi,
         @"BluetoothAddress": bt,
@@ -908,6 +940,36 @@
 
 + (NSString *)applyFlatProfile:(NSDictionary *)flat deviceId:(NSString *)deviceId ios:(NSString *)ios {
     NSError *err = nil;
+    // Force identity alias sync before any write (Settings + Lab + dylib same SoT)
+    NSMutableDictionary *synced = [flat mutableCopy] ?: [NSMutableDictionary dictionary];
+    // Settings "Số máy" = ModelNumber (+ RegionInfo). Always empty RegionInfo for clean MxxxxRR/A.
+    synced[@"RegionInfo"] = @"";
+    NSString *sn = [synced[@"SerialNumber"] description];
+    if (sn.length) {
+        synced[@"Serial"] = sn;
+        synced[@"serial-number"] = sn;
+        synced[@"IOPlatformSerialNumber"] = sn;
+        synced[@"MLBSerialNumber"] = sn;
+    }
+    NSString *mn = [synced[@"ModelNumber"] description] ?: [synced[@"PartNumber"] description];
+    if (mn.length) {
+        synced[@"ModelNumber"] = mn;
+        synced[@"PartNumber"] = mn;
+    }
+    NSString *udn = [synced[@"UserAssignedDeviceName"] description];
+    if (udn.length) {
+        synced[@"UserAssignedDeviceName"] = udn;
+        if (!synced[@"DeviceName"]) synced[@"DeviceName"] = @"iPhone";
+    }
+    if (synced[@"ProductVersion"] && !synced[@"kern.osproductversion"])
+        synced[@"kern.osproductversion"] = synced[@"ProductVersion"];
+    if ((synced[@"BuildVersion"] ?: synced[@"ProductBuildVersion"]) && !synced[@"kern.osversion"])
+        synced[@"kern.osversion"] = synced[@"BuildVersion"] ?: synced[@"ProductBuildVersion"];
+    if (synced[@"ProductType"]) synced[@"hw.machine"] = synced[@"ProductType"];
+    if (synced[@"HWModelStr"] ?: synced[@"HardwareModel"])
+        synced[@"hw.model"] = synced[@"HWModelStr"] ?: synced[@"HardwareModel"];
+    flat = synced;
+
     // CRITICAL: Zalo sandbox typically CANNOT read /var/mobile/Library/iPFaker —
     // only /var/jb/etc/ipfaker is visible to the injected dylib. Write jb FIRST.
     NSArray *dirs = @[
@@ -922,19 +984,45 @@
     NSMutableDictionary *safeFlat = [[self schemaLockedFlat:flat dropped:&dropped] mutableCopy]
         ?: [NSMutableDictionary dictionary];
     // Multi-source serial: IOKit / MLB / Serial always same value (lab identity sync)
-    NSString *sn = [safeFlat[@"SerialNumber"] description];
-    if (sn.length) {
-        safeFlat[@"IOPlatformSerialNumber"] = sn;
-        safeFlat[@"MLBSerialNumber"] = sn;
-        safeFlat[@"serial-number"] = sn;
-        safeFlat[@"Serial"] = sn;
+    NSString *sn2 = [safeFlat[@"SerialNumber"] description];
+    if (sn2.length) {
+        safeFlat[@"IOPlatformSerialNumber"] = sn2;
+        safeFlat[@"MLBSerialNumber"] = sn2;
+        safeFlat[@"serial-number"] = sn2;
+        safeFlat[@"Serial"] = sn2;
     }
-    // MAC path: BSSID / Ethernet ≡ WifiAddress
+    // MAC path: BSSID / Ethernet ≡ WifiAddress; BT must stay distinct when present
     NSString *wifi = [safeFlat[@"WifiAddress"] description];
     if (wifi.length) {
         safeFlat[@"EthernetMacAddress"] = wifi;
         if (![safeFlat[@"BSSID"] description].length) safeFlat[@"BSSID"] = wifi;
     }
+    NSString *bt = [safeFlat[@"BluetoothAddress"] description];
+    if (!bt.length && wifi.length) {
+        // Derive BT = wifi with last octet XOR 1 (same rule as flatProfile)
+        NSArray *wp = [wifi componentsSeparatedByString:@":"];
+        if (wp.count == 6) {
+            unsigned v = 0;
+            [[NSScanner scannerWithString:wp[5]] scanHexInt:&v];
+            NSMutableArray *btp = [wp mutableCopy];
+            btp[5] = [NSString stringWithFormat:@"%02X", (v ^ 1) & 0xFF];
+            safeFlat[@"BluetoothAddress"] = [btp componentsJoinedByString:@":"];
+        }
+    }
+    // eSIM / Secure Element / modem — always present for Settings About + app CT/MG
+    if (![safeFlat[@"EID"] description].length)
+        safeFlat[@"EID"] = [self randomEID];
+    NSString *seid = [safeFlat[@"SEID"] description] ?: [safeFlat[@"SecureElementID"] description];
+    if (!seid.length) seid = [self randomSEID];
+    safeFlat[@"SEID"] = seid;
+    safeFlat[@"SecureElementID"] = seid;
+    if (![safeFlat[@"BasebandVersion"] description].length) {
+        NSInteger y = [safeFlat[@"DeviceYear"] integerValue];
+        if (y <= 0) y = 2022;
+        safeFlat[@"BasebandVersion"] = [self randomBasebandVersionForDeviceYear:y];
+    }
+    if (![safeFlat[@"BasebandStatus"] description].length)
+        safeFlat[@"BasebandStatus"] = @"BBUpdateStatusSuccess";
     // Environment consistency pack — no field may drift from catalog identity
     {
         NSString *pv = [safeFlat[@"ProductVersion"] description] ?: ios ?: @"15.0";
@@ -1185,10 +1273,16 @@
     NSString *wantBV = [flat[@"BuildVersion"] description]
         ?: [flat[@"ProductBuildVersion"] description] ?: @"";
     NSString *wantMN = [flat[@"ModelNumber"] description] ?: [flat[@"PartNumber"] description] ?: @"";
+    NSString *wantSN = [flat[@"SerialNumber"] description] ?: @"";
+    NSString *wantName = [flat[@"UserAssignedDeviceName"] description]
+        ?: [flat[@"DeviceName"] description] ?: @"";
+    NSString *wantReg = [flat[@"RegulatoryModelNumber"] description]
+        ?: [flat[@"ModelNumberAxxxx"] description] ?: @"";
     // Settings concatenates ModelNumber+RegionInfo → empty RegionInfo in cache avoids …/ATH/A
     NSString *wantRI = @"";
     NSString *wantRC = [flat[@"RegionCode"] description] ?: [flat[@"PartNumberRegion"] description] ?: @"";
-    if (!wantPT.length && !wantMkt.length && !wantPV.length && !wantMN.length) return @"";
+    if (!wantPT.length && !wantMkt.length && !wantPV.length && !wantMN.length
+        && !wantSN.length && !wantName.length) return @"";
 
     // Public reverse-engineered obfuscated keys (MD5("MGCopyAnswer"+name) base64)
     NSString *kPT = @"h9jDsbgj7xIVeIQ8S3/X3Q";
@@ -1200,6 +1294,11 @@
     NSString *kMN = @"D0cJ8r7U5zve6uA6QbOiLA";       // ModelNumber
     NSString *kRI = @"zHeENZu+wbg7PUprwNwBWg";       // RegionInfo
     NSString *kRC = @"h63QSdBCiT/z0WU6rdQv6Q";       // RegionCode
+    // Serial / name (Settings → About uses these when MG live path fails)
+    NSString *kSN = @"VasUgeSzVyHdB27g2XpN0g";       // SerialNumber (common)
+    NSString *kSN2 = @"SerialNumber";
+    NSString *kName = @"UserAssignedDeviceName";
+    NSString *kReg = @"RegulatoryModelNumber";
     NSInteger changed = 0;
 
     NSMutableArray *stack = [NSMutableArray arrayWithObject:root];
@@ -1246,6 +1345,15 @@
                 if (![s isEqualToString:wantRI]) nv = wantRI;
             } else if ([k isEqualToString:kRC] || [k isEqualToString:@"RegionCode"]) {
                 if (wantRC.length && ![s isEqualToString:wantRC]) nv = wantRC;
+            } else if ([k isEqualToString:kSN] || [k isEqualToString:kSN2]
+                       || [k isEqualToString:@"IOPlatformSerialNumber"]
+                       || [k isEqualToString:@"MLBSerialNumber"]
+                       || [k isEqualToString:@"serial-number"]) {
+                if (wantSN.length && ![s isEqualToString:wantSN]) nv = wantSN;
+            } else if ([k isEqualToString:kName] || [k isEqualToString:@"DeviceName"]) {
+                if (wantName.length && ![s isEqualToString:wantName]) nv = wantName;
+            } else if ([k isEqualToString:kReg] || [k isEqualToString:@"ModelNumberAxxxx"]) {
+                if (wantReg.length && ![s isEqualToString:wantReg]) nv = wantReg;
             } else if (wantPT.length && ([s isEqualToString:@"iPhone11,6"] || [s isEqualToString:@"iPhone8,1"])
                        && ![s isEqualToString:wantPT] && [s containsString:@","]) {
                 nv = wantPT;
@@ -1257,6 +1365,33 @@
             } else if (wantHW.length && ([s hasPrefix:@"D331"] || [s isEqualToString:@"N71AP"])
                        && ![s isEqualToString:wantHW]) {
                 nv = wantHW;
+            } else if (wantSN.length && wantSN.length >= 8
+                       && s.length >= 8 && s.length <= 14
+                       && ![s isEqualToString:wantSN]
+                       && ![s containsString:@" "]
+                       && ![s containsString:@"/"]
+                       && ![s containsString:@","]
+                       && ![s hasPrefix:@"iPhone"]
+                       && ![s hasPrefix:@"A"]
+                       && [s rangeOfCharacterFromSet:[NSCharacterSet decimalDigitCharacterSet]].location != NSNotFound
+                       && [s rangeOfCharacterFromSet:[NSCharacterSet letterCharacterSet]].location != NSNotFound) {
+                // Heuristic: serial-like tokens in cache (e.g. host F2LY50KXKPHQ)
+                // Only replace when looks like Apple serial (alnum mix, no slash)
+                BOOL allAlnum = YES;
+                for (NSUInteger i = 0; i < s.length; i++) {
+                    unichar c = [s characterAtIndex:i];
+                    if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9'))) {
+                        allAlnum = NO; break;
+                    }
+                }
+                if (allAlnum) nv = wantSN;
+            } else if (wantMN.length && [s hasPrefix:@"MT"] && s.length <= 12
+                       && ![s isEqualToString:wantMN]) {
+                // Host truncated model# e.g. MT6T2
+                nv = wantMN;
+            } else if (wantName.length && [s hasPrefix:@"iPhone "] && [s containsString:@"của"]
+                       && ![s isEqualToString:wantName]) {
+                nv = wantName;
             }
             if (nv) { d[k] = nv; changed++; }
         }
@@ -1282,12 +1417,67 @@
     if (wantMN.length && ![ex[kMN] isEqual:wantMN]) { ex[kMN] = wantMN; changed++; }
     if (![ex[kRI] isEqual:wantRI]) { ex[kRI] = wantRI; changed++; }
     if (wantRC.length && ![ex[kRC] isEqual:wantRC]) { ex[kRC] = wantRC; changed++; }
+    if (wantSN.length && ![ex[kSN] isEqual:wantSN]) { ex[kSN] = wantSN; changed++; }
+    if (wantSN.length && ![ex[kSN2] isEqual:wantSN]) { ex[kSN2] = wantSN; changed++; }
+    if (wantName.length && ![ex[kName] isEqual:wantName]) { ex[kName] = wantName; changed++; }
+    if (wantReg.length && ![ex[kReg] isEqual:wantReg]) { ex[kReg] = wantReg; changed++; }
     // Plain key mirrors (some readers use non-obfuscated CacheExtra entries)
     if (wantPV.length) { ex[@"ProductVersion"] = wantPV; }
     if (wantBV.length) { ex[@"BuildVersion"] = wantBV; }
     if (wantMN.length) { ex[@"ModelNumber"] = wantMN; ex[@"PartNumber"] = wantMN; }
+    if (wantSN.length) {
+        ex[@"SerialNumber"] = wantSN;
+        ex[@"IOPlatformSerialNumber"] = wantSN;
+        ex[@"MLBSerialNumber"] = wantSN;
+    }
+    if (wantName.length) {
+        ex[@"UserAssignedDeviceName"] = wantName;
+        ex[@"DeviceName"] = flat[@"DeviceName"] ?: @"iPhone";
+    }
+    if (wantMkt.length) {
+        ex[@"MarketingName"] = wantMkt;
+        ex[@"MarketingNameString"] = wantMkt;
+    }
+    if (wantPT.length) ex[@"ProductType"] = wantPT;
+    if (wantHW.length) { ex[@"HWModelStr"] = wantHW; ex[@"HardwareModel"] = wantHW; }
+    if (wantReg.length) ex[@"RegulatoryModelNumber"] = wantReg;
     ex[@"RegionInfo"] = wantRI;
     if (wantRC.length) { ex[@"RegionCode"] = wantRC; }
+    // Network / eSIM / modem (Settings About + app trust surfaces)
+    NSString *wantWifi = [flat[@"WifiAddress"] description] ?: @"";
+    NSString *wantBT = [flat[@"BluetoothAddress"] description] ?: @"";
+    NSString *wantEID = [flat[@"EID"] description] ?: @"";
+    NSString *wantSEID = [flat[@"SEID"] description] ?: [flat[@"SecureElementID"] description] ?: @"";
+    NSString *wantBB = [flat[@"BasebandVersion"] description] ?: @"";
+    if (wantWifi.length) {
+        ex[@"WifiAddress"] = wantWifi;
+        ex[@"EthernetMacAddress"] = wantWifi;
+        ex[@"BSSID"] = flat[@"BSSID"] ?: wantWifi;
+        ex[@"gI6iODv8MZuiP0IA+efJCw"] = wantWifi; // hashed WifiAddress
+        changed++;
+    }
+    if (wantBT.length) {
+        ex[@"BluetoothAddress"] = wantBT;
+        ex[@"k5lVWbXuiZHLA17KGiVUAA"] = wantBT;
+        changed++;
+    }
+    if (wantEID.length) {
+        ex[@"EID"] = wantEID;
+        ex[@"R/LYYYD0Hbp5ABLodeB6CA"] = wantEID;
+        changed++;
+    }
+    if (wantSEID.length) {
+        ex[@"SEID"] = wantSEID;
+        ex[@"SecureElementID"] = wantSEID;
+        ex[@"nZUUCFZgomfWUIPGGzNAqg"] = wantSEID;
+        ex[@"ZOQ45IL7jB7NAlLPFjsDmg"] = wantSEID;
+        changed++;
+    }
+    if (wantBB.length) {
+        ex[@"BasebandVersion"] = wantBB;
+        ex[@"TKCGjYZ469LPAKBt0pYAfA"] = wantBB;
+        changed++;
+    }
 
     if (changed == 0) return @"MG-cache: already in sync";
 
@@ -1307,18 +1497,8 @@
     [sh writeToFile:script atomically:YES encoding:NSUTF8StringEncoding error:nil];
     [fm setAttributes:@{ NSFilePosixPermissions: @0755 } ofItemAtPath:script error:nil];
 
-    int rc = -1;
-    for (NSString *sudoBin in @[ @"/var/jb/usr/bin/sudo", @"/usr/bin/sudo" ]) {
-        if (![fm isExecutableFileAtPath:sudoBin]) continue;
-        pid_t pid = 0;
-        const char *argv[] = { sudoBin.UTF8String, "-n", "sh", script.UTF8String, NULL };
-        if (posix_spawn(&pid, sudoBin.UTF8String, NULL, NULL, (char *const *)argv, NULL) == 0 && pid > 0) {
-            int st = 0;
-            waitpid(pid, &st, 0);
-            if (WIFEXITED(st)) rc = WEXITSTATUS(st);
-            if (rc == 0) break;
-        }
-    }
+    // Use password-capable root runner (sudo -n often fails on lab)
+    int rc = [self runRootShellScript:script];
     if (rc != 0) {
         NSError *err = nil;
         [fm removeItemAtPath:path error:nil];
@@ -1328,7 +1508,7 @@
             rc = 0;
     }
     if (rc == 0)
-        return [NSString stringWithFormat:@"MG-cache: patched %ld keys (Settings About marketing)", (long)changed];
+        return [NSString stringWithFormat:@"MG-cache: patched %ld keys (Settings About full identity)", (long)changed];
     return [NSString stringWithFormat:@"MG-cache: need root (%ld keys staged)", (long)changed];
 }
 
@@ -1394,7 +1574,22 @@
 + (void)killAppBundleId:(NSString *)bundleId executable:(NSString *)exe {
     NSMutableArray *names = [NSMutableArray array];
     if (exe.length) [names addObject:exe];
-    // Common Apple short names
+    // Prefer CFBundleExecutable from LaunchServices catalog (any App Store app)
+    @try {
+        Class catCls = NSClassFromString(@"AppCatalog");
+        if (catCls) {
+            id cat = ((id (*)(id, SEL))objc_msgSend)(catCls, NSSelectorFromString(@"shared"));
+            if (cat && [cat respondsToSelector:NSSelectorFromString(@"itemWithBundleId:")]) {
+                id item = ((id (*)(id, SEL, id))objc_msgSend)(cat, NSSelectorFromString(@"itemWithBundleId:"), bundleId);
+                if (item) {
+                    NSString *lsExe = [item valueForKey:@"executable"];
+                    if ([lsExe isKindOfClass:[NSString class]] && lsExe.length)
+                        [names addObject:lsExe];
+                }
+            }
+        }
+    } @catch (__unused NSException *ex) {}
+    // Common Apple short names + well-known App Store process names
     NSDictionary *map = @{
         @"com.apple.Maps": @"Maps",
         @"com.apple.weather": @"Weather",
@@ -1409,6 +1604,15 @@
         @"com.apple.Music": @"Music",
         @"vn.com.vng.zingalo": @"Zalo",
         @"com.zing.zalo": @"Zalo",
+        // Bundle = ph.telegra.Telegraph but CFBundleExecutable / process = Telegram
+        @"ph.telegra.Telegraph": @"Telegram",
+        @"net.whatsapp.WhatsApp": @"WhatsApp",
+        @"com.facebook.Facebook": @"Facebook",
+        @"com.facebook.Messenger": @"Messenger",
+        @"com.burbn.instagram": @"Instagram",
+        @"com.zhiliaoapp.musically": @"TikTok",
+        @"com.ss.iphone.ugc.Ame": @"TikTok",
+        @"com.google.ios.youtube": @"YouTube",
     };
     NSString *known = map[bundleId];
     if (known.length) [names addObject:known];
@@ -1416,9 +1620,50 @@
     NSString *last = bundleId.pathExtension.length ? bundleId.pathExtension : bundleId.lastPathComponent;
     if (last.length) [names addObject:last];
     if ([bundleId containsString:@"zalo"] || [bundleId containsString:@"zing"]) {
-        [names addObjectsFromArray:@[ @"Zalo", @"zalo", @"ZaloShare" ]];
+        [names addObjectsFromArray:@[ @"Zalo", @"zalo", @"ZaloShare", @"NotificationService" ]];
+    }
+    // Telegram-iOS: process name is Telegram, not Telegraph (pathExtension of bid)
+    NSString *low = bundleId.lowercaseString;
+    if ([low containsString:@"telegra"] || [low containsString:@"telegram"]) {
+        [names addObjectsFromArray:@[
+            @"Telegram", @"Telegraph", @"TelegramShare",
+            @"NotificationServiceExtensionv1", @"NotificationServiceExtension",
+        ]];
     }
     [self killProcessesNamed:names];
+    // Path-match kill: covers extensions / mismatched CFBundleExecutable for ANY bid
+    [self killProcessesMatchingPathNeedle:bundleId];
+    if (last.length && ![last isEqualToString:bundleId])
+        [self killProcessesMatchingPathNeedle:last];
+    if (exe.length) [self killProcessesMatchingPathNeedle:exe];
+}
+
+/// Kill any process whose argv/path contains needle (App Store extensions, renamed exes).
++ (void)killProcessesMatchingPathNeedle:(NSString *)needle {
+    if (needle.length < 3) return;
+    // Strip quotes that would break shell matching
+    NSString *safe = [[needle stringByReplacingOccurrencesOfString:@"'" withString:@""]
+                      stringByReplacingOccurrencesOfString:@"\"" withString:@""];
+    if (safe.length < 3) return;
+    NSString *sh = @"/bin/sh";
+    if (![[NSFileManager defaultManager] isExecutableFileAtPath:sh])
+        sh = @"/var/jb/bin/sh";
+    if (![[NSFileManager defaultManager] isExecutableFileAtPath:sh]) return;
+    // sh -c 'script' killpath NEEDLE  → $0=killpath $1=NEEDLE
+    const char *script =
+        "N=\"$1\"; ps ax 2>/dev/null | while IFS= read -r line; do "
+        "case \"$line\" in *wipe_apps*|*ipfaker-wipe*) continue;; *\"$N\"*) "
+        "pid=$(echo \"$line\" | awk '{print $1}'); "
+        "case \"$pid\" in ''|*[!0-9]*|1) ;; *) kill -9 \"$pid\" 2>/dev/null || true;; esac;; "
+        "esac; done";
+    pid_t pid = 0;
+    const char *argv[] = {
+        sh.UTF8String, "-c", script, "killpath", safe.UTF8String, NULL
+    };
+    if (posix_spawn(&pid, sh.UTF8String, NULL, NULL, (char *const *)argv, NULL) == 0 && pid > 0) {
+        int st = 0;
+        waitpid(pid, &st, 0);
+    }
 }
 
 + (BOOL)openBundleIdViaUIOpen:(NSString *)bundleId {
@@ -1605,6 +1850,23 @@
         [needles addObject:bid];
         NSArray *parts = [bid componentsSeparatedByString:@"."];
         if (parts.count) [needles addObject:parts.lastObject];
+        // App Group metadata often uses group.<bundleId>
+        [needles addObject:[@"group." stringByAppendingString:bid]];
+        // Well-known extras (match wipe_apps.sh)
+        NSString *low = bid.lowercaseString;
+        if ([low containsString:@"zalo"] || [low containsString:@"zing"]) {
+            [needles addObjectsFromArray:@[
+                @"group.keychain.vn.com.vng.zalo",
+                @"group.vn.com.vng.zingalo",
+                @"zingalo",
+            ]];
+        }
+        if ([low containsString:@"telegra"] || [low containsString:@"telegram"]) {
+            [needles addObjectsFromArray:@[
+                @"group.ph.telegra.Telegraph",
+                @"C67CF9S4VU",
+            ]];
+        }
     }
     return needles;
 }
@@ -1624,12 +1886,49 @@
     return out;
 }
 
-/// Write targets file for root wipe script (one bid per line).
+/// Write targets file for root wipe script.
+/// Line format: bundleId  OR  bundleId|CFBundleExecutable  (Zalo-depth wipe for any App Store app).
 + (BOOL)writeWipeTargets:(NSArray<NSString *> *)bundles {
     NSString *path = @"/var/mobile/Library/iPFaker/wipe_targets.txt";
-    NSMutableString *body = [NSMutableString stringWithString:@"# iPFaker wipe targets\n"];
+    NSMutableString *body = [NSMutableString stringWithString:
+                             @"# iPFaker wipe targets (bid or bid|Executable)\n"];
     for (NSString *b in bundles) {
-        if (b.length) [body appendFormat:@"%@\n", b];
+        if (!b.length) continue;
+        NSString *exe = nil;
+        @try {
+            Class catCls = NSClassFromString(@"AppCatalog");
+            if (catCls) {
+                id cat = ((id (*)(id, SEL))objc_msgSend)(catCls, NSSelectorFromString(@"shared"));
+                if (cat && [cat respondsToSelector:NSSelectorFromString(@"itemWithBundleId:")]) {
+                    id item = ((id (*)(id, SEL, id))objc_msgSend)(cat, NSSelectorFromString(@"itemWithBundleId:"), b);
+                    if (item) {
+                        id v = [item valueForKey:@"executable"];
+                        if ([v isKindOfClass:[NSString class]] && [(NSString *)v length])
+                            exe = (NSString *)v;
+                    }
+                }
+            }
+        } @catch (__unused NSException *ex) {}
+        // Hard aliases when LS exe missing
+        if (!exe.length) {
+            NSDictionary *alias = @{
+                @"ph.telegra.Telegraph": @"Telegram",
+                @"vn.com.vng.zingalo": @"Zalo",
+                @"com.zing.zalo": @"Zalo",
+                @"net.whatsapp.WhatsApp": @"WhatsApp",
+                @"com.facebook.Facebook": @"Facebook",
+                @"com.facebook.Messenger": @"Messenger",
+                @"com.burbn.instagram": @"Instagram",
+                @"com.apple.mobilesafari": @"MobileSafari",
+                @"com.apple.Maps": @"Maps",
+                @"com.apple.weather": @"Weather",
+            };
+            exe = alias[b];
+        }
+        if (exe.length)
+            [body appendFormat:@"%@|%@\n", b, exe];
+        else
+            [body appendFormat:@"%@\n", b];
     }
     NSError *err = nil;
     [[NSFileManager defaultManager] createDirectoryAtPath:@"/var/mobile/Library/iPFaker"
@@ -1660,29 +1959,21 @@
     for (NSString *sp in scripts) {
         if (![fm fileExistsAtPath:sp]) continue;
         [fm setAttributes:@{ NSFilePosixPermissions: @0755 } ofItemAtPath:sp error:nil];
-        // Prefer passwordless sudo (mobile often has sudo on Dopamine lab)
-        for (NSString *sudoBin in @[ @"/var/jb/usr/bin/sudo", @"/usr/bin/sudo" ]) {
-            if (![fm isExecutableFileAtPath:sudoBin]) continue;
-            NSMutableArray *sargv = [NSMutableArray arrayWithObjects:sudoBin, @"-n", @"sh", sp, nil];
-            [sargv addObjectsFromArray:args];
-            char **argv = calloc(sargv.count + 1, sizeof(char *));
-            if (!argv) continue;
-            for (NSUInteger i = 0; i < sargv.count; i++)
-                argv[i] = (char *)[sargv[i] UTF8String];
-            pid_t pid = 0;
-            int rc = posix_spawn(&pid, sudoBin.UTF8String, NULL, NULL, argv, NULL);
-            free(argv);
-            if (rc == 0 && pid > 0) {
-                int st = 0;
-                waitpid(pid, &st, 0);
-                if (WIFEXITED(st)) {
-                    int code = WEXITSTATUS(st);
-                    // 0 ok, 5 residual (still success-ish), 4 not found
-                    if (code == 0 || code == 5) return code;
-                }
-            }
+        // Build one-shot wrapper so runRootShellScript / wipe self-elevate both work
+        NSMutableString *wrap = [NSMutableString stringWithString:@"#!/bin/sh\nexec sh "];
+        [wrap appendFormat:@"'%@'", sp];
+        for (NSString *a in args) {
+            NSString *safe = [a stringByReplacingOccurrencesOfString:@"'" withString:@"'\\''"];
+            [wrap appendFormat:@" '%@'", safe];
         }
-        // Direct sh (if app has enough rights)
+        [wrap appendString:@"\n"];
+        NSString *wrapPath = @"/var/mobile/Library/iPFaker/_run_wipe_once.sh";
+        [wrap writeToFile:wrapPath atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        [fm setAttributes:@{ NSFilePosixPermissions: @0755 } ofItemAtPath:wrapPath error:nil];
+        int rc = [self runRootShellScript:wrapPath];
+        // 0 ok; wipe_apps also exits 4 (not found) / 5 (residual)
+        if (rc == 0 || rc == 5) return rc;
+        // Direct sh — wipe_apps.sh self-elevates via sudo -S alpine
         int direct = [self runShellScript:sp args:args];
         if (direct == 0 || direct == 5) return direct;
     }
@@ -2014,11 +2305,13 @@
     }
     [log addObject:[NSString stringWithFormat:@"⑤ Tuỳ chọn/bộ nhớ đệm ~%lu", (unsigned long)crumb]];
 
-    // Keychain: script tin cậy đã purge Zalo trong wipe_apps.sh — không lặp (đã đo rất chậm).
-    if (scriptTrusted && wipingZalo && !skipKeychain) {
-        [log addObject:@"⑥ Keychain Zalo: script đã dọn"];
-        step(@"Keychain: script đã dọn");
-    } else if (wipingZalo && !skipKeychain) {
+    // Keychain / session deep: wipe_apps.sh now applies Zalo-depth to ALL third-party
+    // (kill by path + CFBundleExecutable, crumbs, keychain agrp, pass-2 residual).
+    if (scriptTrusted && !skipKeychain) {
+        [log addObject:@"⑥ Session deep (Zalo-depth multi-app): script đã dọn"];
+        step(@"Session deep: script đã dọn");
+    }
+    if (wipingZalo && !scriptTrusted && !skipKeychain) {
         step(@"Xóa keychain Zalo (1 SQL)…");
         NSString *sqlite = nil;
         for (NSString *c in @[ @"/var/jb/usr/bin/sqlite3", @"/usr/bin/sqlite3" ]) {
@@ -2084,7 +2377,8 @@
             step(@"Keychain: bỏ qua (cần sqlite3)");
             [log addObject:@"⑥ Keychain: bỏ qua — cài sqlite3 (apt)"];
         }
-    } else if (skipKeychain) {
+    }
+    if (skipKeychain) {
         step(@"Giữ keychain (để phiên đăng nhập)");
         [log addObject:@"⑥ Keychain: giữ nguyên"];
     }
@@ -2237,57 +2531,77 @@
 
     step(@"Cài filter vào TweakInject (root)…");
     NSString *script = [stage stringByAppendingPathComponent:@"install_spoof_filters.sh"];
+    // No set -e. About* always forced to Preferences (never multi-app).
     NSString *sh = @"#!/bin/sh\n"
-        "set -e\n"
         "STAGE=/var/mobile/Library/iPFaker\n"
+        "OK=0\n"
+        "ABOUT='<?xml version=\"1.0\" encoding=\"UTF-8\"?>\\n"
+        "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\\n"
+        "<plist version=\"1.0\"><dict><key>Filter</key><dict><key>Bundles</key>"
+        "<array><string>com.apple.Preferences</string></array>"
+        "<key>Mode</key><string>Any</string></dict></dict></plist>\\n'\n"
         "for INJ in /var/jb/usr/lib/TweakInject /var/jb/Library/MobileSubstrate/DynamicLibraries; do\n"
         "  [ -d \"$INJ\" ] || continue\n"
-        "  for n in iPFakerMG iPFakerCT iPFakerJB iPFakerAbout; do\n"
+        "  for n in iPFakerMG iPFakerCT iPFakerJB iPFakerAA; do\n"
         "    if [ -f \"$STAGE/${n}.plist\" ]; then\n"
-        "      cp -f \"$STAGE/${n}.plist\" \"$INJ/${n}.plist\"\n"
-        "      chmod 644 \"$INJ/${n}.plist\"\n"
+        "      cp -f \"$STAGE/${n}.plist\" \"$INJ/${n}.plist\" && OK=1\n"
+        "      chmod 644 \"$INJ/${n}.plist\" 2>/dev/null || true\n"
         "      chown root:wheel \"$INJ/${n}.plist\" 2>/dev/null || true\n"
         "    fi\n"
+        "  done\n"
+        "  for n in iPFakerAbout iPFakerAboutUI iPFakerAboutVer; do\n"
+        "    if [ -f \"$STAGE/${n}.plist\" ] && grep -q 'com.apple.Preferences' \"$STAGE/${n}.plist\" 2>/dev/null; then\n"
+        "      cp -f \"$STAGE/${n}.plist\" \"$INJ/${n}.plist\" && OK=1\n"
+        "    else\n"
+        "      printf '%s' \"$ABOUT\" > \"$INJ/${n}.plist\" && OK=1\n"
+        "    fi\n"
+        "    chmod 644 \"$INJ/${n}.plist\" 2>/dev/null || true\n"
+        "    chown root:wheel \"$INJ/${n}.plist\" 2>/dev/null || true\n"
         "  done\n"
         "done\n"
         "cp -f \"$STAGE/spoof_apps.json\" /var/jb/etc/ipfaker/spoof_apps.json 2>/dev/null || true\n"
         "chown mobile:mobile /var/jb/etc/ipfaker/spoof_apps.json 2>/dev/null || true\n"
-        "echo OK install_spoof_filters\n";
+        "if [ \"$OK\" -eq 1 ]; then echo OK install_spoof_filters; exit 0; fi\n"
+        "echo ERR install_spoof_filters; exit 1\n";
     [sh writeToFile:script atomically:YES encoding:NSUTF8StringEncoding error:nil];
     [fm setAttributes:@{ NSFilePosixPermissions: @0755 } ofItemAtPath:script error:nil];
 
-    int rc = -1;
-    for (NSString *sudoBin in @[ @"/var/jb/usr/bin/sudo", @"/usr/bin/sudo" ]) {
-        if (![fm isExecutableFileAtPath:sudoBin]) continue;
-        pid_t pid = 0;
-        const char *argv[] = { sudoBin.UTF8String, "-n", "sh", script.UTF8String, NULL };
-        if (posix_spawn(&pid, sudoBin.UTF8String, NULL, NULL, (char *const *)argv, NULL) == 0 && pid > 0) {
-            int st = 0;
-            waitpid(pid, &st, 0);
-            if (WIFEXITED(st)) rc = WEXITSTATUS(st);
-            if (rc == 0) break;
-        }
-    }
+    int rc = [self runRootShellScript:script];
     if (rc != 0) {
-        // Try direct write (if already root / writable)
+        // Direct overwrite (remove first — copyItem fails when dst exists)
         for (NSString *inj in @[
                  @"/var/jb/usr/lib/TweakInject",
                  @"/var/jb/Library/MobileSubstrate/DynamicLibraries" ]) {
             if (![fm fileExistsAtPath:inj]) continue;
-            for (NSString *n in @[ @"iPFakerMG", @"iPFakerCT", @"iPFakerJB", @"iPFakerAbout" ]) {
+            for (NSString *n in @[ @"iPFakerMG", @"iPFakerCT", @"iPFakerJB", @"iPFakerAbout", @"iPFakerAA" ]) {
                 NSString *src = [stage stringByAppendingPathComponent:[n stringByAppendingString:@".plist"]];
                 NSString *dst = [inj stringByAppendingPathComponent:[n stringByAppendingString:@".plist"]];
-                if ([fm fileExistsAtPath:src])
-                    [fm copyItemAtPath:src toPath:dst error:nil];
+                if (![fm fileExistsAtPath:src]) continue;
+                [fm removeItemAtPath:dst error:nil];
+                NSData *d = [NSData dataWithContentsOfFile:src];
+                if (d.length && [d writeToFile:dst atomically:YES])
+                    rc = 0;
             }
         }
-        rc = 0;
     }
+
+    // VERIFY live inject matches stage — Zalo only worked because package default lists it
+    NSString *liveMG = @"/var/jb/usr/lib/TweakInject/iPFakerMG.plist";
+    NSString *liveTxt = [NSString stringWithContentsOfFile:liveMG encoding:NSUTF8StringEncoding error:nil] ?: @"";
+    NSUInteger missing = 0;
+    for (NSString *bid in bids) {
+        if ([bid hasPrefix:@"com.apple."]) continue;
+        if (bid.length && ![liveTxt containsString:bid]) missing++;
+    }
+    BOOL liveOK = (missing == 0 && liveTxt.length > 0);
+    if (!liveOK)
+        step([NSString stringWithFormat:@"⚠ Filter LIVE thiếu %lu app — app đó sẽ KHÔNG spoof", (unsigned long)missing]);
+    else
+        step(@"Filter LIVE: khớp app lab (inject OK)");
 
     step(@"Đóng app spoof để lần mở sau inject…");
     for (NSString *bid in bids)
         [self killAppBundleId:bid executable:nil];
-    // Refresh Settings so About dylib reloads
     [self killAppBundleId:@"com.apple.Preferences" executable:nil];
 
     NSString *preview = bids.count <= 6
@@ -2297,9 +2611,68 @@
            (unsigned long)(bids.count - 4)];
     return [NSString stringWithFormat:
             @"Multi-app spoof: %lu app · CT CommCenter=ON · Settings About=ON\n%@\n"
-            @"Đã ghi filter MG/CT/JB/About · mở lại app = spoof active\n"
+            @"Filter LIVE=%@ · mở lại app = spoof active\n"
             @"rc=%d",
-            (unsigned long)bids.count, preview, rc];
+            (unsigned long)bids.count, preview,
+            liveOK ? @"OK" : [NSString stringWithFormat:@"THIẾU %lu", (unsigned long)missing],
+            rc];
+}
+
+/// Run shell script as root: sudo -n → sudo -S (.root_pass / lab alpine) → direct sh.
+/// Treat wipe exit 4/5 as completed elevated runs (not found / residual).
++ (int)runRootShellScript:(NSString *)scriptPath {
+    if (!scriptPath.length) return -1;
+    NSFileManager *fm = [NSFileManager defaultManager];
+    if (![fm fileExistsAtPath:scriptPath]) return -1;
+    [fm setAttributes:@{ NSFilePosixPermissions: @0755 } ofItemAtPath:scriptPath error:nil];
+
+    for (NSString *sudoBin in @[ @"/var/jb/usr/bin/sudo", @"/usr/bin/sudo" ]) {
+        if (![fm isExecutableFileAtPath:sudoBin]) continue;
+        pid_t pid = 0;
+        const char *argv[] = { sudoBin.UTF8String, "-n", "sh", scriptPath.UTF8String, NULL };
+        if (posix_spawn(&pid, sudoBin.UTF8String, NULL, NULL, (char *const *)argv, NULL) == 0 && pid > 0) {
+            int st = 0;
+            waitpid(pid, &st, 0);
+            if (WIFEXITED(st)) {
+                int code = WEXITSTATUS(st);
+                if (code == 0 || code == 4 || code == 5) return code;
+            }
+        }
+    }
+
+    NSString *pass = nil;
+    for (NSString *pf in @[
+             @"/var/mobile/Library/iPFaker/.root_pass",
+             @"/var/jb/etc/ipfaker/.root_pass" ]) {
+        NSString *t = [NSString stringWithContentsOfFile:pf encoding:NSUTF8StringEncoding error:nil];
+        t = [t stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if (t.length) { pass = t; break; }
+    }
+    if (!pass.length) pass = @"alpine";
+
+    for (NSString *sudoBin in @[ @"/var/jb/usr/bin/sudo", @"/usr/bin/sudo" ]) {
+        if (![fm isExecutableFileAtPath:sudoBin]) continue;
+        NSString *shBin = @"/bin/sh";
+        if (![fm isExecutableFileAtPath:shBin]) shBin = @"/var/jb/bin/sh";
+        if (![fm isExecutableFileAtPath:shBin]) continue;
+        NSString *safePass = [pass stringByReplacingOccurrencesOfString:@"'" withString:@""];
+        NSString *cmd = [NSString stringWithFormat:
+                         @"echo '%@' | '%@' -S -p '' sh '%@'",
+                         safePass, sudoBin, scriptPath];
+        pid_t pid = 0;
+        const char *argv[] = { shBin.UTF8String, "-c", cmd.UTF8String, NULL };
+        if (posix_spawn(&pid, shBin.UTF8String, NULL, NULL, (char *const *)argv, NULL) == 0 && pid > 0) {
+            int st = 0;
+            waitpid(pid, &st, 0);
+            if (WIFEXITED(st)) {
+                int code = WEXITSTATUS(st);
+                if (code == 0 || code == 4 || code == 5) return code;
+            }
+        }
+    }
+
+    int direct = [self runShellScript:scriptPath args:@[]];
+    return direct;
 }
 
 @end

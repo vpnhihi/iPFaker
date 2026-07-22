@@ -18,7 +18,7 @@ Windows **không build** được `iPFakerMG.dylib` / Theos (cần macOS + clang
 
 ## Cần Mac (hoặc CI macOS) nếu
 
-- Muốn `.deb` / dylib **iPFakerMG + iPFakerCT** giống HIOS (không gadget)
+- Muốn `.deb` / dylib **iPFakerMG + iPFakerCT** split-stack lab (không gadget)
 - Muốn app Settings native Theos
 
 ## Lệnh Windows thường dùng

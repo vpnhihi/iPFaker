@@ -73,17 +73,32 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
         @"MetalDeviceName", @"GPUName", @"MetalRegistryID", @"DeviceSupportsMetal",
         @"InternationalMobileEquipmentIdentity", @"InternationalMobileEquipmentIdentity2",
         @"MobileEquipmentIdentifier", @"EID",
+        @"SEID", @"SecureElementID",
         @"WifiAddress", @"BluetoothAddress", @"EthernetMacAddress",
         @"BSSID", @"SSID", @"VolumeUUID",
         @"IOPlatformSerialNumber", @"MLBSerialNumber",
         @"Hostname",
         @"main-screen-width", @"main-screen-height", @"main-screen-scale", @"main-screen-pitch",
-        @"DeviceColor", @"DeviceEnclosureColor", @"BasebandVersion",
+        @"DeviceColor", @"DeviceEnclosureColor",
+        @"BasebandVersion", @"BasebandStatus", @"BasebandChipId", @"BasebandSerialNumber",
     ];
     for (NSString *k in mgKeys) {
         id v = flat[k];
         if (v) mg[k] = v;
     }
+    // Identity aliases always mirrored into mgMap (Settings About + app MG)
+    if (flat[@"SEID"] ?: flat[@"SecureElementID"]) {
+        id se = flat[@"SEID"] ?: flat[@"SecureElementID"];
+        mg[@"SEID"] = se;
+        mg[@"SecureElementID"] = se;
+    }
+    if (flat[@"WifiAddress"]) {
+        mg[@"WifiAddress"] = flat[@"WifiAddress"];
+        if (!mg[@"EthernetMacAddress"]) mg[@"EthernetMacAddress"] = flat[@"WifiAddress"];
+    }
+    if (flat[@"BluetoothAddress"]) mg[@"BluetoothAddress"] = flat[@"BluetoothAddress"];
+    if (flat[@"EID"]) mg[@"EID"] = flat[@"EID"];
+    if (flat[@"BasebandVersion"]) mg[@"BasebandVersion"] = flat[@"BasebandVersion"];
     // Aliases lab uses
     if (flat[@"ProductType"]) {
         sys[@"hw.machine"] = flat[@"ProductType"];
@@ -169,9 +184,10 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
         id bt = flat[@"kern.boottime"] ?: flat[@"BootTimeUnix"];
         sys[@"kern.boottime"] = bt;
     }
-    // Extra MG colors / baseband / disk / locale / location (Extra hooks also read stringForKey)
+    // Extra MG colors / baseband / SEID / disk / locale / location
     for (NSString *ek in @[
-        @"DeviceColor", @"DeviceEnclosureColor", @"BasebandVersion",
+        @"DeviceColor", @"DeviceEnclosureColor", @"BasebandVersion", @"BasebandStatus",
+        @"SEID", @"SecureElementID", @"EID",
         @"TotalDiskCapacity", @"FreeDiskSpace", @"UserAgent", @"HTTPUserAgent",
         @"MaxRefreshHz", @"EID", @"PartNumber", @"ModelNumberAxxxx",
         @"BatteryLevel", @"BatteryState", @"ThermalState", @"BatteryMah",
@@ -447,8 +463,19 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
             @"InternationalMobileEquipmentIdentity": @"InternationalMobileEquipmentIdentity",
             @"MobileEquipmentIdentifier": @"MobileEquipmentIdentifier",
             @"EID": @"EID",
+            @"eid": @"EID",
+            @"SEID": @"SEID",
+            @"seid": @"SEID",
+            @"SecureElementID": @"SEID",
             @"WifiAddress": @"WifiAddress",
+            @"wifi-address": @"WifiAddress",
+            @"WiFiAddress": @"WifiAddress",
             @"BluetoothAddress": @"BluetoothAddress",
+            @"bluetooth-address": @"BluetoothAddress",
+            @"EthernetMacAddress": @"EthernetMacAddress",
+            @"BasebandVersion": @"BasebandVersion",
+            @"baseband-version": @"BasebandVersion",
+            @"BasebandStatus": @"BasebandStatus",
             // Obfuscated MG keys (MD5("MGCopyAnswer"+name) → base64 without ==)
             // Settings → About often queries these instead of plain names.
             @"qNNddlUK+B/YlooNoymwgA": @"ProductVersion",
@@ -465,6 +492,18 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
             @"bbtR9jQx50Fv5Af/affNtA": @"MarketingName",
             @"aS/S7hCcobxbRgwdTuv4bw": @"MarketingName",
             @"ghpAuGJlPoauWijdtPi7sQ": @"UserAssignedDeviceName",
+            // Settings → About network / modem / eSIM (hashed)
+            @"gI6iODv8MZuiP0IA+efJCw": @"WifiAddress",
+            @"k5lVWbXuiZHLA17KGiVUAA": @"BluetoothAddress",
+            @"VG9TCKNqNLCHk0J6zTkuVQ": @"EthernetMacAddress",
+            @"R/LYYYD0Hbp5ABLodeB6CA": @"EID",
+            @"TKCGjYZ469LPAKBt0pYAfA": @"BasebandVersion",
+            @"CN64p1hw1JVdTHCfBdgPLQ": @"BasebandStatus",
+            @"nZUUCFZgomfWUIPGGzNAqg": @"SEID",
+            @"ZOQ45IL7jB7NAlLPFjsDmg": @"SEID",
+            @"NwKSSWY9/QHIT55G1T7oYg": @"SEID",
+            @"VasUgeSzVyHdB27g2XpN0g": @"SerialNumber",
+            @"QZgogo2DypSAZfkRW4dP/A": @"InternationalMobileEquipmentIdentity",
         };
     });
     NSString *canon = aliases[key];

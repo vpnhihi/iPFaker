@@ -1,6 +1,6 @@
 # Sau khi reset → Rootless (Dopamine) — checklist iPFaker
 
-Mục tiêu: môi trường **rootless `/var/jb` cố định** để build app/tweak fake sâu kiểu HIOS (hoặc hơn về profile + Zalo-only lab).
+Mục tiêu: môi trường **rootless `/var/jb` cố định** để build app/tweak fake sâu lab clean-app (hoặc hơn về profile + Zalo-only lab).
 
 ---
 
@@ -83,7 +83,7 @@ Zalo bundle: thường `vn.com.vng.zingalo` hoặc `com.zing.zalo` — script au
 
 ---
 
-## E. Tweak native (HIOS-style) — khi có Mac + Theos
+## E. Tweak native (lab flat) — khi có Mac + Theos
 
 ```bash
 export THEOS=~/theos

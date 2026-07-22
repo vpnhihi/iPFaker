@@ -1,4 +1,4 @@
-# Xóa sạch Zalo (kiểu HIOS / ChangeInfo)
+# Xóa sạch Zalo (kiểu reference stack)
 
 Mục tiêu lab: sau wipe, Zalo mở như **cài mới** (mất device id local / session / keychain app), rồi mới bật spoof và tạo account test.
 
@@ -6,9 +6,9 @@ Mục tiêu lab: sau wipe, Zalo mở như **cài mới** (mất device id local 
 
 ---
 
-## So với HIOS
+## So với baseline reference
 
-| HIOS / ChangeInfo | iPFaker |
+| reference stack | iPFaker |
 |-------------------|---------|
 | `wipeZaloKC` trong dylib | `frida/wipe_zalo_kc.js` + SQL keychain best-effort |
 | App bấm “đổi máy” → wipe | `scripts/wipe_zalo.ps1` / `injector/wipe_zalo.sh` |

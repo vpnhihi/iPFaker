@@ -46,13 +46,13 @@ a{color:#60a5fa}
 </style></head><body>
 <h1>iPFaker — nguồn Sileo</h1>
 <p class="url">https://vpnhihi.github.io/ipfaker/</p>
-<p>Gói <b>com.ipfaker 2.7.0</b> · rootless · iphoneos-arm64 · Dopamine</p>
+<p>Gói <b>com.ipfaker 2.8.0</b> · full stack lab · rootless · iphoneos-arm64 · Dopamine</p>
 <ol>
 <li>Sileo → Sources → +</li>
 <li>Dán URL (chữ thường ipfaker) → Add</li>
 <li>Refresh → tìm <b>iPFaker</b> → Cài</li>
 </ol>
-<p><a href="debs/com.ipfaker_2.7.0_iphoneos-arm64.deb">Tải .deb 2.7.0 trực tiếp</a></p>
+<p><a href="debs/com.ipfaker_2.8.0_iphoneos-arm64.deb">Tải .deb 2.8.0 trực tiếp</a></p>
 </body></html>
 """,
         encoding="utf-8",
@@ -79,7 +79,7 @@ a{color:#60a5fa}
     run(["git", "config", "user.email", "ipfaker-lab@local"])
     run(["git", "config", "user.name", "iPFaker Lab"])
     run(["git", "add", "-A"])
-    run(["git", "commit", "-m", "sileo pages 2.7.0"])
+    run(["git", "commit", "-m", "sileo pages 2.8.0 full stack"])
 
     ask = tmp / "askpass.py"
     ask.write_text(

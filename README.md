@@ -11,7 +11,8 @@ Jailbreak tool (**Dopamine rootless**) — spoof device identity cho **Zalo**, a
 | 1. Nguồn Sileo | **`https://vpnhihi.github.io/ipfaker/`** (chữ thường) |
 | 2. Hướng dẫn cài + key | **[INSTALL_KHACH.md](INSTALL_KHACH.md)** |
 | 3. Sheet license | **[docs/LICENSE_SHEET.md](docs/LICENSE_SHEET.md)** |
-| 4. Deb trực tiếp | `https://vpnhihi.github.io/ipfaker/debs/com.ipfaker_2.7.0_iphoneos-arm64.deb` |
+| 4. Deb trực tiếp | `https://vpnhihi.github.io/ipfaker/debs/com.ipfaker_2.8.0_iphoneos-arm64.deb` |
+| 5. Tools / máy mới | **[tools/README.md](tools/README.md)** — full stack 1 lần = như lab |
 
 > Repo GitHub: https://github.com/vpnhihi/ipfaker  
 
@@ -47,7 +48,8 @@ python scripts\gen_app_icons.py path\to\icon.png
 
 ## Tính năng chính (máy)
 
-- Spoof full identity (MG + CT dylib), filter **Zalo only**  
+- Full stack lab: **MG · CT · JB · About · AboutUI · AboutVer · AA**  
+- Spoof identity + Settings About sync + multi-app wipe (Zalo-depth)  
 - Multi model iPhone + multi iOS (matrix), multi-select pool  
 - **Đặt lại dữ liệu app** / **Đặt lại + Lưu dữ liệu** (giữ login)  
 - License key + **ID máy** + Chạy/Dừng/Out  

@@ -109,9 +109,12 @@ static BOOL IPFAllowMGKey(NSString *k) {
     if ([lk containsString:@"advertising"] || [lk isEqualToString:@"idfa"]
         || [lk containsString:@"identifierforvendor"] || [lk isEqualToString:@"idfv"])
         return [c flag:@"FakeAds" defaultYes:YES];
-    // Wi‑Fi / BT MAC (IEEE 802 EUI-48)
+    // Wi‑Fi / BT MAC (IEEE 802 EUI-48) + hashed MG keys used by Settings About
     if ([lk containsString:@"wifi"] || [lk containsString:@"bluetooth"]
-        || [lk containsString:@"ethernetmac"] || [lk isEqualToString:@"bssid"])
+        || [lk containsString:@"ethernetmac"] || [lk isEqualToString:@"bssid"]
+        || [k isEqualToString:@"gI6iODv8MZuiP0IA+efJCw"]   // WifiAddress
+        || [k isEqualToString:@"k5lVWbXuiZHLA17KGiVUAA"]   // BluetoothAddress
+        || [k isEqualToString:@"VG9TCKNqNLCHk0J6zTkuVQ"])  // EthernetMacAddress
         return [c flag:@"FakeWifi" defaultYes:YES];
     // OS version / build (plain + known obfuscated MG keys)
     if ([lk containsString:@"productversion"] || [lk containsString:@"buildversion"]
@@ -123,11 +126,17 @@ static BOOL IPFAllowMGKey(NSString *k) {
     // Screen MG keys
     if ([lk containsString:@"screen"] || [lk containsString:@"display"])
         return [c flag:@"FakeScreen" defaultYes:YES] || [c flag:@"FakeRealScreen" defaultYes:NO];
-    // Hardware identity
+    // Hardware identity (+ eSIM EID, Secure Element SEID, baseband/modem)
     if ([lk containsString:@"serial"] || [lk containsString:@"unique"] || [lk containsString:@"chip"]
         || [lk containsString:@"imei"] || [lk containsString:@"meid"] || [lk containsString:@"eid"]
+        || [lk containsString:@"seid"] || [lk containsString:@"secureelement"]
         || [lk containsString:@"baseband"] || [lk containsString:@"memsize"]
-        || [lk containsString:@"physicalmemory"])
+        || [lk containsString:@"physicalmemory"]
+        || [k isEqualToString:@"R/LYYYD0Hbp5ABLodeB6CA"]   // EID
+        || [k isEqualToString:@"TKCGjYZ469LPAKBt0pYAfA"]   // BasebandVersion
+        || [k isEqualToString:@"nZUUCFZgomfWUIPGGzNAqg"]   // SecureElementID
+        || [k isEqualToString:@"ZOQ45IL7jB7NAlLPFjsDmg"]   // SEID
+        || [k isEqualToString:@"NwKSSWY9/QHIT55G1T7oYg"])  // seid
         return [c flag:@"FakeHardware" defaultYes:YES];
     // Device model / marketing (default device surface)
     return [c flag:@"FakeDevice" defaultYes:YES];
@@ -329,17 +338,35 @@ static CFTypeRef stub_MGCopyAnswer(CFStringRef key) {
             CFTypeRef cf = IPFMakeCF(fake);
             if (cf) return cf;
         }
-        // Hashed / unknown keys: still try MarketingName when key looks marketing-related
-        if (!fake && key && [[IPFConfig shared] flag:@"FakeDevice" defaultYes:YES]) {
+        // Hashed / unknown keys: marketing + network/modem/eSIM for Settings About trust
+        if (!fake && key) {
             NSString *lk = k.lowercaseString;
+            IPFConfig *cfg = [IPFConfig shared];
             if ([lk containsString:@"marketing"] || [lk isEqualToString:@"productname"]
                 || [lk containsString:@"humanreadableproduct"]) {
-                fake = [[IPFConfig shared] mgValueForKey:@"MarketingName"];
-                if (fake) {
-                    IPFTrace([NSString stringWithFormat:@"MG FAKE(alias) %@ => %@", k, fake]);
-                    CFTypeRef cf = IPFMakeCF(fake);
-                    if (cf) return cf;
-                }
+                if ([cfg flag:@"FakeDevice" defaultYes:YES])
+                    fake = [cfg mgValueForKey:@"MarketingName"];
+            } else if ([lk containsString:@"wifi"] || [lk containsString:@"wlan"]
+                       || [lk containsString:@"ethernetmac"]) {
+                if ([cfg flag:@"FakeWifi" defaultYes:YES])
+                    fake = [cfg mgValueForKey:@"WifiAddress"];
+            } else if ([lk containsString:@"bluetooth"]) {
+                if ([cfg flag:@"FakeWifi" defaultYes:YES])
+                    fake = [cfg mgValueForKey:@"BluetoothAddress"];
+            } else if ([lk containsString:@"baseband"] || [lk containsString:@"modem"]) {
+                if ([cfg flag:@"FakeHardware" defaultYes:YES])
+                    fake = [cfg mgValueForKey:@"BasebandVersion"];
+            } else if ([lk containsString:@"seid"] || [lk containsString:@"secureelement"]) {
+                if ([cfg flag:@"FakeHardware" defaultYes:YES])
+                    fake = [cfg mgValueForKey:@"SEID"];
+            } else if ([lk isEqualToString:@"eid"] || [lk containsString:@"euicc"]) {
+                if ([cfg flag:@"FakeHardware" defaultYes:YES])
+                    fake = [cfg mgValueForKey:@"EID"];
+            }
+            if (fake) {
+                IPFTrace([NSString stringWithFormat:@"MG FAKE(alias) %@ => %@", k, fake]);
+                CFTypeRef cf = IPFMakeCF(fake);
+                if (cf) return cf;
             }
         }
         CFTypeRef real = orig_MGCopyAnswer ? orig_MGCopyAnswer(key) : NULL;

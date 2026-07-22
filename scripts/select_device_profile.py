@@ -647,6 +647,7 @@ def build_profile(device: dict, ios_ver: str, ios_meta: dict, name: str | None) 
         imei2 = random_imei()
     meid = imei[:14]  # MEID-like: 14 decimal from IMEI body
     eid = random_eid()
+    seid = "".join(random.choice("0123456789ABCDEF") for _ in range(40))
     dev_name = name or random_device_name(device.get("MarketingName") or "iPhone", device["id"])
     host_name = hostname_from_name(dev_name)
     capacity = random_capacity_gb(device)
@@ -712,6 +713,8 @@ def build_profile(device: dict, ios_ver: str, ios_meta: dict, name: str | None) 
         "InternationalMobileEquipmentIdentity2": imei2,
         "MobileEquipmentIdentifier": meid,
         "EID": eid,
+        "SEID": seid,
+        "SecureElementID": seid,
         # MG / IOKit-style aliases (same values)
         "serial-number": serial,
         "Serial": serial,
@@ -781,7 +784,8 @@ def build_profile(device: dict, ios_ver: str, ios_meta: dict, name: str | None) 
         "DeviceEnclosureColor": random.choice(
             ("1", "2", "3", "4", "5", "6", "7", "8", "9", "black", "white", "blue", "natural")
         ),
-        "BasebandVersion": f"1.{random.randint(10, 90):02d}.0{random.randint(0, 9)}",
+        "BasebandVersion": f"{random.randint(1, 4)}.{random.randint(1, 90):02d}.{random.randint(0, 19):02d}",
+        "BasebandStatus": "BBUpdateStatusSuccess",
         "UserAgent": (
             f"Mozilla/5.0 (iPhone; CPU iPhone OS "
             f"{ios_meta['ProductVersion'].replace('.', '_')} like Mac OS X) "
@@ -988,6 +992,8 @@ KNOWN_CONFIG_KEYS = frozenset(
         "InternationalMobileEquipmentIdentity2",
         "MobileEquipmentIdentifier",
         "EID",
+        "SEID",
+        "SecureElementID",
         "ECID",
         "WifiAddress",
         "BluetoothAddress",
@@ -1001,6 +1007,9 @@ KNOWN_CONFIG_KEYS = frozenset(
         "DeviceColor",
         "DeviceEnclosureColor",
         "BasebandVersion",
+        "BasebandStatus",
+        "BasebandChipId",
+        "BasebandSerialNumber",
         "IDFA",
         "IDFV",
         "identifierForVendor",
