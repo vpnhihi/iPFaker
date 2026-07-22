@@ -617,14 +617,7 @@ void IPFInstallMGHooksLite(void) {
         } else {
             IPFTrace(@"Lite WARN no MGCopyAnswer");
         }
-        // Identity sysctl only — full sysctl surface stays off (stability)
-        void *sys = dlsym(RTLD_DEFAULT, "sysctlbyname");
-        if (sys)
-            pMSHookFunction(sys, (void *)stub_sysctlbyname, (void **)&orig_sysctlbyname);
-        void *un = dlsym(RTLD_DEFAULT, "uname");
-        if (un)
-            pMSHookFunction(un, (void *)stub_uname, (void **)&orig_uname);
-        IPFTrace(@"Lite sysctlbyname+uname OK");
+        // Do NOT hook sysctl/uname in Preferences — About path became unstable (crash after ctor).
         // Skip MGCopyAnswerWithError — FDR/CoreRepair PAC on arm64e
     } else {
         IPFTrace(@"Lite WARN no MSHookFunction");
