@@ -146,12 +146,12 @@ static CFDictionaryRef stub_CFCopySysVer(void) {
 
 static void IPFVerResolve(void) {
     if (pMSHookFunction) return;
-    for (const char *lib in (const char *[]){
+    const char *libs[] = {
         "/var/jb/usr/lib/libellekit.dylib",
         "/var/jb/usr/lib/libsubstrate.dylib",
-        NULL
-    }) {
-        void *h = dlopen(lib, RTLD_NOW);
+    };
+    for (size_t i = 0; i < sizeof(libs) / sizeof(libs[0]); i++) {
+        void *h = dlopen(libs[i], RTLD_NOW);
         if (!h) continue;
         pMSHookFunction = (MSHookFunction_t)dlsym(h, "MSHookFunction");
         pMSHookMessageEx = (MSHookMessageEx_t)dlsym(h, "MSHookMessageEx");
