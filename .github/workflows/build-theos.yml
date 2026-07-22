@@ -52,6 +52,7 @@ jobs:
           cp -f layout/Library/MobileSubstrate/DynamicLibraries/iPFakerMG.plist ./iPFakerMG.plist
           cp -f layout/Library/MobileSubstrate/DynamicLibraries/iPFakerCT.plist ./iPFakerCT.plist
           cp -f layout/Library/MobileSubstrate/DynamicLibraries/iPFakerJB.plist ./iPFakerJB.plist
+          cp -f layout/Library/MobileSubstrate/DynamicLibraries/iPFakerAbout.plist ./iPFakerAbout.plist
           cp -f layout/Library/MobileSubstrate/DynamicLibraries/iPFakerMG.plist ./iPFakerAA.plist
           cp -f ./iPFakerAA.plist layout/Library/MobileSubstrate/DynamicLibraries/iPFakerAA.plist
           make clean || true
@@ -66,7 +67,7 @@ jobs:
           set -e
           mkdir -p dist
           find .theos/obj -name 'iPFaker*.dylib' 2>/dev/null | head -20
-          for name in iPFakerAA iPFakerMG iPFakerCT iPFakerJB; do
+          for name in iPFakerAA iPFakerAbout iPFakerMG iPFakerCT iPFakerJB; do
             f=$(find .theos -path '*debug*' -prune -o -name "${name}.dylib" -print 2>/dev/null | head -1)
             if [ -z "$f" ]; then f=$(find .theos -name "${name}.dylib" | head -1); fi
             if [ -z "$f" ]; then
@@ -77,10 +78,11 @@ jobs:
           done
           cp -f layout/Library/MobileSubstrate/DynamicLibraries/*.plist dist/ 2>/dev/null || true
           cp -f iPFakerAA.plist dist/ 2>/dev/null || true
+          cp -f iPFakerAbout.plist dist/ 2>/dev/null || true
           find packages -name '*.deb' -exec cp -f {} dist/ \; 2>/dev/null || true
           ls -la dist
           file dist/iPFaker*.dylib || true
-          for d in dist/iPFakerAA.dylib dist/iPFakerMG.dylib dist/iPFakerCT.dylib dist/iPFakerJB.dylib; do
+          for d in dist/iPFakerAA.dylib dist/iPFakerAbout.dylib dist/iPFakerMG.dylib dist/iPFakerCT.dylib dist/iPFakerJB.dylib; do
             echo "=== fixup $d ==="
             otool -L "$d" || true
             install_name_tool -change \
@@ -103,7 +105,8 @@ jobs:
           CTSIZE=$(stat -f%z dist/iPFakerCT.dylib 2>/dev/null || stat -c%s dist/iPFakerCT.dylib)
           AASIZE=$(stat -f%z dist/iPFakerAA.dylib 2>/dev/null || stat -c%s dist/iPFakerAA.dylib)
           JBSIZE=$(stat -f%z dist/iPFakerJB.dylib 2>/dev/null || stat -c%s dist/iPFakerJB.dylib)
-          echo "MGSIZE=$MGSIZE CTSIZE=$CTSIZE AASIZE=$AASIZE JBSIZE=$JBSIZE"
+          ABOUTSIZE=$(stat -f%z dist/iPFakerAbout.dylib 2>/dev/null || stat -c%s dist/iPFakerAbout.dylib)
+          echo "MGSIZE=$MGSIZE CTSIZE=$CTSIZE AASIZE=$AASIZE JBSIZE=$JBSIZE ABOUTSIZE=$ABOUTSIZE"
           # Lab AMFI: historically ≤132k; allow headroom after kern.uname spoof (~140k still injects)
           if [ "$MGSIZE" -gt 145000 ]; then
             echo "FATAL: MG $MGSIZE > 145000 — AMFI lab reject zone"
@@ -113,10 +116,16 @@ jobs:
             echo "FATAL: AA $AASIZE too large for lite dylib"
             exit 1
           fi
+          # Preferences (platform) rejects ~138k; About must stay small
+          if [ "$ABOUTSIZE" -gt 120000 ]; then
+            echo "FATAL: About $ABOUTSIZE > 120000 — platform Preferences CODESIGN risk"
+            exit 1
+          fi
           ldid -h dist/iPFakerMG.dylib 2>&1 | grep -q CDHash=
           ldid -h dist/iPFakerCT.dylib 2>&1 | grep -q CDHash=
           ldid -h dist/iPFakerJB.dylib 2>&1 | grep -q CDHash=
           ldid -h dist/iPFakerAA.dylib 2>&1 | grep -q CDHash=
+          ldid -h dist/iPFakerAbout.dylib 2>&1 | grep -q CDHash=
 
 
       - name: Build iPFaker.app
