@@ -125,6 +125,93 @@ static BOOL IPFAllowMGKey(NSString *k) {
     return [c flag:@"FakeDevice" defaultYes:YES];
 }
 
+// Host identity captured once (plain keys) — wash hashed/unknown MG keys that still return host values
+static NSString *gHostProductType;
+static NSString *gHostMarketingName;
+static NSString *gHostModelNumber;
+static NSString *gHostHWModel;
+static NSString *gHostSerial;
+
+static void IPFCaptureHostIdentity(void) {
+    if (gHostProductType) return;
+    if (!orig_MGCopyAnswer) return;
+    @autoreleasepool {
+        CFTypeRef (^take)(CFStringRef) = ^CFTypeRef(CFStringRef key) {
+            return orig_MGCopyAnswer(key);
+        };
+        CFTypeRef pt = take(CFSTR("ProductType"));
+        CFTypeRef mk = take(CFSTR("MarketingNameString"));
+        if (!mk) mk = take(CFSTR("marketing-name"));
+        if (!mk) mk = take(CFSTR("MarketingProductName"));
+        CFTypeRef mn = take(CFSTR("ModelNumber"));
+        CFTypeRef hw = take(CFSTR("HWModelStr"));
+        if (!hw) hw = take(CFSTR("HardwareModel"));
+        CFTypeRef sn = take(CFSTR("SerialNumber"));
+        if (pt && CFGetTypeID(pt) == CFStringGetTypeID())
+            gHostProductType = [[NSString alloc] initWithString:(__bridge NSString *)pt];
+        if (mk && CFGetTypeID(mk) == CFStringGetTypeID())
+            gHostMarketingName = [[NSString alloc] initWithString:(__bridge NSString *)mk];
+        if (mn && CFGetTypeID(mn) == CFStringGetTypeID())
+            gHostModelNumber = [[NSString alloc] initWithString:(__bridge NSString *)mn];
+        if (hw && CFGetTypeID(hw) == CFStringGetTypeID())
+            gHostHWModel = [[NSString alloc] initWithString:(__bridge NSString *)hw];
+        if (sn && CFGetTypeID(sn) == CFStringGetTypeID())
+            gHostSerial = [[NSString alloc] initWithString:(__bridge NSString *)sn];
+        if (pt) CFRelease(pt);
+        if (mk) CFRelease(mk);
+        if (mn) CFRelease(mn);
+        if (hw) CFRelease(hw);
+        if (sn) CFRelease(sn);
+        IPFTrace([NSString stringWithFormat:@"host wash PT=%@ Mkt=%@ Model#=%@ HW=%@",
+                  gHostProductType ?: @"?", gHostMarketingName ?: @"?",
+                  gHostModelNumber ?: @"?", gHostHWModel ?: @"?"]);
+    }
+}
+
+/// If real MG string still equals host identity, replace with spoof (covers hashed MG keys).
+static CFTypeRef IPFWashHostMGValue(NSString *k, CFTypeRef real) {
+    if (!real || CFGetTypeID(real) != CFStringGetTypeID()) return real;
+    if (![[IPFConfig shared] flag:@"FakeDevice" defaultYes:YES]) return real;
+    NSString *rs = (__bridge NSString *)real;
+    if (rs.length == 0) return real;
+    IPFConfig *cfg = [IPFConfig shared];
+    id repl = nil;
+    NSString *why = nil;
+    if (gHostProductType.length && [rs isEqualToString:gHostProductType]) {
+        repl = [cfg mgValueForKey:@"ProductType"];
+        why = @"hostPT";
+    } else if (gHostMarketingName.length && [rs isEqualToString:gHostMarketingName]) {
+        repl = [cfg mgValueForKey:@"MarketingName"];
+        why = @"hostMkt";
+    } else if (gHostModelNumber.length && [rs isEqualToString:gHostModelNumber]) {
+        repl = [cfg mgValueForKey:@"ModelNumber"];
+        why = @"hostModel#";
+    } else if (gHostHWModel.length && [rs isEqualToString:gHostHWModel]) {
+        repl = [cfg mgValueForKey:@"HWModelStr"];
+        why = @"hostHW";
+    } else if (gHostSerial.length && [rs isEqualToString:gHostSerial]) {
+        repl = [cfg mgValueForKey:@"SerialNumber"];
+        why = @"hostSN";
+    } else if ([rs hasPrefix:@"iPhone "] && gHostMarketingName.length == 0) {
+        // Fallback: any marketing-looking iPhone name when host mkt unknown → use spoof MarketingName
+        // Only when key hints identity (or value looks like full marketing model, not "iPhone")
+        BOOL keyHint = [k rangeOfString:@"[Mm]arket" options:NSRegularExpressionSearch].location != NSNotFound
+            || [k rangeOfString:@"[Nn]ame" options:NSRegularExpressionSearch].location != NSNotFound
+            || [k rangeOfString:@"[Pp]roduct" options:NSRegularExpressionSearch].location != NSNotFound
+            || k.length >= 16; // hashed MG keys are long
+        if (keyHint && ![rs isEqualToString:@"iPhone"]) {
+            repl = [cfg mgValueForKey:@"MarketingName"];
+            why = @"mktPrefix";
+        }
+    }
+    if (!repl) return real;
+    CFTypeRef cf = IPFMakeCF(repl);
+    if (!cf) return real;
+    IPFTrace([NSString stringWithFormat:@"MG WASH %@ (%@) %@ => %@", k, why, rs, repl]);
+    CFRelease(real);
+    return cf;
+}
+
 static CFTypeRef stub_MGCopyAnswer(CFStringRef key) {
     @autoreleasepool {
         NSString *k = key ? (__bridge NSString *)key : @"(null)";
@@ -134,7 +221,22 @@ static CFTypeRef stub_MGCopyAnswer(CFStringRef key) {
             CFTypeRef cf = IPFMakeCF(fake);
             if (cf) return cf;
         }
+        // Hashed / unknown keys: still try MarketingName when key looks marketing-related
+        if (!fake && key && [[IPFConfig shared] flag:@"FakeDevice" defaultYes:YES]) {
+            NSString *lk = k.lowercaseString;
+            if ([lk containsString:@"marketing"] || [lk isEqualToString:@"productname"]
+                || [lk containsString:@"humanreadableproduct"]) {
+                fake = [[IPFConfig shared] mgValueForKey:@"MarketingName"];
+                if (fake) {
+                    IPFTrace([NSString stringWithFormat:@"MG FAKE(alias) %@ => %@", k, fake]);
+                    CFTypeRef cf = IPFMakeCF(fake);
+                    if (cf) return cf;
+                }
+            }
+        }
         CFTypeRef real = orig_MGCopyAnswer ? orig_MGCopyAnswer(key) : NULL;
+        if (real)
+            real = IPFWashHostMGValue(k, real);
         NSString *rv = @"(nil)";
         if (real) {
             id o = (__bridge id)real;
@@ -155,7 +257,8 @@ static CFTypeRef stub_MGCopyAnswer(CFStringRef key) {
             || [k rangeOfString:@"Chip" options:NSCaseInsensitiveSearch].location != NSNotFound
             || [k rangeOfString:@"Region" options:NSCaseInsensitiveSearch].location != NSNotFound
             || [k rangeOfString:@"screen" options:NSCaseInsensitiveSearch].location != NSNotFound
-            || [k rangeOfString:@"model" options:NSCaseInsensitiveSearch].location != NSNotFound) {
+            || [k rangeOfString:@"model" options:NSCaseInsensitiveSearch].location != NSNotFound
+            || [rv hasPrefix:@"iPhone "]) {
             IPFTrace([NSString stringWithFormat:@"MG REAL %@ => %@", k, rv]);
         }
         return real;
@@ -499,8 +602,8 @@ void IPFInstallMGHooks(void) {
 #endif
 }
 
-// Settings About (Preferences): CoreRepair/FDR calls MGCopyAnswerWithError under PAC.
-// Hooking WithError / global sysctl here → SIGSEGV PAC. Keep only MGCopyAnswer + UIDevice labels.
+// Settings About (Preferences): skip MGCopyAnswerWithError (CoreRepair PAC crash).
+// MGCopyAnswer + host-value wash + sysctl identity (hw.machine) + UIDevice.
 void IPFInstallMGHooksLite(void) {
     IPFTrace(@"IPFInstallMGHooksLite begin");
     IPFResolveSubstrate();
@@ -509,10 +612,20 @@ void IPFInstallMGHooksLite(void) {
         if (mg) {
             pMSHookFunction(mg, (void *)stub_MGCopyAnswer, (void **)&orig_MGCopyAnswer);
             IPFTrace([NSString stringWithFormat:@"Lite MSHook MGCopyAnswer %p orig=%p", mg, orig_MGCopyAnswer]);
+            // Capture host AFTER hook so orig_ is valid
+            IPFCaptureHostIdentity();
         } else {
             IPFTrace(@"Lite WARN no MGCopyAnswer");
         }
-        // Intentionally skip MGCopyAnswerWithError, sysctl*, uname
+        // Identity sysctl only — full sysctl surface stays off (stability)
+        void *sys = dlsym(RTLD_DEFAULT, "sysctlbyname");
+        if (sys)
+            pMSHookFunction(sys, (void *)stub_sysctlbyname, (void **)&orig_sysctlbyname);
+        void *un = dlsym(RTLD_DEFAULT, "uname");
+        if (un)
+            pMSHookFunction(un, (void *)stub_uname, (void **)&orig_uname);
+        IPFTrace(@"Lite sysctlbyname+uname OK");
+        // Skip MGCopyAnswerWithError — FDR/CoreRepair PAC on arm64e
     } else {
         IPFTrace(@"Lite WARN no MSHookFunction");
     }
