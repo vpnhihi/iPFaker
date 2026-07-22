@@ -638,28 +638,8 @@ static int stub_sysctlbyname_lite(const char *name, void *oldp, size_t *oldlenp,
     return orig_sysctlbyname ? orig_sysctlbyname(name, oldp, oldlenp, newp, newlen) : -1;
 }
 
-// CFCopySystemVersionDictionary — Settings About "Phiên bản phần mềm" often reads this
-// (SystemVersion.plist), not only MG ProductVersion.
-static CFDictionaryRef (*orig_CFCopySystemVersionDictionary)(void);
-static CFDictionaryRef stub_CFCopySystemVersionDictionary(void) {
-    CFDictionaryRef real = orig_CFCopySystemVersionDictionary ? orig_CFCopySystemVersionDictionary() : NULL;
-    IPFConfig *cfg = [IPFConfig shared];
-    if (![cfg flag:@"FakeSysOSVersion" defaultYes:YES]) return real;
-    NSString *pv = [cfg stringForKey:@"ProductVersion"];
-    NSString *bv = [cfg stringForKey:@"BuildVersion"] ?: [cfg stringForKey:@"ProductBuildVersion"];
-    if (!pv.length && !bv.length) return real;
-    NSMutableDictionary *m = real ? [(__bridge NSDictionary *)real mutableCopy] : [NSMutableDictionary dictionary];
-    if (pv.length) {
-        m[@"ProductVersion"] = pv;
-        m[@"ProductVersionExtra"] = @"";
-    }
-    if (bv.length) m[@"ProductBuildVersion"] = bv;
-    IPFTrace([NSString stringWithFormat:@"CFCopySystemVersionDictionary FAKE iOS=%@ build=%@", pv ?: @"?", bv ?: @"?"]);
-    if (real) CFRelease(real);
-    return CFBridgingRetain(m);
-}
-
-// Settings About: MG + UIDevice + sysctl OS + CFCopySystemVersionDictionary.
+// Settings About: MG + UIDevice + sysctl (machine + osproductversion).
+// CFCopySystemVersionDictionary intentionally NOT hooked here — AMFI CODESIGN kill on Preferences.
 // No WithError/uname (PAC/stability).
 void IPFInstallMGHooksLite(void) {
     IPFTrace(@"IPFInstallMGHooksLite begin");
@@ -682,15 +662,6 @@ void IPFInstallMGHooksLite(void) {
         if (sc) {
             pMSHookFunction(sc, (void *)stub_sysctl, (void **)&orig_sysctl);
             IPFTrace(@"Lite sysctl CTL_HW machine/model");
-        }
-        void *sv = dlsym(RTLD_DEFAULT, "CFCopySystemVersionDictionary");
-        if (!sv) sv = dlsym(RTLD_DEFAULT, "_CFCopySystemVersionDictionary");
-        if (sv) {
-            pMSHookFunction(sv, (void *)stub_CFCopySystemVersionDictionary,
-                            (void **)&orig_CFCopySystemVersionDictionary);
-            IPFTrace(@"Lite CFCopySystemVersionDictionary OK");
-        } else {
-            IPFTrace(@"Lite WARN no CFCopySystemVersionDictionary");
         }
     } else {
         IPFTrace(@"Lite WARN no MSHookFunction");
