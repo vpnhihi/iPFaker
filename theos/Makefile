@@ -14,7 +14,7 @@ include $(THEOS)/makefiles/common.mk
 #   CT = telephony + deep rewrite
 #   JB = expanded hide (fopen/getenv/fileExists) — optional, fails independently
 # AA = ServerLite (AppAttest/Proxy/WebRTC) — loads first alphabetically, tiny, no IPFConfig.m
-TWEAK_NAME = iPFakerAA iPFakerAbout iPFakerMG iPFakerCT iPFakerJB
+TWEAK_NAME = iPFakerAA iPFakerAbout iPFakerAboutVer iPFakerMG iPFakerCT iPFakerJB
 
 # MG = spoof + Extra (screen/disk/UA/getifaddrs/access-stat/WKWebView)
 # fishhook.c OFF by default: keeps MG ~123k AMFI-safe. ElleKit MSHook is primary on Dopamine.
@@ -26,12 +26,19 @@ iPFakerAA_FRAMEWORKS = Foundation
 iPFakerAA_LIBRARIES = substrate
 iPFakerAA_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerAA.dylib -Wl,-dead_strip
 
-# About: Config + MG hooks (IPF_ABOUT_LITE enables SystemVersion.plist / NSProcessInfo OS hooks)
+# About: Config + MG hooks (model# / marketing / MG ProductVersion)
 iPFakerAbout_FILES = TweakAbout.x src/IPFConfig.m src/IPFHooksMG.m
 iPFakerAbout_CFLAGS = -fobjc-arc -Os -fvisibility=hidden -DIPF_NO_MG_DEBUG=1 -DIPF_ABOUT_LITE=1 -ffunction-sections -fdata-sections -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
 iPFakerAbout_FRAMEWORKS = UIKit Foundation AdSupport
 iPFakerAbout_LIBRARIES = substrate
 iPFakerAbout_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerAbout.dylib -Wl,-dead_strip -Wl,-x
+
+# AboutVer: ultra-tiny SystemVersion-only (Phiên bản phần mềm). No IPFConfig.m — stays AMFI-lean.
+iPFakerAboutVer_FILES = TweakAboutVer.x
+iPFakerAboutVer_CFLAGS = -fobjc-arc -Os -fvisibility=hidden -ffunction-sections -fdata-sections -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations
+iPFakerAboutVer_FRAMEWORKS = Foundation UIKit
+iPFakerAboutVer_LIBRARIES = substrate
+iPFakerAboutVer_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerAboutVer.dylib -Wl,-dead_strip -Wl,-x
 
 # MG: spoof + Extra — must stay under AMFI ~145k (no About-only hooks linked in).
 iPFakerMG_FILES = TweakMG.x src/IPFConfig.m src/IPFHooksMG.m src/IPFHooksExtra.m
