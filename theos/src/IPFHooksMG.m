@@ -183,6 +183,11 @@ static CFTypeRef IPFWashHostMGValue(NSString *k, CFTypeRef real) {
     } else if (gHostMarketingName.length && [rs isEqualToString:gHostMarketingName]) {
         repl = [cfg mgValueForKey:@"MarketingName"];
         why = @"hostMkt";
+    } else if ([rs isEqualToString:@"iPhone XS Max"] || [rs isEqualToString:@"iPhone Xs Max"]
+               || [rs isEqualToString:@"iPhone XS"] || [rs isEqualToString:@"iPhone Xs"]) {
+        // Locale variants of host XS Max marketing string
+        repl = [cfg mgValueForKey:@"MarketingName"];
+        why = @"xsMaxVariant";
     } else if (gHostModelNumber.length && [rs isEqualToString:gHostModelNumber]) {
         repl = [cfg mgValueForKey:@"ModelNumber"];
         why = @"hostModel#";
@@ -602,8 +607,30 @@ void IPFInstallMGHooks(void) {
 #endif
 }
 
-// Settings About (Preferences): skip MGCopyAnswerWithError (CoreRepair PAC crash).
-// MGCopyAnswer + host-value wash + sysctl identity (hw.machine) + UIDevice.
+// Minimal sysctl for Settings model map only (hw.machine/hw.model). No uname, no full surface.
+static int stub_sysctlbyname_lite(const char *name, void *oldp, size_t *oldlenp, void *newp, size_t newlen) {
+    if (name && oldp && oldlenp && *oldlenp > 0
+        && [[IPFConfig shared] flag:@"FakeDevice" defaultYes:YES]) {
+        NSString *fake = nil;
+        if (strcmp(name, "hw.machine") == 0)
+            fake = [[IPFConfig shared] mgValueForKey:@"ProductType"];
+        else if (strcmp(name, "hw.model") == 0)
+            fake = [[IPFConfig shared] mgValueForKey:@"HWModelStr"];
+        if ([fake isKindOfClass:[NSString class]]) {
+            const char *s = fake.UTF8String;
+            size_t need = strlen(s) + 1;
+            if (*oldlenp >= need) {
+                memcpy(oldp, s, need);
+                *oldlenp = need;
+                IPFTrace([NSString stringWithFormat:@"sysctl LITE %s => %@", name, fake]);
+                return 0;
+            }
+        }
+    }
+    return orig_sysctlbyname ? orig_sysctlbyname(name, oldp, oldlenp, newp, newlen) : -1;
+}
+
+// Settings About: MGCopyAnswer + host wash + hw.machine/model only. No WithError/uname.
 void IPFInstallMGHooksLite(void) {
     IPFTrace(@"IPFInstallMGHooksLite begin");
     IPFResolveSubstrate();
@@ -612,13 +639,16 @@ void IPFInstallMGHooksLite(void) {
         if (mg) {
             pMSHookFunction(mg, (void *)stub_MGCopyAnswer, (void **)&orig_MGCopyAnswer);
             IPFTrace([NSString stringWithFormat:@"Lite MSHook MGCopyAnswer %p orig=%p", mg, orig_MGCopyAnswer]);
-            // Capture host AFTER hook so orig_ is valid
             IPFCaptureHostIdentity();
         } else {
             IPFTrace(@"Lite WARN no MGCopyAnswer");
         }
-        // Do NOT hook sysctl/uname in Preferences — About path became unstable (crash after ctor).
-        // Skip MGCopyAnswerWithError — FDR/CoreRepair PAC on arm64e
+        void *sys = dlsym(RTLD_DEFAULT, "sysctlbyname");
+        if (sys) {
+            pMSHookFunction(sys, (void *)stub_sysctlbyname_lite, (void **)&orig_sysctlbyname);
+            IPFTrace(@"Lite sysctlbyname hw.machine/model only");
+        }
+        // Skip uname + MGCopyAnswerWithError (PAC/stability)
     } else {
         IPFTrace(@"Lite WARN no MSHookFunction");
     }
