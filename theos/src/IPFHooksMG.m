@@ -638,23 +638,8 @@ static int stub_sysctlbyname_lite(const char *name, void *oldp, size_t *oldlenp,
     return orig_sysctlbyname ? orig_sysctlbyname(name, oldp, oldlenp, newp, newlen) : -1;
 }
 
-// NSProcessInfo OS string — Settings may prefer this over MG ProductVersion
-static NSString *(*orig_lite_osVersionString)(id, SEL);
-static NSString *stub_lite_osVersionString(id self, SEL _cmd) {
-    IPFConfig *cfg = [IPFConfig shared];
-    if (![cfg flag:@"FakeSysOSVersion" defaultYes:YES])
-        return orig_lite_osVersionString ? orig_lite_osVersionString(self, _cmd) : @"Version 15.0";
-    NSString *pv = [cfg stringForKey:@"ProductVersion"] ?: @"15.0";
-    NSString *bv = [cfg stringForKey:@"BuildVersion"] ?: [cfg stringForKey:@"ProductBuildVersion"] ?: @"";
-    NSString *out = bv.length
-        ? [NSString stringWithFormat:@"Version %@ (Build %@)", pv, bv]
-        : [NSString stringWithFormat:@"Version %@", pv];
-    IPFTrace([NSString stringWithFormat:@"NSProcessInfo.OSVersionString LITE %@", out]);
-    return out;
-}
-
-// Settings About: MG + OS version paths (MG/UIDevice/NSProcessInfo/sysctl) + identity.
-// Skip MGCopyAnswerWithError / uname (PAC/stability on Preferences).
+// Settings About: MG + UIDevice + sysctl (machine + osproductversion). No NSProcessInfo
+// (kept out of Preferences inject to avoid AMFI CODESIGN instability). No WithError/uname.
 void IPFInstallMGHooksLite(void) {
     IPFTrace(@"IPFInstallMGHooksLite begin");
     IPFResolveSubstrate();
@@ -691,12 +676,6 @@ void IPFInstallMGHooksLite(void) {
                 pMSHookMessageEx(uid, @selector(systemName), (IMP)stub_systemName, (IMP *)&orig_systemName);
             pMSHookMessageEx(uid, @selector(systemVersion), (IMP)stub_systemVersion, (IMP *)&orig_systemVersion);
             IPFTrace(@"Lite UIDevice hooks OK");
-        }
-        Class nspi = objc_getClass("NSProcessInfo");
-        if (nspi && class_getInstanceMethod(nspi, @selector(operatingSystemVersionString))) {
-            pMSHookMessageEx(nspi, @selector(operatingSystemVersionString),
-                             (IMP)stub_lite_osVersionString, (IMP *)&orig_lite_osVersionString);
-            IPFTrace(@"Lite NSProcessInfo.operatingSystemVersionString OK");
         }
     }
     IPFTrace(@"IPFInstallMGHooksLite done");
