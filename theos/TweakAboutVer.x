@@ -12,6 +12,7 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
+#import <objc/message.h>
 #import <dlfcn.h>
 #import <stdio.h>
 #import <string.h>
@@ -317,42 +318,72 @@ static int stub_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, void
     return orig_sysctlbyname ? orig_sysctlbyname(name, oldp, oldlenp, newp, newlen) : -1;
 }
 
-// UI last resort: Preferences About cell may set detail text "15.5" without re-querying MG.
-// Only replace exact host version tokens; reentrancy-guarded.
-static BOOL gInUIText;
+// UI last resort: after About controller appears, walk labels and replace exact host version.
+// Avoid hooking UILabel.setText globally (crashes Preferences on this lab).
 static NSString *IPFVerWashHostText(NSString *text) {
     if (![text isKindOfClass:[NSString class]] || !text.length) return text;
     NSDictionary *cfg = IPFVerLoadConfig();
     if (!IPFVerEnabled(cfg)) return text;
     NSString *pv = IPFVerPV(cfg);
     if (!pv.length || [pv isEqualToString:text]) return text;
-    // Exact host tokens only (never broad replace)
     if ([text isEqualToString:@"15.5"] || [text isEqualToString:@"15.5.0"]
-        || (gHostPV.length && [text isEqualToString:gHostPV])) {
+        || (gHostPV.length && [text isEqualToString:gHostPV] && ![gHostPV isEqualToString:pv])) {
         IPFVerLog([NSString stringWithFormat:@"UI WASH %@ => %@", text, pv]);
         return pv;
     }
     return text;
 }
 
-static void (*orig_labelSetText)(id, SEL, NSString *);
-static void stub_labelSetText(id self, SEL _cmd, NSString *text) {
-    if (!gInUIText) {
-        gInUIText = YES;
-        text = IPFVerWashHostText(text);
-        gInUIText = NO;
+static void IPFVerWashViewTree(UIView *root) {
+    if (!root) return;
+    NSMutableArray *stack = [NSMutableArray arrayWithObject:root];
+    while (stack.count) {
+        UIView *v = stack.lastObject;
+        [stack removeLastObject];
+        if ([v isKindOfClass:[UILabel class]]) {
+            UILabel *lab = (UILabel *)v;
+            NSString *w = IPFVerWashHostText(lab.text);
+            if (w && ![w isEqualToString:lab.text])
+                lab.text = w;
+        }
+        // detail labels on cells
+        if ([v respondsToSelector:@selector(detailTextLabel)]) {
+            UILabel *d = ((UILabel *(*)(id, SEL))objc_msgSend)(v, @selector(detailTextLabel));
+            if ([d isKindOfClass:[UILabel class]]) {
+                NSString *w = IPFVerWashHostText(d.text);
+                if (w && ![w isEqualToString:d.text])
+                    d.text = w;
+            }
+        }
+        if (v.subviews.count)
+            [stack addObjectsFromArray:v.subviews];
     }
-    if (orig_labelSetText) orig_labelSetText(self, _cmd, text);
 }
 
-static void (*orig_cellSetValue)(id, SEL, id);
-static void stub_cellSetValue(id self, SEL _cmd, id value) {
-    if ([value isKindOfClass:[NSString class]] && !gInUIText) {
-        gInUIText = YES;
-        value = IPFVerWashHostText((NSString *)value);
-        gInUIText = NO;
-    }
-    if (orig_cellSetValue) orig_cellSetValue(self, _cmd, value);
+static void (*orig_viewDidAppear)(id, SEL, BOOL);
+static void stub_viewDidAppear(id self, SEL _cmd, BOOL animated) {
+    if (orig_viewDidAppear) orig_viewDidAppear(self, _cmd, animated);
+    @try {
+        NSString *cn = NSStringFromClass([self class]) ?: @"";
+        // Broad match: About / PSList about controllers in Preferences
+        BOOL aboutish =
+            [cn rangeOfString:@"About" options:NSCaseInsensitiveSearch].location != NSNotFound
+            || [cn rangeOfString:@"PSUIAbout" options:NSCaseInsensitiveSearch].location != NSNotFound
+            || [cn rangeOfString:@"DeviceInfo" options:NSCaseInsensitiveSearch].location != NSNotFound;
+        // Also wash top-level when General About is shown (class names vary by iOS)
+        if (!aboutish && [cn rangeOfString:@"PSListController"].location != NSNotFound) {
+            // still wash — cheap and only replaces exact "15.5"
+            aboutish = YES;
+        }
+        if (!aboutish) return;
+        UIView *view = nil;
+        if ([self respondsToSelector:@selector(view)])
+            view = [self view];
+        if (view) {
+            IPFVerWashViewTree(view);
+            IPFVerLog([NSString stringWithFormat:@"UI wash after %@", cn]);
+        }
+    } @catch (__unused NSException *ex) {}
 }
 
 static void IPFVerResolve(void) {
@@ -461,13 +492,11 @@ static void *IPFFindMG(const char *name) {
                     pMSHookMessageEx(nspi, @selector(operatingSystemVersionString),
                                      (IMP)stub_osvString, (IMP *)&orig_osvString);
             }
-            // UI wash: exact host version only (Preferences About detail)
-            Class uil = objc_getClass("UILabel");
-            if (uil && class_getInstanceMethod(uil, @selector(setText:)))
-                pMSHookMessageEx(uil, @selector(setText:), (IMP)stub_labelSetText, (IMP *)&orig_labelSetText);
-            Class psc = objc_getClass("PSTableCell");
-            if (psc && class_getInstanceMethod(psc, @selector(setValue:)))
-                pMSHookMessageEx(psc, @selector(setValue:), (IMP)stub_cellSetValue, (IMP *)&orig_cellSetValue);
+            // Safe UI wash after About-like controllers appear
+            Class uivc = objc_getClass("UIViewController");
+            if (uivc && class_getInstanceMethod(uivc, @selector(viewDidAppear:)))
+                pMSHookMessageEx(uivc, @selector(viewDidAppear:),
+                                 (IMP)stub_viewDidAppear, (IMP *)&orig_viewDidAppear);
         }
 
         NSDictionary *cfg = IPFVerLoadConfig();
