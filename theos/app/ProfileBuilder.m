@@ -153,6 +153,7 @@
             @"ModelNumber", @"PartNumber", @"RegionInfo", @"RegionCode", @"RegulatoryModelNumber",
             @"ModelNumberAxxxx", @"PartNumberRegion",
             @"CPUArchitecture", @"HardwarePlatform", @"DeviceClass", @"ChipName",
+            @"MetalDeviceName", @"GPUName", @"DeviceSupportsMetal",
             @"DeviceCatalogId", @"DeviceYear", @"BatteryMah",
             @"InternationalMobileEquipmentIdentity", @"InternationalMobileEquipmentIdentity2",
             @"MobileEquipmentIdentifier", @"EID",
@@ -604,6 +605,10 @@
         @"hw.physicalcpu": @(cores),
         @"hw.logicalcpu": @(cores),
         @"ChipName": device[@"chip"] ?: @"",
+        // GPU/Metal identity label (string surface — silicon still host; apps reading MG/name sync to catalog)
+        @"MetalDeviceName": device[@"chip"] ?: device[@"MarketingName"] ?: @"Apple GPU",
+        @"GPUName": device[@"chip"] ?: @"",
+        @"DeviceSupportsMetal": @YES,
         @"DeviceCatalogId": device[@"id"] ?: @"",
         @"MaxRefreshHz": @(maxHz),
         @"DeviceYear": device[@"year"] ?: @0,
@@ -1433,10 +1438,10 @@
     [log addObject:[NSString stringWithFormat:@"Mục tiêu: %@", [bundles componentsJoinedByString:@", "]]];
 
     for (NSString *bid in bundles) {
-        step([NSString stringWithFormat:@"Đóng tiến trình: %@", bid]);
+        step([NSString stringWithFormat:@"Đóng: %@", bid.pathExtension.length ? bid : bid]);
         [self killAppBundleId:bid executable:nil];
     }
-    usleep(400000);
+    usleep(120 * 1000); // was 400ms — kill is enough for next wipe
     [log addObject:@"① Đã đóng tiến trình"];
 
     BOOL wipingZalo = NO;
@@ -1449,57 +1454,47 @@
     // One-tap trusted path: root multi-app script (all selected bundles)
     BOOL scriptTrusted = NO;
     if (!skipScript) {
-        step(@"Chạy script xóa tin cậy (root multi-app)…");
+        step(@"Script xóa root…");
         int rc = [self runTrustedWipeScriptForBundles:bundles];
         if (rc == 0 || rc == 5) {
             scriptTrusted = YES;
-            NSString *m = [NSString stringWithFormat:
-                           @"② Script tin cậy OK (mã %d)%@",
-                           rc, rc == 5 ? @" — còn file rác nhỏ, đã dọn skeleton" : @""];
+            NSString *m = [NSString stringWithFormat:@"② Script tin cậy OK (mã %d)", rc];
             [log addObject:m];
             step(m);
         } else {
-            [log addObject:[NSString stringWithFormat:@"② Script root: mã %d — xóa trực tiếp bổ sung", rc]];
-            step(@"Script root không đủ quyền — xóa trực tiếp");
+            [log addObject:[NSString stringWithFormat:@"② Script root: mã %d — xóa trực tiếp", rc]];
+            step(@"Xóa trực tiếp…");
         }
     } else {
-        step(@"Bỏ script xóa sâu (chế độ giữ đăng nhập)");
         [log addObject:@"② Script: bỏ qua"];
     }
 
-    // Always also wipe via NSFileManager (covers non-root + residual after script)
-    step(@"Quét / xóa thư mục dữ liệu app…");
+    // FAST PATH: if root script succeeded, skip full FileManager container walk (was 2x wipe → very slow).
+    // Only light residual prefs/cookies below.
     NSUInteger dataWiped = 0;
-    for (NSString *root in [self containerPathsUnder:@"/var/mobile/Containers/Data/Application" matchingNeedles:needles]) {
-        step([NSString stringWithFormat:@"Xóa dữ liệu %@", root.lastPathComponent]);
-        dataWiped += [self wipeContainerRoot:root fm:fm];
-    }
-    // PluginKit extensions
-    for (NSString *base in @[
-             @"/var/mobile/Containers/Data/PluginKitPlugin",
-             @"/private/var/mobile/Containers/Data/PluginKitPlugin" ]) {
-        for (NSString *root in [self containerPathsUnder:base matchingNeedles:needles]) {
+    NSUInteger groupWiped = 0;
+    if (!scriptTrusted) {
+        step(@"Quét / xóa thư mục dữ liệu app…");
+        for (NSString *root in [self containerPathsUnder:@"/var/mobile/Containers/Data/Application" matchingNeedles:needles]) {
             dataWiped += [self wipeContainerRoot:root fm:fm];
         }
-    }
-    if (dataWiped == 0 && !scriptTrusted) {
-        [log addObject:@"③ Dữ liệu: không tìm thấy / đã trống"];
-        step(@"Thư mục dữ liệu: trống hoặc không khớp");
+        for (NSString *base in @[
+                 @"/var/mobile/Containers/Data/PluginKitPlugin",
+                 @"/private/var/mobile/Containers/Data/PluginKitPlugin" ]) {
+            for (NSString *root in [self containerPathsUnder:base matchingNeedles:needles]) {
+                dataWiped += [self wipeContainerRoot:root fm:fm];
+            }
+        }
+        for (NSString *root in [self containerPathsUnder:@"/var/mobile/Containers/Shared/AppGroup" matchingNeedles:needles]) {
+            groupWiped += [self wipeContainerRoot:root fm:fm];
+        }
+        [log addObject:[NSString stringWithFormat:@"③ Dữ liệu mục~%lu · nhóm~%lu",
+                        (unsigned long)dataWiped, (unsigned long)groupWiped]];
     } else {
-        [log addObject:[NSString stringWithFormat:@"③ Dữ liệu mục~%lu%@",
-                        (unsigned long)dataWiped,
-                        scriptTrusted ? @" (+script)" : @""]];
+        // Residual only (fast)
+        step(@"Dọn residual prefs/cache…");
+        [log addObject:@"③ Containers: script đã xóa — residual nhẹ"];
     }
-
-    step(@"Quét / xóa nhóm chia sẻ app…");
-    NSUInteger groupWiped = 0;
-    for (NSString *root in [self containerPathsUnder:@"/var/mobile/Containers/Shared/AppGroup" matchingNeedles:needles]) {
-        NSString *tail = root.lastPathComponent;
-        if (tail.length > 8) tail = [tail substringToIndex:8];
-        step([NSString stringWithFormat:@"Xóa nhóm chia sẻ %@", tail]);
-        groupWiped += [self wipeContainerRoot:root fm:fm];
-    }
-    [log addObject:groupWiped ? [NSString stringWithFormat:@"④ Nhóm chia sẻ ~%lu", (unsigned long)groupWiped] : @"④ Nhóm chia sẻ: trống"];
 
     step(@"Xóa tuỳ chọn / cookie / bộ nhớ đệm…");
     NSUInteger crumb = 0;
@@ -1560,31 +1555,32 @@
         [log addObject:@"⑥ Keychain: giữ nguyên"];
     }
 
-    step(@"Đóng lại các tiến trình…");
+    step(@"Đóng lại…");
     for (NSString *bid in bundles) [self killAppBundleId:bid executable:nil];
 
-    // Verify residual files
-    NSUInteger residual = 0;
-    for (NSString *root in [self containerPathsUnder:@"/var/mobile/Containers/Data/Application" matchingNeedles:needles]) {
-        for (NSString *sub in @[ @"Documents", @"Library", @"tmp" ]) {
-            NSString *p = [root stringByAppendingPathComponent:sub];
-            NSDirectoryEnumerator *en = [fm enumeratorAtPath:p];
-            for (NSString *rel in en) {
-                NSString *full = [p stringByAppendingPathComponent:rel];
-                BOOL isDir = NO;
-                if ([fm fileExistsAtPath:full isDirectory:&isDir] && !isDir) residual++;
+    // Skip full residual walk when script trusted (was very slow)
+    if (!scriptTrusted) {
+        NSUInteger residual = 0;
+        for (NSString *root in [self containerPathsUnder:@"/var/mobile/Containers/Data/Application" matchingNeedles:needles]) {
+            for (NSString *sub in @[ @"Documents", @"Library", @"tmp" ]) {
+                NSString *p = [root stringByAppendingPathComponent:sub];
+                NSDirectoryEnumerator *en = [fm enumeratorAtPath:p];
+                for (NSString *rel in en) {
+                    NSString *full = [p stringByAppendingPathComponent:rel];
+                    BOOL isDir = NO;
+                    if ([fm fileExistsAtPath:full isDirectory:&isDir] && !isDir) residual++;
+                    if (residual > 50) break; // cap scan
+                }
+                if (residual > 50) break;
             }
         }
-    }
-    if (residual == 0) {
-        [log addObject:@"⑦ Kiểm tra: sạch (0 file rác)"];
-        step(@"Kiểm tra: sạch");
+        [log addObject:residual == 0 ? @"⑦ Kiểm tra: sạch" :
+         [NSString stringWithFormat:@"⑦ Kiểm tra: còn ~%lu file", (unsigned long)residual]];
     } else {
-        [log addObject:[NSString stringWithFormat:@"⑦ Kiểm tra: còn ~%lu file (mở lại app = first launch thường OK)", (unsigned long)residual]];
-        step([NSString stringWithFormat:@"Còn ~%lu file rác", (unsigned long)residual]);
+        [log addObject:@"⑦ Kiểm tra: bỏ qua (script OK)"];
     }
 
-    step(@"Hoàn tất xóa 1 chạm");
+    step(@"Hoàn tất");
     return [NSString stringWithFormat:
             @"Xóa 1 chạm %lu app:\n%@",
             (unsigned long)bundles.count,

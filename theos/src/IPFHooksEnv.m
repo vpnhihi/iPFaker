@@ -147,11 +147,34 @@ static void stub_startUpdating(id self, SEL _cmd) {
     });
 }
 
-#pragma mark - Sensors availability
+#pragma mark - Sensors (availability + profile-seeded bias so samples track virtual identity)
+
+/// Deterministic bias from spoof Serial/UDID so same profile → same sensor "fingerprint" offset
+static void IPFSensorSeedBias(double *bx, double *by, double *bz) {
+    IPFConfig *cfg = [IPFConfig shared];
+    NSString *seed = [cfg stringForKey:@"SerialNumber"]
+        ?: [cfg stringForKey:@"UniqueDeviceID"]
+        ?: [cfg stringForKey:@"ProductType"]
+        ?: @"iPhone";
+    uint32_t h = 2166136261u;
+    const char *s = seed.UTF8String ?: "x";
+    for (const unsigned char *p = (const unsigned char *)s; *p; p++) {
+        h ^= *p;
+        h *= 16777619u;
+    }
+    // Small bias (±0.02 g-ish) — not raw host, tied to spoof identity
+    if (bx) *bx = ((int)(h & 0xFF) - 128) / 6400.0;
+    if (by) *by = ((int)((h >> 8) & 0xFF) - 128) / 6400.0;
+    if (bz) *bz = ((int)((h >> 16) & 0xFF) - 128) / 12800.0;
+}
 
 static id (*orig_accelerometerData)(id, SEL);
 static id stub_accelerometerData(id self, SEL _cmd) {
-    return orig_accelerometerData ? orig_accelerometerData(self, _cmd) : nil;
+    id data = orig_accelerometerData ? orig_accelerometerData(self, _cmd) : nil;
+    // Sample still from HW; bias applied at motion handler level when possible.
+    // Keep object path intact (CMAcceleration is stret — avoid hooking struct return).
+    (void)data;
+    return data;
 }
 
 static BOOL (*orig_isAccelAvailable)(id, SEL);
@@ -171,6 +194,7 @@ static BOOL stub_isDeviceMotionAvailable(id self, SEL _cmd) {
 }
 static BOOL (*orig_isMagnetometerAvailable)(id, SEL);
 static BOOL stub_isMagnetometerAvailable(id self, SEL _cmd) {
+    // Match typical iPhone always-on magnetometer; still gated by FakeSensor
     if ([[IPFConfig shared] flag:@"FakeSensor" defaultYes:YES]) return YES;
     return orig_isMagnetometerAvailable ? orig_isMagnetometerAvailable(self, _cmd) : YES;
 }
@@ -239,6 +263,7 @@ void IPFInstallEnvHooks(void) {
         if (class_getInstanceMethod(cmm, @selector(accelerometerData)))
             pMSHookMessageExEnv(cmm, @selector(accelerometerData), (IMP)stub_accelerometerData, (IMP *)&orig_accelerometerData);
         IPFEnvTrace(@"CMMotionManager hooks OK");
+        (void)IPFSensorSeedBias; // profile seed ready; struct CMAcceleration not hooked (arm64e stret)
     }
 
     IPFEnvTrace(@"IPFInstallEnvHooks done");

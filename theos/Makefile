@@ -34,10 +34,10 @@ iPFakerMG_FRAMEWORKS = UIKit Foundation AdSupport
 iPFakerMG_LIBRARIES = substrate
 iPFakerMG_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerMG.dylib -Wl,-dead_strip -Wl,-x
 
-# CT lean: telephony + Deep (~105k inject OK)
-iPFakerCT_FILES = TweakCT.x src/IPFConfig.m src/IPFHooksCT.m src/IPFHooksDeep.m
-iPFakerCT_CFLAGS = -fobjc-arc -Os -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
-iPFakerCT_FRAMEWORKS = UIKit Foundation CoreTelephony
+# CT: telephony + Deep + Env (locale/location/sensor) — Env was dead code before
+iPFakerCT_FILES = TweakCT.x src/IPFConfig.m src/IPFHooksCT.m src/IPFHooksDeep.m src/IPFHooksEnv.m
+iPFakerCT_CFLAGS = -fobjc-arc -Os -fvisibility=hidden -ffunction-sections -fdata-sections -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
+iPFakerCT_FRAMEWORKS = UIKit Foundation CoreTelephony CoreLocation CoreMotion
 iPFakerCT_LIBRARIES = substrate
 iPFakerCT_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerCT.dylib -Wl,-dead_strip
 
