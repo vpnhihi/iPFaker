@@ -107,22 +107,11 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
         mg[@"BuildVersion"] = b;
         sys[@"kern.osversion"] = b;
     }
-    // Darwin: iOS N.M → (N+6).M.0 (15.4→21.4.0). Do not leave host uname release.
-    {
-        NSString *rel = flat[@"kern.osrelease"];
-        if (![rel isKindOfClass:[NSString class]] || !rel.length) {
-            NSString *iosVer = [flat[@"ProductVersion"] description] ?: @"15.0";
-            int maj = 21, min = 0, pat = 0;
-            sscanf(iosVer.UTF8String, "%d.%d.%d", &maj, &min, &pat);
-            maj += 6;
-            rel = [NSString stringWithFormat:@"%d.%d.%d", maj, min, pat];
-        }
-        sys[@"kern.osrelease"] = rel;
-        NSString *kv = flat[@"kern.version"];
-        if (![kv isKindOfClass:[NSString class]] || !kv.length)
-            kv = [NSString stringWithFormat:@"Darwin Kernel Version %@: root:xnu-spoof", rel];
-        sys[@"kern.version"] = kv;
-    }
+    // Darwin release/version from flat (ProfileBuilder writes iOS N.M → (N+6).M.0)
+    if ([flat[@"kern.osrelease"] isKindOfClass:[NSString class]])
+        sys[@"kern.osrelease"] = flat[@"kern.osrelease"];
+    if ([flat[@"kern.version"] isKindOfClass:[NSString class]])
+        sys[@"kern.version"] = flat[@"kern.version"];
     if (flat[@"DeviceName"] ?: flat[@"UserAssignedDeviceName"] ?: flat[@"Hostname"]) {
         id n = flat[@"UserAssignedDeviceName"] ?: flat[@"DeviceName"] ?: @"iPhone";
         mg[@"UserAssignedDeviceName"] = n;
