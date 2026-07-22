@@ -488,5 +488,7 @@ void IPFInstallMGHooks(void) {
         [dbg writeToFile:@"/var/mobile/Library/iPFaker/v3_mg_debug.log"
               atomically:YES encoding:NSUTF8StringEncoding error:nil];
     }
+#else
+    (void)fishhook_rc;
 #endif
 }
