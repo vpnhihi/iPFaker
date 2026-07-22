@@ -292,37 +292,13 @@ static int stub_uname(struct utsname *buf) {
                 strlcpy(buf->nodename, node.UTF8String, sizeof(buf->nodename));
         }
         if ([cfg flag:@"FakeSysOSVersion" defaultYes:YES] || [cfg flag:@"FakeSysctl" defaultYes:YES]) {
-            // uname.release / version MUST match spoof iOS (not host kernel e.g. 21.5.0 on 15.5 when spoof 15.4)
-            NSString *rel = [cfg sysctlValueForName:@"kern.osrelease"];
-            if (![rel isKindOfClass:[NSString class]] || !rel.length)
-                rel = [cfg stringForKey:@"kern.osrelease"];
-            if (![rel isKindOfClass:[NSString class]] || !rel.length) {
-                NSString *iosVer = [cfg stringForKey:@"ProductVersion"]
-                    ?: [[cfg mgValueForKey:@"ProductVersion"] description];
-                NSInteger maj = 21, min = 0, pat = 0;
-                if (iosVer.length) {
-                    NSArray *parts = [iosVer componentsSeparatedByString:@"."];
-                    if (parts.count >= 1) maj = [parts[0] integerValue] + 6;
-                    if (parts.count >= 2) min = [parts[1] integerValue];
-                    if (parts.count >= 3) pat = [parts[2] integerValue];
-                }
-                rel = [NSString stringWithFormat:@"%ld.%ld.%ld", (long)maj, (long)min, (long)pat];
-            }
-            if (rel.length)
-                strlcpy(buf->release, rel.UTF8String, sizeof(buf->release));
-
-            NSString *kver = [cfg sysctlValueForName:@"kern.version"];
-            if (![kver isKindOfClass:[NSString class]] || !kver.length)
-                kver = [cfg stringForKey:@"kern.version"];
-            if (![kver isKindOfClass:[NSString class]] || !kver.length) {
-                NSString *board = [[cfg mgValueForKey:@"HWModelStr"] description] ?: @"T8020";
-                kver = [NSString stringWithFormat:
-                        @"Darwin Kernel Version %@: root:xnu-spoof/RELEASE_ARM64_%@",
-                        rel, board];
-            }
-            if (kver.length)
-                strlcpy(buf->version, kver.UTF8String, sizeof(buf->version));
-            IPFTrace([NSString stringWithFormat:@"uname FAKE release=%@ version=%@", rel, kver]);
+            // Prefer map from IPFConfig (kern.osrelease/version); never leave host Darwin on mismatch spoof
+            id rel = [cfg sysctlValueForName:@"kern.osrelease"] ?: [cfg stringForKey:@"kern.osrelease"];
+            id kver = [cfg sysctlValueForName:@"kern.version"] ?: [cfg stringForKey:@"kern.version"];
+            if ([rel isKindOfClass:[NSString class]] && [(NSString *)rel length])
+                strlcpy(buf->release, [(NSString *)rel UTF8String], sizeof(buf->release));
+            if ([kver isKindOfClass:[NSString class]] && [(NSString *)kver length])
+                strlcpy(buf->version, [(NSString *)kver UTF8String], sizeof(buf->version));
         }
     }
     return rc;

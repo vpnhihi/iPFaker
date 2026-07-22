@@ -44,8 +44,9 @@
             @"PhysicalMemoryMB", @"PhysicalMemoryBytes", @"hw.memsize",
             @"hw.ncpu", @"hw.physicalcpu", @"hw.logicalcpu",
             @"DiskCapacityGB", @"TotalDiskCapacity", @"FreeDiskSpace",
-            // Boot / time
+            // Boot / time / Darwin kernel
             @"BootTimeUnix", @"kern.boottime", @"TimeOffsetSeconds", @"TimeZoneName",
+            @"kern.osrelease", @"kern.version", @"kern.osversion", @"kern.osproductversion",
             // Locale
             @"PreferredLanguage", @"LocaleIdentifier", @"AppleLocale", @"AppleLanguages",
             @"LanguageCode", @"CountryCode", @"CurrencyCode", @"CalendarIdentifier",
@@ -378,7 +379,7 @@
     NSString *bssid = wifi;
     NSString *volumeUUID = [self uuidUpper];
 
-    return @{
+    NSMutableDictionary *m = [@{
         @"Enabled": @YES,
         @"FakeDevice": @YES,
         @"FakeScreen": @YES,
@@ -429,25 +430,7 @@
         @"ProductVersion": iosMeta[@"ProductVersion"] ?: iosVer,
         @"BuildVersion": iosMeta[@"BuildVersion"] ?: @"",
         @"ProductBuildVersion": iosMeta[@"BuildVersion"] ?: @"",
-        // Darwin kernel (iOS N.M → Darwin (N+6).M.0) — must not leave host uname release
-        @"kern.osrelease": ({
-            NSString *iv = iosMeta[@"ProductVersion"] ?: iosVer ?: @"15.0";
-            NSArray *pp = [iv componentsSeparatedByString:@"."];
-            NSInteger maj = pp.count ? [pp[0] integerValue] + 6 : 21;
-            NSInteger min = pp.count > 1 ? [pp[1] integerValue] : 0;
-            NSInteger pat = pp.count > 2 ? [pp[2] integerValue] : 0;
-            [NSString stringWithFormat:@"%ld.%ld.%ld", (long)maj, (long)min, (long)pat];
-        }),
-        @"kern.version": ({
-            NSString *iv = iosMeta[@"ProductVersion"] ?: iosVer ?: @"15.0";
-            NSArray *pp = [iv componentsSeparatedByString:@"."];
-            NSInteger maj = pp.count ? [pp[0] integerValue] + 6 : 21;
-            NSInteger min = pp.count > 1 ? [pp[1] integerValue] : 0;
-            NSInteger pat = pp.count > 2 ? [pp[2] integerValue] : 0;
-            NSString *rel = [NSString stringWithFormat:@"%ld.%ld.%ld", (long)maj, (long)min, (long)pat];
-            NSString *board = device[@"HWModelStr"] ?: @"T8020";
-            [NSString stringWithFormat:@"Darwin Kernel Version %@: root:xnu-spoof/RELEASE_ARM64_%@", rel, board];
-        }),
+        // Darwin (iOS N.M → (N+6).M.0) filled after dict build — see below
         // UUID v4 uppercase (Apple IDFA / IDFV)
         @"IDFA": idfa,
         @"IDFV": idfv,
@@ -528,7 +511,15 @@
         @"WebRTCLocalIP": webrtcIP.length ? webrtcIP : @"10.0.0.2",
         // FakeWebRTC / DisableWebRTC / FakeSensor / HideJailbreak / FakeWifi set above once
         @"DisableAppAttest": @YES,
-    };
+    }];
+    // Darwin kernel: iOS N.M → (N+6).M.0 (must not leave host uname)
+    NSString *iv = iosMeta[@"ProductVersion"] ?: iosVer ?: @"15.0";
+    int maj = 15, min = 0, pat = 0;
+    sscanf(iv.UTF8String ?: "15.0", "%d.%d.%d", &maj, &min, &pat);
+    NSString *darwinRel = [NSString stringWithFormat:@"%d.%d.%d", maj + 6, min, pat];
+    m[@"kern.osrelease"] = darwinRel;
+    m[@"kern.version"] = [NSString stringWithFormat:@"Darwin Kernel Version %@: root:xnu-spoof", darwinRel];
+    return m;
 }
 
 + (BOOL)ensureDir:(NSString *)dir error:(NSError **)err {
