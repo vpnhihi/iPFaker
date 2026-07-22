@@ -1,17 +1,32 @@
-// iPFakerAboutVer — ultra-tiny SystemVersion-only hook for Settings About software version.
-// Separate from iPFakerAbout (MG/model) so AMFI size/signature stays independent.
-// Reads ProductVersion/BuildVersion from dual-path config.plist (no IPFConfig.m link).
+// iPFakerAboutVer — Preferences-only software version spoof (Phiên bản phần mềm).
+// Stays tiny (no IPFConfig.m). Complements iPFakerAbout (model# / marketing / MG surface).
+//
+// Root cause: Settings About often reads ProductVersion via obfuscated MG keys or
+// host string "15.5", while plain MG "ProductVersion" is already faked by About.
+// This dylib:
+//   1) Hooks MGCopyAnswer for ProductVersion/BuildVersion (plain + known hashes)
+//   2) Washes any MG string equal to host ProductVersion → spoof PV
+//   3) Hooks SystemVersion.plist load paths + UIDevice/NSProcessInfo
+//   4) CFCopySystemVersionDictionary when present
 
 #import <Foundation/Foundation.h>
+#import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 #import <dlfcn.h>
 #import <stdio.h>
+#import <string.h>
 
 typedef void (*MSHookFunction_t)(void *symbol, void *replace, void **result);
 typedef void (*MSHookMessageEx_t)(Class _class, SEL sel, IMP imp, IMP *result);
 
 static MSHookFunction_t pMSHookFunction;
 static MSHookMessageEx_t pMSHookMessageEx;
+static NSString *gHostPV; // captured once from real MG
+
+// Obfuscated MG keys (MD5("MGCopyAnswer"+name) base64 without ==)
+static NSString *const kHashProductVersion = @"qNNddlUK+B/YlooNoymwgA";
+static NSString *const kHashBuildVersion = @"mZfUC7qo4pURNhyMHZ62RQ";
+static NSString *const kHashProductBuildVersion = @"FbsJngVSVXK87pG0SJtlNg";
 
 static void IPFVerMark(const char *msg) {
     NSString *body = [NSString stringWithFormat:@"%s\n", msg];
@@ -21,6 +36,29 @@ static void IPFVerMark(const char *msg) {
         @"/var/jb/tmp/v3_aboutver_loaded.txt",
     ]) {
         [body writeToFile:p atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    }
+}
+
+static void IPFVerLog(NSString *line) {
+    if (!line) return;
+    NSString *row = [NSString stringWithFormat:@"%0.3f %@\n", CFAbsoluteTimeGetCurrent(), line];
+    for (NSString *p in @[
+        @"/var/mobile/Library/iPFaker/logs/ipfaker_aboutver.log",
+        @"/var/mobile/Documents/ipfaker_aboutver.log",
+    ]) {
+        @try {
+            NSFileHandle *h = [NSFileHandle fileHandleForWritingAtPath:p];
+            if (!h) {
+                [[p stringByDeletingLastPathComponent] length]; // silence
+                [[NSFileManager defaultManager] createDirectoryAtPath:[p stringByDeletingLastPathComponent]
+                                         withIntermediateDirectories:YES attributes:nil error:nil];
+                [row writeToFile:p atomically:YES encoding:NSUTF8StringEncoding error:nil];
+            } else {
+                [h seekToEndOfFile];
+                [h writeData:[row dataUsingEncoding:NSUTF8StringEncoding]];
+                [h closeFile];
+            }
+        } @catch (__unused NSException *ex) {}
     }
 }
 
@@ -43,9 +81,20 @@ static BOOL IPFVerEnabled(NSDictionary *cfg) {
     id f = cfg[@"FakeSysOSVersion"];
     if ([f isKindOfClass:[NSNumber class]] && ![f boolValue]) return NO;
     if ([f isKindOfClass:[NSString class]] &&
-        ([[f lowercaseString] isEqualToString:@"0"] || [[f lowercaseString] isEqualToString:@"false"]))
+        ([[(NSString *)f lowercaseString] isEqualToString:@"0"]
+         || [[(NSString *)f lowercaseString] isEqualToString:@"false"]))
         return NO;
     return YES;
+}
+
+static NSString *IPFVerPV(NSDictionary *cfg) {
+    return cfg ? [cfg[@"ProductVersion"] description] : nil;
+}
+
+static NSString *IPFVerBV(NSDictionary *cfg) {
+    if (!cfg) return nil;
+    id b = cfg[@"BuildVersion"] ?: cfg[@"ProductBuildVersion"];
+    return b ? [b description] : nil;
 }
 
 static BOOL IPFVerIsSysPath(id pathOrURL) {
@@ -60,8 +109,8 @@ static NSDictionary *IPFVerSpoofDict(NSDictionary *real) {
     if (![real isKindOfClass:[NSDictionary class]]) return real;
     NSDictionary *cfg = IPFVerLoadConfig();
     if (!IPFVerEnabled(cfg)) return real;
-    NSString *pv = [cfg[@"ProductVersion"] description];
-    NSString *bv = [cfg[@"BuildVersion"] description] ?: [cfg[@"ProductBuildVersion"] description];
+    NSString *pv = IPFVerPV(cfg);
+    NSString *bv = IPFVerBV(cfg);
     if (!pv.length) return real;
     NSMutableDictionary *m = [real mutableCopy];
     m[@"ProductVersion"] = pv;
@@ -70,6 +119,7 @@ static NSDictionary *IPFVerSpoofDict(NSDictionary *real) {
         m[@"ProductBuildVersion"] = bv;
         m[@"BuildVersion"] = bv;
     }
+    IPFVerLog([NSString stringWithFormat:@"SystemVersion.dict FAKE iOS=%@ build=%@", pv, bv ?: @"?"]);
     return m;
 }
 
@@ -85,7 +135,84 @@ static NSData *IPFVerSpoofData(NSData *real) {
                                                        error:NULL] ?: real;
 }
 
-#pragma mark - hooks
+#pragma mark - MGCopyAnswer (version keys + host wash)
+
+static CFTypeRef (*orig_MGCopyAnswer)(CFStringRef key);
+
+static BOOL IPFVerIsVersionKey(NSString *k) {
+    if (!k.length) return NO;
+    if ([k isEqualToString:@"ProductVersion"] || [k isEqualToString:@"product-version"]
+        || [k isEqualToString:kHashProductVersion])
+        return YES;
+    if ([k isEqualToString:@"BuildVersion"] || [k isEqualToString:@"build-version"]
+        || [k isEqualToString:kHashBuildVersion])
+        return YES;
+    if ([k isEqualToString:@"ProductBuildVersion"] || [k isEqualToString:kHashProductBuildVersion])
+        return YES;
+    // os-version style
+    if ([k.lowercaseString isEqualToString:@"os-version"])
+        return YES;
+    return NO;
+}
+
+static CFTypeRef stub_MGCopyAnswer(CFStringRef key) {
+    @autoreleasepool {
+        NSString *k = key ? (__bridge NSString *)key : @"";
+        NSDictionary *cfg = IPFVerLoadConfig();
+        BOOL en = IPFVerEnabled(cfg);
+        NSString *pv = en ? IPFVerPV(cfg) : nil;
+        NSString *bv = en ? IPFVerBV(cfg) : nil;
+
+        if (en && IPFVerIsVersionKey(k)) {
+            BOOL isBuild = [k isEqualToString:@"BuildVersion"] || [k isEqualToString:@"build-version"]
+                || [k isEqualToString:kHashBuildVersion]
+                || [k isEqualToString:@"ProductBuildVersion"]
+                || [k isEqualToString:kHashProductBuildVersion];
+            NSString *out = isBuild ? (bv.length ? bv : pv) : pv;
+            if (out.length) {
+                IPFVerLog([NSString stringWithFormat:@"MG FAKE %@ => %@", k, out]);
+                return CFBridgingRetain(out);
+            }
+        }
+
+        CFTypeRef real = orig_MGCopyAnswer ? orig_MGCopyAnswer(key) : NULL;
+
+        // Capture host PV once (from real path, plain key preferred)
+        if (!gHostPV && real && CFGetTypeID(real) == CFStringGetTypeID()
+            && ([k isEqualToString:@"ProductVersion"] || [k isEqualToString:kHashProductVersion])) {
+            gHostPV = [[NSString alloc] initWithString:(__bridge NSString *)real];
+        }
+
+        // Host-value wash: ANY MG string that equals host OS version → spoof PV
+        // Covers unknown/hashed keys Settings uses for "Phiên bản phần mềm"
+        if (en && pv.length && real && CFGetTypeID(real) == CFStringGetTypeID()) {
+            NSString *rs = (__bridge NSString *)real;
+            BOOL isHost = NO;
+            if (gHostPV.length && [rs isEqualToString:gHostPV]) isHost = YES;
+            // Lab host is 15.5 — also match common host tokens
+            if ([rs isEqualToString:@"15.5"] || [rs isEqualToString:@"15.5.0"]) isHost = YES;
+            if (isHost && ![rs isEqualToString:pv]) {
+                IPFVerLog([NSString stringWithFormat:@"MG WASH hostPV key=%@ %@ => %@", k, rs, pv]);
+                CFRelease(real);
+                return CFBridgingRetain(pv);
+            }
+            // Build host wash
+            if (bv.length && ([rs isEqualToString:@"19F77"] /* host 15.5 build */)) {
+                if ([k rangeOfString:@"[Bb]uild" options:NSRegularExpressionSearch].location != NSNotFound
+                    || [k isEqualToString:kHashBuildVersion]
+                    || [k isEqualToString:kHashProductBuildVersion]
+                    || k.length >= 16) {
+                    IPFVerLog([NSString stringWithFormat:@"MG WASH hostBV key=%@ %@ => %@", k, rs, bv]);
+                    CFRelease(real);
+                    return CFBridgingRetain(bv);
+                }
+            }
+        }
+        return real;
+    }
+}
+
+#pragma mark - SystemVersion file paths
 
 static id (*orig_dictFile)(Class, SEL, NSString *);
 static id stub_dictFile(Class c, SEL s, NSString *path) {
@@ -115,8 +242,11 @@ static NSString *(*orig_sysVer)(id, SEL);
 static NSString *stub_sysVer(id self, SEL _cmd) {
     NSDictionary *cfg = IPFVerLoadConfig();
     if (IPFVerEnabled(cfg)) {
-        NSString *pv = [cfg[@"ProductVersion"] description];
-        if (pv.length) return pv;
+        NSString *pv = IPFVerPV(cfg);
+        if (pv.length) {
+            IPFVerLog([NSString stringWithFormat:@"UIDevice.systemVersion FAKE %@", pv]);
+            return pv;
+        }
     }
     return orig_sysVer ? orig_sysVer(self, _cmd) : @"15.0";
 }
@@ -126,14 +256,31 @@ static NSOperatingSystemVersion stub_osv(id self, SEL _cmd) {
     NSOperatingSystemVersion v = {15, 0, 0};
     NSDictionary *cfg = IPFVerLoadConfig();
     if (IPFVerEnabled(cfg)) {
-        NSString *pv = [cfg[@"ProductVersion"] description] ?: @"15.0";
+        NSString *pv = IPFVerPV(cfg) ?: @"15.0";
         NSArray *p = [pv componentsSeparatedByString:@"."];
         if (p.count > 0) v.majorVersion = [p[0] integerValue];
         if (p.count > 1) v.minorVersion = [p[1] integerValue];
         if (p.count > 2) v.patchVersion = [p[2] integerValue];
+        IPFVerLog([NSString stringWithFormat:@"NSProcessInfo.operatingSystemVersion FAKE %ld.%ld.%ld",
+                   (long)v.majorVersion, (long)v.minorVersion, (long)v.patchVersion]);
         return v;
     }
     return orig_osv ? orig_osv(self, _cmd) : v;
+}
+
+static NSString *(*orig_osvString)(id, SEL);
+static NSString *stub_osvString(id self, SEL _cmd) {
+    NSDictionary *cfg = IPFVerLoadConfig();
+    if (IPFVerEnabled(cfg)) {
+        NSString *pv = IPFVerPV(cfg) ?: @"15.0";
+        NSString *bv = IPFVerBV(cfg) ?: @"";
+        NSString *out = bv.length
+            ? [NSString stringWithFormat:@"Version %@ (Build %@)", pv, bv]
+            : [NSString stringWithFormat:@"Version %@", pv];
+        IPFVerLog([NSString stringWithFormat:@"NSProcessInfo.OSVersionString FAKE %@", out]);
+        return out;
+    }
+    return orig_osvString ? orig_osvString(self, _cmd) : @"Version 15.0";
 }
 
 static CFDictionaryRef (*orig_CFCopySysVer)(void);
@@ -142,6 +289,32 @@ static CFDictionaryRef stub_CFCopySysVer(void) {
     if (!real) return real;
     NSDictionary *ns = CFBridgingRelease(real);
     return CFBridgingRetain(IPFVerSpoofDict(ns));
+}
+
+// sysctl kern.osproductversion / kern.osversion
+static int (*orig_sysctlbyname)(const char *, void *, size_t *, void *, size_t);
+static int stub_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, void *newp, size_t newlen) {
+    if (name && oldp && oldlenp && *oldlenp > 0) {
+        NSDictionary *cfg = IPFVerLoadConfig();
+        if (IPFVerEnabled(cfg)) {
+            NSString *fake = nil;
+            if (strcmp(name, "kern.osproductversion") == 0)
+                fake = IPFVerPV(cfg);
+            else if (strcmp(name, "kern.osversion") == 0)
+                fake = IPFVerBV(cfg);
+            if (fake.length) {
+                const char *s = fake.UTF8String;
+                size_t need = strlen(s) + 1;
+                if (*oldlenp >= need) {
+                    memcpy(oldp, s, need);
+                    *oldlenp = need;
+                    IPFVerLog([NSString stringWithFormat:@"sysctl FAKE %s => %@", name, fake]);
+                    return 0;
+                }
+            }
+        }
+    }
+    return orig_sysctlbyname ? orig_sysctlbyname(name, oldp, oldlenp, newp, newlen) : -1;
 }
 
 static void IPFVerResolve(void) {
@@ -161,6 +334,15 @@ static void IPFVerResolve(void) {
     pMSHookMessageEx = (MSHookMessageEx_t)dlsym(RTLD_DEFAULT, "MSHookMessageEx");
 }
 
+static void *IPFFindMG(const char *name) {
+    void *p = dlsym(RTLD_DEFAULT, name);
+    if (p) return p;
+    void *h = dlopen("/usr/lib/libMobileGestalt.dylib", RTLD_NOW);
+    if (!h) h = dlopen("/System/Library/PrivateFrameworks/MobileGestalt.framework/MobileGestalt", RTLD_NOW);
+    if (h) p = dlsym(h, name);
+    return p;
+}
+
 %ctor {
     @autoreleasepool {
         NSString *bid = [[NSBundle mainBundle] bundleIdentifier] ?: @"";
@@ -170,6 +352,37 @@ static void IPFVerResolve(void) {
         }
         IPFVerMark("CTOR_ENTER");
         IPFVerResolve();
+
+        // Capture REAL host PV from SystemVersion.plist BEFORE any of our hooks
+        // (do not use MGCopyAnswer — About may already be hooked alphabetically).
+        if (!gHostPV) {
+            NSDictionary *sv = [NSDictionary dictionaryWithContentsOfFile:
+                                @"/System/Library/CoreServices/SystemVersion.plist"];
+            NSString *hp = [sv[@"ProductVersion"] description];
+            gHostPV = hp.length ? [hp copy] : @"15.5";
+            IPFVerLog([NSString stringWithFormat:@"hostPV=%@", gHostPV]);
+        }
+
+        if (pMSHookFunction) {
+            // Hook AFTER About's hook when possible: load order About then AboutVer alphabetically
+            // so our stub sits outermost and can wash host values About misses (hashed keys).
+            void *mg = IPFFindMG("MGCopyAnswer");
+            if (mg) {
+                pMSHookFunction(mg, (void *)stub_MGCopyAnswer, (void **)&orig_MGCopyAnswer);
+                IPFVerLog([NSString stringWithFormat:@"MSHook MGCopyAnswer %p", mg]);
+            }
+            void *sys = dlsym(RTLD_DEFAULT, "sysctlbyname");
+            if (sys)
+                pMSHookFunction(sys, (void *)stub_sysctlbyname, (void **)&orig_sysctlbyname);
+            void *cf = dlsym(RTLD_DEFAULT, "CFCopySystemVersionDictionary");
+            if (!cf) {
+                void *h = dlopen("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation", RTLD_NOW);
+                if (h) cf = dlsym(h, "CFCopySystemVersionDictionary");
+            }
+            if (cf)
+                pMSHookFunction(cf, (void *)stub_CFCopySysVer, (void **)&orig_CFCopySysVer);
+        }
+
         if (pMSHookMessageEx) {
             Class dm = objc_getMetaClass("NSDictionary");
             if (dm) {
@@ -193,19 +406,19 @@ static void IPFVerResolve(void) {
             if (uid && class_getInstanceMethod(uid, @selector(systemVersion)))
                 pMSHookMessageEx(uid, @selector(systemVersion), (IMP)stub_sysVer, (IMP *)&orig_sysVer);
             Class nspi = objc_getClass("NSProcessInfo");
-            if (nspi && class_getInstanceMethod(nspi, @selector(operatingSystemVersion)))
-                pMSHookMessageEx(nspi, @selector(operatingSystemVersion),
-                                 (IMP)stub_osv, (IMP *)&orig_osv);
-        }
-        if (pMSHookFunction) {
-            void *cf = dlsym(RTLD_DEFAULT, "CFCopySystemVersionDictionary");
-            if (!cf) {
-                void *h = dlopen("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation", RTLD_NOW);
-                if (h) cf = dlsym(h, "CFCopySystemVersionDictionary");
+            if (nspi) {
+                if (class_getInstanceMethod(nspi, @selector(operatingSystemVersion)))
+                    pMSHookMessageEx(nspi, @selector(operatingSystemVersion),
+                                     (IMP)stub_osv, (IMP *)&orig_osv);
+                if (class_getInstanceMethod(nspi, @selector(operatingSystemVersionString)))
+                    pMSHookMessageEx(nspi, @selector(operatingSystemVersionString),
+                                     (IMP)stub_osvString, (IMP *)&orig_osvString);
             }
-            if (cf)
-                pMSHookFunction(cf, (void *)stub_CFCopySysVer, (void **)&orig_CFCopySysVer);
         }
+
+        NSDictionary *cfg = IPFVerLoadConfig();
+        IPFVerLog([NSString stringWithFormat:@"ready PV=%@ BV=%@ hostPV=%@",
+                   IPFVerPV(cfg) ?: @"?", IPFVerBV(cfg) ?: @"?", gHostPV ?: @"?"]);
         IPFVerMark("CTOR_OK");
     }
 }
