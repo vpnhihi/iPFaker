@@ -75,7 +75,7 @@
     title.translatesAutoresizingMaskIntoConstraints = NO;
 
     UILabel *ver = [[UILabel alloc] init];
-    ver.text = @"Phiên bản: 2.10.5 · Settings About đồng bộ MG-cache";
+    ver.text = @"Phiên bản: 2.10.6 · iOS↔máy matrix · Số máy chuẩn · Tên pool";
     ver.font = AppTheme.captionFont;
     ver.textColor = AppTheme.textSecondary;
     ver.translatesAutoresizingMaskIntoConstraints = NO;

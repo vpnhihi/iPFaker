@@ -401,18 +401,75 @@
 }
 
 + (NSDictionary *)randomPartNumberFromDevice:(NSDictionary *)device {
-    // Part Number: MU783KH/A style — Settings "Số máy" default
+    // Settings → About "Số máy" (before tap): Apple part number
+    // Standard form: M + 4 alnum + 2-letter region + /A   e.g. MQ8N3LL/A, MYD83KH/A
+    // Region letters MUST sit before the slash so UI does not show Mxxxx/ARR/A double form.
+    // Prefix: M=retail new, N=replacement, F=refurbished, P=personalized (engraved).
     static NSString *alpha = @"ABCDEFGHJKLMNPQRSTUVWXYZ0123456789";
-    static NSArray *regions = @[ @"LL", @"J", @"CH", @"KH", @"ZA", @"ZP", @"B", @"D", @"F", @"T", @"X", @"Y", @"C", @"HN", @"PP", @"TH", @"TU", @"RU" ];
-    static NSArray *pfx = @[ @"M", @"N", @"F", @"P" ];
-    NSString *prefix = pfx[arc4random_uniform((u_int32_t)pfx.count)];
-    NSMutableString *body = [NSMutableString string];
-    int blen = (arc4random_uniform(4) == 0) ? 5 : 4;
-    for (int i = 0; i < blen; i++)
+    // Common Apple country/region codes (2 letters) used in part numbers
+    static NSArray *regions = @[
+        @"LL", @"J", @"CH", @"KH", @"ZA", @"ZP", @"B", @"D", @"F", @"T",
+        @"X", @"Y", @"C", @"HN", @"PP", @"TH", @"TU", @"RU", @"ZD", @"QN",
+    ];
+    // Prefer retail M (~85%); occasional N/F/P for realism
+    NSString *prefix = @"M";
+    u_int32_t pr = arc4random_uniform(100);
+    if (pr >= 85 && pr < 93) prefix = @"N";
+    else if (pr >= 93 && pr < 98) prefix = @"F";
+    else if (pr >= 98) prefix = @"P";
+    NSMutableString *body = [NSMutableString stringWithCapacity:4];
+    for (int i = 0; i < 4; i++)
         [body appendFormat:@"%C", [alpha characterAtIndex:arc4random_uniform((u_int32_t)alpha.length)]];
-    NSString *region = regions[arc4random_uniform((u_int32_t)regions.count)];
+    // Prefer region from device catalog / last flat if present
+    NSString *region = nil;
+    NSString *hint = device[@"PartNumberRegion"] ?: device[@"RegionCode"];
+    if ([hint isKindOfClass:[NSString class]] && hint.length >= 1) {
+        NSString *h = hint.uppercaseString;
+        if (h.length > 2) h = [h substringToIndex:2];
+        if ([regions containsObject:h]) region = h;
+        // single-letter regions (J, B, …) already in list
+        if (!region && h.length == 1) {
+            for (NSString *r in regions) {
+                if ([r isEqualToString:h]) { region = r; break; }
+            }
+        }
+    }
+    if (!region)
+        region = regions[arc4random_uniform((u_int32_t)regions.count)];
+    // Canonical: PREFIX + 4 body + REGION + /A  (exactly one slash)
     NSString *part = [NSString stringWithFormat:@"%@%@%@/A", prefix, body, region];
     return @{ @"part": part, @"region": region };
+}
+
+/// Random User-Assigned Device Name (Settings → About → Tên). Lab VN-friendly pool.
++ (NSString *)randomUserDeviceName {
+    static NSArray *pool;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        pool = @[
+            @"iPhone",
+            @"iPhone vip",
+            @"iPhone của Linh",
+            @"iPhone của An",
+            @"iPhone của Minh",
+            @"iPhone của Hương",
+            @"iPhone của Nam",
+            @"iPhone nhà",
+            @"iPhone mới",
+            @"My iPhone",
+            @"iPhone 12",
+            @"iPhone Pro",
+            @"iPhone chính chủ",
+            @"Điện thoại",
+            @"iPhone em",
+            @"iPhone anh",
+            @"iPhone chị",
+            @"Work iPhone",
+            @"iPhone ❤️",
+            @"iPhone ✨",
+        ];
+    });
+    return pool[arc4random_uniform((u_int32_t)pool.count)];
 }
 
 + (NSString *)randomAxxxxFromDevice:(NSDictionary *)device {
@@ -551,7 +608,8 @@
     while ([imei2 isEqualToString:imei]) imei2 = [self randomIMEI];
     NSString *meid = [imei substringToIndex:MIN((NSUInteger)14, imei.length)];
     NSString *eid = [self randomEID];
-    NSString *devName = name.length ? name : [NSString stringWithFormat:@"iPhone Lab %@", device[@"id"] ?: @"dev"];
+    // Settings → About "Tên": pool human names (not "iPhone Lab <catalog-id>")
+    NSString *devName = name.length ? name : [self randomUserDeviceName];
     // Hostname ≡ gethostname / uname.nodename / NSProcessInfo (DNS-label safe)
     NSMutableString *hostBuf = [NSMutableString string];
     for (NSUInteger i = 0; i < devName.length && hostBuf.length < 63; i++) {
@@ -567,9 +625,9 @@
     while (hostBuf.length && [hostBuf characterAtIndex:hostBuf.length - 1] == '-')
         [hostBuf deleteCharactersInRange:NSMakeRange(hostBuf.length - 1, 1)];
     NSString *hostName = hostBuf.length ? [hostBuf copy] : @"iPhone";
+    // Region letters must match part number (…LL/A, …KH/A) — avoid Settings showing Mxxxx/ARR/A
     NSString *regLetters = partInfo[@"region"] ?: @"ZA";
-    NSString *regionCode = @{ @"LL":@"US", @"J":@"JP", @"CH":@"CN", @"KH":@"KR", @"ZA":@"SG", @"ZP":@"HK",
-                              @"B":@"GB", @"D":@"DE", @"F":@"FR", @"T":@"IT", @"X":@"AU", @"C":@"CA" }[regLetters] ?: @"VN";
+    NSString *regionCode = regLetters;
 
     // Display — 100% from catalog row (any device), never hardcode one model
     NSInteger w = [disp[@"NativeWidth"] integerValue];

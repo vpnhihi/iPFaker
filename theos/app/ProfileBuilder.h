@@ -24,6 +24,8 @@ typedef void (^IPFWipeProgress)(NSString *step);
                                  productType:(nullable NSString *)productType;
 /// Clamp spoof iOS to host so UA/WebKit/OS client không lệch (lab “no OS skew”).
 + (NSString *)clampSpoofIOSToHost:(NSString *)spoofIOS;
+/// Random Settings device name from lab pool (iPhone / iPhone vip / iPhone của Linh…).
++ (NSString *)randomUserDeviceName;
 /// Radio RAT string matching device year (no NR on pre-5G phones).
 + (NSString *)radioAccessTechnologyForDevice:(NSDictionary *)device;
 /// Short honest claim footer (what lab can / cannot claim).
