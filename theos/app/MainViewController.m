@@ -12,12 +12,12 @@
 @property (nonatomic, strong) UILabel *deviceModelLabel;
 @property (nonatomic, strong) UILabel *deviceVersionLabel;
 @property (nonatomic, strong) UILabel *deviceIdfaLabel;
-@property (nonatomic, strong) UILabel *deviceStatusLabel;
 @property (nonatomic, strong) UILabel *ipProxyLabel;
 @property (nonatomic, strong) UILabel *ipAddrLabel;
 @property (nonatomic, strong) UILabel *ipCountryLabel;
 @property (nonatomic, strong) UILabel *ipTzLabel;
-@property (nonatomic, strong) UILabel *statusFooter;
+/// One-profile SoT for Zalo body: mod | osv | ss
+@property (nonatomic, strong) UILabel *sotStatusLabel;
 
 // Collapsible proxy on home
 @property (nonatomic, strong) UIView *proxyCard;
@@ -75,7 +75,7 @@
     title.translatesAutoresizingMaskIntoConstraints = NO;
 
     UILabel *ver = [[UILabel alloc] init];
-    ver.text = @"Phiên bản: 2.10.11 · About SystemVersion multi-path · Số máy sạch";
+    ver.text = @"Lab rootless · spoof multi-device";
     ver.font = AppTheme.captionFont;
     ver.textColor = AppTheme.textSecondary;
     ver.translatesAutoresizingMaskIntoConstraints = NO;
@@ -103,14 +103,13 @@
     self.deviceModelLabel = [self bodyLabel];
     self.deviceVersionLabel = [self bodyLabel];
     self.deviceIdfaLabel = [self bodyLabel];
-    self.deviceStatusLabel = [self bodyLabel];
     self.ipProxyLabel = [self bodyLabel];
     self.ipAddrLabel = [self bodyLabel];
     self.ipCountryLabel = [self bodyLabel];
     self.ipTzLabel = [self bodyLabel];
 
     UIStackView *leftCol = [[UIStackView alloc] initWithArrangedSubviews:@[
-        devHeader, self.deviceModelLabel, self.deviceVersionLabel, self.deviceIdfaLabel, self.deviceStatusLabel
+        devHeader, self.deviceModelLabel, self.deviceVersionLabel, self.deviceIdfaLabel
     ]];
     leftCol.axis = UILayoutConstraintAxisVertical;
     leftCol.spacing = 6;
@@ -129,6 +128,29 @@
     cols.spacing = 12;
     cols.translatesAutoresizingMaskIntoConstraints = NO;
     [card addSubview:cols];
+
+    // SoT bar — only status that matters for body spoof (mod | osv | ss)
+    UIView *sotBar = [[UIView alloc] init];
+    sotBar.translatesAutoresizingMaskIntoConstraints = NO;
+    sotBar.backgroundColor = [UIColor colorWithWhite:1 alpha:0.06];
+    sotBar.layer.cornerRadius = 8;
+    [card addSubview:sotBar];
+
+    UILabel *sotTitle = [[UILabel alloc] init];
+    sotTitle.text = @"Body SoT";
+    sotTitle.font = AppTheme.captionFont;
+    sotTitle.textColor = AppTheme.textSecondary;
+    sotTitle.translatesAutoresizingMaskIntoConstraints = NO;
+    [sotBar addSubview:sotTitle];
+
+    self.sotStatusLabel = [[UILabel alloc] init];
+    self.sotStatusLabel.font = [UIFont monospacedDigitSystemFontOfSize:13 weight:UIFontWeightSemibold];
+    self.sotStatusLabel.textColor = AppTheme.textPrimary;
+    self.sotStatusLabel.numberOfLines = 2;
+    self.sotStatusLabel.adjustsFontSizeToFitWidth = YES;
+    self.sotStatusLabel.minimumScaleFactor = 0.7;
+    self.sotStatusLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [sotBar addSubview:self.sotStatusLabel];
 
     // —— Collapsible proxy (home) ——
     self.proxyCard = [AppTheme roundedCardIn:content];
@@ -203,32 +225,6 @@
     locBtn.translatesAutoresizingMaskIntoConstraints = NO;
     [content addSubview:locBtn];
 
-    // Terms (compact)
-    UIView *termsCard = [AppTheme roundedCardIn:content];
-    termsCard.backgroundColor = AppTheme.cardAlt;
-    UILabel *termsTitle = [[UILabel alloc] init];
-    termsTitle.text = @"Điều khoản · Trách nhiệm · Miễn trừ";
-    termsTitle.font = AppTheme.sectionFont;
-    termsTitle.textColor = AppTheme.textPrimary;
-    termsTitle.translatesAutoresizingMaskIntoConstraints = NO;
-    UILabel *termsBody = [[UILabel alloc] init];
-    termsBody.numberOfLines = 0;
-    termsBody.font = AppTheme.captionFont;
-    termsBody.textColor = AppTheme.textSecondary;
-    termsBody.text =
-        @"Chỉ dùng nghiên cứu/kiểm thử trên thiết bị bạn sở hữu. Cấm vi phạm pháp luật. "
-        @"Bạn chịu trách nhiệm khi sử dụng tool.";
-    termsBody.translatesAutoresizingMaskIntoConstraints = NO;
-    [termsCard addSubview:termsTitle];
-    [termsCard addSubview:termsBody];
-
-    self.statusFooter = [[UILabel alloc] init];
-    self.statusFooter.font = AppTheme.captionFont;
-    self.statusFooter.textColor = AppTheme.textSecondary;
-    self.statusFooter.numberOfLines = 2;
-    self.statusFooter.translatesAutoresizingMaskIntoConstraints = NO;
-    [content addSubview:self.statusFooter];
-
     CGFloat pad = 16;
     [NSLayoutConstraint activateConstraints:@[
         [title.topAnchor constraintEqualToAnchor:content.topAnchor constant:12],
@@ -247,7 +243,19 @@
         [cols.topAnchor constraintEqualToAnchor:card.topAnchor constant:16],
         [cols.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:14],
         [cols.trailingAnchor constraintEqualToAnchor:card.trailingAnchor constant:-14],
-        [cols.bottomAnchor constraintEqualToAnchor:card.bottomAnchor constant:-16],
+
+        [sotBar.topAnchor constraintEqualToAnchor:cols.bottomAnchor constant:12],
+        [sotBar.leadingAnchor constraintEqualToAnchor:card.leadingAnchor constant:12],
+        [sotBar.trailingAnchor constraintEqualToAnchor:card.trailingAnchor constant:-12],
+        [sotBar.bottomAnchor constraintEqualToAnchor:card.bottomAnchor constant:-12],
+
+        [sotTitle.topAnchor constraintEqualToAnchor:sotBar.topAnchor constant:8],
+        [sotTitle.leadingAnchor constraintEqualToAnchor:sotBar.leadingAnchor constant:10],
+        [sotTitle.trailingAnchor constraintEqualToAnchor:sotBar.trailingAnchor constant:-10],
+        [self.sotStatusLabel.topAnchor constraintEqualToAnchor:sotTitle.bottomAnchor constant:4],
+        [self.sotStatusLabel.leadingAnchor constraintEqualToAnchor:sotTitle.leadingAnchor],
+        [self.sotStatusLabel.trailingAnchor constraintEqualToAnchor:sotTitle.trailingAnchor],
+        [self.sotStatusLabel.bottomAnchor constraintEqualToAnchor:sotBar.bottomAnchor constant:-8],
 
         // Proxy card
         [self.proxyCard.topAnchor constraintEqualToAnchor:card.bottomAnchor constant:12],
@@ -289,23 +297,7 @@
         [locBtn.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:pad],
         [locBtn.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-pad],
         [locBtn.heightAnchor constraintEqualToConstant:48],
-
-        [termsCard.topAnchor constraintEqualToAnchor:locBtn.bottomAnchor constant:14],
-        [termsCard.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:pad],
-        [termsCard.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-pad],
-
-        [termsTitle.topAnchor constraintEqualToAnchor:termsCard.topAnchor constant:12],
-        [termsTitle.leadingAnchor constraintEqualToAnchor:termsCard.leadingAnchor constant:14],
-        [termsTitle.trailingAnchor constraintEqualToAnchor:termsCard.trailingAnchor constant:-14],
-        [termsBody.topAnchor constraintEqualToAnchor:termsTitle.bottomAnchor constant:8],
-        [termsBody.leadingAnchor constraintEqualToAnchor:termsTitle.leadingAnchor],
-        [termsBody.trailingAnchor constraintEqualToAnchor:termsTitle.trailingAnchor],
-        [termsBody.bottomAnchor constraintEqualToAnchor:termsCard.bottomAnchor constant:-12],
-
-        [self.statusFooter.topAnchor constraintEqualToAnchor:termsCard.bottomAnchor constant:12],
-        [self.statusFooter.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:pad],
-        [self.statusFooter.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-pad],
-        [self.statusFooter.bottomAnchor constraintEqualToAnchor:content.bottomAnchor constant:-24],
+        [locBtn.bottomAnchor constraintEqualToAnchor:content.bottomAnchor constant:-28],
     ]];
 
     [self updateProxyHeaderTitle];
@@ -433,21 +425,83 @@
 
 #pragma mark - UI data
 
+/// Read dual-path config for live SoT (prefer disk over in-memory so user sees truth after PC deploy).
+- (NSDictionary *)liveFlatForSoT {
+    NSDictionary *disk = [ProfileBuilder loadCurrentFlat];
+    if (disk.count) return disk;
+    return AppState.shared.lastFlat ?: @{};
+}
+
+- (void)refreshSoTBar {
+    NSDictionary *flat = [self liveFlatForSoT];
+    NSString *mod = [flat[@"mod"] description] ?: @"";
+    NSString *osv = [flat[@"osv"] description] ?: @"";
+    NSString *ss  = [flat[@"ss"] description] ?: @"";
+    // Fallbacks so bar is still useful if only Class A present
+    if (!mod.length) mod = [flat[@"ProductType"] description] ?: @"";
+    if (!osv.length) osv = [flat[@"ProductVersion"] description] ?: @"";
+    if (!ss.length) {
+        id nw = flat[@"main-screen-width"];
+        id nh = flat[@"main-screen-height"];
+        if (nw && nh) ss = [NSString stringWithFormat:@"%@x%@", nw, nh];
+        else ss = [flat[@"ScreenSizeString"] description] ?: @"";
+    }
+    BOOL hasMod = mod.length > 0;
+    BOOL hasOsv = osv.length > 0;
+    BOOL hasSs  = ss.length > 0;
+    // Strict: aliases mod/osv/ss present (body rewrite SoT)
+    BOOL strict = flat[@"mod"] && flat[@"osv"] && flat[@"ss"]
+        && [[flat[@"mod"] description] length]
+        && [[flat[@"osv"] description] length]
+        && [[flat[@"ss"] description] length];
+    // Consistency with Class A
+    BOOL match = YES;
+    if (strict) {
+        NSString *pt = [flat[@"ProductType"] description] ?: @"";
+        NSString *pv = [flat[@"ProductVersion"] description] ?: @"";
+        if (pt.length && ![mod isEqualToString:pt]) match = NO;
+        if (pv.length && ![osv isEqualToString:pv]) match = NO;
+    }
+
+    NSString *modShow = hasMod ? mod : @"—";
+    NSString *osvShow = hasOsv ? osv : @"—";
+    NSString *ssShow  = hasSs  ? ss  : @"—";
+    NSString *line = [NSString stringWithFormat:@"%@  |  %@  |  %@", modShow, osvShow, ssShow];
+
+    if (!flat.count) {
+        self.sotStatusLabel.text = @"—  |  —  |  —   ·  chưa có config";
+        self.sotStatusLabel.textColor = AppTheme.textSecondary;
+    } else if (strict && match) {
+        self.sotStatusLabel.text = [NSString stringWithFormat:@"%@   ·  OK", line];
+        self.sotStatusLabel.textColor = AppTheme.success;
+    } else if (hasMod && hasOsv && hasSs) {
+        // Values present via fallback only (no explicit mod/osv/ss keys)
+        self.sotStatusLabel.text = [NSString stringWithFormat:@"%@   ·  thiếu key mod/osv/ss", line];
+        self.sotStatusLabel.textColor = [UIColor colorWithRed:0.95 green:0.7 blue:0.2 alpha:1];
+    } else {
+        NSMutableArray *miss = [NSMutableArray array];
+        if (!hasMod) [miss addObject:@"mod"];
+        if (!hasOsv) [miss addObject:@"osv"];
+        if (!hasSs)  [miss addObject:@"ss"];
+        self.sotStatusLabel.text = [NSString stringWithFormat:@"%@   ·  thiếu %@",
+                                    line, [miss componentsJoinedByString:@"+"]];
+        self.sotStatusLabel.textColor = [UIColor colorWithRed:0.95 green:0.35 blue:0.3 alpha:1];
+    }
+}
+
 - (void)refreshUI {
     AppState *st = AppState.shared;
     NSDictionary *dev = [st currentDevice] ?: @{};
-    NSDictionary *flat = st.lastFlat ?: @{};
+    NSDictionary *flat = [self liveFlatForSoT];
+    if (!flat.count) flat = st.lastFlat ?: @{};
     NSString *model = flat[@"MarketingName"] ?: dev[@"MarketingName"] ?: @"—";
     NSString *ios = flat[@"ProductVersion"] ?: st.selectedIOS ?: @"—";
-    NSString *idfa = flat[@"IDFA"] ?: @"— (Apply để sinh)";
+    NSString *idfa = flat[@"IDFA"] ?: @"—";
     if (idfa.length > 22) idfa = [[idfa substringToIndex:20] stringByAppendingString:@"…"];
-    BOOL worked = flat.count > 0;
 
     self.deviceModelLabel.text = [NSString stringWithFormat:@"Model: %@", model];
     self.deviceVersionLabel.text = [NSString stringWithFormat:@"Phiên bản: %@", ios];
     self.deviceIdfaLabel.text = [NSString stringWithFormat:@"IDFA: %@", idfa];
-    self.deviceStatusLabel.text = worked ? @"Trạng thái: Đã áp dụng" : @"Trạng thái: Chưa áp dụng";
-    self.deviceStatusLabel.textColor = worked ? AppTheme.success : AppTheme.textSecondary;
 
     self.ipProxyLabel.text = [NSString stringWithFormat:@"Loại: %@", flat[@"ProductType"] ?: dev[@"ProductType"] ?: @"—"];
     self.ipAddrLabel.text = [NSString stringWithFormat:@"Sê-ri: %@", flat[@"SerialNumber"] ?: @"—"];
@@ -459,10 +513,7 @@
         self.proxyEnableSw.on = [st proxyEnabled];
     }
     [self updateProxyHeaderTitle];
-
-    NSString *msg = st.statusText ?: @"";
-    if (msg.length > 120) msg = [[msg substringToIndex:117] stringByAppendingString:@"…"];
-    self.statusFooter.text = msg;
+    [self refreshSoTBar];
 }
 
 #pragma mark - Actions
@@ -485,26 +536,22 @@
         if (!msg.length) msg = @"Xong";
         dispatch_async(dispatch_get_main_queue(), ^{
             self.view.userInteractionEnabled = YES;
-            [ov finishWithTitle:@"Hoàn tất" detail:msg];
+            // Short overlay only — no extra UIAlert (noise)
+            BOOL err = [msg hasPrefix:@"Lỗi"] || [msg containsString:@"FAIL"] || [msg containsString:@"trống"];
+            NSString *shortDetail = err ? msg : @"SoT đã ghi · xem Body SoT phía trên";
+            if (shortDetail.length > 90)
+                shortDetail = [[shortDetail substringToIndex:87] stringByAppendingString:@"…"];
+            [ov finishWithTitle:err ? @"Lỗi" : @"OK" detail:shortDetail];
             [self refreshUI];
-            [ov dismissAfter:1.0 completion:^{
-                [self showAlertTitle:@"Đặt lại + Lưu dữ liệu" message:msg];
-            }];
+            [ov dismissAfter:err ? 2.0 : 0.9 completion:nil];
+            if (err) [self showAlertTitle:@"Đặt lại + Lưu" message:msg];
         });
     });
 }
 
 - (void)killTapped {
-    UIAlertController *ac = [UIAlertController
-        alertControllerWithTitle:@"Đặt lại dữ liệu app?"
-                         message:@"Spoof mới + xóa session (mất đăng nhập). Không tự mở lại app."
-                  preferredStyle:UIAlertControllerStyleAlert];
-    [ac addAction:[UIAlertAction actionWithTitle:@"Hủy" style:UIAlertActionStyleCancel handler:nil]];
-    __weak typeof(self) weakSelf = self;
-    [ac addAction:[UIAlertAction actionWithTitle:@"Chạy" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *a) {
-        [weakSelf runResetAppData];
-    }]];
-    [self presentViewController:ac animated:YES completion:nil];
+    // No confirm dialog — run directly; overlay shows progress
+    [self runResetAppData];
 }
 
 - (void)runResetAppData {
@@ -525,11 +572,12 @@
         if (!msg.length) msg = @"Xong";
         dispatch_async(dispatch_get_main_queue(), ^{
             self.view.userInteractionEnabled = YES;
-            [ov finishWithTitle:@"Hoàn tất" detail:msg];
+            BOOL err = [msg hasPrefix:@"Lỗi"] || [msg containsString:@"FAIL"];
+            [ov finishWithTitle:err ? @"Lỗi" : @"OK"
+                         detail:err ? msg : @"Session wipe · SoT mới"];
             [self refreshUI];
-            [ov dismissAfter:1.0 completion:^{
-                [self showAlertTitle:@"Đặt lại dữ liệu app" message:msg];
-            }];
+            [ov dismissAfter:err ? 2.0 : 0.9 completion:nil];
+            if (err) [self showAlertTitle:@"Đặt lại dữ liệu app" message:msg];
         });
     });
 }
@@ -549,11 +597,11 @@
             self.view.userInteractionEnabled = YES;
             BOOL ok = [msg containsString:@"Đã đồng bộ"] || [msg containsString:@"random"] || [msg containsString:@"Latitude"]
                 || (![msg hasPrefix:@"Bật proxy"] && ![msg containsString:@"FAIL"]);
-            [ov finishWithTitle:ok ? @"Location OK" : @"Location" detail:msg];
+            NSString *shortDetail = ok ? @"Geo OK" : (msg.length > 80 ? [[msg substringToIndex:77] stringByAppendingString:@"…"] : msg);
+            [ov finishWithTitle:ok ? @"OK" : @"Location" detail:shortDetail];
             [self refreshUI];
-            [ov dismissAfter:1.2 completion:^{
-                [self showAlertTitle:@"Đồng bộ Location" message:msg];
-            }];
+            [ov dismissAfter:ok ? 0.9 : 1.5 completion:nil];
+            if (!ok) [self showAlertTitle:@"Location" message:msg];
         });
     });
 }
