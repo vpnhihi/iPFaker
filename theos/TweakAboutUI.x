@@ -259,38 +259,6 @@ static NSInteger IPFUIWashView(UIView *root,
     return n;
 }
 
-/// Scroll About table through rows so off-screen Wi‑Fi/BT/modem cells are built.
-static void IPFUIForceTableCells(UIView *root) {
-    if (!root) return;
-    NSMutableArray *stack = [NSMutableArray arrayWithObject:root];
-    while (stack.count) {
-        UIView *v = stack.lastObject;
-        [stack removeLastObject];
-        if ([v isKindOfClass:[UITableView class]]) {
-            UITableView *tv = (UITableView *)v;
-            @try {
-                CGPoint saved = tv.contentOffset;
-                NSInteger secs = [tv numberOfSections];
-                for (NSInteger s = 0; s < secs && s < 20; s++) {
-                    NSInteger rows = [tv numberOfRowsInSection:s];
-                    for (NSInteger r = 0; r < rows && r < 40; r++) {
-                        NSIndexPath *ip = [NSIndexPath indexPathForRow:r inSection:s];
-                        @try {
-                            [tv scrollToRowAtIndexPath:ip
-                                      atScrollPosition:UITableViewScrollPositionNone
-                                              animated:NO];
-                        } @catch (__unused NSException *ex2) {}
-                    }
-                }
-                [tv layoutIfNeeded];
-                // restore so user does not see jump (About may re-layout)
-                [tv setContentOffset:saved animated:NO];
-            } @catch (__unused NSException *ex) {}
-        }
-        if (v.subviews.count) [stack addObjectsFromArray:v.subviews];
-    }
-}
-
 static void IPFUIWashAllWindows(void) {
     NSDictionary *cfg = IPFUIConfig();
     if (!IPFUIEnabled(cfg)) return;
@@ -323,9 +291,6 @@ static void IPFUIWashAllWindows(void) {
     if (!windows.count)
         windows = UIApplication.sharedApplication.windows;
     for (UIWindow *w in windows) {
-        IPFUIForceTableCells(w);
-        if (w.rootViewController.view)
-            IPFUIForceTableCells(w.rootViewController.view);
         total += IPFUIWashView(w, wantPV, wantMk, wantName, wantWifi, wantBT,
                               wantEID, wantSEID, wantBB, hostVers);
         UIViewController *r = w.rootViewController;
@@ -334,11 +299,9 @@ static void IPFUIWashAllWindows(void) {
                                   wantEID, wantSEID, wantBB, hostVers);
         UIViewController *p = r.presentedViewController;
         while (p) {
-            if (p.view) {
-                IPFUIForceTableCells(p.view);
+            if (p.view)
                 total += IPFUIWashView(p.view, wantPV, wantMk, wantName, wantWifi, wantBT,
                                       wantEID, wantSEID, wantBB, hostVers);
-            }
             p = p.presentedViewController;
         }
     }
@@ -353,7 +316,8 @@ static void IPFUIWashAllWindows(void) {
 }
 
 static void IPFUIScheduleWashes(void) {
-    NSArray *delays = @[ @0.3, @0.8, @1.5, @2.5, @4.0, @6.0, @9.0, @12.0 ];
+    // Longer passes: Wi‑Fi/BT/modem rows appear after user scrolls About
+    NSArray *delays = @[ @0.3, @0.8, @1.5, @2.5, @4.0, @6.0, @10.0, @15.0, @20.0 ];
     for (NSNumber *d in delays) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(d.doubleValue * NSEC_PER_SEC)),
                        dispatch_get_main_queue(), ^{
@@ -390,7 +354,6 @@ static void IPFUIOnActive(CFNotificationCenterRef center, void *observer,
                         object:nil
                          queue:nil
                     usingBlock:^(__unused NSNotification *note) {
-                        gIPFUIMacSlot = 0;
                         IPFUIScheduleWashes();
                     }];
         IPFUIMark("CTOR_OK");
