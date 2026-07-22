@@ -171,58 +171,96 @@ static NSData *IPFRewritePayload(NSData *data) {
                 }
             }
         }
-        // Zalo analytics: "osv":"15.8.4" / osv=15.8.4  → profile ProductVersion
-        // Only replace when body looks like analytics/reg (avoid breaking unrelated API version numbers)
-        if (osv.length) {
-            BOOL analyticsish =
-                [out rangeOfString:@"osv"].location != NSNotFound
-                || [out rangeOfString:@"%22osv%22"].location != NSNotFound
-                || [out rangeOfString:@"centralized"].location != NSNotFound
-                || [out rangeOfString:@"deviceUUID"].location != NSNotFound
-                || [out rangeOfString:@"deviceUUID" options:NSCaseInsensitiveSearch].location != NSNotFound
-                || [out rangeOfString:@"mod="].location != NSNotFound
-                || [out rangeOfString:@"%22mod%22"].location != NSNotFound
-                || [out rangeOfString:@"\"mod\""].location != NSNotFound;
-            if (analyticsish) {
-                NSString *safeOsv = [[osv componentsSeparatedByCharactersInSet:
-                    [[NSCharacterSet characterSetWithCharactersInString:@"0123456789."] invertedSet]]
-                    componentsJoinedByString:@""];
-                if (!safeOsv.length) safeOsv = osv;
-                // Plain JSON: "osv":"15.8.4"
-                NSRegularExpression *reOsvJson = [NSRegularExpression
-                    regularExpressionWithPattern:@"\"osv\"\\s*:\\s*\"[0-9.]+\""
-                                         options:0 error:nil];
-                if (reOsvJson) {
-                    NSString *repl = [NSString stringWithFormat:@"\"osv\":\"%@\"", safeOsv];
-                    NSString *tmp = [reOsvJson stringByReplacingMatchesInString:out options:0
-                        range:NSMakeRange(0, out.length) withTemplate:repl];
-                    if (tmp && ![tmp isEqualToString:out]) { out = tmp; changed = YES; }
-                }
-                // form: osv=15.8.4
-                NSRegularExpression *reOsvForm = [NSRegularExpression
-                    regularExpressionWithPattern:@"osv=[0-9.]+" options:0 error:nil];
-                if (reOsvForm) {
-                    NSString *repl = [NSString stringWithFormat:@"osv=%@", safeOsv];
-                    NSString *tmp = [reOsvForm stringByReplacingMatchesInString:out options:0
-                        range:NSMakeRange(0, out.length) withTemplate:repl];
-                    if (tmp && ![tmp isEqualToString:out]) { out = tmp; changed = YES; }
-                }
-                // URL-encoded JSON fragment: %22osv%22%3A%2215.8.4%22
-                NSRegularExpression *reOsvPct = [NSRegularExpression
-                    regularExpressionWithPattern:@"%22osv%22%3A%22[0-9.]+%22"
-                                         options:NSRegularExpressionCaseInsensitive error:nil];
-                if (reOsvPct) {
-                    NSString *repl = [NSString stringWithFormat:@"%%22osv%%22%%3A%%22%@%%22", safeOsv];
-                    NSString *tmp = [reOsvPct stringByReplacingMatchesInString:out options:0
-                        range:NSMakeRange(0, out.length) withTemplate:repl];
-                    if (tmp && ![tmp isEqualToString:out]) { out = tmp; changed = YES; }
-                }
+        // ── Point 3 (lab): API spoof = body mạng spoof ─────────────────────
+        // UIDevice/MG alone still fails: Zalo centralized sends mod/osv/ss in body.
+        // Force-rewrite those fields to one-profile SoT whenever analytics-ish.
+        BOOL analyticsish =
+            [out rangeOfString:@"osv"].location != NSNotFound
+            || [out rangeOfString:@"%22osv%22"].location != NSNotFound
+            || [out rangeOfString:@"centralized"].location != NSNotFound
+            || [out rangeOfString:@"deviceUUID"].location != NSNotFound
+            || [out rangeOfString:@"deviceUUID" options:NSCaseInsensitiveSearch].location != NSNotFound
+            || [out rangeOfString:@"mod="].location != NSNotFound
+            || [out rangeOfString:@"%22mod%22"].location != NSNotFound
+            || [out rangeOfString:@"\"mod\""].location != NSNotFound
+            || [out rangeOfString:@"\"ss\""].location != NSNotFound
+            || [out rangeOfString:@"%22ss%22"].location != NSNotFound
+            || [out rangeOfString:@"zaloapp.com"].location != NSNotFound;
+
+        // Force "mod" / mod= → profile ProductType (even if host PT not in realPT list)
+        if (analyticsish && pt.length) {
+            NSString *safeMod = [[pt componentsSeparatedByCharactersInSet:
+                [[NSCharacterSet characterSetWithCharactersInString:@"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789,"] invertedSet]]
+                componentsJoinedByString:@""];
+            if (!safeMod.length) safeMod = pt;
+            NSString *modEnc = [safeMod stringByReplacingOccurrencesOfString:@"," withString:@"%2C"];
+            NSRegularExpression *reModJson = [NSRegularExpression
+                regularExpressionWithPattern:@"\"mod\"\\s*:\\s*\"[^\"]+\""
+                                     options:0 error:nil];
+            if (reModJson) {
+                NSString *repl = [NSString stringWithFormat:@"\"mod\":\"%@\"", safeMod];
+                NSString *tmp = [reModJson stringByReplacingMatchesInString:out options:0
+                    range:NSMakeRange(0, out.length) withTemplate:repl];
+                if (tmp && ![tmp isEqualToString:out]) { out = tmp; changed = YES; }
+            }
+            NSRegularExpression *reModForm = [NSRegularExpression
+                regularExpressionWithPattern:@"mod=iPhone[0-9,]+" options:0 error:nil];
+            if (reModForm) {
+                NSString *repl = [NSString stringWithFormat:@"mod=%@", safeMod];
+                NSString *tmp = [reModForm stringByReplacingMatchesInString:out options:0
+                    range:NSMakeRange(0, out.length) withTemplate:repl];
+                if (tmp && ![tmp isEqualToString:out]) { out = tmp; changed = YES; }
+            }
+            // URL-encoded: %22mod%22%3A%22iPhone9%2C1%22
+            NSRegularExpression *reModPct = [NSRegularExpression
+                regularExpressionWithPattern:@"%22mod%22%3A%22iPhone[^%\"&]+%22"
+                                     options:NSRegularExpressionCaseInsensitive error:nil];
+            if (reModPct) {
+                NSString *repl = [NSString stringWithFormat:@"%%22mod%%22%%3A%%22%@%%22", modEnc];
+                NSString *tmp = [reModPct stringByReplacingMatchesInString:out options:0
+                    range:NSMakeRange(0, out.length) withTemplate:repl];
+                if (tmp && ![tmp isEqualToString:out]) { out = tmp; changed = YES; }
             }
         }
-        // Zalo analytics: "ss":"750x1334" / ss=750x1334 / %22ss%22%3A%22750x1334%22
-        if (ss.length && ([out rangeOfString:@"ss"].location != NSNotFound
-                          || [out rangeOfString:@"%22ss%22"].location != NSNotFound
-                          || [out rangeOfString:@"%22SS%22"].location != NSNotFound)) {
+
+        // Force "osv" → profile ProductVersion
+        if (analyticsish && osv.length) {
+            NSString *safeOsv = [[osv componentsSeparatedByCharactersInSet:
+                [[NSCharacterSet characterSetWithCharactersInString:@"0123456789."] invertedSet]]
+                componentsJoinedByString:@""];
+            if (!safeOsv.length) safeOsv = osv;
+            // Plain JSON: "osv":"15.8.4"
+            NSRegularExpression *reOsvJson = [NSRegularExpression
+                regularExpressionWithPattern:@"\"osv\"\\s*:\\s*\"[0-9.]+\""
+                                     options:0 error:nil];
+            if (reOsvJson) {
+                NSString *repl = [NSString stringWithFormat:@"\"osv\":\"%@\"", safeOsv];
+                NSString *tmp = [reOsvJson stringByReplacingMatchesInString:out options:0
+                    range:NSMakeRange(0, out.length) withTemplate:repl];
+                if (tmp && ![tmp isEqualToString:out]) { out = tmp; changed = YES; }
+            }
+            // form: osv=15.8.4
+            NSRegularExpression *reOsvForm = [NSRegularExpression
+                regularExpressionWithPattern:@"osv=[0-9.]+" options:0 error:nil];
+            if (reOsvForm) {
+                NSString *repl = [NSString stringWithFormat:@"osv=%@", safeOsv];
+                NSString *tmp = [reOsvForm stringByReplacingMatchesInString:out options:0
+                    range:NSMakeRange(0, out.length) withTemplate:repl];
+                if (tmp && ![tmp isEqualToString:out]) { out = tmp; changed = YES; }
+            }
+            // URL-encoded JSON fragment: %22osv%22%3A%2215.8.4%22
+            NSRegularExpression *reOsvPct = [NSRegularExpression
+                regularExpressionWithPattern:@"%22osv%22%3A%22[0-9.]+%22"
+                                     options:NSRegularExpressionCaseInsensitive error:nil];
+            if (reOsvPct) {
+                NSString *repl = [NSString stringWithFormat:@"%%22osv%%22%%3A%%22%@%%22", safeOsv];
+                NSString *tmp = [reOsvPct stringByReplacingMatchesInString:out options:0
+                    range:NSMakeRange(0, out.length) withTemplate:repl];
+                if (tmp && ![tmp isEqualToString:out]) { out = tmp; changed = YES; }
+            }
+        }
+        // Force "ss" → native WxH from profile
+        if (analyticsish && ss.length) {
             NSString *safeSs = [[ss componentsSeparatedByCharactersInSet:
                 [[NSCharacterSet characterSetWithCharactersInString:@"0123456789xX"] invertedSet]]
                 componentsJoinedByString:@""];
