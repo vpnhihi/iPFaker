@@ -329,6 +329,7 @@
             @"Enabled", @"FakeDevice", @"FakeHardware", @"FakeAds", @"FakeScreen", @"FakeRealScreen",
             @"FakeBrowser", @"FakeNetwork", @"FakeWifi", @"FakeSysctl", @"FakeSysOSVersion",
             @"HideJailbreak", @"FakeLocale", @"FakeDateTime", @"FakeLocation", @"FakeSensor",
+            @"SpoofSettingsAbout",
             @"FakeWebRTC", @"DisableWebRTC", @"FakeProxy", @"DisableAppAttest",
             // Proxy / AppAttest / geo meta
             @"EnableProxy", @"ProxyHost", @"ProxyPort", @"ProxyType",
@@ -919,6 +920,8 @@
             if (!safeFlat[fk]) safeFlat[fk] = @YES;
         }
         safeFlat[@"DisableAppAttest"] = @YES;
+        if (safeFlat[@"SpoofSettingsAbout"] == nil)
+            safeFlat[@"SpoofSettingsAbout"] = @YES;
     }
     flat = [safeFlat copy];
 

@@ -227,9 +227,15 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
 
 - (NSArray<NSString *> *)filterSpoofTargets {
     // Inject: selected installed apps + system lab (identity when open Map/Safari)
+    // + Settings About (Giới thiệu) when SpoofSettingsAbout is on (default YES)
     NSMutableArray *out = [[self labAppTargets] mutableCopy] ?: [NSMutableArray array];
     for (NSString *s in [AppState systemLabBackgroundBundleIds]) {
         if (![out containsObject:s]) [out addObject:s];
+    }
+    // Cài đặt → Giới thiệu: MG-only inject (see TweakMG.x) — not wiped on Reset
+    if ([self toggleForKey:@"SpoofSettingsAbout" defaultOn:YES]) {
+        if (![out containsObject:@"com.apple.Preferences"])
+            [out addObject:@"com.apple.Preferences"];
     }
     return out;
 }
@@ -763,6 +769,8 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     setFlag(@"HideJailbreak", YES);
     setFlag(@"FakeWifi", YES);
     setFlag(@"FakeProxy", [self proxyEnabled]); // align with EnableProxy if set
+    // Settings → General → About shows spoof identity (MG inject only)
+    mflat[@"SpoofSettingsAbout"] = @([self toggleForKey:@"SpoofSettingsAbout" defaultOn:YES]);
     // Pool metadata for lab debug
     mflat[@"SelectedDevicePool"] = [self.selectedDeviceIds copy];
     mflat[@"SelectedIOSPool"] = [self.selectedIOSList copy];

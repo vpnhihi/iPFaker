@@ -37,6 +37,7 @@
             @{ @"t": @"Giả lập sysctl", @"k": @"FakeSysctl", @"d": @YES },
             @{ @"t": @"Giả lập phiên bản hệ thống", @"k": @"FakeSysOSVersion", @"d": @YES },
             @{ @"t": @"Ẩn jailbreak", @"k": @"HideJailbreak", @"d": @YES },
+            @{ @"t": @"Hiện spoof trong Cài đặt → Giới thiệu", @"k": @"SpoofSettingsAbout", @"d": @YES },
         ],
         @[
             @{ @"t": @"Giả lập ngôn ngữ / múi giờ", @"k": @"FakeLocale", @"d": @YES },
@@ -70,7 +71,7 @@
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
     if (section == 0)
-        return @"Công tắc giả lập (trang chủ đã gọn). Bật/tắt hook khi «Đặt lại…». Giả lập thiết bị / màn hình / mạng / Ẩn JB nằm ở đây.";
+        return @"Bật «Hiện spoof trong Cài đặt → Giới thiệu» để xem model/serial/iOS ảo tại Cài đặt chung → Giới thiệu (MG only; không xóa data Settings khi Đặt lại). Sau Đặt lại: killall Preferences rồi mở lại Cài đặt.";
     if (section == 1)
         return @"Ngôn ngữ · múi giờ · GPS · WebRTC. Giả lập ngày giờ mặc định TẮT (tránh lệch giờ TLS).";
     if (section == (NSInteger)self.sections.count)

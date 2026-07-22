@@ -44,11 +44,21 @@ static void IPFMark(const char *msg) {
         IPFMark("CTOR_ENTER");
 
         NSString *bid = [[NSBundle mainBundle] bundleIdentifier] ?: @"";
-        // Filter scopes inject; allow Zalo + Settings (About / Giới thiệu).
-        // Multi-app spoof: ElleKit Filter.plist decides inject targets.
-        // Hard-block Settings (historical crash). Do not second-guess other bundles.
+        // Multi-app: ElleKit Filter.plist scopes inject.
+        // Settings (Preferences): MG-only for Cài đặt → Cài đặt chung → Giới thiệu.
+        // Skip Extra/WebKit/getifaddrs here — historical crash risk when full Extra runs in Settings.
         if (bid.length > 0 && [bid isEqualToString:@"com.apple.Preferences"]) {
-            IPFMark("CTOR_SKIP_PREFS");
+            BOOL okPrefs = [[IPFConfig shared] reload];
+            if (!okPrefs || ![IPFConfig shared].enabled) {
+                IPFMark("CTOR_PREFS_NO_CONFIG");
+                return;
+            }
+            if (![[IPFConfig shared] flag:@"SpoofSettingsAbout" defaultYes:YES]) {
+                IPFMark("CTOR_PREFS_FLAG_OFF");
+                return;
+            }
+            IPFInstallMGHooks(); // About: MGCopyAnswer / UIDevice / sysctl / uname
+            IPFMark("CTOR_PREFS_MG_ONLY");
             return;
         }
 
