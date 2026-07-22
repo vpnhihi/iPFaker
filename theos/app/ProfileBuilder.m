@@ -429,6 +429,25 @@
         @"ProductVersion": iosMeta[@"ProductVersion"] ?: iosVer,
         @"BuildVersion": iosMeta[@"BuildVersion"] ?: @"",
         @"ProductBuildVersion": iosMeta[@"BuildVersion"] ?: @"",
+        // Darwin kernel (iOS N.M → Darwin (N+6).M.0) — must not leave host uname release
+        @"kern.osrelease": ({
+            NSString *iv = iosMeta[@"ProductVersion"] ?: iosVer ?: @"15.0";
+            NSArray *pp = [iv componentsSeparatedByString:@"."];
+            NSInteger maj = pp.count ? [pp[0] integerValue] + 6 : 21;
+            NSInteger min = pp.count > 1 ? [pp[1] integerValue] : 0;
+            NSInteger pat = pp.count > 2 ? [pp[2] integerValue] : 0;
+            [NSString stringWithFormat:@"%ld.%ld.%ld", (long)maj, (long)min, (long)pat];
+        }),
+        @"kern.version": ({
+            NSString *iv = iosMeta[@"ProductVersion"] ?: iosVer ?: @"15.0";
+            NSArray *pp = [iv componentsSeparatedByString:@"."];
+            NSInteger maj = pp.count ? [pp[0] integerValue] + 6 : 21;
+            NSInteger min = pp.count > 1 ? [pp[1] integerValue] : 0;
+            NSInteger pat = pp.count > 2 ? [pp[2] integerValue] : 0;
+            NSString *rel = [NSString stringWithFormat:@"%ld.%ld.%ld", (long)maj, (long)min, (long)pat];
+            NSString *board = device[@"HWModelStr"] ?: @"T8020";
+            [NSString stringWithFormat:@"Darwin Kernel Version %@: root:xnu-spoof/RELEASE_ARM64_%@", rel, board];
+        }),
         // UUID v4 uppercase (Apple IDFA / IDFV)
         @"IDFA": idfa,
         @"IDFV": idfv,
@@ -634,6 +653,10 @@
                 @"hw.model": flat[@"HWModelStr"] ?: @"",
                 @"hw.memsize": flat[@"hw.memsize"] ?: @0,
                 @"hw.ncpu": flat[@"hw.ncpu"] ?: @0,
+                @"kern.osversion": flat[@"BuildVersion"] ?: @"",
+                @"kern.osproductversion": flat[@"ProductVersion"] ?: @"",
+                @"kern.osrelease": flat[@"kern.osrelease"] ?: @"",
+                @"kern.version": flat[@"kern.version"] ?: @"",
             },
         },
     };
@@ -1518,20 +1541,18 @@
         [bids addObject:@"com.zing.zalo"];
     [bids removeObject:@"com.apple.Preferences"];
 
-    // lab parity: Safari selected → also inject WebKit helper processes (WebContent/Networking/GPU)
-    // so WKWebView UA/screen spoof applies outside main Safari process.
-    BOOL wantSafari = [bids containsObject:@"com.apple.mobilesafari"];
-    if (wantSafari) {
-        for (NSString *wk in @[
-                 @"com.apple.WebKit.WebContent",
-                 @"com.apple.WebKit.Networking",
-                 @"com.apple.WebKit.GPU",
-             ]) {
-            if (![bids containsObject:wk]) [bids addObject:wk];
-        }
+    // Do NOT inject full MG/CT/JB into WebKit.WebContent/Networking/GPU by default.
+    // Full stack on WebContent causes lag/white hybrid WebViews (Zalo zBox / in-app browser).
+    // Safari main process still spoofed when listed; WKWebView in Zalo uses Zalo process hooks.
+    for (NSString *wk in @[
+             @"com.apple.WebKit.WebContent",
+             @"com.apple.WebKit.Networking",
+             @"com.apple.WebKit.GPU",
+         ]) {
+        [bids removeObject:wk];
     }
 
-    step([NSString stringWithFormat:@"Chuẩn bị filter %lu app (CT + CommCenter)…", (unsigned long)bids.count]);
+    step([NSString stringWithFormat:@"Chuẩn bị filter %lu app (CT + CommCenter, no WebKit helpers)…", (unsigned long)bids.count]);
 
     NSFileManager *fm = [NSFileManager defaultManager];
     NSString *stage = @"/var/mobile/Library/iPFaker";

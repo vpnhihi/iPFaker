@@ -1,7 +1,7 @@
 Package: com.ipfaker.app
 Name: iPFaker
 Depends: firmware (>= 14.0)
-Version: 2.9.3
+Version: 2.9.4
 Architecture: iphoneos-arm64
 Description: Lab control app for iPFaker — unified lab apps, Method A fast reset, home proxy + Location. Does not inject Settings.
 Maintainer: iPFaker Lab

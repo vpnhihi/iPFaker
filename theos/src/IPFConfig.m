@@ -107,6 +107,36 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
         mg[@"BuildVersion"] = b;
         sys[@"kern.osversion"] = b;
     }
+    // Darwin kernel release/version must track spoof iOS (NOT leave host kernel 21.5.0 when spoof 15.4)
+    // Mapping: iOS N.M → Darwin (N+6).M.0  (e.g. 15.4 → 21.4.0, 16.5 → 22.5.0)
+    {
+        NSString *iosVer = [flat[@"ProductVersion"] description];
+        NSString *rel = flat[@"kern.osrelease"] ?: flat[@"DarwinRelease"];
+        if (![rel isKindOfClass:[NSString class]] || !rel.length) {
+            NSInteger maj = 21, min = 0, pat = 0;
+            if (iosVer.length) {
+                NSArray *parts = [iosVer componentsSeparatedByString:@"."];
+                if (parts.count >= 1) maj = [parts[0] integerValue] + 6;
+                if (parts.count >= 2) min = [parts[1] integerValue];
+                if (parts.count >= 3) pat = [parts[2] integerValue];
+                if (maj < 19) maj = 19;
+            }
+            rel = [NSString stringWithFormat:@"%ld.%ld.%ld", (long)maj, (long)min, (long)pat];
+        }
+        sys[@"kern.osrelease"] = rel;
+        NSString *kv = flat[@"kern.version"] ?: flat[@"DarwinVersion"];
+        if (![kv isKindOfClass:[NSString class]] || !kv.length) {
+            NSString *board = flat[@"HWModelStr"] ?: flat[@"HardwareModel"] ?: @"T8020";
+            // Compact utsname.version-style string (apps often only parse leading Darwin Kernel Version X.Y.Z)
+            kv = [NSString stringWithFormat:
+                  @"Darwin Kernel Version %@: root:xnu-spoof/RELEASE_ARM64_%@",
+                  rel, board];
+        }
+        sys[@"kern.version"] = kv;
+        // Mirror flat for UI/debug
+        if (!flat[@"kern.osrelease"]) ((NSMutableDictionary *)flat)[@"kern.osrelease"] = rel;
+        if (!flat[@"kern.version"]) ((NSMutableDictionary *)flat)[@"kern.version"] = kv;
+    }
     if (flat[@"DeviceName"] ?: flat[@"UserAssignedDeviceName"] ?: flat[@"Hostname"]) {
         id n = flat[@"UserAssignedDeviceName"] ?: flat[@"DeviceName"] ?: @"iPhone";
         mg[@"UserAssignedDeviceName"] = n;
