@@ -684,6 +684,7 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
 
 - (NSString *)applyWithDevice:(NSDictionary *)dev ios:(NSString *)ios {
     if (!dev) return @"Danh mục máy trống";
+    NSString *iosRequested = [ios copy];
     NSString *hostIOS = [ProfileBuilder hostSystemVersion] ?: @"?";
     // Lab «Thật nhất»: iOS must be on device matrix AND ≤ host. Never force host OS on
     // phones that never shipped it (e.g. iPhone 17 Pro Max + 15.5).
