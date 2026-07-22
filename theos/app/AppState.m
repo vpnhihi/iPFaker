@@ -603,7 +603,46 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
 
 #pragma mark - Apply / random pool
 
-/// Pick random device from pool + random iOS from pool that matrix allows for that device.
+/// Best iOS for device: highest catalog version ≤ host (lab realism).
+- (NSString *)bestHostAlignedIOSForDevice:(NSDictionary *)dev {
+    if (!dev) return [ProfileBuilder hostSystemVersion];
+    NSString *host = [ProfileBuilder hostSystemVersion] ?: @"15.0";
+    NSArray *iosOpts = [self selectedIOSCompatibleWithDevice:dev];
+    if (iosOpts.count == 0)
+        iosOpts = [Catalog.shared supportedIOSForDevice:dev];
+    NSString *best = nil;
+    for (NSString *v in iosOpts) {
+        if (!Catalog.shared.iosReleases[v]) continue;
+        NSString *c = [ProfileBuilder clampSpoofIOSToHost:v];
+        // Prefer version that survives clamp and is supported
+        NSString *use = c;
+        if (![Catalog.shared device:dev supportsIOS:use]) {
+            // after clamp may be host — find highest ≤ host still on device
+            use = nil;
+            for (NSString *x in iosOpts) {
+                if (!Catalog.shared.iosReleases[x]) continue;
+                if ([ProfileBuilder compareVersion:x toVersion:host] == NSOrderedDescending) continue;
+                if (![Catalog.shared device:dev supportsIOS:x]) continue;
+                if (!use || [ProfileBuilder compareVersion:x toVersion:use] == NSOrderedDescending)
+                    use = x;
+            }
+            if (!use) continue;
+        }
+        if (!best || [ProfileBuilder compareVersion:use toVersion:best] == NSOrderedDescending)
+            best = use;
+    }
+    if (best) return best;
+    // Fallback: any supported ≤ host
+    for (NSString *v in [Catalog.shared supportedIOSForDevice:dev]) {
+        if ([ProfileBuilder compareVersion:v toVersion:host] == NSOrderedDescending) continue;
+        if (!Catalog.shared.iosReleases[v]) continue;
+        if (!best || [ProfileBuilder compareVersion:v toVersion:best] == NSOrderedDescending)
+            best = v;
+    }
+    return best ?: host;
+}
+
+/// Pick random pair — Full catalog OK; weighted toward host-realism (iOS≤host, model gen near host).
 - (BOOL)pickRandomPairDevice:(NSDictionary **)outDev ios:(NSString **)outIOS error:(NSString **)err {
     [self ensureDefaults];
     if (self.selectedDeviceIds.count == 0) {
@@ -611,37 +650,37 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
         return NO;
     }
 
-    // Build list of valid (deviceId, ios) pairs from pools + matrix
-    // Prefer pairs with iOS already host-aligned (after clamp stays same)
-    NSString *hostIOS = [ProfileBuilder hostSystemVersion];
     NSMutableArray<NSDictionary *> *pairs = [NSMutableArray array];
-    NSMutableArray<NSDictionary *> *pairsAligned = [NSMutableArray array];
+    NSMutableArray<NSNumber *> *weights = [NSMutableArray array];
+    NSInteger totalW = 0;
     for (NSString *did in self.selectedDeviceIds) {
         NSDictionary *dev = [Catalog.shared deviceWithId:did];
         if (!dev) continue;
-        NSArray *iosOpts = [self selectedIOSCompatibleWithDevice:dev];
-        if (iosOpts.count == 0) {
-            // Pool iOS empty for this device — use full matrix for device as fallback
-            iosOpts = [Catalog.shared supportedIOSForDevice:dev];
-        }
-        for (NSString *v in iosOpts) {
-            if (!Catalog.shared.iosReleases[v]) continue;
-            NSString *clamped = [ProfileBuilder clampSpoofIOSToHost:v];
-            // Only keep if clamped version still supported by device (or equals host in releases)
-            NSDictionary *row = @{ @"device": dev, @"ios": clamped };
-            [pairs addObject:row];
-            if ([clamped isEqualToString:v] ||
-                (hostIOS.length && [clamped isEqualToString:hostIOS]))
-                [pairsAligned addObject:row];
-        }
+        NSString *ios = [self bestHostAlignedIOSForDevice:dev];
+        if (!ios.length || !Catalog.shared.iosReleases[ios]) continue;
+        // One canonical pair per device (best iOS) — still Full model coverage
+        NSInteger score = [ProfileBuilder labRealismScoreForProductType:dev[@"ProductType"] ios:ios];
+        // Weight: score^2 so near-host dominates but far models still possible
+        NSInteger w = score * score;
+        if (w < 1) w = 1;
+        [pairs addObject:@{ @"device": dev, @"ios": ios, @"score": @(score) }];
+        [weights addObject:@(w)];
+        totalW += w;
     }
     if (pairs.count == 0) {
         if (err) *err = @"Không có cặp máy+iOS hợp lệ trong matrix. Chọn lại đời máy / iOS.";
         return NO;
     }
-    // Prefer host-aligned iOS pairs when available
-    NSArray *pool = pairsAligned.count ? pairsAligned : pairs;
-    NSDictionary *pick = pool[arc4random_uniform((uint32_t)pool.count)];
+    NSDictionary *pick = nil;
+    if (totalW > 0) {
+        NSInteger r = (NSInteger)arc4random_uniform((uint32_t)totalW);
+        NSInteger acc = 0;
+        for (NSUInteger i = 0; i < pairs.count; i++) {
+            acc += weights[i].integerValue;
+            if (r < acc) { pick = pairs[i]; break; }
+        }
+    }
+    if (!pick) pick = pairs[arc4random_uniform((uint32_t)pairs.count)];
     if (outDev) *outDev = pick[@"device"];
     if (outIOS) *outIOS = pick[@"ios"];
     return YES;
@@ -650,40 +689,41 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
 - (NSString *)applyWithDevice:(NSDictionary *)dev ios:(NSString *)ios {
     if (!dev) return @"Danh mục máy trống";
     NSString *iosRequested = ios;
-    // Lab: kẹp iOS spoof về host — claim “không lệch OS client” (UA/WebKit/Darwin)
-    ios = [ProfileBuilder clampSpoofIOSToHost:ios];
+    // Lab «Thật nhất»: Full model OK; iOS → best ≤ host for this device (sync UA/WebKit/Darwin)
+    NSString *aligned = [self bestHostAlignedIOSForDevice:dev];
+    if (aligned.length) {
+        // If requested iOS already ≤ host and supported, keep if score close; else prefer aligned
+        NSString *clampedReq = [ProfileBuilder clampSpoofIOSToHost:ios ?: aligned];
+        if (clampedReq.length && [Catalog.shared device:dev supportsIOS:clampedReq]
+            && Catalog.shared.iosReleases[clampedReq]) {
+            // Prefer the higher of requested-clamped vs aligned when both ≤ host (closer to host)
+            if ([ProfileBuilder compareVersion:clampedReq toVersion:aligned] == NSOrderedDescending)
+                ios = clampedReq;
+            else
+                ios = aligned;
+        } else {
+            ios = aligned;
+        }
+    } else {
+        ios = [ProfileBuilder clampSpoofIOSToHost:ios];
+    }
     NSDictionary *meta = Catalog.shared.iosReleases[ios];
     if (!meta) {
-        // host version may not be in catalog releases — fall back nearest supported ≤ host
-        NSArray *sup = [Catalog.shared supportedIOSForDevice:dev];
-        NSString *host = [ProfileBuilder hostSystemVersion];
-        NSString *best = nil;
-        for (NSString *v in sup) {
-            if ([ProfileBuilder compareVersion:v toVersion:host] != NSOrderedDescending) {
-                if (!best || [ProfileBuilder compareVersion:v toVersion:best] == NSOrderedDescending)
-                    best = v;
-            }
-        }
-        ios = best ?: (sup.count ? sup.lastObject : ios);
+        ios = [self bestHostAlignedIOSForDevice:dev] ?: ios;
         meta = Catalog.shared.iosReleases[ios];
     }
     if (!meta) return [NSString stringWithFormat:@"Không có iOS %@ trong catalog", ios];
 
     // Strict matrix guard
     if (![Catalog.shared device:dev supportsIOS:ios]) {
-        NSArray *sup = [Catalog.shared supportedIOSForDevice:dev];
-        if (!sup.count) return @"Máy này không có iOS trong matrix";
-        // Prefer highest supported ≤ host
-        NSString *host = [ProfileBuilder hostSystemVersion];
-        NSString *best = nil;
-        for (NSString *v in sup) {
-            if ([ProfileBuilder compareVersion:v toVersion:host] != NSOrderedDescending) {
-                if (!best || [ProfileBuilder compareVersion:v toVersion:best] == NSOrderedDescending)
-                    best = v;
-            }
-        }
-        ios = best ?: sup.lastObject;
+        ios = [self bestHostAlignedIOSForDevice:dev];
         meta = Catalog.shared.iosReleases[ios];
+        if (!meta) {
+            NSArray *sup = [Catalog.shared supportedIOSForDevice:dev];
+            if (!sup.count) return @"Máy này không có iOS trong matrix";
+            ios = sup.lastObject;
+            meta = Catalog.shared.iosReleases[ios];
+        }
         if (!meta) return @"Bảng iOS tương thích lỗi";
     }
 
@@ -742,13 +782,16 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     self.lastFlat = flat;
     NSString *warn = [ProfileBuilder labMismatchWarningForSpoofIOS:ios
                                                        productType:dev[@"ProductType"]];
+    NSInteger realism = [ProfileBuilder labRealismScoreForProductType:dev[@"ProductType"] ios:ios];
     NSString *clampNote = @"";
     if (iosRequested.length && ![iosRequested isEqualToString:ios])
-        clampNote = [NSString stringWithFormat:@"\n✓ iOS kẹp host: %@ → %@", iosRequested, ios];
-    self.statusText = [NSString stringWithFormat:@"%@ · %@ / iOS %@%@\n%@%@%@",
+        clampNote = [NSString stringWithFormat:@"\n✓ iOS thật nhất: %@ → %@ (≤ host)", iosRequested, ios];
+    self.statusText = [NSString stringWithFormat:
+                       @"%@ · %@ / iOS %@ · điểm thật %ld/100%@\n%@%@%@",
                        result ?: @"OK",
                        dev[@"MarketingName"] ?: dev[@"id"],
                        ios,
+                       (long)realism,
                        clampNote,
                        filt ?: @"",
                        warn.length ? @"\n" : @"",

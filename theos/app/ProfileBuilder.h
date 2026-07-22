@@ -28,6 +28,11 @@ typedef void (^IPFWipeProgress)(NSString *step);
 + (NSString *)radioAccessTechnologyForDevice:(NSDictionary *)device;
 /// Short honest claim footer (what lab can / cannot claim).
 + (NSString *)labHonestClaimFooter;
+/// Realism score 0–100: higher = closer to host (still allows full-catalog spoof via weighted pick).
++ (NSInteger)labRealismScoreForProductType:(nullable NSString *)productType
+                                      ios:(nullable NSString *)ios;
+/// Parse iPhoneN from ProductType (iPhone11,6 → 11). 0 if unknown.
++ (NSInteger)productTypeGeneration:(nullable NSString *)productType;
 
 /// Write config.plist + active_profile.json to lab paths. Returns error message or nil.
 + (nullable NSString *)applyFlatProfile:(NSDictionary *)flat deviceId:(NSString *)deviceId ios:(NSString *)ios;

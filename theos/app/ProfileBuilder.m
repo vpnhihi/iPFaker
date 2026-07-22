@@ -185,8 +185,46 @@
 }
 
 + (NSString *)labHonestClaimFooter {
-    return @"Claim lab: identity client + OS/UA/Darwin đồng bộ host.\n"
+    return @"Lab «Thật nhất»: Full model OK · iOS ≤ host & gần host · radio/màn/UA/Darwin sync.\n"
            @"KHÔNG claim: server risk VNG · silicon SE/GPU die · App Attest token thật.";
+}
+
++ (NSInteger)productTypeGeneration:(NSString *)productType {
+    if (!productType.length) return 0;
+    int gen = 0;
+    // iPhone11,6 / iPhone8,1 → 11 / 8
+    if (sscanf(productType.UTF8String ?: "", "iPhone%d", &gen) == 1) return gen;
+    return 0;
+}
+
++ (NSInteger)labRealismScoreForProductType:(NSString *)productType ios:(NSString *)ios {
+    // Higher = safer on this host (API/OS/silicon class closer). Full catalog still allowed.
+    NSString *hostIOS = [self hostSystemVersion] ?: @"15.0";
+    NSString *hostPT = [self hostProductType] ?: @"";
+    NSInteger score = 100;
+    NSString *useIOS = ios.length ? [self clampSpoofIOSToHost:ios] : hostIOS;
+    NSInteger hm = [self ipfMajorFromVersion:hostIOS];
+    NSInteger sm = [self ipfMajorFromVersion:useIOS];
+    if (hm > 0 && sm > 0) {
+        score -= labs(hm - sm) * 18; // major iOS gap hurts WebKit story
+        // minor: prefer closer to host string
+        if ([self compareVersion:useIOS toVersion:hostIOS] == NSOrderedAscending)
+            score -= 3;
+    }
+    NSInteger hg = [self productTypeGeneration:hostPT];
+    NSInteger sg = [self productTypeGeneration:productType];
+    if (hg > 0 && sg > 0) {
+        NSInteger gap = labs(hg - sg);
+        // Soft: model far from host still OK but lower weight (Full catalog)
+        score -= (NSInteger)MIN(gap * 8, 48);
+        // Spoof much newer than host silicon = riskier than slightly older
+        if (sg > hg) score -= (sg - hg) * 4;
+    } else if (productType.length && hostPT.length && ![productType isEqualToString:hostPT]) {
+        score -= 15;
+    }
+    if (score < 1) score = 1;
+    if (score > 100) score = 100;
+    return score;
 }
 
 + (NSString *)labMismatchWarningForSpoofIOS:(NSString *)spoofIOS productType:(NSString *)productType {
