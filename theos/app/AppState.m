@@ -235,8 +235,12 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
 }
 
 - (NSArray<NSString *> *)sessionWipeTargets {
-    // Method A: wipe **only** selected installed third-party (no Safari/Maps/Weather)
-    return [self labAppTargets];
+    // Wipe: app lab đã chọn + system Safari/Maps/Weather (ngầm)
+    NSMutableArray *out = [[self labAppTargets] mutableCopy] ?: [NSMutableArray array];
+    for (NSString *s in [AppState systemLabBackgroundBundleIds]) {
+        if (s.length && ![out containsObject:s]) [out addObject:s];
+    }
+    return out;
 }
 
 - (NSArray<NSString *> *)sessionWipeRelaunchTargets {
@@ -815,7 +819,7 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
      «Đặt lại dữ liệu app» — Method A nhanh:
      1) Filter inject (app đã chọn + system identity ngầm)
      2) Flags ON → random spoof (apply đã gộp proxy/flags)
-     3) Wipe **chỉ** app third-party đã chọn (không Safari/Maps/Weather)
+     3) Wipe app lab đã chọn + system Safari/Maps/Weather
      4) Kill — không relaunch, **không geo** (dùng nút Đồng bộ Location)
      */
     NSMutableArray *log = [NSMutableArray array];
@@ -869,9 +873,13 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     else
         [log addObject:@"Geo: bấm «Đồng bộ Location» nếu cần Map/Thời tiết."];
 
-    // Method A: wipe only selected installed third-party
+    // Wipe lab apps + system Safari/Maps/Weather
     NSArray *wipeBids = [self sessionWipeTargets];
-    if (progress) progress([NSString stringWithFormat:@"④ Xóa session %lu app…", (unsigned long)wipeBids.count]);
+    NSUInteger nUser = [self labAppTargets].count;
+    NSUInteger nSys = wipeBids.count > nUser ? wipeBids.count - nUser : 0;
+    if (progress)
+        progress([NSString stringWithFormat:@"④ Xóa session %lu app lab + %lu system…",
+                  (unsigned long)nUser, (unsigned long)nSys]);
     NSString *wipeMsg = @"wipe skip";
     @try {
         wipeMsg = [ProfileBuilder wipeApps:wipeBids progress:progress];
@@ -889,7 +897,7 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     @try {
         NSDictionary *flat = [ProfileBuilder loadCurrentFlat] ?: @{};
         NSDictionary *snap = @{
-            @"schema": @"ipfaker.reset_app_data/5",
+            @"schema": @"ipfaker.reset_app_data/6",
             @"ts": @((NSInteger)[[NSDate date] timeIntervalSince1970]),
             @"ProductType": flat[@"ProductType"] ?: @"",
             @"MarketingName": flat[@"MarketingName"] ?: @"",
@@ -899,9 +907,8 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
             @"sessionApps": wipeBids ?: @[],
             @"filterApps": [self filterSpoofTargets] ?: @[],
             @"userApps": [self labAppTargets] ?: @[],
-            @"methodA": @YES,
+            @"systemWipe": [AppState systemLabBackgroundBundleIds] ?: @[],
             @"noGeoOnReset": @YES,
-            @"noSystemWipe": @YES,
             @"noRelaunch": @YES,
         };
         NSData *json = [NSJSONSerialization dataWithJSONObject:snap options:NSJSONWritingPrettyPrinted error:nil];
@@ -910,12 +917,12 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     } @catch (__unused NSException *ex) {}
 
     self.statusText = [NSString stringWithFormat:
-                       @"Đặt lại dữ liệu app xong (nhanh):\n\n%@\n\n"
-                       @"→ Wipe %lu app đã chọn · không wipe system\n"
+                       @"Đặt lại dữ liệu app xong:\n\n%@\n\n"
+                       @"→ Wipe %lu app lab + system (Safari/Maps/Weather)\n"
                        @"→ Không geo / không tự mở app\n"
                        @"→ Proxy: %@\n",
                        [log componentsJoinedByString:@"\n---\n"],
-                       (unsigned long)wipeBids.count,
+                       (unsigned long)nUser,
                        hasProxy ? ([NSString stringWithFormat:@"%@:%ld", [self proxyHost], (long)[self proxyPort]])
                                 : @"CHƯA bật"];
     [self postDidChange];

@@ -128,7 +128,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (NSArray<NSString *> *)labAppTargets;
 /// Inject filter = third-party selected + system lab (Safari/Maps/Weather) always.
 - (NSArray<NSString *> *)filterSpoofTargets;
-/// Wipe session = third-party selected + system lab (system wipe ngầm, không hiện UI).
+/// Wipe session = third-party selected + system Safari/Maps/Weather (system không hiện UI picker).
 - (NSArray<NSString *> *)sessionWipeTargets;
 /// @deprecated alias → sessionWipeTargets
 - (NSArray<NSString *> *)sessionWipeRelaunchTargets;
