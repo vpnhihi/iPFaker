@@ -317,6 +317,44 @@ static int stub_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, void
     return orig_sysctlbyname ? orig_sysctlbyname(name, oldp, oldlenp, newp, newlen) : -1;
 }
 
+// UI last resort: Preferences About cell may set detail text "15.5" without re-querying MG.
+// Only replace exact host version tokens; reentrancy-guarded.
+static BOOL gInUIText;
+static NSString *IPFVerWashHostText(NSString *text) {
+    if (![text isKindOfClass:[NSString class]] || !text.length) return text;
+    NSDictionary *cfg = IPFVerLoadConfig();
+    if (!IPFVerEnabled(cfg)) return text;
+    NSString *pv = IPFVerPV(cfg);
+    if (!pv.length || [pv isEqualToString:text]) return text;
+    // Exact host tokens only (never broad replace)
+    if ([text isEqualToString:@"15.5"] || [text isEqualToString:@"15.5.0"]
+        || (gHostPV.length && [text isEqualToString:gHostPV])) {
+        IPFVerLog([NSString stringWithFormat:@"UI WASH %@ => %@", text, pv]);
+        return pv;
+    }
+    return text;
+}
+
+static void (*orig_labelSetText)(id, SEL, NSString *);
+static void stub_labelSetText(id self, SEL _cmd, NSString *text) {
+    if (!gInUIText) {
+        gInUIText = YES;
+        text = IPFVerWashHostText(text);
+        gInUIText = NO;
+    }
+    if (orig_labelSetText) orig_labelSetText(self, _cmd, text);
+}
+
+static void (*orig_cellSetValue)(id, SEL, id);
+static void stub_cellSetValue(id self, SEL _cmd, id value) {
+    if ([value isKindOfClass:[NSString class]] && !gInUIText) {
+        gInUIText = YES;
+        value = IPFVerWashHostText((NSString *)value);
+        gInUIText = NO;
+    }
+    if (orig_cellSetValue) orig_cellSetValue(self, _cmd, value);
+}
+
 static void IPFVerResolve(void) {
     if (pMSHookFunction) return;
     const char *libs[] = {
@@ -423,6 +461,13 @@ static void *IPFFindMG(const char *name) {
                     pMSHookMessageEx(nspi, @selector(operatingSystemVersionString),
                                      (IMP)stub_osvString, (IMP *)&orig_osvString);
             }
+            // UI wash: exact host version only (Preferences About detail)
+            Class uil = objc_getClass("UILabel");
+            if (uil && class_getInstanceMethod(uil, @selector(setText:)))
+                pMSHookMessageEx(uil, @selector(setText:), (IMP)stub_labelSetText, (IMP *)&orig_labelSetText);
+            Class psc = objc_getClass("PSTableCell");
+            if (psc && class_getInstanceMethod(psc, @selector(setValue:)))
+                pMSHookMessageEx(psc, @selector(setValue:), (IMP)stub_cellSetValue, (IMP *)&orig_cellSetValue);
         }
 
         NSDictionary *cfg = IPFVerLoadConfig();
