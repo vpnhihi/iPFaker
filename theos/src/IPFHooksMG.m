@@ -1,6 +1,11 @@
 // IPFHooksMG — ElleKit MSHook absolute (stable on Dopamine).
 // fishhook: SAFE FALLBACK only when MSHookFunction is missing (not used if ElleKit loads).
 // Full always-on GOT rebind was removed (SIGBUS on Zalo DATA_CONST).
+// IPF_ABOUT_LITE=1 (iPFakerAbout only): SystemVersion.plist + NSProcessInfo OS hooks.
+
+#ifndef IPF_ABOUT_LITE
+#define IPF_ABOUT_LITE 0
+#endif
 
 #import "IPFHooksMG.h"
 #import "IPFConfig.h"
@@ -221,11 +226,14 @@ static CFTypeRef stub_MGCopyAnswer(CFStringRef key) {
     @autoreleasepool {
         NSString *k = key ? (__bridge NSString *)key : @"(null)";
         // Settings → About "Số máy" can render ModelNumber+RegionInfo as one string:
-        //   "MEGGJTH/A" + "TH/A" => "MEGGJTH/ATH/A". RegionInfo empty keeps Số máy = full part number only.
+        //   "MEGGJTH/A" + "TH/A" => "MEGGJTH/ATH/A". Empty RegionInfo only in Preferences.
         if (([k isEqualToString:@"RegionInfo"] || [k isEqualToString:@"region-info"])
             && [[IPFConfig shared] flag:@"FakeDevice" defaultYes:YES]) {
-            IPFTrace(@"MG FAKE RegionInfo => (empty, avoid Số máy concat)");
-            return CFBridgingRetain(@"");
+            NSString *bid = [[NSBundle mainBundle] bundleIdentifier] ?: @"";
+            if ([bid isEqualToString:@"com.apple.Preferences"]) {
+                IPFTrace(@"MG FAKE RegionInfo => (empty, avoid Số máy concat)");
+                return CFBridgingRetain(@"");
+            }
         }
         id fake = (key && IPFAllowMGKey(k)) ? [[IPFConfig shared] mgValueForKey:k] : nil;
         if (fake) {
@@ -658,7 +666,8 @@ static int stub_sysctlbyname_lite(const char *name, void *oldp, size_t *oldlenp,
     return orig_sysctlbyname ? orig_sysctlbyname(name, oldp, oldlenp, newp, newlen) : -1;
 }
 
-// SystemVersion.plist — Settings About "Phiên bản phần mềm" often loads this file directly.
+#if IPF_ABOUT_LITE
+// SystemVersion.plist — Settings About "Phiên bản phần mềm" (only in iPFakerAbout dylib)
 static id (*orig_dictWithContentsOfFile)(Class, SEL, NSString *);
 static id stub_dictWithContentsOfFile(Class cls, SEL sel, NSString *path) {
     id real = orig_dictWithContentsOfFile ? orig_dictWithContentsOfFile(cls, sel, path) : nil;
@@ -677,7 +686,7 @@ static id stub_dictWithContentsOfFile(Class cls, SEL sel, NSString *path) {
     }
     if (bv.length) {
         m[@"ProductBuildVersion"] = bv;
-        m[@"BuildVersion"] = bv; // some readers
+        m[@"BuildVersion"] = bv;
     }
     IPFTrace([NSString stringWithFormat:@"SystemVersion.plist FAKE iOS=%@ build=%@", pv ?: @"?", bv ?: @"?"]);
     return m;
@@ -720,9 +729,9 @@ static NSString *stub_lite_osVersionString(id self, SEL _cmd) {
     IPFTrace([NSString stringWithFormat:@"NSProcessInfo.OSVersionString FAKE %@", out]);
     return out;
 }
+#endif // IPF_ABOUT_LITE
 
-// Settings About: MG + UIDevice + sysctl OS + SystemVersion.plist + NSProcessInfo OS string.
-// No CFCopySystemVersionDictionary / WithError / uname (AMFI/PAC stability).
+// Settings About lite entry (iPFakerAbout). Full MG keeps a minimal stub for TweakMG safety.
 void IPFInstallMGHooksLite(void) {
     IPFTrace(@"IPFInstallMGHooksLite begin");
     IPFResolveSubstrate();
@@ -732,8 +741,6 @@ void IPFInstallMGHooksLite(void) {
             pMSHookFunction(mg, (void *)stub_MGCopyAnswer, (void **)&orig_MGCopyAnswer);
             IPFTrace([NSString stringWithFormat:@"Lite MSHook MGCopyAnswer %p orig=%p", mg, orig_MGCopyAnswer]);
             IPFCaptureHostIdentity();
-        } else {
-            IPFTrace(@"Lite WARN no MGCopyAnswer");
         }
         void *sys = dlsym(RTLD_DEFAULT, "sysctlbyname");
         if (sys) {
@@ -745,8 +752,6 @@ void IPFInstallMGHooksLite(void) {
             pMSHookFunction(sc, (void *)stub_sysctl, (void **)&orig_sysctl);
             IPFTrace(@"Lite sysctl CTL_HW machine/model");
         }
-    } else {
-        IPFTrace(@"Lite WARN no MSHookFunction");
     }
     if (pMSHookMessageEx) {
         Class uid = objc_getClass("UIDevice");
@@ -760,6 +765,7 @@ void IPFInstallMGHooksLite(void) {
             pMSHookMessageEx(uid, @selector(systemVersion), (IMP)stub_systemVersion, (IMP *)&orig_systemVersion);
             IPFTrace(@"Lite UIDevice hooks OK");
         }
+#if IPF_ABOUT_LITE
         Class nspi = objc_getClass("NSProcessInfo");
         if (nspi && class_getInstanceMethod(nspi, @selector(operatingSystemVersionString))) {
             pMSHookMessageEx(nspi, @selector(operatingSystemVersionString),
@@ -778,6 +784,7 @@ void IPFInstallMGHooksLite(void) {
                              (IMP)stub_initWithContentsOfFile, (IMP *)&orig_initWithContentsOfFile);
             IPFTrace(@"Lite NSDictionary.initWithContentsOfFile OK");
         }
+#endif
     }
     IPFTrace(@"IPFInstallMGHooksLite done");
 }

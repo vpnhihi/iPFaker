@@ -26,15 +26,14 @@ iPFakerAA_FRAMEWORKS = Foundation
 iPFakerAA_LIBRARIES = substrate
 iPFakerAA_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerAA.dylib -Wl,-dead_strip
 
-# About: Config + MG hooks only → Settings Giới thiệu (must stay small; platform CODESIGN)
+# About: Config + MG hooks (IPF_ABOUT_LITE enables SystemVersion.plist / NSProcessInfo OS hooks)
 iPFakerAbout_FILES = TweakAbout.x src/IPFConfig.m src/IPFHooksMG.m
-iPFakerAbout_CFLAGS = -fobjc-arc -Os -fvisibility=hidden -DIPF_NO_MG_DEBUG=1 -ffunction-sections -fdata-sections -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
+iPFakerAbout_CFLAGS = -fobjc-arc -Os -fvisibility=hidden -DIPF_NO_MG_DEBUG=1 -DIPF_ABOUT_LITE=1 -ffunction-sections -fdata-sections -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
 iPFakerAbout_FRAMEWORKS = UIKit Foundation AdSupport
 iPFakerAbout_LIBRARIES = substrate
 iPFakerAbout_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerAbout.dylib -Wl,-dead_strip -Wl,-x
 
-# MG: spoof + Extra core only. Proven inject ≤128k on lab AMFI for third-party; Preferences uses About.
-# Env (locale/location) optional — enable via IPF_WITH_ENV=1 if budget allows.
+# MG: spoof + Extra — must stay under AMFI ~145k (no About-only hooks linked in).
 iPFakerMG_FILES = TweakMG.x src/IPFConfig.m src/IPFHooksMG.m src/IPFHooksExtra.m
 # IPF_NO_MG_DEBUG=1 strips verbose ctor logs (AMFI size)
 iPFakerMG_CFLAGS = -fobjc-arc -Os -fvisibility=hidden -DIPF_NO_MG_DEBUG=1 -ffunction-sections -fdata-sections -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
