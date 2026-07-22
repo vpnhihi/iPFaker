@@ -457,35 +457,76 @@
     return @{ @"part": part, @"region": region };
 }
 
-/// Random User-Assigned Device Name (Settings → About → Tên). Lab VN-friendly pool.
+/// Random User-Assigned Device Name (Settings → About → Tên). Lab VN-friendly pool (~120+).
 + (NSString *)randomUserDeviceName {
     static NSArray *pool;
+    static NSArray *icons;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
+        // Plain / phrase names (icons appended randomly below when name has no emoji)
         pool = @[
-            @"iPhone",
-            @"iPhone vip",
-            @"iPhone của Linh",
-            @"iPhone của An",
-            @"iPhone của Minh",
-            @"iPhone của Hương",
-            @"iPhone của Nam",
-            @"iPhone nhà",
-            @"iPhone mới",
-            @"My iPhone",
-            @"iPhone 12",
-            @"iPhone Pro",
-            @"iPhone chính chủ",
-            @"Điện thoại",
-            @"iPhone em",
-            @"iPhone anh",
-            @"iPhone chị",
-            @"Work iPhone",
-            @"iPhone ❤️",
-            @"iPhone ✨",
+            // Core
+            @"iPhone", @"My iPhone", @"iPhone Lab", @"iPhone Pro", @"iPhone Max",
+            @"iPhone vip", @"iPhone VIP", @"iPhone Vip", @"iPhone Super Vip",
+            @"iPhone chùa", @"iPhone Chùa", @"iPhone free", @"iPhone xịn",
+            @"Icon", @"iPhone Icon", @"Phone Icon",
+            // iPhone của …
+            @"iPhone của Nam", @"iPhone của Linh", @"iPhone của An", @"iPhone của Minh",
+            @"iPhone của Hương", @"iPhone của Lan", @"iPhone của Mai", @"iPhone của Hùng",
+            @"iPhone của Dũng", @"iPhone của Tuấn", @"iPhone của Hạnh", @"iPhone của Nga",
+            @"iPhone của Trang", @"iPhone của Hằng", @"iPhone của Phương", @"iPhone của Thảo",
+            @"iPhone của Long", @"iPhone của Khoa", @"iPhone của Đức", @"iPhone của Huy",
+            @"iPhone của Bảo", @"iPhone của Khánh", @"iPhone của My", @"iPhone của Vy",
+            @"iPhone của Chi", @"iPhone của Quân", @"iPhone của Vinh", @"iPhone của Sơn",
+            @"iPhone của Hà", @"iPhone của Oanh", @"iPhone của Trâm", @"iPhone của Như",
+            @"iPhone của Binh", @"iPhone của Phúc", @"iPhone của Tài", @"iPhone của Lộc",
+            // Gia đình / xưng hô
+            @"iPhone nhà", @"iPhone nhà mình", @"iPhone nhà em", @"iPhone bố",
+            @"iPhone mẹ", @"iPhone em", @"iPhone anh", @"iPhone chị",
+            @"iPhone bé", @"iPhone ông", @"iPhone bà", @"Điện thoại nhà",
+            // Phong cách VN
+            @"iPhone chính chủ", @"iPhone mới", @"iPhone cũ", @"iPhone 2nd",
+            @"iPhone xài chung", @"iPhone công ty", @"iPhone cơ quan", @"iPhone cá nhân",
+            @"iPhone dự phòng", @"iPhone phụ", @"iPhone chính", @"iPhone backup",
+            @"iPhone đi làm", @"iPhone đi chơi", @"iPhone học", @"iPhone game",
+            @"iPhone live", @"iPhone reg", @"iPhone clone", @"iPhone fake",
+            @"iPhone real", @"iPhone zin", @"iPhone lock", @"iPhone LL/A",
+            // EN / mixed
+            @"Work iPhone", @"Office Phone", @"Personal iPhone", @"Backup Phone",
+            @"Lab Phone", @"Test iPhone", @"Demo iPhone", @"Spare iPhone",
+            @"iPhone SE", @"iPhone mini", @"iPhone Air", @"Pink iPhone",
+            @"Black iPhone", @"White iPhone", @"Gold iPhone", @"Blue iPhone",
+            // Ngắn / meme
+            @"Phone", @"Điện thoại", @"May", @"Máy tao", @"Máy tui",
+            @"Xài tạm", @"Hàng chùa", @"Hàng xịn", @"Hàng hot",
+            @"Boss", @"Ceo", @"Rich", @"Poor", @"Broke",
+            @"iPhone 13", @"iPhone 14", @"iPhone 15", @"iPhone 16",
+            // Đã có icon sẵn (không gắn thêm)
+            @"iPhone ❤️", @"iPhone ✨", @"iPhone 🔥", @"iPhone 💎",
+            @"iPhone 🌟", @"iPhone ⭐", @"iPhone 🍀", @"iPhone 🌸",
+            @"iPhone 🐱", @"iPhone 🐶", @"iPhone 🌙", @"iPhone ☀️",
+            @"iPhone 🎵", @"iPhone 🎮", @"iPhone 📱", @"iPhone 💯",
+            @"Vip 👑", @"Chùa 🙏", @"Icon ✨", @"Nam 😎",
+        ];
+        icons = @[
+            @"❤️", @"✨", @"🔥", @"💎", @"🌟", @"⭐", @"🍀", @"🌸",
+            @"🐱", @"🐶", @"🌙", @"☀️", @"🎵", @"🎮", @"📱", @"💯",
+            @"👑", @"🙏", @"😎", @"🥰", @"💜", @"💙", @"💚", @"🧡",
+            @"⚡️", @"🌈", @"🎀", @"🧸", @"🌺", @"🦋", @"🍕", @"🧋",
         ];
     });
-    return pool[arc4random_uniform((u_int32_t)pool.count)];
+    NSString *name = pool[arc4random_uniform((u_int32_t)pool.count)];
+    // ~45%: gắn random icon nếu tên chưa có emoji (Unicode > 0x2600)
+    BOOL hasEmoji = NO;
+    for (NSUInteger i = 0; i < name.length; i++) {
+        unichar c = [name characterAtIndex:i];
+        if (c >= 0x2600 || (c >= 0xD800 && c <= 0xDBFF)) { hasEmoji = YES; break; }
+    }
+    if (!hasEmoji && arc4random_uniform(100) < 45) {
+        NSString *ic = icons[arc4random_uniform((u_int32_t)icons.count)];
+        name = [NSString stringWithFormat:@"%@ %@", name, ic];
+    }
+    return name;
 }
 
 + (NSString *)randomAxxxxFromDevice:(NSDictionary *)device {

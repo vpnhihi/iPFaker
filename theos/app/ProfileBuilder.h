@@ -26,7 +26,7 @@ typedef void (^IPFWipeProgress)(NSString *step);
 + (NSString *)clampSpoofIOSToHost:(NSString *)spoofIOS;
 /// Prefer min(spoof, host) when a “at most host” choice is needed (optional helper).
 + (NSString *)preferIOSAtMostHost:(NSString *)spoofIOS;
-/// Random Settings device name from lab pool (iPhone / iPhone vip / iPhone của Linh…).
+/// Random Settings device name from lab pool (~120 VN/EN + optional emoji icon).
 + (NSString *)randomUserDeviceName;
 /// Radio RAT string matching device year (no NR on pre-5G phones).
 + (NSString *)radioAccessTechnologyForDevice:(NSDictionary *)device;

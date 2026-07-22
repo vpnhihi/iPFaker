@@ -179,8 +179,58 @@ _APPLE_OUI = (
     "F4:5C:89", "28:CF:E9", "D0:03:4B", "BC:52:B7", "6C:96:CF",
     "88:66:5A", "B8:63:4D", "F0:D1:A9", "A8:86:DD", "C8:69:CD",
 )
+# Settings → About → Tên (UserAssignedDeviceName). Keep in sync with ProfileBuilder.randomUserDeviceName.
 _DEVICE_NAME_POOL = (
-    "iPhone", "My iPhone", "iPhone Lab", "iPhone {}", "Lab {}", "{} iPhone",
+    # Core
+    "iPhone", "My iPhone", "iPhone Lab", "iPhone Pro", "iPhone Max",
+    "iPhone vip", "iPhone VIP", "iPhone Vip", "iPhone Super Vip",
+    "iPhone chùa", "iPhone Chùa", "iPhone free", "iPhone xịn",
+    "Icon", "iPhone Icon", "Phone Icon",
+    # iPhone của …
+    "iPhone của Nam", "iPhone của Linh", "iPhone của An", "iPhone của Minh",
+    "iPhone của Hương", "iPhone của Lan", "iPhone của Mai", "iPhone của Hùng",
+    "iPhone của Dũng", "iPhone của Tuấn", "iPhone của Hạnh", "iPhone của Nga",
+    "iPhone của Trang", "iPhone của Hằng", "iPhone của Phương", "iPhone của Thảo",
+    "iPhone của Long", "iPhone của Khoa", "iPhone của Đức", "iPhone của Huy",
+    "iPhone của Bảo", "iPhone của Khánh", "iPhone của My", "iPhone của Vy",
+    "iPhone của Chi", "iPhone của Quân", "iPhone của Vinh", "iPhone của Sơn",
+    "iPhone của Hà", "iPhone của Oanh", "iPhone của Trâm", "iPhone của Như",
+    "iPhone của Binh", "iPhone của Phúc", "iPhone của Tài", "iPhone của Lộc",
+    # Gia đình / xưng hô
+    "iPhone nhà", "iPhone nhà mình", "iPhone nhà em", "iPhone bố",
+    "iPhone mẹ", "iPhone em", "iPhone anh", "iPhone chị",
+    "iPhone bé", "iPhone ông", "iPhone bà", "Điện thoại nhà",
+    # Phong cách VN
+    "iPhone chính chủ", "iPhone mới", "iPhone cũ", "iPhone 2nd",
+    "iPhone xài chung", "iPhone công ty", "iPhone cơ quan", "iPhone cá nhân",
+    "iPhone dự phòng", "iPhone phụ", "iPhone chính", "iPhone backup",
+    "iPhone đi làm", "iPhone đi chơi", "iPhone học", "iPhone game",
+    "iPhone live", "iPhone reg", "iPhone clone", "iPhone fake",
+    "iPhone real", "iPhone zin", "iPhone lock", "iPhone LL/A",
+    # EN / mixed
+    "Work iPhone", "Office Phone", "Personal iPhone", "Backup Phone",
+    "Lab Phone", "Test iPhone", "Demo iPhone", "Spare iPhone",
+    "iPhone SE", "iPhone mini", "iPhone Air", "Pink iPhone",
+    "Black iPhone", "White iPhone", "Gold iPhone", "Blue iPhone",
+    # Ngắn / meme
+    "Phone", "Điện thoại", "May", "Máy tao", "Máy tui",
+    "Xài tạm", "Hàng chùa", "Hàng xịn", "Hàng hot",
+    "Boss", "Ceo", "Rich", "Poor", "Broke",
+    "iPhone 13", "iPhone 14", "iPhone 15", "iPhone 16",
+    # Template (format marketing / id)
+    "iPhone {}", "Lab {}", "{} iPhone",
+    # Đã có icon
+    "iPhone ❤️", "iPhone ✨", "iPhone 🔥", "iPhone 💎",
+    "iPhone 🌟", "iPhone ⭐", "iPhone 🍀", "iPhone 🌸",
+    "iPhone 🐱", "iPhone 🐶", "iPhone 🌙", "iPhone ☀️",
+    "iPhone 🎵", "iPhone 🎮", "iPhone 📱", "iPhone 💯",
+    "Vip 👑", "Chùa 🙏", "Icon ✨", "Nam 😎",
+)
+_DEVICE_NAME_ICONS = (
+    "❤️", "✨", "🔥", "💎", "🌟", "⭐", "🍀", "🌸",
+    "🐱", "🐶", "🌙", "☀️", "🎵", "🎮", "📱", "💯",
+    "👑", "🙏", "😎", "🥰", "💜", "💙", "💚", "🧡",
+    "⚡", "🌈", "🎀", "🧸", "🌺", "🦋", "🍕", "🧋",
 )
 _CARRIERS = (
     ("Viettel", "452", "04", "vn"),
@@ -323,10 +373,17 @@ def random_eid() -> str:
 
 
 def random_device_name(marketing: str, device_id: str) -> str:
+    """Random Settings device name; ~45% append emoji if name has none (sync ProfileBuilder)."""
     tpl = random.choice(_DEVICE_NAME_POOL)
     if "{}" in tpl:
-        return tpl.format(random.choice((marketing.split()[-1], device_id, "Lab", "Pro")))
-    return tpl
+        name = tpl.format(random.choice((marketing.split()[-1], device_id, "Lab", "Pro")))
+    else:
+        name = tpl
+    # Detect existing emoji / symbol in BMP+surrogate
+    has_icon = any(ord(ch) >= 0x2600 for ch in name)
+    if not has_icon and random.random() < 0.45 and _DEVICE_NAME_ICONS:
+        name = f"{name} {random.choice(_DEVICE_NAME_ICONS)}"
+    return name
 
 
 def hostname_from_name(name: str) -> str:
