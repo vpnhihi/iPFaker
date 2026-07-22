@@ -183,7 +183,9 @@ done
 for w in /var/jb/usr/libexec/ipfaker-wipe-apps /var/jb/etc/ipfaker/wipe_apps.sh \
          /var/mobile/Library/iPFaker/wipe_apps.sh \
          /var/jb/usr/libexec/ipfaker-wipe-zalo /var/jb/etc/ipfaker/wipe_zalo.sh \
-         /var/mobile/Library/iPFaker/wipe_zalo.sh; do
+         /var/mobile/Library/iPFaker/wipe_zalo.sh \
+         /var/jb/usr/libexec/ipfaker-wipe-zalo-session /var/jb/etc/ipfaker/wipe_zalo_session.sh \
+         /var/mobile/Library/iPFaker/wipe_zalo_session.sh; do
   if [ -f "$w" ]; then
     chmod 755 "$w" 2>/dev/null || true
     chown root:wheel "$w" 2>/dev/null || true
@@ -495,6 +497,12 @@ def build(version: str, app_path: str | None) -> Path:
             add_file(tar, "var/jb/usr/libexec/ipfaker-wipe-zalo", wdata, 0o755)
             add_file(tar, "var/jb/etc/ipfaker/wipe_zalo.sh", wdata, 0o755)
             add_file(tar, "var/mobile/Library/iPFaker/wipe_zalo.sh", wdata, 0o755)
+        sess_src = ROOT / "injector" / "wipe_zalo_session.sh"
+        if sess_src.is_file():
+            sdata = track(sess_src.read_bytes())
+            add_file(tar, "var/jb/usr/libexec/ipfaker-wipe-zalo-session", sdata, 0o755)
+            add_file(tar, "var/jb/etc/ipfaker/wipe_zalo_session.sh", sdata, 0o755)
+            add_file(tar, "var/mobile/Library/iPFaker/wipe_zalo_session.sh", sdata, 0o755)
 
         if app:
             add_tree(tar, app, "var/jb/Applications/iPFaker.app")

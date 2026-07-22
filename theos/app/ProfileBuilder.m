@@ -1525,24 +1525,60 @@
             if ([fm isReadableFileAtPath:p]) { kcDB = p; break; }
         }
         if (sqlite && kcDB) {
-            // One statement per table (was 12×2 spawns)
+            // Match wipe_zalo_session.sh: team agrp + zalo patterns (genp/inet/keys)
             NSString *where =
-                @"svce LIKE '%zalo%' OR acct LIKE '%zalo%' OR agrp LIKE '%zalo%' OR "
-                 "svce LIKE '%zing%' OR acct LIKE '%zing%' OR agrp LIKE '%zing%' OR "
-                 "agrp LIKE '%vng.zalo%' OR agrp LIKE '%vng.zingalo%' OR agrp LIKE '%com.zing.zalo%'";
-            for (NSString *tbl in @[ @"genp", @"inet" ]) {
-                NSString *sql = [NSString stringWithFormat:@"DELETE FROM %@ WHERE %@;", tbl, where];
+                @"agrp LIKE '%group.keychain.vn.com.vng.zalo%' OR "
+                 "agrp LIKE '%vn.com.vng.zingalo%' OR agrp LIKE '%com.zing.zalo%' OR "
+                 "agrp LIKE '%vng.zalo%' OR agrp LIKE '%zingalo%' OR agrp LIKE '%zing.zalo%' OR "
+                 "svce LIKE '%zalo%' OR acct LIKE '%zalo%' OR "
+                 "svce LIKE '%zingalo%' OR acct LIKE '%zingalo%'";
+            // genp (has svce); inet has no svce on modern keychain-2.db
+            {
+                NSString *sql = [NSString stringWithFormat:@"DELETE FROM genp WHERE %@;", where];
                 pid_t pid = 0;
                 const char *argv[] = { sqlite.UTF8String, kcDB.UTF8String, sql.UTF8String, NULL };
                 if (posix_spawn(&pid, sqlite.UTF8String, NULL, NULL, (char *const *)argv, NULL) == 0 && pid > 0) {
                     int st = 0; waitpid(pid, &st, 0);
                 }
             }
-            [log addObject:@"⑥ Keychain Zalo (1 SQL) đã dọn"];
-            step(@"Keychain Zalo: đã dọn");
+            {
+                NSString *inetWhere =
+                    @"agrp LIKE '%group.keychain.vn.com.vng.zalo%' OR "
+                     "agrp LIKE '%vn.com.vng.zingalo%' OR agrp LIKE '%com.zing.zalo%' OR "
+                     "agrp LIKE '%vng.zalo%' OR agrp LIKE '%zingalo%' OR "
+                     "acct LIKE '%zalo%' OR srvr LIKE '%zalo%' OR srvr LIKE '%zalo.me%'";
+                NSString *sql = [NSString stringWithFormat:@"DELETE FROM inet WHERE %@;", inetWhere];
+                pid_t pid = 0;
+                const char *argv[] = { sqlite.UTF8String, kcDB.UTF8String, sql.UTF8String, NULL };
+                if (posix_spawn(&pid, sqlite.UTF8String, NULL, NULL, (char *const *)argv, NULL) == 0 && pid > 0) {
+                    int st = 0; waitpid(pid, &st, 0);
+                }
+            }
+            {
+                NSString *sqlKeys =
+                    @"DELETE FROM keys WHERE agrp LIKE '%group.keychain.vn.com.vng.zalo%' OR "
+                     "agrp LIKE '%vn.com.vng.zingalo%' OR agrp LIKE '%zingalo%' OR "
+                     "agrp LIKE '%vng.zalo%' OR labl LIKE '%zalo%';";
+                pid_t pid = 0;
+                const char *argv[] = { sqlite.UTF8String, kcDB.UTF8String, sqlKeys.UTF8String, NULL };
+                if (posix_spawn(&pid, sqlite.UTF8String, NULL, NULL, (char *const *)argv, NULL) == 0 && pid > 0) {
+                    int st = 0; waitpid(pid, &st, 0);
+                }
+            }
+            {
+                NSString *chk = @"PRAGMA wal_checkpoint(TRUNCATE);";
+                pid_t pid = 0;
+                const char *argv[] = { sqlite.UTF8String, kcDB.UTF8String, chk.UTF8String, NULL };
+                if (posix_spawn(&pid, sqlite.UTF8String, NULL, NULL, (char *const *)argv, NULL) == 0 && pid > 0) {
+                    int st = 0; waitpid(pid, &st, 0);
+                }
+            }
+            [self killProcessesNamed:@[ @"securityd" ]];
+            [log addObject:@"⑥ Keychain Zalo session (genp/inet/keys) đã dọn"];
+            step(@"Keychain Zalo session: đã dọn");
         } else {
-            step(@"Keychain: bỏ qua");
-            [log addObject:@"⑥ Keychain: bỏ qua"];
+            step(@"Keychain: bỏ qua (cần sqlite3)");
+            [log addObject:@"⑥ Keychain: bỏ qua — cài sqlite3 (apt)"];
         }
     } else if (skipKeychain) {
         step(@"Giữ keychain (để phiên đăng nhập)");
