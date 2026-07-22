@@ -511,12 +511,12 @@
         @"WebRTCLocalIP": webrtcIP.length ? webrtcIP : @"10.0.0.2",
         // FakeWebRTC / DisableWebRTC / FakeSensor / HideJailbreak / FakeWifi set above once
         @"DisableAppAttest": @YES,
-    }];
+    } mutableCopy];
     // Darwin kernel: iOS N.M → (N+6).M.0 (must not leave host uname)
     NSString *iv = iosMeta[@"ProductVersion"] ?: iosVer ?: @"15.0";
-    int maj = 15, min = 0, pat = 0;
-    sscanf(iv.UTF8String ?: "15.0", "%d.%d.%d", &maj, &min, &pat);
-    NSString *darwinRel = [NSString stringWithFormat:@"%d.%d.%d", maj + 6, min, pat];
+    int dMaj = 15, dMin = 0, dPat = 0;
+    sscanf(iv.UTF8String ?: "15.0", "%d.%d.%d", &dMaj, &dMin, &dPat);
+    NSString *darwinRel = [NSString stringWithFormat:@"%d.%d.%d", dMaj + 6, dMin, dPat];
     m[@"kern.osrelease"] = darwinRel;
     m[@"kern.version"] = [NSString stringWithFormat:@"Darwin Kernel Version %@: root:xnu-spoof", darwinRel];
     return m;
