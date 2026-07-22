@@ -94,7 +94,10 @@ static void IPFMark(const char *msg) {
             IPFInstallExtraHooks();
             IPFMark("CTOR_MG_PLUS_EXTRA");
         } else {
-            IPFMark("CTOR_MG_LEAN_NO_EXTRA_ZALO");
+            // Lean net only: getifaddrs + canOpenURL + hostname (checklist D/E medium).
+            // Still skip UIScreen/WebKit/disk path-hide (A10 crash history).
+            IPFInstallExtraNetLeanHooks();
+            IPFMark("CTOR_MG_LEAN_NET_ZALO");
         }
 
         // Module cover: MG(+Extra) · CT+Deep · JB+Server
@@ -103,8 +106,8 @@ static void IPFMark(const char *msg) {
                 @"MODULE IPFHooksMG: MGCopyAnswer(+Error) sysctl uname UIDevice IDFA/IDFV boottime Fake* gates; MSHook primary\n"
                 @"MODULE IPFHooksExtra: %@\n"
                 @"MODULE stack: MG%@ · CT+Deep · JB+Server · bid=%@\n",
-                skipExtra ? @"(skipped in Zalo — SkipExtraForZalo)" : @"UIScreen disk path-hide canOpenURL UA getifaddrs hostname WKWebView",
-                skipExtra ? @" lean" : @"+Extra",
+                skipExtra ? @"(lean net: getifaddrs+canOpenURL+hostname — no UIScreen)" : @"UIScreen disk path-hide canOpenURL UA getifaddrs hostname WKWebView",
+                skipExtra ? @" lean+net" : @"+Extra",
                 bid];
             NSString *home = NSHomeDirectory();
             if (home.length)

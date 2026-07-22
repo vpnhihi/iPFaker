@@ -292,6 +292,61 @@ static NSData *IPFRewritePayload(NSData *data) {
                 if (tmp && ![tmp isEqualToString:out]) { out = tmp; changed = YES; }
             }
         }
+        // Force deviceUUID / device_uuid → UniqueDeviceID (Zalo centralized + analytics)
+        // Checklist B — only rewrite when analytics-ish body already has the field.
+        if (analyticsish) {
+            NSString *du = [cfg stringForKey:@"UniqueDeviceID"]
+                ?: [cfg stringForKey:@"DeviceUniqueIdentifier"]
+                ?: [cfg stringForKey:@"UDID"];
+            if (du.length >= 16) {
+                NSString *safeDu = [[du componentsSeparatedByCharactersInSet:
+                    [[NSCharacterSet characterSetWithCharactersInString:
+                      @"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-"] invertedSet]]
+                    componentsJoinedByString:@""];
+                if (!safeDu.length) safeDu = du;
+                // JSON: "deviceUUID":"..." or "device_uuid":"..."
+                for (NSString *pat in @[
+                    @"\"deviceUUID\"\\s*:\\s*\"[^\"]+\"",
+                    @"\"device_uuid\"\\s*:\\s*\"[^\"]+\"",
+                    @"\"deviceId\"\\s*:\\s*\"[^\"]+\"",
+                    @"\"dId\"\\s*:\\s*\"[^\"]+\"",
+                ]) {
+                    NSRegularExpression *re = [NSRegularExpression
+                        regularExpressionWithPattern:pat options:0 error:nil];
+                    if (!re) continue;
+                    // extract key for repl
+                    NSString *key = @"deviceUUID";
+                    if ([pat containsString:@"device_uuid"]) key = @"device_uuid";
+                    else if ([pat containsString:@"deviceId"]) key = @"deviceId";
+                    else if ([pat containsString:@"dId"]) key = @"dId";
+                    NSString *repl = [NSString stringWithFormat:@"\"%@\":\"%@\"", key, safeDu];
+                    NSString *tmp = [re stringByReplacingMatchesInString:out options:0
+                        range:NSMakeRange(0, out.length) withTemplate:repl];
+                    if (tmp && ![tmp isEqualToString:out]) { out = tmp; changed = YES; }
+                }
+                // form: deviceUUID=...
+                NSRegularExpression *reForm = [NSRegularExpression
+                    regularExpressionWithPattern:@"deviceUUID=[^&\\s]+"
+                                         options:NSRegularExpressionCaseInsensitive error:nil];
+                if (reForm) {
+                    NSString *repl = [NSString stringWithFormat:@"deviceUUID=%@", safeDu];
+                    NSString *tmp = [reForm stringByReplacingMatchesInString:out options:0
+                        range:NSMakeRange(0, out.length) withTemplate:repl];
+                    if (tmp && ![tmp isEqualToString:out]) { out = tmp; changed = YES; }
+                }
+                // URL-encoded %22deviceUUID%22%3A%22...%22
+                NSRegularExpression *rePct = [NSRegularExpression
+                    regularExpressionWithPattern:@"%22deviceUUID%22%3A%22[^%]+%22"
+                                         options:NSRegularExpressionCaseInsensitive error:nil];
+                if (rePct) {
+                    NSString *repl = [NSString stringWithFormat:
+                        @"%%22deviceUUID%%22%%3A%%22%@%%22", safeDu];
+                    NSString *tmp = [rePct stringByReplacingMatchesInString:out options:0
+                        range:NSMakeRange(0, out.length) withTemplate:repl];
+                    if (tmp && ![tmp isEqualToString:out]) { out = tmp; changed = YES; }
+                }
+            }
+        }
         if (changed) {
             IPFLog([NSString stringWithFormat:@"NET rewrite body len %lu → PT=%@ osv=%@ ss=%@",
                     (unsigned long)data.length, pt ?: @"?", osv ?: @"?", ss ?: @"?"]);

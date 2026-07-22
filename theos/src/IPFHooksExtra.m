@@ -901,6 +901,37 @@ static id stub_wkInitCoder(id self, SEL _cmd, id coder) {
 
 #pragma mark - Install
 
+void IPFInstallExtraNetLeanHooks(void) {
+    // Checklist D (wifi/getifaddrs) + E medium (canOpenURL) without full Extra crash surface.
+    IPFResolve();
+    IPFExTrace(@"IPFInstallExtraNetLeanHooks begin");
+    if (pMSHookMessageEx) {
+        Class app = objc_getClass("UIApplication");
+        if (app && class_getInstanceMethod(app, @selector(canOpenURL:))) {
+            pMSHookMessageEx(app, @selector(canOpenURL:), (IMP)stub_canOpen, (IMP *)&orig_canOpen);
+            IPFExTrace(@"lean canOpenURL OK");
+        }
+        Class nspi = objc_getClass("NSProcessInfo");
+        if (nspi && class_getInstanceMethod(nspi, @selector(hostName))) {
+            pMSHookMessageEx(nspi, @selector(hostName), (IMP)stub_hostName, (IMP *)&orig_hostName);
+            IPFExTrace(@"lean hostName OK");
+        }
+    }
+    if (pMSHookFunction) {
+        void *gif = dlsym(RTLD_DEFAULT, "getifaddrs");
+        if (gif) {
+            pMSHookFunction(gif, (void *)stub_getifaddrs, (void **)&orig_getifaddrs);
+            IPFExTrace(@"lean getifaddrs OK");
+        }
+        void *ghn = dlsym(RTLD_DEFAULT, "gethostname");
+        if (ghn) {
+            pMSHookFunction(ghn, (void *)stub_gethostname, (void **)&orig_gethostname);
+            IPFExTrace(@"lean gethostname OK");
+        }
+    }
+    IPFExTrace(@"IPFInstallExtraNetLeanHooks done");
+}
+
 void IPFInstallExtraHooks(void) {
     IPFResolve();
     IPFExTrace(@"IPFInstallExtraHooks begin");

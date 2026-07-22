@@ -6,6 +6,9 @@ extern "C" {
 #endif
 
 void IPFInstallExtraHooks(void);
+/// Lean net+JB medium for Zalo when SkipExtraForZalo (no UIScreen/WebKit/disk).
+/// Only: getifaddrs MAC · gethostname · canOpenURL JB schemes.
+void IPFInstallExtraNetLeanHooks(void);
 
 #ifdef __cplusplus
 }

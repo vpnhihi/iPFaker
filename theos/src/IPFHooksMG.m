@@ -447,7 +447,9 @@ static int (*orig_uname)(struct utsname *);
 static int (*orig_sysctl)(int *, u_int, void *, size_t *, void *, size_t);
 
 static int stub_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, void *newp, size_t newlen) {
-    if (name && oldp && oldlenp && *oldlenp > 0) {
+    // Handle size-probe (oldp==NULL) too — host iPhone9,1 is shorter than iPhone15,2 so
+    // callers that size against host then copy would PASS and leak real machine.
+    if (name && oldlenp) {
         @autoreleasepool {
             NSString *n = [NSString stringWithUTF8String:name];
             IPFConfig *cfg = [IPFConfig shared];
@@ -488,12 +490,24 @@ static int stub_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, void
             if ([fake isKindOfClass:[NSString class]]) {
                 const char *s = [(NSString *)fake UTF8String];
                 size_t need = strlen(s) + 1;
-                if (*oldlenp >= need) {
-                    memcpy(oldp, s, need);
+                if (!oldp) {
+                    // size probe — report spoofed length (not host)
                     *oldlenp = need;
-                    IPFTrace([NSString stringWithFormat:@"sysctl FAKE %s => %@", name, fake]);
                     return 0;
                 }
+                if (*oldlenp < need) {
+                    *oldlenp = need;
+                    errno = ENOMEM;
+                    return -1; // do NOT fall through to host orig
+                }
+                memcpy(oldp, s, need);
+                *oldlenp = need;
+                IPFTrace([NSString stringWithFormat:@"sysctl FAKE %s => %@", name, fake]);
+                return 0;
+            }
+            // Remaining integer/boottime paths need a real buffer
+            if (!oldp || *oldlenp == 0) {
+                return orig_sysctlbyname ? orig_sysctlbyname(name, oldp, oldlenp, newp, newlen) : -1;
             }
             // kern.boottime → struct timeval { tv_sec, tv_usec }
             if ([n isEqualToString:@"kern.boottime"]) {
