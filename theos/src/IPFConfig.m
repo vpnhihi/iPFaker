@@ -65,7 +65,8 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
     NSMutableDictionary *sys = [NSMutableDictionary dictionary];
     NSArray *mgKeys = @[
         @"ProductType", @"HWModelStr", @"HardwareModel", @"DeviceName", @"UserAssignedDeviceName",
-        @"MarketingName", @"SerialNumber", @"UniqueDeviceID", @"UniqueChipID",
+        @"MarketingName", @"MarketingNameString", @"ArtworkDeviceProductDescription",
+        @"SerialNumber", @"UniqueDeviceID", @"UniqueChipID",
         @"ProductVersion", @"BuildVersion", @"ProductBuildVersion",
         @"ModelNumber", @"PartNumber", @"RegionInfo", @"RegionCode", @"RegulatoryModelNumber",
         @"ModelNumberAxxxx", @"PartNumberRegion",
@@ -163,7 +164,18 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
         flat[@"Hostname"] = hn; // Extra gethostname / NSProcessInfo read same key
     }
     // Marketing name for Zalo UI (critical — Zalo shows "iPhone XS Max" from real type)
-    if (flat[@"MarketingName"]) mg[@"MarketingName"] = flat[@"MarketingName"];
+    // ArtworkDeviceProductDescription / MarketingNameString are MG keys Frida sees as "iPhone 7"
+    if (flat[@"MarketingName"]) {
+        mg[@"MarketingName"] = flat[@"MarketingName"];
+        if (!mg[@"MarketingNameString"])
+            mg[@"MarketingNameString"] = flat[@"MarketingName"];
+        if (!mg[@"ArtworkDeviceProductDescription"])
+            mg[@"ArtworkDeviceProductDescription"] = flat[@"MarketingName"];
+    }
+    if (flat[@"ArtworkDeviceProductDescription"])
+        mg[@"ArtworkDeviceProductDescription"] = flat[@"ArtworkDeviceProductDescription"];
+    if (flat[@"MarketingNameString"])
+        mg[@"MarketingNameString"] = flat[@"MarketingNameString"];
 
     // RAM / CPU (sysctl integer keys)
     id mem = flat[@"hw.memsize"] ?: flat[@"PhysicalMemoryBytes"];
@@ -491,6 +503,10 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
             @"Z/dqyWS6OZTRy10UcmUAhw": @"MarketingName",
             @"bbtR9jQx50Fv5Af/affNtA": @"MarketingName",
             @"aS/S7hCcobxbRgwdTuv4bw": @"MarketingName",
+            // Artwork / product description (Zalo + Settings marketing row)
+            @"ArtworkDeviceProductDescription": @"MarketingName",
+            @"MarketingNameString": @"MarketingName",
+            @"DeviceProductDescription": @"MarketingName",
             @"ghpAuGJlPoauWijdtPi7sQ": @"UserAssignedDeviceName",
             // Settings → About network / modem / eSIM (hashed)
             @"gI6iODv8MZuiP0IA+efJCw": @"WifiAddress",

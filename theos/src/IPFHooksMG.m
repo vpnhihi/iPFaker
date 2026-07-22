@@ -66,7 +66,12 @@ static void IPFTrace(NSString *line) {
 
 static CFTypeRef IPFMakeCF(id v) {
     if (!v || v == [NSNull null]) return NULL;
-    if ([v isKindOfClass:[NSString class]] || [v isKindOfClass:[NSNumber class]])
+    // String / Number / Dict (screen-dimensions) / Array (AppleLanguages)
+    if ([v isKindOfClass:[NSString class]]
+        || [v isKindOfClass:[NSNumber class]]
+        || [v isKindOfClass:[NSDictionary class]]
+        || [v isKindOfClass:[NSArray class]]
+        || [v isKindOfClass:[NSData class]])
         return CFBridgingRetain(v);
     return NULL;
 }
@@ -342,8 +347,29 @@ static CFTypeRef stub_MGCopyAnswer(CFStringRef key) {
         if (!fake && key) {
             NSString *lk = k.lowercaseString;
             IPFConfig *cfg = [IPFConfig shared];
-            if ([lk containsString:@"marketing"] || [lk isEqualToString:@"productname"]
-                || [lk containsString:@"humanreadableproduct"]) {
+            // Composite screen-dimensions dict (Zalo probes this; host returns 750×1334 on iPhone 7)
+            if (([lk containsString:@"screen-dimension"] || [lk isEqualToString:@"screen-dimensions"]
+                 || [lk containsString:@"screendimension"])
+                && ([cfg flag:@"FakeScreen" defaultYes:YES] || [cfg flag:@"FakeRealScreen" defaultYes:NO])) {
+                id w = [cfg mgValueForKey:@"main-screen-width"] ?: cfg.flat[@"main-screen-width"];
+                id h = [cfg mgValueForKey:@"main-screen-height"] ?: cfg.flat[@"main-screen-height"];
+                id sc = [cfg mgValueForKey:@"main-screen-scale"] ?: cfg.flat[@"main-screen-scale"];
+                id pitch = [cfg mgValueForKey:@"main-screen-pitch"] ?: cfg.flat[@"main-screen-pitch"];
+                if (w && h) {
+                    NSMutableDictionary *dim = [NSMutableDictionary dictionary];
+                    dim[@"main-screen-width"] = w;
+                    dim[@"main-screen-height"] = h;
+                    if (sc) dim[@"main-screen-scale"] = sc;
+                    if (pitch) dim[@"main-screen-pitch"] = pitch;
+                    dim[@"main-screen-orientation"] = @0;
+                    // class 8 ≈ phone; keep host-like structure
+                    dim[@"main-screen-class"] = @8;
+                    fake = dim;
+                    IPFTrace([NSString stringWithFormat:@"MG FAKE screen-dimensions => %@x%@ scale=%@", w, h, sc ?: @"?"]);
+                }
+            } else if ([lk containsString:@"marketing"] || [lk isEqualToString:@"productname"]
+                || [lk containsString:@"humanreadableproduct"]
+                || [lk containsString:@"artwork"] || [lk containsString:@"devicedescription"]) {
                 if ([cfg flag:@"FakeDevice" defaultYes:YES])
                     fake = [cfg mgValueForKey:@"MarketingName"];
             } else if ([lk containsString:@"wifi"] || [lk containsString:@"wlan"]
@@ -487,18 +513,26 @@ static int stub_sysctlbyname(const char *name, void *oldp, size_t *oldlenp, void
                 }
             }
             // integer sysctls: hw.memsize, hw.ncpu, ...
+            // Callers request 4-byte int OR 8-byte int64 — old code only accepted 8-byte
+            // so hw.ncpu often fell through as PASS (host core count leak).
             if ([fake isKindOfClass:[NSNumber class]]) {
+                int64_t v = [(NSNumber *)fake longLongValue];
                 if (*oldlenp >= sizeof(int64_t)) {
-                    int64_t v = [(NSNumber *)fake longLongValue];
-                    // prefer native size requested by caller
-                    if (*oldlenp >= sizeof(int64_t)) {
-                        *(int64_t *)oldp = v;
-                        *oldlenp = sizeof(int64_t);
-                    } else if (*oldlenp >= sizeof(int32_t)) {
-                        *(int32_t *)oldp = (int32_t)v;
-                        *oldlenp = sizeof(int32_t);
-                    }
-                    IPFTrace([NSString stringWithFormat:@"sysctl FAKE %s => %lld", name, (long long)v]);
+                    *(int64_t *)oldp = v;
+                    *oldlenp = sizeof(int64_t);
+                    IPFTrace([NSString stringWithFormat:@"sysctl FAKE %s => %lld (i64)", name, (long long)v]);
+                    return 0;
+                }
+                if (*oldlenp >= sizeof(int32_t)) {
+                    *(int32_t *)oldp = (int32_t)v;
+                    *oldlenp = sizeof(int32_t);
+                    IPFTrace([NSString stringWithFormat:@"sysctl FAKE %s => %lld (i32)", name, (long long)v]);
+                    return 0;
+                }
+                if (*oldlenp >= sizeof(long)) {
+                    *(long *)oldp = (long)v;
+                    *oldlenp = sizeof(long);
+                    IPFTrace([NSString stringWithFormat:@"sysctl FAKE %s => %lld (long)", name, (long long)v]);
                     return 0;
                 }
             }
