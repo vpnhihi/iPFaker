@@ -607,16 +607,24 @@ void IPFInstallMGHooks(void) {
 #endif
 }
 
-// Minimal sysctl for Settings model map only (hw.machine/hw.model). No uname, no full surface.
+// Lite sysctl: identity + OS version (Settings About reads kern.osproductversion, not only MG).
 static int stub_sysctlbyname_lite(const char *name, void *oldp, size_t *oldlenp, void *newp, size_t newlen) {
-    if (name && oldp && oldlenp && *oldlenp > 0
-        && [[IPFConfig shared] flag:@"FakeDevice" defaultYes:YES]) {
+    if (name && oldp && oldlenp && *oldlenp > 0) {
+        IPFConfig *cfg = [IPFConfig shared];
         NSString *fake = nil;
-        if (strcmp(name, "hw.machine") == 0)
-            fake = [[IPFConfig shared] mgValueForKey:@"ProductType"];
-        else if (strcmp(name, "hw.model") == 0)
-            fake = [[IPFConfig shared] mgValueForKey:@"HWModelStr"];
-        if ([fake isKindOfClass:[NSString class]]) {
+        BOOL allowDev = [cfg flag:@"FakeDevice" defaultYes:YES];
+        BOOL allowOS = [cfg flag:@"FakeSysOSVersion" defaultYes:YES];
+        if (allowDev && strcmp(name, "hw.machine") == 0)
+            fake = [cfg mgValueForKey:@"ProductType"];
+        else if (allowDev && strcmp(name, "hw.model") == 0)
+            fake = [cfg mgValueForKey:@"HWModelStr"];
+        else if (allowOS && strcmp(name, "kern.osproductversion") == 0)
+            fake = [cfg stringForKey:@"ProductVersion"];
+        else if (allowOS && strcmp(name, "kern.osversion") == 0)
+            fake = [cfg stringForKey:@"BuildVersion"] ?: [cfg stringForKey:@"ProductBuildVersion"];
+        else if (allowOS && strcmp(name, "kern.osrelease") == 0)
+            fake = [cfg stringForKey:@"kern.osrelease"];
+        if ([fake isKindOfClass:[NSString class]] && fake.length) {
             const char *s = fake.UTF8String;
             size_t need = strlen(s) + 1;
             if (*oldlenp >= need) {
@@ -630,7 +638,23 @@ static int stub_sysctlbyname_lite(const char *name, void *oldp, size_t *oldlenp,
     return orig_sysctlbyname ? orig_sysctlbyname(name, oldp, oldlenp, newp, newlen) : -1;
 }
 
-// Settings About: MGCopyAnswer + host wash + hw.machine/model only. No WithError/uname.
+// NSProcessInfo OS string — Settings may prefer this over MG ProductVersion
+static NSString *(*orig_lite_osVersionString)(id, SEL);
+static NSString *stub_lite_osVersionString(id self, SEL _cmd) {
+    IPFConfig *cfg = [IPFConfig shared];
+    if (![cfg flag:@"FakeSysOSVersion" defaultYes:YES])
+        return orig_lite_osVersionString ? orig_lite_osVersionString(self, _cmd) : @"Version 15.0";
+    NSString *pv = [cfg stringForKey:@"ProductVersion"] ?: @"15.0";
+    NSString *bv = [cfg stringForKey:@"BuildVersion"] ?: [cfg stringForKey:@"ProductBuildVersion"] ?: @"";
+    NSString *out = bv.length
+        ? [NSString stringWithFormat:@"Version %@ (Build %@)", pv, bv]
+        : [NSString stringWithFormat:@"Version %@", pv];
+    IPFTrace([NSString stringWithFormat:@"NSProcessInfo.OSVersionString LITE %@", out]);
+    return out;
+}
+
+// Settings About: MG + OS version paths (MG/UIDevice/NSProcessInfo/sysctl) + identity.
+// Skip MGCopyAnswerWithError / uname (PAC/stability on Preferences).
 void IPFInstallMGHooksLite(void) {
     IPFTrace(@"IPFInstallMGHooksLite begin");
     IPFResolveSubstrate();
@@ -646,15 +670,13 @@ void IPFInstallMGHooksLite(void) {
         void *sys = dlsym(RTLD_DEFAULT, "sysctlbyname");
         if (sys) {
             pMSHookFunction(sys, (void *)stub_sysctlbyname_lite, (void **)&orig_sysctlbyname);
-            IPFTrace(@"Lite sysctlbyname hw.machine/model only");
+            IPFTrace(@"Lite sysctlbyname machine/model/osproductversion");
         }
-        // Settings may use sysctl(CTL_HW, HW_MACHINE) not byname — map ProductType
         void *sc = dlsym(RTLD_DEFAULT, "sysctl");
         if (sc) {
             pMSHookFunction(sc, (void *)stub_sysctl, (void **)&orig_sysctl);
             IPFTrace(@"Lite sysctl CTL_HW machine/model");
         }
-        // Skip uname + MGCopyAnswerWithError (PAC/stability)
     } else {
         IPFTrace(@"Lite WARN no MSHookFunction");
     }
@@ -665,8 +687,16 @@ void IPFInstallMGHooksLite(void) {
             pMSHookMessageEx(uid, @selector(model), (IMP)stub_model, (IMP *)&orig_model);
             if (class_getInstanceMethod(uid, @selector(localizedModel)))
                 pMSHookMessageEx(uid, @selector(localizedModel), (IMP)stub_localizedModel, (IMP *)&orig_localizedModel);
+            if (class_getInstanceMethod(uid, @selector(systemName)))
+                pMSHookMessageEx(uid, @selector(systemName), (IMP)stub_systemName, (IMP *)&orig_systemName);
             pMSHookMessageEx(uid, @selector(systemVersion), (IMP)stub_systemVersion, (IMP *)&orig_systemVersion);
             IPFTrace(@"Lite UIDevice hooks OK");
+        }
+        Class nspi = objc_getClass("NSProcessInfo");
+        if (nspi && class_getInstanceMethod(nspi, @selector(operatingSystemVersionString))) {
+            pMSHookMessageEx(nspi, @selector(operatingSystemVersionString),
+                             (IMP)stub_lite_osVersionString, (IMP *)&orig_lite_osVersionString);
+            IPFTrace(@"Lite NSProcessInfo.operatingSystemVersionString OK");
         }
     }
     IPFTrace(@"IPFInstallMGHooksLite done");

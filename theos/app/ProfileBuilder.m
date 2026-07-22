@@ -403,17 +403,15 @@
 }
 
 + (NSDictionary *)randomPartNumberFromDevice:(NSDictionary *)device {
-    // Settings → About "Số máy" (before tap): Apple part number
-    // Standard form: M + 4 alnum + 2-letter region + /A   e.g. MQ8N3LL/A, MYD83KH/A
-    // Region letters MUST sit before the slash so UI does not show Mxxxx/ARR/A double form.
-    // Prefix: M=retail new, N=replacement, F=refurbished, P=personalized (engraved).
+    // Settings → About "Số máy": [MNFP] + 4 alnum + 2-letter region + /A
+    // e.g. MQ8N3LL/A · MYD83KH/A · MLTE3ZP/A  (exactly one slash)
+    // Never use 1-letter region (J/B/D…) — Settings rendered MCTHZJ/AJ/A.
     static NSString *alpha = @"ABCDEFGHJKLMNPQRSTUVWXYZ0123456789";
-    // Common Apple country/region codes (2 letters) used in part numbers
-    static NSArray *regions = @[
-        @"LL", @"J", @"CH", @"KH", @"ZA", @"ZP", @"B", @"D", @"F", @"T",
-        @"X", @"Y", @"C", @"HN", @"PP", @"TH", @"TU", @"RU", @"ZD", @"QN",
-    ];
-    // Prefer retail M (~85%); occasional N/F/P for realism
+    static NSArray *safe2;
+    static dispatch_once_t onceR;
+    dispatch_once(&onceR, ^{
+        safe2 = @[ @"LL", @"CH", @"KH", @"ZA", @"ZP", @"HN", @"PP", @"TH", @"TU", @"RU", @"ZD", @"QN" ];
+    });
     NSString *prefix = @"M";
     u_int32_t pr = arc4random_uniform(100);
     if (pr >= 85 && pr < 93) prefix = @"N";
@@ -422,24 +420,29 @@
     NSMutableString *body = [NSMutableString stringWithCapacity:4];
     for (int i = 0; i < 4; i++)
         [body appendFormat:@"%C", [alpha characterAtIndex:arc4random_uniform((u_int32_t)alpha.length)]];
-    // Prefer region from device catalog / last flat if present
+
     NSString *region = nil;
     NSString *hint = device[@"PartNumberRegion"] ?: device[@"RegionCode"];
-    if ([hint isKindOfClass:[NSString class]] && hint.length >= 1) {
-        NSString *h = hint.uppercaseString;
-        if (h.length > 2) h = [h substringToIndex:2];
-        if ([regions containsObject:h]) region = h;
-        // single-letter regions (J, B, …) already in list
-        if (!region && h.length == 1) {
-            for (NSString *r in regions) {
-                if ([r isEqualToString:h]) { region = r; break; }
-            }
+    if ([hint isKindOfClass:[NSString class]] && hint.length) {
+        NSMutableString *letters = [NSMutableString string];
+        for (NSUInteger i = 0; i < hint.length && letters.length < 2; i++) {
+            unichar c = [hint characterAtIndex:i];
+            if (c >= 'a' && c <= 'z') c = (unichar)(c - 32);
+            if (c >= 'A' && c <= 'Z')
+                [letters appendFormat:@"%C", c];
         }
+        if (letters.length == 2 && [safe2 containsObject:letters])
+            region = [letters copy];
     }
     if (!region)
-        region = regions[arc4random_uniform((u_int32_t)regions.count)];
-    // Canonical: PREFIX + 4 body + REGION + /A  (exactly one slash)
+        region = safe2[arc4random_uniform((uint32_t)safe2.count)];
+
     NSString *part = [NSString stringWithFormat:@"%@%@%@/A", prefix, body, region];
+    // Hard guarantee: MxxxxRR/A length 9, one slash
+    if (part.length != 9 || [[part componentsSeparatedByString:@"/"] count] != 2) {
+        part = [NSString stringWithFormat:@"M%@LL/A", body];
+        region = @"LL";
+    }
     return @{ @"part": part, @"region": region };
 }
 
