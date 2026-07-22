@@ -1922,10 +1922,16 @@
     [ctPl writeToFile:[stage stringByAppendingPathComponent:@"iPFakerCT.plist"] atomically:YES];
     [jbPl writeToFile:[stage stringByAppendingPathComponent:@"iPFakerJB.plist"] atomically:YES];
 
+    // Settings → Giới thiệu: tiny iPFakerAbout only (full MG is CODESIGN-killed in Preferences)
+    NSData *aboutPl = [self filterPlistDataForBundles:@[ @"com.apple.Preferences" ] includeCommCenter:NO];
+    if (aboutPl.length)
+        [aboutPl writeToFile:[stage stringByAppendingPathComponent:@"iPFakerAbout.plist"] atomically:YES];
+
     // Manifest for PC / debug
     NSDictionary *manifest = @{
         @"schema": @"ipfaker.spoof_apps/1",
         @"bundles": bids,
+        @"settingsAbout": @[ @"com.apple.Preferences" ],
         @"updated": @([[NSDate date] timeIntervalSince1970]),
     };
     NSData *json = [NSJSONSerialization dataWithJSONObject:manifest options:NSJSONWritingPrettyPrinted error:nil];
@@ -1938,7 +1944,7 @@
         "STAGE=/var/mobile/Library/iPFaker\n"
         "for INJ in /var/jb/usr/lib/TweakInject /var/jb/Library/MobileSubstrate/DynamicLibraries; do\n"
         "  [ -d \"$INJ\" ] || continue\n"
-        "  for n in iPFakerMG iPFakerCT iPFakerJB; do\n"
+        "  for n in iPFakerMG iPFakerCT iPFakerJB iPFakerAbout; do\n"
         "    if [ -f \"$STAGE/${n}.plist\" ]; then\n"
         "      cp -f \"$STAGE/${n}.plist\" \"$INJ/${n}.plist\"\n"
         "      chmod 644 \"$INJ/${n}.plist\"\n"
@@ -1970,10 +1976,11 @@
                  @"/var/jb/usr/lib/TweakInject",
                  @"/var/jb/Library/MobileSubstrate/DynamicLibraries" ]) {
             if (![fm fileExistsAtPath:inj]) continue;
-            for (NSString *n in @[ @"iPFakerMG", @"iPFakerCT", @"iPFakerJB" ]) {
+            for (NSString *n in @[ @"iPFakerMG", @"iPFakerCT", @"iPFakerJB", @"iPFakerAbout" ]) {
                 NSString *src = [stage stringByAppendingPathComponent:[n stringByAppendingString:@".plist"]];
                 NSString *dst = [inj stringByAppendingPathComponent:[n stringByAppendingString:@".plist"]];
-                [fm copyItemAtPath:src toPath:dst error:nil];
+                if ([fm fileExistsAtPath:src])
+                    [fm copyItemAtPath:src toPath:dst error:nil];
             }
         }
         rc = 0;
@@ -1982,6 +1989,8 @@
     step(@"Đóng app spoof để lần mở sau inject…");
     for (NSString *bid in bids)
         [self killAppBundleId:bid executable:nil];
+    // Refresh Settings so About dylib reloads
+    [self killAppBundleId:@"com.apple.Preferences" executable:nil];
 
     NSString *preview = bids.count <= 6
         ? [bids componentsJoinedByString:@", "]
@@ -1989,8 +1998,8 @@
            [[bids subarrayWithRange:NSMakeRange(0, 4)] componentsJoinedByString:@", "],
            (unsigned long)(bids.count - 4)];
     return [NSString stringWithFormat:
-            @"Multi-app spoof: %lu app · CT CommCenter=ON\n%@\n"
-            @"Đã ghi filter MG/CT/JB · mở lại app = spoof active\n"
+            @"Multi-app spoof: %lu app · CT CommCenter=ON · Settings About=ON\n%@\n"
+            @"Đã ghi filter MG/CT/JB/About · mở lại app = spoof active\n"
             @"rc=%d",
             (unsigned long)bids.count, preview, rc];
 }

@@ -9,11 +9,12 @@ export THEOS_PACKAGE_SCHEME := rootless
 include $(THEOS)/makefiles/common.mk
 
 # Split stack (Dopamine AMFI):
-#   MG = spoof + Extra core (screen/disk/UA/getifaddrs/access-stat)
+#   MG = spoof + Extra core (screen/disk/UA/getifaddrs/access-stat) — third-party + Safari lab
+#   About = tiny MG-only for Settings → About (platform Preferences rejects large MG)
 #   CT = telephony + deep rewrite
 #   JB = expanded hide (fopen/getenv/fileExists) — optional, fails independently
 # AA = ServerLite (AppAttest/Proxy/WebRTC) — loads first alphabetically, tiny, no IPFConfig.m
-TWEAK_NAME = iPFakerAA iPFakerMG iPFakerCT iPFakerJB
+TWEAK_NAME = iPFakerAA iPFakerAbout iPFakerMG iPFakerCT iPFakerJB
 
 # MG = spoof + Extra (screen/disk/UA/getifaddrs/access-stat/WKWebView)
 # fishhook.c OFF by default: keeps MG ~123k AMFI-safe. ElleKit MSHook is primary on Dopamine.
@@ -25,7 +26,14 @@ iPFakerAA_FRAMEWORKS = Foundation
 iPFakerAA_LIBRARIES = substrate
 iPFakerAA_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerAA.dylib -Wl,-dead_strip
 
-# MG: spoof + Extra core only. Proven inject ≤128k on lab AMFI.
+# About: Config + MG hooks only → Settings Giới thiệu (must stay small; platform CODESIGN)
+iPFakerAbout_FILES = TweakAbout.x src/IPFConfig.m src/IPFHooksMG.m
+iPFakerAbout_CFLAGS = -fobjc-arc -Os -fvisibility=hidden -DIPF_NO_MG_DEBUG=1 -ffunction-sections -fdata-sections -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
+iPFakerAbout_FRAMEWORKS = UIKit Foundation AdSupport
+iPFakerAbout_LIBRARIES = substrate
+iPFakerAbout_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerAbout.dylib -Wl,-dead_strip -Wl,-x
+
+# MG: spoof + Extra core only. Proven inject ≤128k on lab AMFI for third-party; Preferences uses About.
 # Env (locale/location) optional — enable via IPF_WITH_ENV=1 if budget allows.
 iPFakerMG_FILES = TweakMG.x src/IPFConfig.m src/IPFHooksMG.m src/IPFHooksExtra.m
 # IPF_NO_MG_DEBUG=1 strips verbose ctor logs (AMFI size)

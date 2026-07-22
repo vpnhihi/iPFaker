@@ -71,7 +71,7 @@
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
     if (section == 0)
-        return @"Bật «Hiện spoof trong Cài đặt → Giới thiệu» để xem model/serial/iOS ảo tại Cài đặt chung → Giới thiệu (MG only; không xóa data Settings khi Đặt lại). Sau Đặt lại: killall Preferences rồi mở lại Cài đặt.";
+        return @"Bật «Hiện spoof trong Cài đặt → Giới thiệu» để xem model/serial/iOS ảo tại Cài đặt chung → Giới thiệu (dylib iPFakerAbout nhỏ, MG only — full MG bị AMFI chặn trên Preferences). Không xóa data Settings khi Đặt lại. Sau Đặt lại: killall Preferences rồi mở lại Cài đặt.";
     if (section == 1)
         return @"Ngôn ngữ · múi giờ · GPS · WebRTC. Giả lập ngày giờ mặc định TẮT (tránh lệch giờ TLS).";
     if (section == (NSInteger)self.sections.count)
