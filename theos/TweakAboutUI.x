@@ -1,8 +1,6 @@
-// iPFakerAboutUI — last-resort UI wash for Settings → About.
-// Preferences only. Syncs host-cached UILabel text to dual-path config SoT:
-//   ProductVersion, MarketingName, UserAssignedDeviceName (protect),
-//   WifiAddress, BluetoothAddress, EID, SEID, BasebandVersion.
-// Does NOT own ModelNumber/RegionInfo (iPFakerAbout MG when loaded).
+// iPFakerAboutUI — Preferences-only UILabel wash for Settings → About.
+// Syncs host UI text to dual-path config SoT (version, model, name protect,
+// Wi‑Fi / Bluetooth MAC, EID, SEID, BasebandVersion).
 
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
@@ -34,8 +32,8 @@ static void IPFUILog(NSString *line) {
     } @catch (__unused NSException *ex) {}
 }
 
-/// Newest mtime wins; /var/jb preferred on tie (same rule as ProfileBuilder / IPFConfig).
 static NSDictionary *IPFUIConfig(void) {
+    // Newest mtime wins; jb preferred on tie
     NSArray *paths = @[
         @"/var/jb/etc/ipfaker/config.plist",
         @"/var/mobile/Library/iPFaker/config.plist",
@@ -43,7 +41,6 @@ static NSDictionary *IPFUIConfig(void) {
     NSFileManager *fm = [NSFileManager defaultManager];
     NSDictionary *best = nil;
     NSDate *bestDate = [NSDate distantPast];
-    NSString *bestPath = nil;
     for (NSString *p in paths) {
         if (![fm isReadableFileAtPath:p]) continue;
         NSDictionary *attrs = [fm attributesOfItemAtPath:p error:nil];
@@ -55,34 +52,21 @@ static NSDictionary *IPFUIConfig(void) {
         if (!best || newer || tieJb) {
             best = d;
             bestDate = mod;
-            bestPath = p;
         }
     }
-    (void)bestPath;
     return best;
-}
-
-static BOOL IPFUIFlag(NSDictionary *cfg, NSString *key) {
-    if (!cfg) return NO;
-    id f = cfg[key];
-    if ([f isKindOfClass:[NSNumber class]]) return [f boolValue];
-    return YES; // missing → default ON (lab SoT)
 }
 
 static BOOL IPFUIEnabled(NSDictionary *cfg) {
     if (!cfg) return NO;
     id en = cfg[@"Enabled"];
     if ([en isKindOfClass:[NSNumber class]] && ![en boolValue]) return NO;
-    return IPFUIFlag(cfg, @"FakeSysOSVersion")
-        || IPFUIFlag(cfg, @"FakeWifi")
-        || IPFUIFlag(cfg, @"FakeHardware")
-        || IPFUIFlag(cfg, @"FakeDevice");
+    return YES;
 }
 
 static NSArray<NSString *> *IPFUIHostVersionTokens(void) {
     return @[
-        @"14.0", @"14.1", @"14.2", @"14.3", @"14.4", @"14.5", @"14.6", @"14.7", @"14.8",
-        @"14.8.1",
+        @"14.0", @"14.1", @"14.2", @"14.3", @"14.4", @"14.5", @"14.6", @"14.7", @"14.8", @"14.8.1",
         @"15.0", @"15.1", @"15.2", @"15.3", @"15.4", @"15.5", @"15.5.0", @"15.6", @"15.7",
         @"15.7.1", @"15.7.2", @"15.7.3", @"15.7.4", @"15.7.5", @"15.7.6", @"15.7.7", @"15.7.8", @"15.7.9",
         @"15.8", @"15.8.1", @"15.8.2", @"15.8.3", @"15.8.4", @"15.8.5",
@@ -96,17 +80,6 @@ static NSArray<NSString *> *IPFUIHostVersionTokens(void) {
         @"18.0", @"18.0.1", @"18.1", @"18.1.1", @"18.2", @"18.2.1", @"18.3", @"18.3.1", @"18.3.2",
         @"18.4", @"18.4.1", @"18.5", @"18.6", @"18.6.1", @"18.6.2", @"18.7", @"18.7.1", @"18.7.2",
         @"18.7.9",
-    ];
-}
-
-/// Host modem firmware tokens (iPhone 7 / older baseband often shown in Settings About).
-static NSArray<NSString *> *IPFUIHostBasebandTokens(void) {
-    return @[
-        @"9.61.00", @"9.60.00", @"9.51.00", @"9.40.01", @"9.30.00", @"9.01.00",
-        @"8.50.01", @"8.40.01", @"8.30.01", @"7.80.04", @"7.01.00",
-        @"6.01.00", @"5.00.00", @"4.00.00", @"3.00.00", @"2.00.00", @"1.00.00",
-        @"1.14.00", @"1.15.00", @"1.23.00", @"1.40.00", @"1.55.00", @"1.70.00",
-        @"2.23.02", @"2.40.00", @"2.50.05", @"2.60.00", @"2.68.01",
     ];
 }
 
@@ -124,8 +97,6 @@ static BOOL IPFUIShouldReplaceVersion(NSString *t, NSString *wantPV, NSArray *ho
     return NO;
 }
 
-// Only wash real host marketing model labels → config MarketingName.
-// MUST NOT touch UserAssignedDeviceName (Settings "Tên").
 static BOOL IPFUIShouldReplaceModel(NSString *t, NSString *wantMk, NSString *wantName) {
     if (!t.length || !wantMk.length) return NO;
     if ([t isEqualToString:wantMk]) return NO;
@@ -167,9 +138,13 @@ static BOOL IPFUIShouldReplaceModel(NSString *t, NSString *wantMk, NSString *wan
 
 static BOOL IPFUIIsMAC(NSString *t) {
     if (t.length != 17) return NO;
-    NSRegularExpression *re = [NSRegularExpression
-        regularExpressionWithPattern:@"^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$"
-                             options:0 error:nil];
+    static NSRegularExpression *re;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        re = [NSRegularExpression
+            regularExpressionWithPattern:@"^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$"
+                                 options:0 error:nil];
+    });
     return re && [re numberOfMatchesInString:t options:0 range:NSMakeRange(0, t.length)] > 0;
 }
 
@@ -186,52 +161,33 @@ static BOOL IPFUIIsSEID(NSString *t) {
     if (t.length != 40) return NO;
     for (NSUInteger i = 0; i < t.length; i++) {
         unichar c = [t characterAtIndex:i];
-        BOOL hex = (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f');
-        if (!hex) return NO;
+        BOOL ok = (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f');
+        if (!ok) return NO;
     }
     return YES;
 }
 
-static BOOL IPFUILooksLikeBaseband(NSString *t) {
+static BOOL IPFUIIsBaseband(NSString *t) {
     if (!t.length || t.length > 12) return NO;
-    NSRegularExpression *re = [NSRegularExpression
-        regularExpressionWithPattern:@"^\\d{1,2}\\.\\d{2}\\.\\d{2}$"
-                             options:0 error:nil];
+    static NSRegularExpression *re;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        re = [NSRegularExpression
+            regularExpressionWithPattern:@"^\\d{1,2}\\.\\d{2}\\.\\d{2}$"
+                                 options:0 error:nil];
+    });
     return re && [re numberOfMatchesInString:t options:0 range:NSMakeRange(0, t.length)] > 0;
 }
 
-static BOOL IPFUIShouldReplaceBaseband(NSString *t, NSString *wantBB, NSArray *hosts, NSString *wantPV) {
-    if (!t.length || !wantBB.length) return NO;
-    if ([t isEqualToString:wantBB]) return NO;
-    if (wantPV.length && [t isEqualToString:wantPV]) return NO; // never steal OS version cell
-    for (NSString *h in hosts) {
-        if ([t isEqualToString:h]) return YES;
-    }
-    // Host modem firmware pattern X.YY.ZZ that is not our spoof
-    if (IPFUILooksLikeBaseband(t)) return YES;
-    return NO;
-}
+// macSlot: 0 → next host MAC becomes Wifi, 1 → BT (Settings row order)
+static NSInteger gIPFUIMacSlot = 0;
 
-typedef struct {
-    NSString *wantPV;
-    NSString *wantMk;
-    NSString *wantName;
-    NSString *wantWifi;
-    NSString *wantBT;
-    NSString *wantEID;
-    NSString *wantSEID;
-    NSString *wantBB;
-    NSArray *hostVers;
-    NSArray *hostBB;
-    BOOL doVer;
-    BOOL doModel;
-    BOOL doNet;
-    BOOL doHW;
-    NSInteger macSlot;
-} IPFUIWashCtx;
-
-static NSInteger IPFUIWashView(UIView *root, IPFUIWashCtx *ctx) {
-    if (!root || !ctx) return 0;
+static NSInteger IPFUIWashView(UIView *root,
+                               NSString *wantPV, NSString *wantMk, NSString *wantName,
+                               NSString *wantWifi, NSString *wantBT,
+                               NSString *wantEID, NSString *wantSEID, NSString *wantBB,
+                               NSArray *hostVers) {
+    if (!root) return 0;
     __block NSInteger n = 0;
     NSMutableArray *stack = [NSMutableArray arrayWithObject:root];
     while (stack.count) {
@@ -241,61 +197,54 @@ static NSInteger IPFUIWashView(UIView *root, IPFUIWashCtx *ctx) {
             if (![lab isKindOfClass:[UILabel class]]) return;
             NSString *t = lab.text;
             if (![t isKindOfClass:[NSString class]] || !t.length) return;
-            if (ctx->wantName.length && [t isEqualToString:ctx->wantName]) return;
+            if (wantName.length && [t isEqualToString:wantName]) return;
 
-            if (ctx->doVer && IPFUIShouldReplaceVersion(t, ctx->wantPV, ctx->hostVers)) {
-                lab.text = ctx->wantPV;
+            if (wantPV.length && IPFUIShouldReplaceVersion(t, wantPV, hostVers)) {
+                lab.text = wantPV;
                 n++;
-                IPFUILog([NSString stringWithFormat:@"label ver %@ => %@", t, ctx->wantPV]);
+                IPFUILog([NSString stringWithFormat:@"label ver %@ => %@", t, wantPV]);
                 return;
             }
-            if (ctx->doModel && ctx->wantMk.length
-                && IPFUIShouldReplaceModel(t, ctx->wantMk, ctx->wantName)) {
-                lab.text = ctx->wantMk;
+            if (wantMk.length && IPFUIShouldReplaceModel(t, wantMk, wantName)) {
+                lab.text = wantMk;
                 n++;
-                IPFUILog([NSString stringWithFormat:@"label model %@ => %@", t, ctx->wantMk]);
+                IPFUILog([NSString stringWithFormat:@"label model %@ => %@", t, wantMk]);
                 return;
             }
-            if (ctx->doNet && IPFUIIsMAC(t)) {
-                BOOL isWifi = ctx->wantWifi.length
-                    && [t caseInsensitiveCompare:ctx->wantWifi] == NSOrderedSame;
-                BOOL isBT = ctx->wantBT.length
-                    && [t caseInsensitiveCompare:ctx->wantBT] == NSOrderedSame;
-                if (isWifi || isBT) return;
+            if ((wantWifi.length || wantBT.length) && IPFUIIsMAC(t)) {
+                if (wantWifi.length && [t caseInsensitiveCompare:wantWifi] == NSOrderedSame) return;
+                if (wantBT.length && [t caseInsensitiveCompare:wantBT] == NSOrderedSame) return;
                 NSString *repl = nil;
-                if (ctx->macSlot == 0 && ctx->wantWifi.length)
-                    repl = ctx->wantWifi;
-                else if (ctx->wantBT.length)
-                    repl = ctx->wantBT;
-                else if (ctx->wantWifi.length)
-                    repl = ctx->wantWifi;
-                if (repl.length && [t caseInsensitiveCompare:repl] != NSOrderedSame) {
+                if (gIPFUIMacSlot == 0 && wantWifi.length) repl = wantWifi;
+                else if (wantBT.length) repl = wantBT;
+                else if (wantWifi.length) repl = wantWifi;
+                if (repl.length) {
                     lab.text = repl;
                     n++;
-                    ctx->macSlot++;
-                    IPFUILog([NSString stringWithFormat:@"label mac %@ => %@ (slot %ld)",
-                              t, repl, (long)ctx->macSlot]);
+                    gIPFUIMacSlot++;
+                    IPFUILog([NSString stringWithFormat:@"label mac %@ => %@", t, repl]);
                 }
                 return;
             }
-            if (ctx->doHW && ctx->wantEID.length && IPFUIIsEID(t)
-                && ![t isEqualToString:ctx->wantEID]) {
-                lab.text = ctx->wantEID;
+            if (wantEID.length && IPFUIIsEID(t) && ![t isEqualToString:wantEID]) {
+                lab.text = wantEID;
                 n++;
-                IPFUILog([NSString stringWithFormat:@"label EID %@ => %@", t, ctx->wantEID]);
+                IPFUILog([NSString stringWithFormat:@"label EID %@ => %@", t, wantEID]);
                 return;
             }
-            if (ctx->doHW && ctx->wantSEID.length && IPFUIIsSEID(t)
-                && [t caseInsensitiveCompare:ctx->wantSEID] != NSOrderedSame) {
-                lab.text = ctx->wantSEID;
+            if (wantSEID.length && IPFUIIsSEID(t)
+                && [t caseInsensitiveCompare:wantSEID] != NSOrderedSame) {
+                lab.text = wantSEID;
                 n++;
-                IPFUILog([NSString stringWithFormat:@"label SEID %@ => %@", t, ctx->wantSEID]);
+                IPFUILog([NSString stringWithFormat:@"label SEID %@ => %@", t, wantSEID]);
                 return;
             }
-            if (ctx->doHW && IPFUIShouldReplaceBaseband(t, ctx->wantBB, ctx->hostBB, ctx->wantPV)) {
-                lab.text = ctx->wantBB;
+            if (wantBB.length && IPFUIIsBaseband(t) && ![t isEqualToString:wantBB]
+                && !(wantPV.length && [t isEqualToString:wantPV])) {
+                // host modem firmware e.g. 9.61.00 → spoof
+                lab.text = wantBB;
                 n++;
-                IPFUILog([NSString stringWithFormat:@"label bb %@ => %@", t, ctx->wantBB]);
+                IPFUILog([NSString stringWithFormat:@"label bb %@ => %@", t, wantBB]);
                 return;
             }
         };
@@ -313,28 +262,20 @@ static NSInteger IPFUIWashView(UIView *root, IPFUIWashCtx *ctx) {
 static void IPFUIWashAllWindows(void) {
     NSDictionary *cfg = IPFUIConfig();
     if (!IPFUIEnabled(cfg)) return;
-
-    IPFUIWashCtx ctx = {0};
-    ctx.wantPV = [cfg[@"ProductVersion"] description] ?: @"";
-    ctx.wantMk = [cfg[@"MarketingName"] description] ?: @"";
-    ctx.wantName = [cfg[@"UserAssignedDeviceName"] description]
+    NSString *wantPV = [cfg[@"ProductVersion"] description] ?: @"";
+    NSString *wantMk = [cfg[@"MarketingName"] description] ?: @"";
+    NSString *wantName = [cfg[@"UserAssignedDeviceName"] description]
         ?: [cfg[@"DeviceName"] description] ?: @"";
-    ctx.wantWifi = [cfg[@"WifiAddress"] description] ?: @"";
-    ctx.wantBT = [cfg[@"BluetoothAddress"] description] ?: @"";
-    ctx.wantEID = [cfg[@"EID"] description] ?: @"";
-    ctx.wantSEID = [cfg[@"SEID"] description]
+    NSString *wantWifi = [cfg[@"WifiAddress"] description] ?: @"";
+    NSString *wantBT = [cfg[@"BluetoothAddress"] description] ?: @"";
+    NSString *wantEID = [cfg[@"EID"] description] ?: @"";
+    NSString *wantSEID = [cfg[@"SEID"] description]
         ?: [cfg[@"SecureElementID"] description] ?: @"";
-    ctx.wantBB = [cfg[@"BasebandVersion"] description] ?: @"";
-    ctx.hostVers = IPFUIHostVersionTokens();
-    ctx.hostBB = IPFUIHostBasebandTokens();
-    ctx.doVer = ctx.wantPV.length > 0 && IPFUIFlag(cfg, @"FakeSysOSVersion");
-    ctx.doModel = ctx.wantMk.length > 0 && IPFUIFlag(cfg, @"FakeDevice");
-    ctx.doNet = (ctx.wantWifi.length > 0 || ctx.wantBT.length > 0) && IPFUIFlag(cfg, @"FakeWifi");
-    ctx.doHW = IPFUIFlag(cfg, @"FakeHardware")
-        && (ctx.wantEID.length || ctx.wantSEID.length || ctx.wantBB.length);
-    ctx.macSlot = 0;
+    NSString *wantBB = [cfg[@"BasebandVersion"] description] ?: @"";
+    if (!wantPV.length && !wantWifi.length && !wantBT.length && !wantBB.length) return;
 
-    if (!ctx.doVer && !ctx.doModel && !ctx.doNet && !ctx.doHW) return;
+    NSArray *hostVers = IPFUIHostVersionTokens();
+    gIPFUIMacSlot = 0;
 
     NSInteger total = 0;
     NSArray *windows = nil;
@@ -350,25 +291,28 @@ static void IPFUIWashAllWindows(void) {
     if (!windows.count)
         windows = UIApplication.sharedApplication.windows;
     for (UIWindow *w in windows) {
-        total += IPFUIWashView(w, &ctx);
+        total += IPFUIWashView(w, wantPV, wantMk, wantName, wantWifi, wantBT,
+                              wantEID, wantSEID, wantBB, hostVers);
         UIViewController *r = w.rootViewController;
-        if (r.view) total += IPFUIWashView(r.view, &ctx);
+        if (r.view)
+            total += IPFUIWashView(r.view, wantPV, wantMk, wantName, wantWifi, wantBT,
+                                  wantEID, wantSEID, wantBB, hostVers);
         UIViewController *p = r.presentedViewController;
         while (p) {
-            if (p.view) total += IPFUIWashView(p.view, &ctx);
+            if (p.view)
+                total += IPFUIWashView(p.view, wantPV, wantMk, wantName, wantWifi, wantBT,
+                                      wantEID, wantSEID, wantBB, hostVers);
             p = p.presentedViewController;
         }
     }
     if (total > 0)
         IPFUILog([NSString stringWithFormat:
-                  @"washed %ld label(s) mk=%@ ver=%@ wifi=%@ bt=%@ eid=%@ seid=%@ bb=%@ name=%@",
-                  (long)total, ctx.wantMk, ctx.wantPV,
-                  ctx.wantWifi.length ? ctx.wantWifi : @"-",
-                  ctx.wantBT.length ? ctx.wantBT : @"-",
-                  ctx.wantEID.length ? @"yes" : @"-",
-                  ctx.wantSEID.length ? @"yes" : @"-",
-                  ctx.wantBB.length ? ctx.wantBB : @"-",
-                  ctx.wantName.length ? ctx.wantName : @"-"]);
+                  @"washed %ld -> ver=%@ mk=%@ wifi=%@ bt=%@ bb=%@ name=%@",
+                  (long)total, wantPV, wantMk,
+                  wantWifi.length ? wantWifi : @"-",
+                  wantBT.length ? wantBT : @"-",
+                  wantBB.length ? wantBB : @"-",
+                  wantName.length ? wantName : @"-"]);
 }
 
 static void IPFUIScheduleWashes(void) {
@@ -412,6 +356,6 @@ static void IPFUIOnActive(CFNotificationCenterRef center, void *observer,
                         IPFUIScheduleWashes();
                     }];
         IPFUIMark("CTOR_OK");
-        IPFUILog(@"AboutUI ready (ver+model+net+modem)");
+        IPFUILog(@"AboutUI ready");
     }
 }
