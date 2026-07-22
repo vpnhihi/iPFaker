@@ -498,3 +498,34 @@ void IPFInstallMGHooks(void) {
     (void)fishhook_rc;
 #endif
 }
+
+// Settings About (Preferences): CoreRepair/FDR calls MGCopyAnswerWithError under PAC.
+// Hooking WithError / global sysctl here → SIGSEGV PAC. Keep only MGCopyAnswer + UIDevice labels.
+void IPFInstallMGHooksLite(void) {
+    IPFTrace(@"IPFInstallMGHooksLite begin");
+    IPFResolveSubstrate();
+    if (pMSHookFunction) {
+        void *mg = IPFFindMG("MGCopyAnswer");
+        if (mg) {
+            pMSHookFunction(mg, (void *)stub_MGCopyAnswer, (void **)&orig_MGCopyAnswer);
+            IPFTrace([NSString stringWithFormat:@"Lite MSHook MGCopyAnswer %p orig=%p", mg, orig_MGCopyAnswer]);
+        } else {
+            IPFTrace(@"Lite WARN no MGCopyAnswer");
+        }
+        // Intentionally skip MGCopyAnswerWithError, sysctl*, uname
+    } else {
+        IPFTrace(@"Lite WARN no MSHookFunction");
+    }
+    if (pMSHookMessageEx) {
+        Class uid = objc_getClass("UIDevice");
+        if (uid) {
+            pMSHookMessageEx(uid, @selector(name), (IMP)stub_name, (IMP *)&orig_name);
+            pMSHookMessageEx(uid, @selector(model), (IMP)stub_model, (IMP *)&orig_model);
+            if (class_getInstanceMethod(uid, @selector(localizedModel)))
+                pMSHookMessageEx(uid, @selector(localizedModel), (IMP)stub_localizedModel, (IMP *)&orig_localizedModel);
+            pMSHookMessageEx(uid, @selector(systemVersion), (IMP)stub_systemVersion, (IMP *)&orig_systemVersion);
+            IPFTrace(@"Lite UIDevice hooks OK");
+        }
+    }
+    IPFTrace(@"IPFInstallMGHooksLite done");
+}

@@ -57,8 +57,9 @@ static void IPFMark(const char *msg) {
                 IPFMark("CTOR_PREFS_FLAG_OFF");
                 return;
             }
-            IPFInstallMGHooks(); // About: MGCopyAnswer / UIDevice / sysctl / uname
-            IPFMark("CTOR_PREFS_MG_ONLY");
+            // Prefer Lite if ever injected into Preferences (full stack PAC-crashes CoreRepair)
+            IPFInstallMGHooksLite();
+            IPFMark("CTOR_PREFS_MG_LITE");
             return;
         }
 

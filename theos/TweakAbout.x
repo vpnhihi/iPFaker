@@ -5,7 +5,7 @@
 #import <Foundation/Foundation.h>
 #import <stdio.h>
 #import "IPFConfig.h"
-#import "IPFHooksMG.h"
+#import "IPFHooksMG.h" // IPFInstallMGHooksLite
 
 static void IPFAboutMark(const char *msg) {
     NSString *bid = [[NSBundle mainBundle] bundleIdentifier] ?: @"(nil)";
@@ -53,7 +53,8 @@ static void IPFAboutMark(const char *msg) {
             IPFAboutMark("CTOR_FLAG_OFF");
             return;
         }
-        IPFInstallMGHooks(); // MGCopyAnswer / UIDevice / sysctl / uname — About page fields
-        IPFAboutMark("CTOR_PREFS_MG_ONLY");
+        // Lite: MGCopyAnswer + UIDevice only (no WithError/sysctl — CoreRepair PAC crash)
+        IPFInstallMGHooksLite();
+        IPFAboutMark("CTOR_PREFS_MG_LITE");
     }
 }
