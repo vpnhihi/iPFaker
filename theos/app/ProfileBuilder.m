@@ -151,43 +151,87 @@
     };
 }
 
++ (NSInteger)ipfMajorFromVersion:(NSString *)v {
+    if (!v.length) return 0;
+    return [[v componentsSeparatedByString:@"."].firstObject integerValue];
+}
+
+/// Lab rule: spoof iOS never > host; never major-gap ≥ 2 below host (forces host iOS).
++ (NSString *)clampSpoofIOSToHost:(NSString *)spoofIOS {
+    NSString *host = [self hostSystemVersion];
+    if (!spoofIOS.length) return host.length ? host : @"15.0";
+    if (!host.length) return spoofIOS;
+    if ([self compareVersion:spoofIOS toVersion:host] == NSOrderedDescending)
+        return host;
+    NSInteger sm = [self ipfMajorFromVersion:spoofIOS];
+    NSInteger hm = [self ipfMajorFromVersion:host];
+    if (hm > 0 && sm > 0 && (hm - sm) >= 2)
+        return host; // e.g. spoof 12.x on host 15.x → clamp 15.x (WebKit/UA sync)
+    return spoofIOS;
+}
+
++ (NSString *)radioAccessTechnologyForDevice:(NSDictionary *)device {
+    NSInteger year = [device[@"year"] integerValue];
+    NSString *pt = [device[@"ProductType"] description] ?: @"";
+    int gen = 0;
+    sscanf(pt.UTF8String ?: "", "iPhone%d", &gen);
+    // 5G: iPhone 12+ (ProductType iPhone13,* …) or year ≥ 2020
+    if (year >= 2020 || gen >= 13)
+        return @"CTRadioAccessTechnologyNR";
+    // LTE era iPhone 6s–11 class
+    if (year >= 2016 || gen >= 8)
+        return @"CTRadioAccessTechnologyLTE";
+    return @"CTRadioAccessTechnologyWCDMA";
+}
+
++ (NSString *)labHonestClaimFooter {
+    return @"Claim lab: identity client + OS/UA/Darwin đồng bộ host.\n"
+           @"KHÔNG claim: server risk VNG · silicon SE/GPU die · App Attest token thật.";
+}
+
 + (NSString *)labMismatchWarningForSpoofIOS:(NSString *)spoofIOS productType:(NSString *)productType {
     NSMutableArray *w = [NSMutableArray array];
     NSString *hostIOS = [self hostSystemVersion];
     NSString *hostPT = [self hostProductType];
-    if (spoofIOS.length && hostIOS.length) {
-        NSComparisonResult c = [self compareVersion:spoofIOS toVersion:hostIOS];
+    NSString *aligned = spoofIOS.length ? [self clampSpoofIOSToHost:spoofIOS] : spoofIOS;
+    if (spoofIOS.length && aligned.length && ![aligned isEqualToString:spoofIOS]) {
+        [w addObject:[NSString stringWithFormat:
+                      @"✓ Đã kẹp iOS %@ → %@ (khớp host, chống lệch WebKit/UA)",
+                      spoofIOS, aligned]];
+    }
+    if (aligned.length && hostIOS.length) {
+        NSComparisonResult c = [self compareVersion:aligned toVersion:hostIOS];
         if (c == NSOrderedDescending) {
             [w addObject:[NSString stringWithFormat:
-                          @"⚠ Spoof iOS %@ > host iOS %@ — WebView/zBox/fingerprint rủi ro cao",
-                          spoofIOS, hostIOS]];
+                          @"⚠ Spoof iOS %@ > host iOS %@", aligned, hostIOS]];
         } else if (c == NSOrderedAscending) {
-            NSArray *sp = [spoofIOS componentsSeparatedByString:@"."];
-            NSArray *hp = [hostIOS componentsSeparatedByString:@"."];
-            NSInteger sm = sp.count ? [sp[0] integerValue] : 0;
-            NSInteger hm = hp.count ? [hp[0] integerValue] : 0;
-            if (hm - sm >= 2) {
+            NSInteger sm = [self ipfMajorFromVersion:aligned];
+            NSInteger hm = [self ipfMajorFromVersion:hostIOS];
+            if (hm - sm >= 1) {
                 [w addObject:[NSString stringWithFormat:
-                              @"⚠ Spoof iOS %@ << host %@ — UA/WebKit lệch lớn",
-                              spoofIOS, hostIOS]];
+                              @"⚠ Spoof iOS %@ < host %@ — đã cố đồng bộ major",
+                              aligned, hostIOS]];
             }
         }
     }
     if (productType.length && hostPT.length && ![productType isEqualToString:hostPT]) {
         [w addObject:[NSString stringWithFormat:
-                      @"⚠ Spoof model %@ ≠ host %@ — silicon IMU/GPU host; WebGL/name đã spoof theo catalog",
+                      @"⚠ Spoof model %@ ≠ host %@ — silicon IMU/GPU die vẫn host",
                       productType, hostPT]];
-        // Generation gap: iPhoneN,M vs host — large gap → higher risk FP
         int spoofGen = 0, hostGen = 0;
         sscanf(productType.UTF8String ?: "", "iPhone%d", &spoofGen);
         sscanf(hostPT.UTF8String ?: "", "iPhone%d", &hostGen);
-        if (spoofGen > 0 && hostGen > 0 && spoofGen - hostGen >= 3) {
-            [w addObject:[NSString stringWithFormat:
-                          @"⚠ Spoof gen iPhone%d >> host iPhone%d — nên chọn model gần host (lab an toàn hơn)",
-                          spoofGen, hostGen]];
+        if (spoofGen > 0 && hostGen > 0) {
+            int gap = abs(spoofGen - hostGen);
+            if (gap >= 3) {
+                [w addObject:[NSString stringWithFormat:
+                              @"⚠ Gen gap iPhone%d vs host iPhone%d — Full model OK nhưng silicon lệch",
+                              spoofGen, hostGen]];
+            }
         }
     }
-    return w.count ? [w componentsJoinedByString:@"\n"] : @"";
+    [w addObject:[self labHonestClaimFooter]];
+    return [w componentsJoinedByString:@"\n"];
 }
 
 // Apple-like synthetic identity (match scripts/select_device_profile.py):
@@ -648,13 +692,13 @@
         @"carrierMCC": @"452",
         @"carrierMNC": @"04",
         @"carrierISO": @"vn",
-        @"carrierRadioAccess": @"CTRadioAccessTechnologyNR",
+        @"carrierRadioAccess": [self radioAccessTechnologyForDevice:device],
         @"CarrierName": @"Viettel",
         @"MobileCountryCode": @"452",
         @"MobileNetworkCode": @"04",
         @"ISOCountryCode": @"vn",
-        @"RadioAccessTechnology": @"CTRadioAccessTechnologyNR",
-        @"CurrentRadioAccessTechnology": @"CTRadioAccessTechnologyNR",
+        @"RadioAccessTechnology": [self radioAccessTechnologyForDevice:device],
+        @"CurrentRadioAccessTechnology": [self radioAccessTechnologyForDevice:device],
         @"AllowsVOIP": @YES,
         // Display (catalog native + logical + scale) — UIScreen / WK JS / MG same source
         @"main-screen-width": @(w),

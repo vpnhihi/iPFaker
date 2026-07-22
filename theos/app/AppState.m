@@ -612,7 +612,10 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     }
 
     // Build list of valid (deviceId, ios) pairs from pools + matrix
+    // Prefer pairs with iOS already host-aligned (after clamp stays same)
+    NSString *hostIOS = [ProfileBuilder hostSystemVersion];
     NSMutableArray<NSDictionary *> *pairs = [NSMutableArray array];
+    NSMutableArray<NSDictionary *> *pairsAligned = [NSMutableArray array];
     for (NSString *did in self.selectedDeviceIds) {
         NSDictionary *dev = [Catalog.shared deviceWithId:did];
         if (!dev) continue;
@@ -623,14 +626,22 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
         }
         for (NSString *v in iosOpts) {
             if (!Catalog.shared.iosReleases[v]) continue;
-            [pairs addObject:@{ @"device": dev, @"ios": v }];
+            NSString *clamped = [ProfileBuilder clampSpoofIOSToHost:v];
+            // Only keep if clamped version still supported by device (or equals host in releases)
+            NSDictionary *row = @{ @"device": dev, @"ios": clamped };
+            [pairs addObject:row];
+            if ([clamped isEqualToString:v] ||
+                (hostIOS.length && [clamped isEqualToString:hostIOS]))
+                [pairsAligned addObject:row];
         }
     }
     if (pairs.count == 0) {
         if (err) *err = @"Không có cặp máy+iOS hợp lệ trong matrix. Chọn lại đời máy / iOS.";
         return NO;
     }
-    NSDictionary *pick = pairs[arc4random_uniform((uint32_t)pairs.count)];
+    // Prefer host-aligned iOS pairs when available
+    NSArray *pool = pairsAligned.count ? pairsAligned : pairs;
+    NSDictionary *pick = pool[arc4random_uniform((uint32_t)pool.count)];
     if (outDev) *outDev = pick[@"device"];
     if (outIOS) *outIOS = pick[@"ios"];
     return YES;
@@ -638,14 +649,40 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
 
 - (NSString *)applyWithDevice:(NSDictionary *)dev ios:(NSString *)ios {
     if (!dev) return @"Danh mục máy trống";
+    NSString *iosRequested = ios;
+    // Lab: kẹp iOS spoof về host — claim “không lệch OS client” (UA/WebKit/Darwin)
+    ios = [ProfileBuilder clampSpoofIOSToHost:ios];
     NSDictionary *meta = Catalog.shared.iosReleases[ios];
+    if (!meta) {
+        // host version may not be in catalog releases — fall back nearest supported ≤ host
+        NSArray *sup = [Catalog.shared supportedIOSForDevice:dev];
+        NSString *host = [ProfileBuilder hostSystemVersion];
+        NSString *best = nil;
+        for (NSString *v in sup) {
+            if ([ProfileBuilder compareVersion:v toVersion:host] != NSOrderedDescending) {
+                if (!best || [ProfileBuilder compareVersion:v toVersion:best] == NSOrderedDescending)
+                    best = v;
+            }
+        }
+        ios = best ?: (sup.count ? sup.lastObject : ios);
+        meta = Catalog.shared.iosReleases[ios];
+    }
     if (!meta) return [NSString stringWithFormat:@"Không có iOS %@ trong catalog", ios];
 
     // Strict matrix guard
     if (![Catalog.shared device:dev supportsIOS:ios]) {
         NSArray *sup = [Catalog.shared supportedIOSForDevice:dev];
         if (!sup.count) return @"Máy này không có iOS trong matrix";
-        ios = sup.lastObject;
+        // Prefer highest supported ≤ host
+        NSString *host = [ProfileBuilder hostSystemVersion];
+        NSString *best = nil;
+        for (NSString *v in sup) {
+            if ([ProfileBuilder compareVersion:v toVersion:host] != NSOrderedDescending) {
+                if (!best || [ProfileBuilder compareVersion:v toVersion:best] == NSOrderedDescending)
+                    best = v;
+            }
+        }
+        ios = best ?: sup.lastObject;
         meta = Catalog.shared.iosReleases[ios];
         if (!meta) return @"Bảng iOS tương thích lỗi";
     }
@@ -705,10 +742,14 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     self.lastFlat = flat;
     NSString *warn = [ProfileBuilder labMismatchWarningForSpoofIOS:ios
                                                        productType:dev[@"ProductType"]];
-    self.statusText = [NSString stringWithFormat:@"%@ · %@ / iOS %@\n%@%@%@",
+    NSString *clampNote = @"";
+    if (iosRequested.length && ![iosRequested isEqualToString:ios])
+        clampNote = [NSString stringWithFormat:@"\n✓ iOS kẹp host: %@ → %@", iosRequested, ios];
+    self.statusText = [NSString stringWithFormat:@"%@ · %@ / iOS %@%@\n%@%@%@",
                        result ?: @"OK",
                        dev[@"MarketingName"] ?: dev[@"id"],
                        ios,
+                       clampNote,
                        filt ?: @"",
                        warn.length ? @"\n" : @"",
                        warn ?: @""];

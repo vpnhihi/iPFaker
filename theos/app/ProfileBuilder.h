@@ -22,6 +22,12 @@ typedef void (^IPFWipeProgress)(NSString *step);
 /// Lab warnings: spoof iOS > host, model ≠ host, etc.
 + (NSString *)labMismatchWarningForSpoofIOS:(NSString *)spoofIOS
                                  productType:(nullable NSString *)productType;
+/// Clamp spoof iOS to host so UA/WebKit/OS client không lệch (lab “no OS skew”).
++ (NSString *)clampSpoofIOSToHost:(NSString *)spoofIOS;
+/// Radio RAT string matching device year (no NR on pre-5G phones).
++ (NSString *)radioAccessTechnologyForDevice:(NSDictionary *)device;
+/// Short honest claim footer (what lab can / cannot claim).
++ (NSString *)labHonestClaimFooter;
 
 /// Write config.plist + active_profile.json to lab paths. Returns error message or nil.
 + (nullable NSString *)applyFlatProfile:(NSDictionary *)flat deviceId:(NSString *)deviceId ios:(NSString *)ios;

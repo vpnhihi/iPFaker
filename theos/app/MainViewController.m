@@ -75,7 +75,7 @@
     title.translatesAutoresizingMaskIntoConstraints = NO;
 
     UILabel *ver = [[UILabel alloc] init];
-    ver.text = @"Phiên bản: 2.10.0 · Công cụ lab thiết bị";
+    ver.text = @"Phiên bản: 2.10.1 · Công cụ lab thiết bị";
     ver.font = AppTheme.captionFont;
     ver.textColor = AppTheme.textSecondary;
     ver.translatesAutoresizingMaskIntoConstraints = NO;
