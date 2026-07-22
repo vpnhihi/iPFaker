@@ -1041,7 +1041,7 @@
 }
 
 /// Patch system MobileGestalt cache so Settings About marketing name follows spoof.
-/// Safe no-op if path missing / unreadable. Does not delete cache structure.
+/// Safe no-op if path missing / unreadable. Iterative (no recursive blocks — ARC retain cycle).
 + (NSString *)patchMobileGestaltCacheWithFlat:(NSDictionary *)flat {
     if (!flat.count) return @"";
     NSString *path =
@@ -1061,60 +1061,79 @@
     // Public reverse-engineered obfuscated keys (AppleWiki / guesstalt)
     NSString *kPT = @"h9jDsbgj7xIVeIQ8S3/X3Q";
     NSString *kMkt = @"Z/dqyWS6OZTRy10UcmUAhw";
-    __block NSInteger changed = 0;
+    NSString *kArt = @"bbtR9jQx50Fv5Af/affNtA";
+    NSString *kHW = @"/YYygAofPDbhrwToVsXdeA";
+    NSInteger changed = 0;
 
-    void (^washDict)(NSMutableDictionary *);
-    __block void (^washDictRec)(NSMutableDictionary *);
-    washDictRec = ^(NSMutableDictionary *d) {
-        if (!d) return;
+    NSMutableArray *stack = [NSMutableArray arrayWithObject:root];
+    while (stack.count) {
+        NSMutableDictionary *d = stack.lastObject;
+        [stack removeLastObject];
+        if (![d isKindOfClass:[NSMutableDictionary class]]) continue;
         for (NSString *k in d.allKeys) {
             id v = d[k];
-            if ([v isKindOfClass:[NSDictionary class]]) {
+            if ([v isKindOfClass:[NSDictionary class]] && ![v isKindOfClass:[NSMutableDictionary class]]) {
                 NSMutableDictionary *sub = [v mutableCopy];
-                washDictRec(sub);
                 d[k] = sub;
+                [stack addObject:sub];
+                continue;
+            }
+            if ([v isKindOfClass:[NSMutableDictionary class]]) {
+                [stack addObject:v];
                 continue;
             }
             if (![v isKindOfClass:[NSString class]]) continue;
             NSString *s = (NSString *)v;
-            BOOL set = NO;
-            NSString *nv = s;
+            NSString *nv = nil;
             if ([k isEqualToString:kPT] || [k isEqualToString:@"ProductType"]) {
-                if (wantPT.length && ![s isEqualToString:wantPT]) { nv = wantPT; set = YES; }
-            } else if ([k isEqualToString:kMkt] || [k isEqualToString:@"MarketingNameString"]
+                if (wantPT.length && ![s isEqualToString:wantPT]) nv = wantPT;
+            } else if ([k isEqualToString:kMkt] || [k isEqualToString:kArt]
+                       || [k isEqualToString:@"MarketingNameString"]
                        || [k isEqualToString:@"MarketingName"] || [k isEqualToString:@"marketing-name"]
-                       || [k isEqualToString:@"ArtworkDeviceProductDescription"]) {
-                if (wantMkt.length && ![s isEqualToString:wantMkt]) { nv = wantMkt; set = YES; }
-            } else if ([k isEqualToString:@"HWModelStr"] || [k isEqualToString:@"HardwareModel"]) {
-                if (wantHW.length && ![s isEqualToString:wantHW]) { nv = wantHW; set = YES; }
-            } else if ([s isEqualToString:@"iPhone11,6"] && wantPT.length) {
-                nv = wantPT; set = YES;
-            } else if (([s isEqualToString:@"iPhone XS Max"] || [s isEqualToString:@"iPhone Xs Max"]) && wantMkt.length) {
-                nv = wantMkt; set = YES;
-            } else if (([s hasPrefix:@"D331"] || [s isEqualToString:@"D331pAP"]) && wantHW.length) {
-                nv = wantHW; set = YES;
+                       || [k isEqualToString:@"ArtworkDeviceProductDescription"]
+                       || [k isEqualToString:@"ProductName"]) {
+                if (wantMkt.length && ![s isEqualToString:wantMkt]) nv = wantMkt;
+            } else if ([k isEqualToString:kHW] || [k isEqualToString:@"HWModelStr"]
+                       || [k isEqualToString:@"HardwareModel"]) {
+                if (wantHW.length && ![s isEqualToString:wantHW]) nv = wantHW;
+            } else if (wantPT.length && ([s isEqualToString:@"iPhone11,6"] || [s isEqualToString:@"iPhone8,1"])
+                       && ![s isEqualToString:wantPT] && [s containsString:@","]) {
+                nv = wantPT;
+            } else if (wantMkt.length
+                       && ([s isEqualToString:@"iPhone XS Max"] || [s isEqualToString:@"iPhone Xs Max"]
+                           || [s isEqualToString:@"iPhone 6s"] || [s isEqualToString:@"iPhone 11 Pro Max"])
+                       && ![s isEqualToString:wantMkt]) {
+                nv = wantMkt;
+            } else if (wantHW.length && ([s hasPrefix:@"D331"] || [s isEqualToString:@"N71AP"])
+                       && ![s isEqualToString:wantHW]) {
+                nv = wantHW;
             }
-            if (set) { d[k] = nv; changed++; }
+            if (nv) { d[k] = nv; changed++; }
         }
-    };
-    washDict = washDictRec;
+    }
 
-    // Prefer CacheExtra subtree
+    // Force canonical keys in CacheExtra even if absent
+    NSMutableDictionary *ex = nil;
     id extra = root[@"CacheExtra"];
-    if ([extra isKindOfClass:[NSDictionary class]]) {
-        NSMutableDictionary *ex = [extra mutableCopy];
-        washDict(ex);
+    if ([extra isKindOfClass:[NSMutableDictionary class]]) ex = extra;
+    else if ([extra isKindOfClass:[NSDictionary class]]) {
+        ex = [extra mutableCopy];
+        root[@"CacheExtra"] = ex;
+    } else {
+        ex = [NSMutableDictionary dictionary];
         root[@"CacheExtra"] = ex;
     }
-    washDict(root);
+    if (wantPT.length && ![ex[kPT] isEqual:wantPT]) { ex[kPT] = wantPT; changed++; }
+    if (wantMkt.length && ![ex[kMkt] isEqual:wantMkt]) { ex[kMkt] = wantMkt; changed++; }
+    if (wantMkt.length && ![ex[kArt] isEqual:wantMkt]) { ex[kArt] = wantMkt; changed++; }
+    if (wantHW.length && ![ex[kHW] isEqual:wantHW]) { ex[kHW] = wantHW; changed++; }
 
-    if (changed == 0) return @"MG-cache: no host keys to replace";
+    if (changed == 0) return @"MG-cache: already in sync";
 
     NSString *stage = @"/var/mobile/Library/iPFaker/mg_cache_patched.plist";
     if (![root writeToFile:stage atomically:YES])
         return @"MG-cache: stage write fail";
 
-    // Root copy via sudo when possible
     NSString *script = @"/var/mobile/Library/iPFaker/install_mg_cache.sh";
     NSString *sh = [NSString stringWithFormat:
                     @"#!/bin/sh\n"
@@ -1139,10 +1158,12 @@
             if (rc == 0) break;
         }
     }
-    // fallback direct (if already writable)
     if (rc != 0) {
         NSError *err = nil;
-        if ([fm copyItemAtPath:stage toPath:path error:&err] || [root writeToFile:path atomically:YES])
+        [fm removeItemAtPath:path error:nil];
+        if ([fm copyItemAtPath:stage toPath:path error:&err])
+            rc = 0;
+        else if ([root writeToFile:path atomically:YES])
             rc = 0;
     }
     if (rc == 0)

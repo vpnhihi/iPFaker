@@ -75,7 +75,7 @@
     title.translatesAutoresizingMaskIntoConstraints = NO;
 
     UILabel *ver = [[UILabel alloc] init];
-    ver.text = @"Phiên bản: 2.10.4 · Spoof Cài đặt → Giới thiệu (About dylib)";
+    ver.text = @"Phiên bản: 2.10.5 · Settings About đồng bộ MG-cache";
     ver.font = AppTheme.captionFont;
     ver.textColor = AppTheme.textSecondary;
     ver.translatesAutoresizingMaskIntoConstraints = NO;
