@@ -2,7 +2,6 @@
 #import "AppCatalog.h"
 #import "AppState.h"
 #import "AppTheme.h"
-#import "ProfileBuilder.h"
 #import "ProgressOverlay.h"
 
 @interface SpoofAppsController () <UISearchResultsUpdating>
@@ -18,39 +17,14 @@
     self.title = @"App lab";
     self.view.backgroundColor = AppTheme.bg;
     self.tableView.backgroundColor = self.view.backgroundColor;
+    self.tableView.rowHeight = 58;
 
-    [[AppCatalog shared] reloadSpoofCatalog];
-    // Only third-party (installed / social) — hide system apps
-    NSMutableArray *tp = [NSMutableArray array];
-    for (AppCatalogItem *it in AppCatalog.shared.spoofApps) {
-        if (!it.bundleId.length) continue;
-        if ([AppState isSystemLabBundleId:it.bundleId]) continue;
-        if (it.systemApp && [it.bundleId hasPrefix:@"com.apple."]) continue;
-        [tp addObject:it];
-    }
-    // Also merge live third-party from wipe scan
-    [[AppCatalog shared] reload];
-    for (AppCatalogItem *it in AppCatalog.shared.apps) {
-        if (!it.bundleId.length || it.systemApp) continue;
-        if ([AppState isSystemLabBundleId:it.bundleId]) continue;
-        BOOL exists = NO;
-        for (AppCatalogItem *x in tp) {
-            if ([x.bundleId isEqualToString:it.bundleId]) { exists = YES; break; }
-        }
-        if (!exists) [tp addObject:it];
-    }
-    self.items = [tp sortedArrayUsingComparator:^NSComparisonResult(AppCatalogItem *a, AppCatalogItem *b) {
-        BOOL az = [a.bundleId.lowercaseString containsString:@"zalo"];
-        BOOL bz = [b.bundleId.lowercaseString containsString:@"zalo"];
-        if (az != bz) return az ? NSOrderedAscending : NSOrderedDescending;
-        return [a.name localizedCaseInsensitiveCompare:b.name];
-    }];
-    self.filtered = self.items;
+    [self reloadItems];
 
     self.search = [[UISearchController alloc] initWithSearchResultsController:nil];
     self.search.searchResultsUpdater = self;
     self.search.obscuresBackgroundDuringPresentation = NO;
-    self.search.searchBar.placeholder = @"Tìm app";
+    self.search.searchBar.placeholder = @"Tìm app đã cài";
     self.navigationItem.searchController = self.search;
     self.definesPresentationContext = YES;
 
@@ -60,7 +34,7 @@
                                         target:self
                                         action:@selector(applyFilters)];
 
-    UIView *header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 320, 56)];
+    UIView *header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 320, 52)];
     UIButton *all = [UIButton buttonWithType:UIButtonTypeSystem];
     [all setTitle:@"Chọn tất cả" forState:UIControlStateNormal];
     all.titleLabel.font = AppTheme.sectionFont;
@@ -93,8 +67,24 @@
     self.tableView.tableHeaderView = header;
 }
 
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    [self reloadItems];
+    [self.tableView reloadData];
+}
+
+- (void)reloadItems {
+    // Chỉ app third-party **đã cài** (LS) — kèm icon
+    [[AppCatalog shared] reloadSpoofCatalog];
+    self.items = AppCatalog.shared.spoofApps ?: @[];
+    self.filtered = self.items;
+    // Prune selection to installed only
+    [AppState.shared syncLabAppPoolsFromSpoofMaster];
+}
+
 - (void)labSocialTapped {
     [AppState.shared applyLabSocialSpoofPreset];
+    [self reloadItems];
     [self.tableView reloadData];
     if (self.onChange) self.onChange();
 }
@@ -107,6 +97,7 @@
 
 - (void)deselectAllTapped {
     [AppState.shared deselectAllSpoofAppsKeepingZalo:YES];
+    [AppState.shared syncLabAppPoolsFromSpoofMaster];
     [self.tableView reloadData];
     if (self.onChange) self.onChange();
 }
@@ -126,7 +117,7 @@
         }
         dispatch_async(dispatch_get_main_queue(), ^{
             [ov finishWithTitle:@"Xong" detail:msg];
-            [ov dismissAfter:1.0 completion:^{
+            [ov dismissAfter:0.9 completion:^{
                 UIAlertController *a = [UIAlertController alertControllerWithTitle:@"App lab"
                                                                            message:msg
                                                                     preferredStyle:UIAlertControllerStyleAlert];
@@ -143,26 +134,56 @@
 }
 
 - (NSString *)tableView:(UITableView *)tableView titleForFooterInSection:(NSInteger)section {
-    return [NSString stringWithFormat:@"Đã chọn %lu app",
+    return [NSString stringWithFormat:@"%lu app đã cài · chọn %lu",
+            (unsigned long)self.items.count,
             (unsigned long)AppState.shared.selectedSpoofBundleIds.count];
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
-    static NSString *cid = @"spoofapp";
+    static NSString *cid = @"spoofapp_icon";
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:cid];
     if (!cell)
         cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:cid];
     if (indexPath.row >= (NSInteger)self.filtered.count) return cell;
+
     AppCatalogItem *it = self.filtered[indexPath.row];
     BOOL on = [AppState.shared isSpoofAppSelected:it.bundleId];
     cell.backgroundColor = AppTheme.cardAlt;
     cell.textLabel.textColor = AppTheme.textPrimary;
     cell.detailTextLabel.textColor = AppTheme.textSecondary;
     cell.textLabel.text = it.name;
-    cell.detailTextLabel.text = it.bundleId;
+    cell.detailTextLabel.text = it.version.length
+        ? [NSString stringWithFormat:@"%@ · v%@", it.bundleId, it.version]
+        : it.bundleId;
     cell.detailTextLabel.numberOfLines = 2;
     cell.accessoryType = on ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
     cell.tintColor = AppTheme.accent;
+
+    // Icon
+    UIImage *icon = it.icon;
+    if (icon) {
+        cell.imageView.image = icon;
+        cell.imageView.contentMode = UIViewContentModeScaleAspectFill;
+        cell.imageView.layer.cornerRadius = 10;
+        cell.imageView.clipsToBounds = YES;
+        // Fixed size via layer
+        CGFloat s = 40;
+        UIGraphicsBeginImageContextWithOptions(CGSizeMake(s, s), NO, 0);
+        [icon drawInRect:CGRectMake(0, 0, s, s)];
+        UIImage *scaled = UIGraphicsGetImageFromCurrentImageContext();
+        UIGraphicsEndImageContext();
+        cell.imageView.image = scaled ?: icon;
+        cell.imageView.layer.cornerRadius = 9;
+        cell.imageView.clipsToBounds = YES;
+    } else {
+        // Placeholder
+        if (@available(iOS 13.0, *)) {
+            cell.imageView.image = [UIImage systemImageNamed:@"app.fill"];
+            cell.imageView.tintColor = AppTheme.textSecondary;
+        } else {
+            cell.imageView.image = nil;
+        }
+    }
     return cell;
 }
 

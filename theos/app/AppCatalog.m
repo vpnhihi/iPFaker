@@ -1,6 +1,7 @@
 #import "AppCatalog.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
+#import <UIKit/UIKit.h>
 
 @implementation AppCatalogItem
 @end
@@ -8,6 +9,7 @@
 @interface AppCatalog ()
 @property (nonatomic, strong) NSArray<AppCatalogItem *> *apps;
 @property (nonatomic, strong) NSArray<AppCatalogItem *> *spoofApps;
+@property (nonatomic, strong) NSMutableSet<NSString *> *installedIds;
 @end
 
 @implementation AppCatalog
@@ -17,26 +19,51 @@
     static dispatch_once_t once;
     dispatch_once(&once, ^{
         s = [[AppCatalog alloc] init];
+        s.installedIds = [NSMutableSet set];
         [s reload];
     });
     return s;
 }
 
-/// Keep only: third-party (non com.apple.*) + Bản đồ + Thời tiết.
-- (BOOL)shouldListBundleId:(NSString *)bid {
+- (BOOL)shouldListThirdPartyBundleId:(NSString *)bid {
     if (!bid.length) return NO;
-    if ([bid isEqualToString:@"com.apple.Maps"]) return YES;
-    if ([bid isEqualToString:@"com.apple.weather"]) return YES;
-    if ([bid isEqualToString:@"com.apple.mobilesafari"]) return YES;
-    // Drop stock system apps; keep sideloaded / App Store third-party
+    if ([bid isEqualToString:@"com.apple.Preferences"]) return NO;
     if ([bid hasPrefix:@"com.apple."]) return NO;
-    // Skip common system-ish prefixes
     if ([bid hasPrefix:@"com.apple.WebKit"] || [bid hasPrefix:@"com.apple.UIKit"]) return NO;
+    // Skip empty / system-ish
+    if ([bid hasPrefix:@"com.apple"]) return NO;
     return YES;
+}
+
+/// Load home-screen style icon for installed app (private LS / UIImage helpers).
++ (UIImage *)iconForProxy:(id)proxy bundleId:(NSString *)bid {
+    UIImage *icon = nil;
+    @try {
+        // LSApplicationProxy iconDataForVariant: (2 ≈ 60pt home)
+        SEL iconSel = NSSelectorFromString(@"iconDataForVariant:");
+        if (proxy && [proxy respondsToSelector:iconSel]) {
+            for (NSInteger variant = 2; variant >= 0 && !icon; variant--) {
+                NSData *data = ((id (*)(id, SEL, NSInteger))objc_msgSend)(proxy, iconSel, variant);
+                if ([data isKindOfClass:[NSData class]] && data.length > 32)
+                    icon = [UIImage imageWithData:data];
+            }
+        }
+        if (!icon) {
+            // UIImage private: _applicationIconImageForBundleIdentifier:format:scale:
+            SEL uiSel = NSSelectorFromString(@"_applicationIconImageForBundleIdentifier:format:scale:");
+            if ([UIImage respondsToSelector:uiSel]) {
+                CGFloat scale = UIScreen.mainScreen.scale > 0 ? UIScreen.mainScreen.scale : 2.0;
+                icon = ((id (*)(id, SEL, id, NSInteger, CGFloat))objc_msgSend)(
+                    (id)[UIImage class], uiSel, bid, 0, scale);
+            }
+        }
+    } @catch (__unused NSException *ex) {}
+    return icon;
 }
 
 - (void)reload {
     NSMutableDictionary<NSString *, AppCatalogItem *> *map = [NSMutableDictionary dictionary];
+    NSMutableSet *installed = [NSMutableSet set];
 
     @try {
         Class wsClass = NSClassFromString(@"LSApplicationWorkspace");
@@ -52,6 +79,9 @@
                     NSString *exe = nil;
                     if ([proxy respondsToSelector:NSSelectorFromString(@"applicationIdentifier")])
                         bid = ((id (*)(id, SEL))objc_msgSend)(proxy, NSSelectorFromString(@"applicationIdentifier"));
+                    if (!bid.length) continue;
+                    [installed addObject:bid];
+
                     if ([proxy respondsToSelector:NSSelectorFromString(@"localizedName")])
                         name = ((id (*)(id, SEL))objc_msgSend)(proxy, NSSelectorFromString(@"localizedName"));
                     if (!name.length && [proxy respondsToSelector:NSSelectorFromString(@"itemName")])
@@ -60,63 +90,45 @@
                         ver = ((id (*)(id, SEL))objc_msgSend)(proxy, NSSelectorFromString(@"shortVersionString"));
                     if ([proxy respondsToSelector:NSSelectorFromString(@"bundleExecutable")])
                         exe = ((id (*)(id, SEL))objc_msgSend)(proxy, NSSelectorFromString(@"bundleExecutable"));
-                    if (![self shouldListBundleId:bid]) continue;
+
+                    // Store all non-Preferences for installed set; apps list = third-party for lab
+                    if ([bid isEqualToString:@"com.apple.Preferences"]) continue;
+                    BOOL isTP = [self shouldListThirdPartyBundleId:bid];
+                    if (!isTP) continue;
+
                     AppCatalogItem *it = [[AppCatalogItem alloc] init];
                     it.bundleId = bid;
                     it.name = name.length ? name : bid;
                     it.version = ver;
                     it.executable = exe;
-                    it.systemApp = [bid hasPrefix:@"com.apple."];
+                    it.systemApp = NO;
+                    it.icon = [AppCatalog iconForProxy:proxy bundleId:bid];
                     map[bid] = it;
                 }
             }
         }
     } @catch (__unused NSException *ex) {}
 
-    // Always ensure Maps + Weather + Safari present
-    for (NSArray *must in @[
-        @[ @"com.apple.Maps", @"Bản đồ" ],
-        @[ @"com.apple.weather", @"Thời tiết" ],
-        @[ @"com.apple.mobilesafari", @"Safari" ],
-    ]) {
-        if (!map[must[0]]) {
-            AppCatalogItem *it = [[AppCatalogItem alloc] init];
-            it.bundleId = must[0];
-            it.name = must[1];
-            it.systemApp = YES;
-            map[must[0]] = it;
-        }
-    }
-
-    // Fallback if LS empty: Maps + Weather + Safari
-    if (map.count == 0) {
-        for (NSArray *row in @[
-            @[ @"com.apple.Maps", @"Bản đồ" ],
-            @[ @"com.apple.weather", @"Thời tiết" ],
-            @[ @"com.apple.mobilesafari", @"Safari" ],
-        ]) {
-            AppCatalogItem *it = [[AppCatalogItem alloc] init];
-            it.bundleId = row[0];
-            it.name = row[1];
-            it.systemApp = YES;
-            map[it.bundleId] = it;
-        }
-    }
+    self.installedIds = installed;
 
     NSArray *all = [[map allValues] sortedArrayUsingComparator:^NSComparisonResult(AppCatalogItem *a, AppCatalogItem *b) {
-        NSInteger pa = [self pinRank:a.bundleId];
-        NSInteger pb = [self pinRank:b.bundleId];
-        if (pa != pb) return pa < pb ? NSOrderedAscending : NSOrderedDescending;
+        BOOL az = [a.bundleId.lowercaseString containsString:@"zalo"] || [a.bundleId.lowercaseString containsString:@"zing"];
+        BOOL bz = [b.bundleId.lowercaseString containsString:@"zalo"] || [b.bundleId.lowercaseString containsString:@"zing"];
+        if (az != bz) return az ? NSOrderedAscending : NSOrderedDescending;
         return [a.name localizedCaseInsensitiveCompare:b.name];
     }];
     self.apps = all;
+    // spoofApps default = same as installed third-party
+    self.spoofApps = all;
 }
 
-- (NSInteger)pinRank:(NSString *)bid {
-    if ([bid isEqualToString:@"com.apple.Maps"]) return 0;
-    if ([bid isEqualToString:@"com.apple.weather"]) return 1;
-    if ([bid isEqualToString:@"com.apple.mobilesafari"]) return 2;
-    return 20;
+- (BOOL)isInstalledBundleId:(NSString *)bid {
+    if (!bid.length) return NO;
+    if ([self.installedIds containsObject:bid]) return YES;
+    // Fallback scan
+    for (AppCatalogItem *it in self.apps)
+        if ([it.bundleId isEqualToString:bid]) return YES;
+    return NO;
 }
 
 - (AppCatalogItem *)itemWithBundleId:(NSString *)bid {
@@ -127,46 +139,13 @@
     return nil;
 }
 
-/// Stock apps shown in lab Multi-app spoof (exclude Preferences — inject crash).
 + (NSArray<NSArray *> *)labStockSpoofApps {
     return @[
-        @[ @"com.apple.AppStore", @"App Store" ],
-        @[ @"com.apple.calculator", @"Calculator" ],
-        @[ @"com.apple.camera", @"Camera" ],
-        @[ @"com.apple.mobiletimer", @"Clock" ],
-        @[ @"com.apple.MobileAddressBook", @"Contacts" ],
-        @[ @"com.apple.facetime", @"FaceTime" ],
-        @[ @"com.apple.DocumentsApp", @"Files" ],
-        @[ @"com.apple.findmy", @"Find My" ],
-        @[ @"com.apple.Health", @"Health" ],
-        @[ @"com.apple.Home", @"Home" ],
-        @[ @"com.apple.MobileStore", @"iTunes Store" ],
-        @[ @"com.apple.Maps", @"Maps" ],
-        @[ @"com.apple.measure", @"Measure" ],
-        @[ @"com.apple.MobileSMS", @"Messages" ],
-        @[ @"com.apple.Music", @"Music" ],
-        @[ @"com.apple.news", @"News" ],
-        @[ @"com.apple.mobilenotes", @"Notes" ],
-        @[ @"com.apple.mobilephone", @"Phone" ],
-        @[ @"com.apple.mobileslideshow", @"Photos" ],
-        @[ @"com.apple.podcasts", @"Podcasts" ],
-        @[ @"com.apple.reminders", @"Reminders" ],
-        @[ @"com.apple.mobilesafari", @"Safari" ],
-        @[ @"com.apple.shortcuts", @"Shortcuts" ],
-        @[ @"com.apple.stocks", @"Stocks" ],
-        @[ @"com.apple.tips", @"Tips" ],
-        @[ @"com.apple.tv", @"TV" ],
-        @[ @"com.apple.VoiceMemos", @"Voice Memos" ],
-        @[ @"com.apple.Passbook", @"Wallet" ],
-        @[ @"com.apple.Bridge", @"Watch" ],
-        @[ @"com.apple.weather", @"Weather" ],
-        @[ @"com.apple.iBooks", @"Books" ],
         @[ @"vn.com.vng.zingalo", @"Zalo" ],
         @[ @"com.zing.zalo", @"Zalo (alt)" ],
     ];
 }
 
-/// FB / IG / TikTok / Shopee / Telegram + common device-info tools (+ Zalo).
 + (NSArray<NSArray *> *)labSocialSpoofApps {
     return @[
         @[ @"vn.com.vng.zingalo", @"Zalo" ],
@@ -176,67 +155,18 @@
         @[ @"com.burbn.instagram", @"Instagram" ],
         @[ @"com.zhiliaoapp.musically", @"TikTok" ],
         @[ @"com.ss.iphone.ugc.Ame", @"TikTok (Asia)" ],
-        @[ @"com.ss.iphone.ugc.tiktok.lite", @"TikTok Lite" ],
         @[ @"vn.shopee.app", @"Shopee VN" ],
         @[ @"com.shopee.ShopeeVN", @"Shopee VN (alt)" ],
-        @[ @"com.shopee.id", @"Shopee ID" ],
         @[ @"ph.telegra.Telegraph", @"Telegram" ],
         @[ @"net.whatsapp.WhatsApp", @"WhatsApp" ],
         @[ @"com.google.ios.youtube", @"YouTube" ],
-        @[ @"com.toyopagroup.picaboo", @"Snapchat" ],
-        @[ @"com.apple.mobilesafari", @"Safari" ],
-        @[ @"com.apple.Maps", @"Maps" ],
-        @[ @"com.apple.weather", @"Weather" ],
-        // Device-info / fingerprint tools often used in lab
-        @[ @"com.apple.AppStore", @"App Store" ],
-        // Preferences intentionally omitted — inject Settings crashes
     ];
 }
 
 - (void)reloadSpoofCatalog {
-    NSMutableDictionary<NSString *, AppCatalogItem *> *map = [NSMutableDictionary dictionary];
-
-    // 1) Stock system list
-    for (NSArray *row in [AppCatalog labStockSpoofApps]) {
-        AppCatalogItem *it = [[AppCatalogItem alloc] init];
-        it.bundleId = row[0];
-        it.name = row[1];
-        it.systemApp = ![it.bundleId containsString:@"zalo"] && ![it.bundleId containsString:@"zing"];
-        map[it.bundleId] = it;
-    }
-    // 1b) Social / commerce multi-app (FB IG TikTok Shopee Telegram…)
-    for (NSArray *row in [AppCatalog labSocialSpoofApps]) {
-        NSString *bid = row[0];
-        if ([bid isEqualToString:@"com.apple.Preferences"]) continue; // never inject Settings
-        if (map[bid]) continue;
-        AppCatalogItem *it = [[AppCatalogItem alloc] init];
-        it.bundleId = bid;
-        it.name = row[1];
-        it.systemApp = [bid hasPrefix:@"com.apple."];
-        map[bid] = it;
-    }
-
-    // 2) Merge third-party from LS (reuse wipe scan via temporary reload of apps)
+    // Picker = only apps actually installed (from LS), third-party only
     [self reload];
-    for (AppCatalogItem *it in self.apps) {
-        if (!it.bundleId.length) continue;
-        if ([it.bundleId isEqualToString:@"com.apple.Preferences"]) continue;
-        if (!map[it.bundleId]) {
-            map[it.bundleId] = it;
-        } else if (it.name.length) {
-            map[it.bundleId].name = it.name;
-            map[it.bundleId].version = it.version;
-        }
-    }
-
-    NSArray *all = [[map allValues] sortedArrayUsingComparator:^NSComparisonResult(AppCatalogItem *a, AppCatalogItem *b) {
-        // Zalo first, then alpha
-        BOOL az = [a.bundleId.lowercaseString containsString:@"zalo"] || [a.bundleId.lowercaseString containsString:@"zing"];
-        BOOL bz = [b.bundleId.lowercaseString containsString:@"zalo"] || [b.bundleId.lowercaseString containsString:@"zing"];
-        if (az != bz) return az ? NSOrderedAscending : NSOrderedDescending;
-        return [a.name localizedCaseInsensitiveCompare:b.name];
-    }];
-    self.spoofApps = all;
+    self.spoofApps = self.apps ?: @[];
 }
 
 @end

@@ -1,29 +1,33 @@
 #import <Foundation/Foundation.h>
+#import <UIKit/UIKit.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
-/// One installed app entry for Wipe / Multi-app spoof multi-select.
+/// One installed app entry for App lab multi-select.
 @interface AppCatalogItem : NSObject
 @property (nonatomic, copy) NSString *bundleId;
 @property (nonatomic, copy) NSString *name;
 @property (nonatomic, copy, nullable) NSString *version;
 @property (nonatomic, copy, nullable) NSString *executable;
 @property (nonatomic, assign) BOOL systemApp;
+@property (nonatomic, strong, nullable) UIImage *icon;
 @end
 
 @interface AppCatalog : NSObject
 + (instancetype)shared;
-/// Refresh wipe list (third-party + Maps/Weather/Safari).
+/// Refresh installed apps from LaunchServices (third-party + optional system pins).
 - (void)reload;
-/// lab flat Multi-app spoof catalog (stock + third-party).
+/// Lab picker: **chỉ app third-party đã cài** (không list app chưa tải).
 - (void)reloadSpoofCatalog;
-/// Stock rows: @[ bundleId, name ] (lab Multi-app list, no Preferences).
+/// Stock rows (legacy presets — not used for picker list).
 + (NSArray<NSArray *> *)labStockSpoofApps;
-/// FB/IG/TikTok/Shopee/Telegram + Zalo multi-app rows.
+/// Social bundle ids (preset only selects if installed).
 + (NSArray<NSArray *> *)labSocialSpoofApps;
 @property (nonatomic, readonly) NSArray<AppCatalogItem *> *apps;
 @property (nonatomic, readonly) NSArray<AppCatalogItem *> *spoofApps;
 - (nullable AppCatalogItem *)itemWithBundleId:(NSString *)bid;
+/// YES if bundle is installed (seen by LS).
+- (BOOL)isInstalledBundleId:(NSString *)bid;
 @end
 
 NS_ASSUME_NONNULL_END
