@@ -1018,12 +1018,18 @@
                 [failMsgs componentsJoinedByString:@"\n"]];
     }
 
+    // Settings → Giới thiệu: MobileGestalt on-disk cache holds MarketingNameString/ProductType
+    // (Preferences may not re-query live MG for Tên kiểu máy). Patch dual with spoof flat.
+    NSString *mgCacheNote = [self patchMobileGestaltCacheWithFlat:flat];
+
     NSString *mk = flat[@"MarketingName"] ?: @"?";
     NSString *pt = flat[@"ProductType"] ?: @"?";
     NSString *msg = [NSString stringWithFormat:
                      @"Đã áp dụng %@ (%@) iOS %@ → %@",
                      mk, pt, ios ?: @"?",
                      [okPaths componentsJoinedByString:@", "]];
+    if (mgCacheNote.length)
+        msg = [msg stringByAppendingFormat:@"\n%@", mgCacheNote];
     if (!jbOk) {
         msg = [msg stringByAppendingString:
                @"\n⚠ CHƯA ghi /var/jb/etc/ipfaker — app đích vẫn đọc cấu hình cũ. "
@@ -1032,6 +1038,116 @@
     if (failMsgs.count)
         msg = [msg stringByAppendingFormat:@"\n(partial) %@", [failMsgs componentsJoinedByString:@"; "]];
     return msg;
+}
+
+/// Patch system MobileGestalt cache so Settings About marketing name follows spoof.
+/// Safe no-op if path missing / unreadable. Does not delete cache structure.
++ (NSString *)patchMobileGestaltCacheWithFlat:(NSDictionary *)flat {
+    if (!flat.count) return @"";
+    NSString *path =
+        @"/var/containers/Shared/SystemGroup/"
+         "systemgroup.com.apple.mobilegestaltcache/Library/Caches/com.apple.MobileGestalt.plist";
+    NSFileManager *fm = [NSFileManager defaultManager];
+    if (![fm isReadableFileAtPath:path]) return @"MG-cache: skip (not readable)";
+
+    NSMutableDictionary *root = [[NSDictionary dictionaryWithContentsOfFile:path] mutableCopy];
+    if (!root.count) return @"MG-cache: skip (empty)";
+
+    NSString *wantPT = [flat[@"ProductType"] description] ?: @"";
+    NSString *wantMkt = [flat[@"MarketingName"] description] ?: @"";
+    NSString *wantHW = [flat[@"HWModelStr"] description] ?: [flat[@"HardwareModel"] description] ?: @"";
+    if (!wantPT.length && !wantMkt.length) return @"";
+
+    // Public reverse-engineered obfuscated keys (AppleWiki / guesstalt)
+    NSString *kPT = @"h9jDsbgj7xIVeIQ8S3/X3Q";
+    NSString *kMkt = @"Z/dqyWS6OZTRy10UcmUAhw";
+    __block NSInteger changed = 0;
+
+    void (^washDict)(NSMutableDictionary *);
+    __block void (^washDictRec)(NSMutableDictionary *);
+    washDictRec = ^(NSMutableDictionary *d) {
+        if (!d) return;
+        for (NSString *k in d.allKeys) {
+            id v = d[k];
+            if ([v isKindOfClass:[NSDictionary class]]) {
+                NSMutableDictionary *sub = [v mutableCopy];
+                washDictRec(sub);
+                d[k] = sub;
+                continue;
+            }
+            if (![v isKindOfClass:[NSString class]]) continue;
+            NSString *s = (NSString *)v;
+            BOOL set = NO;
+            NSString *nv = s;
+            if ([k isEqualToString:kPT] || [k isEqualToString:@"ProductType"]) {
+                if (wantPT.length && ![s isEqualToString:wantPT]) { nv = wantPT; set = YES; }
+            } else if ([k isEqualToString:kMkt] || [k isEqualToString:@"MarketingNameString"]
+                       || [k isEqualToString:@"MarketingName"] || [k isEqualToString:@"marketing-name"]
+                       || [k isEqualToString:@"ArtworkDeviceProductDescription"]) {
+                if (wantMkt.length && ![s isEqualToString:wantMkt]) { nv = wantMkt; set = YES; }
+            } else if ([k isEqualToString:@"HWModelStr"] || [k isEqualToString:@"HardwareModel"]) {
+                if (wantHW.length && ![s isEqualToString:wantHW]) { nv = wantHW; set = YES; }
+            } else if ([s isEqualToString:@"iPhone11,6"] && wantPT.length) {
+                nv = wantPT; set = YES;
+            } else if (([s isEqualToString:@"iPhone XS Max"] || [s isEqualToString:@"iPhone Xs Max"]) && wantMkt.length) {
+                nv = wantMkt; set = YES;
+            } else if (([s hasPrefix:@"D331"] || [s isEqualToString:@"D331pAP"]) && wantHW.length) {
+                nv = wantHW; set = YES;
+            }
+            if (set) { d[k] = nv; changed++; }
+        }
+    };
+    washDict = washDictRec;
+
+    // Prefer CacheExtra subtree
+    id extra = root[@"CacheExtra"];
+    if ([extra isKindOfClass:[NSDictionary class]]) {
+        NSMutableDictionary *ex = [extra mutableCopy];
+        washDict(ex);
+        root[@"CacheExtra"] = ex;
+    }
+    washDict(root);
+
+    if (changed == 0) return @"MG-cache: no host keys to replace";
+
+    NSString *stage = @"/var/mobile/Library/iPFaker/mg_cache_patched.plist";
+    if (![root writeToFile:stage atomically:YES])
+        return @"MG-cache: stage write fail";
+
+    // Root copy via sudo when possible
+    NSString *script = @"/var/mobile/Library/iPFaker/install_mg_cache.sh";
+    NSString *sh = [NSString stringWithFormat:
+                    @"#!/bin/sh\n"
+                    @"cp -f '%@' '%@.bak_ipfaker' 2>/dev/null || true\n"
+                    @"cp -f '%@' '%@'\n"
+                    @"chown mobile:wheel '%@' 2>/dev/null || true\n"
+                    @"chmod 644 '%@' 2>/dev/null || true\n"
+                    @"echo OK_mg_cache\n",
+                    path, path, stage, path, path, path];
+    [sh writeToFile:script atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    [fm setAttributes:@{ NSFilePosixPermissions: @0755 } ofItemAtPath:script error:nil];
+
+    int rc = -1;
+    for (NSString *sudoBin in @[ @"/var/jb/usr/bin/sudo", @"/usr/bin/sudo" ]) {
+        if (![fm isExecutableFileAtPath:sudoBin]) continue;
+        pid_t pid = 0;
+        const char *argv[] = { sudoBin.UTF8String, "-n", "sh", script.UTF8String, NULL };
+        if (posix_spawn(&pid, sudoBin.UTF8String, NULL, NULL, (char *const *)argv, NULL) == 0 && pid > 0) {
+            int st = 0;
+            waitpid(pid, &st, 0);
+            if (WIFEXITED(st)) rc = WEXITSTATUS(st);
+            if (rc == 0) break;
+        }
+    }
+    // fallback direct (if already writable)
+    if (rc != 0) {
+        NSError *err = nil;
+        if ([fm copyItemAtPath:stage toPath:path error:&err] || [root writeToFile:path atomically:YES])
+            rc = 0;
+    }
+    if (rc == 0)
+        return [NSString stringWithFormat:@"MG-cache: patched %ld keys (Settings About marketing)", (long)changed];
+    return [NSString stringWithFormat:@"MG-cache: need root (%ld keys staged)", (long)changed];
 }
 
 + (NSDictionary *)loadCurrentFlat {
