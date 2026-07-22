@@ -6,7 +6,6 @@
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 #import <objc/message.h>
-#import <dlfcn.h>
 
 static void IPFUIMark(const char *msg) {
     NSString *body = [NSString stringWithFormat:@"%s\n", msg];
@@ -260,6 +259,38 @@ static NSInteger IPFUIWashView(UIView *root,
     return n;
 }
 
+/// Scroll About table through rows so off-screen Wi‑Fi/BT/modem cells are built.
+static void IPFUIForceTableCells(UIView *root) {
+    if (!root) return;
+    NSMutableArray *stack = [NSMutableArray arrayWithObject:root];
+    while (stack.count) {
+        UIView *v = stack.lastObject;
+        [stack removeLastObject];
+        if ([v isKindOfClass:[UITableView class]]) {
+            UITableView *tv = (UITableView *)v;
+            @try {
+                CGPoint saved = tv.contentOffset;
+                NSInteger secs = [tv numberOfSections];
+                for (NSInteger s = 0; s < secs && s < 20; s++) {
+                    NSInteger rows = [tv numberOfRowsInSection:s];
+                    for (NSInteger r = 0; r < rows && r < 40; r++) {
+                        NSIndexPath *ip = [NSIndexPath indexPathForRow:r inSection:s];
+                        @try {
+                            [tv scrollToRowAtIndexPath:ip
+                                      atScrollPosition:UITableViewScrollPositionNone
+                                              animated:NO];
+                        } @catch (__unused NSException *ex2) {}
+                    }
+                }
+                [tv layoutIfNeeded];
+                // restore so user does not see jump (About may re-layout)
+                [tv setContentOffset:saved animated:NO];
+            } @catch (__unused NSException *ex) {}
+        }
+        if (v.subviews.count) [stack addObjectsFromArray:v.subviews];
+    }
+}
+
 static void IPFUIWashAllWindows(void) {
     NSDictionary *cfg = IPFUIConfig();
     if (!IPFUIEnabled(cfg)) return;
@@ -292,6 +323,9 @@ static void IPFUIWashAllWindows(void) {
     if (!windows.count)
         windows = UIApplication.sharedApplication.windows;
     for (UIWindow *w in windows) {
+        IPFUIForceTableCells(w);
+        if (w.rootViewController.view)
+            IPFUIForceTableCells(w.rootViewController.view);
         total += IPFUIWashView(w, wantPV, wantMk, wantName, wantWifi, wantBT,
                               wantEID, wantSEID, wantBB, hostVers);
         UIViewController *r = w.rootViewController;
@@ -300,9 +334,11 @@ static void IPFUIWashAllWindows(void) {
                                   wantEID, wantSEID, wantBB, hostVers);
         UIViewController *p = r.presentedViewController;
         while (p) {
-            if (p.view)
+            if (p.view) {
+                IPFUIForceTableCells(p.view);
                 total += IPFUIWashView(p.view, wantPV, wantMk, wantName, wantWifi, wantBT,
                                       wantEID, wantSEID, wantBB, hostVers);
+            }
             p = p.presentedViewController;
         }
     }
@@ -317,7 +353,6 @@ static void IPFUIWashAllWindows(void) {
 }
 
 static void IPFUIScheduleWashes(void) {
-    // Longer tail: Wi‑Fi/BT/modem cells often create only after scroll/layout
     NSArray *delays = @[ @0.3, @0.8, @1.5, @2.5, @4.0, @6.0, @9.0, @12.0 ];
     for (NSNumber *d in delays) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(d.doubleValue * NSEC_PER_SEC)),
@@ -332,68 +367,6 @@ static void IPFUIOnActive(CFNotificationCenterRef center, void *observer,
     IPFUIScheduleWashes();
 }
 
-/// Live rewrite when Preferences assigns host MAC / BB / EID to a label (covers off-screen cells).
-static void (*orig_setText)(id, SEL, NSString *);
-static void stub_setText(id self, SEL _cmd, NSString *text) {
-    if ([text isKindOfClass:[NSString class]] && text.length) {
-        NSDictionary *cfg = IPFUIConfig();
-        if (IPFUIEnabled(cfg)) {
-            NSString *wantWifi = [cfg[@"WifiAddress"] description] ?: @"";
-            NSString *wantBT = [cfg[@"BluetoothAddress"] description] ?: @"";
-            NSString *wantEID = [cfg[@"EID"] description] ?: @"";
-            NSString *wantSEID = [cfg[@"SEID"] description]
-                ?: [cfg[@"SecureElementID"] description] ?: @"";
-            NSString *wantBB = [cfg[@"BasebandVersion"] description] ?: @"";
-            NSString *wantPV = [cfg[@"ProductVersion"] description] ?: @"";
-            NSString *wantMk = [cfg[@"MarketingName"] description] ?: @"";
-            NSString *wantName = [cfg[@"UserAssignedDeviceName"] description] ?: @"";
-
-            if (wantName.length && [text isEqualToString:wantName]) {
-                // keep
-            } else if (IPFUIIsMAC(text)) {
-                BOOL okW = wantWifi.length && [text caseInsensitiveCompare:wantWifi] == NSOrderedSame;
-                BOOL okB = wantBT.length && [text caseInsensitiveCompare:wantBT] == NSOrderedSame;
-                if (!okW && !okB) {
-                    // Prefer Wi‑Fi spoof for first unknown, BT for second — slot is best-effort
-                    NSString *repl = nil;
-                    if (gIPFUIMacSlot == 0 && wantWifi.length) repl = wantWifi;
-                    else if (wantBT.length) repl = wantBT;
-                    else if (wantWifi.length) repl = wantWifi;
-                    if (repl.length) {
-                        IPFUILog([NSString stringWithFormat:@"setText mac %@ => %@", text, repl]);
-                        text = repl;
-                        gIPFUIMacSlot++;
-                    }
-                }
-            } else if (wantEID.length && IPFUIIsEID(text) && ![text isEqualToString:wantEID]) {
-                IPFUILog([NSString stringWithFormat:@"setText EID %@ => %@", text, wantEID]);
-                text = wantEID;
-            } else if (wantSEID.length && IPFUIIsSEID(text)
-                       && [text caseInsensitiveCompare:wantSEID] != NSOrderedSame) {
-                IPFUILog([NSString stringWithFormat:@"setText SEID %@ => %@", text, wantSEID]);
-                text = wantSEID;
-            } else if (wantBB.length && IPFUIIsBaseband(text) && ![text isEqualToString:wantBB]
-                       && !(wantPV.length && [text isEqualToString:wantPV])) {
-                IPFUILog([NSString stringWithFormat:@"setText bb %@ => %@", text, wantBB]);
-                text = wantBB;
-            } else if (wantPV.length && IPFUIShouldReplaceVersion(text, wantPV, IPFUIHostVersionTokens())) {
-                text = wantPV;
-            } else if (wantMk.length && IPFUIShouldReplaceModel(text, wantMk, wantName)) {
-                text = wantMk;
-            }
-        }
-    }
-    if (orig_setText) orig_setText(self, _cmd, text);
-}
-
-static void *(*pMSHookMessageEx)(Class, SEL, IMP, IMP *) = NULL;
-
-static void IPFUIResolveSubstrate(void) {
-    void *h = dlopen("/var/jb/usr/lib/libsubstrate.dylib", RTLD_NOW);
-    if (!h) h = dlopen("/usr/lib/libsubstrate.dylib", RTLD_NOW);
-    if (h) pMSHookMessageEx = dlsym(h, "MSHookMessageEx");
-}
-
 %ctor {
     @autoreleasepool {
         NSString *bid = [[NSBundle mainBundle] bundleIdentifier] ?: @"";
@@ -402,14 +375,6 @@ static void IPFUIResolveSubstrate(void) {
             return;
         }
         IPFUIMark("CTOR_ENTER");
-        IPFUIResolveSubstrate();
-        if (pMSHookMessageEx) {
-            Class lab = objc_getClass("UILabel");
-            if (lab) {
-                pMSHookMessageEx(lab, @selector(setText:), (IMP)stub_setText, (IMP *)&orig_setText);
-                IPFUILog(@"UILabel.setText hooked");
-            }
-        }
         dispatch_async(dispatch_get_main_queue(), ^{
             IPFUIScheduleWashes();
         });
