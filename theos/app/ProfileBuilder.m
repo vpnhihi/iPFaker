@@ -287,7 +287,8 @@
         s = [NSSet setWithArray:@[
             // Identity / MG
             @"ProductType", @"HWModelStr", @"HardwareModel", @"DeviceName", @"UserAssignedDeviceName",
-            @"MarketingName", @"SerialNumber", @"UniqueDeviceID", @"UniqueChipID",
+            @"MarketingName", @"MarketingNameString", @"ArtworkDeviceProductDescription",
+            @"SerialNumber", @"UniqueDeviceID", @"UniqueChipID",
             @"ProductVersion", @"BuildVersion", @"ProductBuildVersion",
             @"ModelNumber", @"PartNumber", @"RegionInfo", @"RegionCode", @"RegulatoryModelNumber",
             @"ModelNumberAxxxx", @"PartNumberRegion",

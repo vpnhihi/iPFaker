@@ -1156,6 +1156,8 @@ KNOWN_CONFIG_KEYS = frozenset(
         "mod",
         "osv",
         "ss",
+        "MarketingNameString",
+        "ArtworkDeviceProductDescription",
         "ScreenSizeString",
         "ScreenResolution",
         "AnalyticsMod",
