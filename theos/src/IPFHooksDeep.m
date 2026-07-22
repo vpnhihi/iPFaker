@@ -92,8 +92,8 @@ static NSData *IPFRewritePayload(NSData *data) {
         }
         if (!pt.length && !hw.length && !osv.length && !ss.length)
             return data; // no profile → do not rewrite to a fixed SKU
-        NSString *out = s;
-        BOOL changed = NO;
+        __block NSString *out = s;
+        __block BOOL changed = NO;
         // Rewrite common real fingerprints → current profile ProductType / board (any device)
         NSArray *realPT = @[
             @"iPhone7,1", @"iPhone7,2", @"iPhone8,1", @"iPhone8,2", @"iPhone8,4",
@@ -292,60 +292,84 @@ static NSData *IPFRewritePayload(NSData *data) {
                 if (tmp && ![tmp isEqualToString:out]) { out = tmp; changed = YES; }
             }
         }
-        // Force deviceUUID / device_uuid → UniqueDeviceID (Zalo centralized + analytics)
-        // Checklist B — only rewrite when analytics-ish body already has the field.
-        if (analyticsish) {
-            NSString *du = [cfg stringForKey:@"UniqueDeviceID"]
+        // ── B Network P0: deviceUUID / dId / adId (centralized.zaloapp.com) ──
+        // Docs: adId ≡ IDFA, dId ≡ IDFV-like, deviceUUID ≡ UniqueDeviceID (UDID).
+        // Only rewrite when field already present (analytics-ish).
+        if (analyticsish
+            || [out rangeOfString:@"adId"].location != NSNotFound
+            || [out rangeOfString:@"%22adId%22"].location != NSNotFound
+            || [out rangeOfString:@"\"dId\""].location != NSNotFound
+            || [out rangeOfString:@"%22dId%22"].location != NSNotFound) {
+            NSString *udid = [cfg stringForKey:@"UniqueDeviceID"]
                 ?: [cfg stringForKey:@"DeviceUniqueIdentifier"]
                 ?: [cfg stringForKey:@"UDID"];
-            if (du.length >= 16) {
-                NSString *safeDu = [[du componentsSeparatedByCharactersInSet:
-                    [[NSCharacterSet characterSetWithCharactersInString:
-                      @"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-"] invertedSet]]
-                    componentsJoinedByString:@""];
-                if (!safeDu.length) safeDu = du;
-                // JSON: "deviceUUID":"..." or "device_uuid":"..."
-                for (NSString *pat in @[
-                    @"\"deviceUUID\"\\s*:\\s*\"[^\"]+\"",
-                    @"\"device_uuid\"\\s*:\\s*\"[^\"]+\"",
-                    @"\"deviceId\"\\s*:\\s*\"[^\"]+\"",
-                    @"\"dId\"\\s*:\\s*\"[^\"]+\"",
-                ]) {
-                    NSRegularExpression *re = [NSRegularExpression
-                        regularExpressionWithPattern:pat options:0 error:nil];
-                    if (!re) continue;
-                    // extract key for repl
-                    NSString *key = @"deviceUUID";
-                    if ([pat containsString:@"device_uuid"]) key = @"device_uuid";
-                    else if ([pat containsString:@"deviceId"]) key = @"deviceId";
-                    else if ([pat containsString:@"dId"]) key = @"dId";
-                    NSString *repl = [NSString stringWithFormat:@"\"%@\":\"%@\"", key, safeDu];
-                    NSString *tmp = [re stringByReplacingMatchesInString:out options:0
+            NSString *idfa = [cfg stringForKey:@"IDFA"]
+                ?: [cfg stringForKey:@"advertisingIdentifier"]
+                ?: [cfg stringForKey:@"AdvertisingIdentifier"];
+            NSString *idfv = [cfg stringForKey:@"IDFV"]
+                ?: [cfg stringForKey:@"identifierForVendor"];
+            // Sanitize UUID / hex (no regex meta)
+            NSCharacterSet *okSet = [NSCharacterSet characterSetWithCharactersInString:
+                @"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-"];
+            NSString *(^clean)(NSString *) = ^NSString *(NSString *s) {
+                if (!s.length) return @"";
+                return [[s componentsSeparatedByCharactersInSet:[okSet invertedSet]]
+                        componentsJoinedByString:@""];
+            };
+            NSString *safeUdid = clean(udid);
+            NSString *safeAd = clean(idfa);
+            NSString *safeDid = clean(idfv.length ? idfv : udid);
+
+            // Helper: replace JSON key, form key=, and URL-encoded %22key%22%3A%22...%22
+            void (^forceField)(NSString *, NSString *) = ^(NSString *key, NSString *val) {
+                if (!key.length || !val.length) return;
+                // JSON "key":"..."
+                NSString *jpat = [NSString stringWithFormat:@"\"%@\"\\s*:\\s*\"[^\"]+\"", key];
+                NSRegularExpression *reJ = [NSRegularExpression
+                    regularExpressionWithPattern:jpat options:0 error:nil];
+                if (reJ) {
+                    NSString *repl = [NSString stringWithFormat:@"\"%@\":\"%@\"", key, val];
+                    NSString *tmp = [reJ stringByReplacingMatchesInString:out options:0
                         range:NSMakeRange(0, out.length) withTemplate:repl];
                     if (tmp && ![tmp isEqualToString:out]) { out = tmp; changed = YES; }
                 }
-                // form: deviceUUID=...
-                NSRegularExpression *reForm = [NSRegularExpression
-                    regularExpressionWithPattern:@"deviceUUID=[^&\\s]+"
+                // form key=...
+                NSString *fpat = [NSString stringWithFormat:@"%@=[^&\\s]+", key];
+                NSRegularExpression *reF = [NSRegularExpression
+                    regularExpressionWithPattern:fpat
                                          options:NSRegularExpressionCaseInsensitive error:nil];
-                if (reForm) {
-                    NSString *repl = [NSString stringWithFormat:@"deviceUUID=%@", safeDu];
-                    NSString *tmp = [reForm stringByReplacingMatchesInString:out options:0
+                if (reF) {
+                    NSString *repl = [NSString stringWithFormat:@"%@=%@", key, val];
+                    NSString *tmp = [reF stringByReplacingMatchesInString:out options:0
                         range:NSMakeRange(0, out.length) withTemplate:repl];
                     if (tmp && ![tmp isEqualToString:out]) { out = tmp; changed = YES; }
                 }
-                // URL-encoded %22deviceUUID%22%3A%22...%22
-                NSRegularExpression *rePct = [NSRegularExpression
-                    regularExpressionWithPattern:@"%22deviceUUID%22%3A%22[^%]+%22"
+                // URL-encoded JSON fragment
+                NSString *ppat = [NSString stringWithFormat:
+                    @"%%22%@%%22%%3A%%22[^%%]+%%22", key];
+                NSRegularExpression *reP = [NSRegularExpression
+                    regularExpressionWithPattern:ppat
                                          options:NSRegularExpressionCaseInsensitive error:nil];
-                if (rePct) {
+                if (reP) {
                     NSString *repl = [NSString stringWithFormat:
-                        @"%%22deviceUUID%%22%%3A%%22%@%%22", safeDu];
-                    NSString *tmp = [rePct stringByReplacingMatchesInString:out options:0
+                        @"%%22%@%%22%%3A%%22%@%%22", key, val];
+                    NSString *tmp = [reP stringByReplacingMatchesInString:out options:0
                         range:NSMakeRange(0, out.length) withTemplate:repl];
                     if (tmp && ![tmp isEqualToString:out]) { out = tmp; changed = YES; }
                 }
+            };
+
+            if (safeUdid.length >= 16) {
+                forceField(@"deviceUUID", safeUdid);
+                forceField(@"device_uuid", safeUdid);
+                forceField(@"deviceId", safeUdid);
             }
+            // dId: IDFV preferred (vendor-scoped device id in Zalo analytics)
+            if (safeDid.length >= 8)
+                forceField(@"dId", safeDid);
+            // adId: IDFA (advertising id) — B P0 gap that was still failing
+            if (safeAd.length >= 8)
+                forceField(@"adId", safeAd);
         }
         if (changed) {
             IPFLog([NSString stringWithFormat:@"NET rewrite body len %lu → PT=%@ osv=%@ ss=%@",
