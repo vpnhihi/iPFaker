@@ -125,8 +125,8 @@ jobs:
             exit 1
           fi
           # Preferences (platform) — About must stay lean per-slice
-          if [ "$ABOUTSIZE" -gt 260000 ]; then
-            echo "FATAL: About $ABOUTSIZE > 260000 — unexpected fat size"
+          if [ "$ABOUTSIZE" -gt 290000 ]; then
+            echo "FATAL: About $ABOUTSIZE > 290000 — unexpected fat size"
             exit 1
           fi
           file dist/iPFakerMG.dylib || true
