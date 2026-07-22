@@ -114,21 +114,24 @@ jobs:
           JBSIZE=$(stat -f%z dist/iPFakerJB.dylib 2>/dev/null || stat -c%s dist/iPFakerJB.dylib)
           ABOUTSIZE=$(stat -f%z dist/iPFakerAbout.dylib 2>/dev/null || stat -c%s dist/iPFakerAbout.dylib)
           echo "MGSIZE=$MGSIZE CTSIZE=$CTSIZE AASIZE=$AASIZE JBSIZE=$JBSIZE ABOUTSIZE=$ABOUTSIZE"
-          # Lab AMFI: historically ≤132k; allow headroom after kern.uname spoof (~140k still injects)
-          # Lab third-party inject: ~145k was historical; allow headroom after shared MG sources
-          if [ "$MGSIZE" -gt 160000 ]; then
-            echo "FATAL: MG $MGSIZE > 160000 — AMFI lab reject zone"
+          # Dual-arch fat ≈ 2× thin arm64e. AMFI cares about the loaded slice, not full fat size.
+          # Thin arm64e MG ~155k → fat ~310k; About ~105k → fat ~210k.
+          if [ "$MGSIZE" -gt 360000 ]; then
+            echo "FATAL: MG $MGSIZE > 360000 — unexpected fat size"
             exit 1
           fi
-          if [ "$AASIZE" -gt 90000 ]; then
-            echo "FATAL: AA $AASIZE too large for lite dylib"
+          if [ "$AASIZE" -gt 200000 ]; then
+            echo "FATAL: AA $AASIZE too large for lite dylib (fat)"
             exit 1
           fi
-          # Preferences (platform) rejects ~138k; About must stay small
-          if [ "$ABOUTSIZE" -gt 120000 ]; then
-            echo "FATAL: About $ABOUTSIZE > 120000 — platform Preferences CODESIGN risk"
+          # Preferences (platform) — About must stay lean per-slice
+          if [ "$ABOUTSIZE" -gt 260000 ]; then
+            echo "FATAL: About $ABOUTSIZE > 260000 — unexpected fat size"
             exit 1
           fi
+          file dist/iPFakerMG.dylib || true
+          lipo -info dist/iPFakerMG.dylib 2>/dev/null || true
+          lipo -info dist/iPFakerAbout.dylib 2>/dev/null || true
           ldid -h dist/iPFakerMG.dylib 2>&1 | grep -q CDHash=
           ldid -h dist/iPFakerCT.dylib 2>&1 | grep -q CDHash=
           ldid -h dist/iPFakerJB.dylib 2>&1 | grep -q CDHash=

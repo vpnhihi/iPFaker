@@ -1,6 +1,7 @@
 # iPFaker.app — Shadow Tech–style lab UI (rootless, no Settings inject)
 export TARGET := iphone:clang:latest:14.0
-export ARCHS := arm64e
+# Dual-arch: arm64 (A9–A11) + arm64e (A12+) — same as tweak stack
+export ARCHS := arm64 arm64e
 export THEOS_PACKAGE_SCHEME := rootless
 
 include $(THEOS)/makefiles/common.mk

@@ -225,8 +225,8 @@ def ct_filter_plist() -> bytes:
 """.encode("utf-8")
 
 
-# Soft size hint only — full lab MG is ~155KB and is shipped intentionally
-MG_SAFE_MAX = 200_000
+# Soft size hint — thin arm64e MG ~155KB; dual-arch fat ~310KB
+MG_SAFE_MAX = 360_000
 MG_HYBRID_HINT = 130_000
 
 
@@ -251,6 +251,37 @@ def postinst_script() -> str:
     return r"""#!/bin/sh
 set -e
 ROOT="${JBROOT:-/var/jb}"
+# Rootless: ldid/uicache live under /var/jb, often NOT on default PATH
+export PATH="/var/jb/usr/bin:/var/jb/usr/sbin:/var/jb/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+LDID=""
+for c in /var/jb/usr/bin/ldid /var/jb/bin/ldid /usr/bin/ldid ldid; do
+  if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then LDID="$c"; break; fi
+done
+JBCTL=""
+[ -x /var/jb/basebin/jbctl ] && JBCTL=/var/jb/basebin/jbctl
+ENT="/var/jb/etc/ipfaker/entitlements.plist"
+[ -f "$ENT" ] || ENT="$ROOT/etc/ipfaker/entitlements.plist"
+
+trust_add() {
+  f="$1"
+  [ -n "$JBCTL" ] || return 0
+  [ -f "$f" ] || return 0
+  if [ -n "$LDID" ]; then
+    H=$("$LDID" -h "$f" 2>/dev/null | sed -n 's/.*CDHash=//p' | head -1 | tr 'A-F' 'a-f' | cut -c1-40)
+    if [ ${#H} -eq 40 ]; then
+      "$JBCTL" trustcache add "$H" 2>/dev/null || true
+    fi
+  fi
+  # Precomputed hashes (package-time) — works when device has no ldid
+  base=$(basename "$f")
+  for hf in /var/jb/etc/ipfaker/cdhashes.txt "$ROOT/etc/ipfaker/cdhashes.txt"; do
+    [ -f "$hf" ] || continue
+    for H in $(grep -i "^$base " "$hf" 2>/dev/null | awk '{print $2}'); do
+      H=$(echo "$H" | tr 'A-F' 'a-f' | cut -c1-40)
+      [ ${#H} -eq 40 ] && "$JBCTL" trustcache add "$H" 2>/dev/null || true
+    done
+  done
+}
 
 # --- dirs (mobile MUST write jb config — Zalo only reads /var/jb/etc/ipfaker) ---
 mkdir -p "$ROOT/etc/ipfaker" 2>/dev/null || true
@@ -294,15 +325,10 @@ do
     if [ -f "$MS/$f" ]; then
       chown root:wheel "$MS/$f" 2>/dev/null || true
       chmod 755 "$MS/$f" 2>/dev/null || true
-      if command -v ldid >/dev/null 2>&1; then
-        ldid -S "$MS/$f" 2>/dev/null || true
+      if [ -n "$LDID" ]; then
+        "$LDID" -S "$MS/$f" 2>/dev/null || true
       fi
-      if [ -x /var/jb/basebin/jbctl ] && command -v ldid >/dev/null 2>&1; then
-        H=$(ldid -h "$MS/$f" 2>/dev/null | sed -n 's/.*CDHash=//p' | head -1 | tr 'A-F' 'a-f' | cut -c1-40)
-        if [ ${#H} -eq 40 ]; then
-          /var/jb/basebin/jbctl trustcache add "$H" 2>/dev/null || true
-        fi
-      fi
+      trust_add "$MS/$f"
     fi
   done
   for f in iPFakerMG.plist iPFakerCT.plist iPFakerJB.plist \
@@ -320,15 +346,14 @@ done
 if [ -n "$APP" ]; then
   chown -R root:wheel "$APP" 2>/dev/null || true
   [ -f "$APP/iPFaker" ] && chmod 755 "$APP/iPFaker" 2>/dev/null || true
-  if [ -f "$APP/iPFaker" ] && command -v ldid >/dev/null 2>&1; then
-    ldid -S "$APP/iPFaker" 2>/dev/null || true
-    if [ -x /var/jb/basebin/jbctl ]; then
-      H=$(ldid -h "$APP/iPFaker" 2>/dev/null | sed -n 's/.*CDHash=//p' | head -1 | tr 'A-F' 'a-f' | cut -c1-40)
-      if [ ${#H} -eq 40 ]; then
-        /var/jb/basebin/jbctl trustcache add "$H" 2>/dev/null || true
-      fi
+  if [ -f "$APP/iPFaker" ] && [ -n "$LDID" ]; then
+    if [ -f "$ENT" ]; then
+      "$LDID" -S"$ENT" "$APP/iPFaker" 2>/dev/null || "$LDID" -S "$APP/iPFaker" 2>/dev/null || true
+    else
+      "$LDID" -S "$APP/iPFaker" 2>/dev/null || true
     fi
   fi
+  trust_add "$APP/iPFaker"
   if [ -f "$APP/device_catalog.json" ]; then
     cp -f "$APP/device_catalog.json" "$ROOT/etc/ipfaker/device_catalog.json" 2>/dev/null || true
     cp -f "$APP/device_catalog.json" /var/mobile/Library/iPFaker/device_catalog.json 2>/dev/null || true
@@ -347,6 +372,7 @@ if [ -f "$ROOT/etc/ipfaker/device_catalog.json" ]; then
 fi
 
 killall -9 Zalo 2>/dev/null || true
+killall -9 Preferences 2>/dev/null || true
 exit 0
 """
 
