@@ -749,47 +749,24 @@ static NSString *IPFWebSpoofJS(void) {
         h *= 16777619u;
     }
     int seed = (int)(h & 0xFF);
+    // Compact JS (MG AMFI size) — WebGL renderer + canvas seed + core navigator/screen
     return [NSString stringWithFormat:
-        @"(function(){try{"
-        @"var ua='%@',sw=%d,sh=%d,dpr=%g,gpu='%@',cores=%d,mem=%d,lang='%@',tz='%@',seed=%d;"
-        @"var d=function(o,k,v){try{Object.defineProperty(o,k,{get:function(){return v},configurable:true});}catch(e){}};"
-        @"try{d(Navigator.prototype,'userAgent',ua);}catch(e){}"
-        @"try{d(navigator,'userAgent',ua);}catch(e){}"
-        @"try{d(Navigator.prototype,'appVersion',ua.replace(/^Mozilla\\//,''));}catch(e){}"
-        @"try{d(navigator,'platform','iPhone');}catch(e){}"
-        @"try{d(navigator,'vendor','Apple Computer, Inc.');}catch(e){}"
-        @"try{d(navigator,'maxTouchPoints',5);}catch(e){}"
-        @"try{d(navigator,'language',lang);}catch(e){}"
-        @"try{d(navigator,'languages',[lang,'en-US','en']);}catch(e){}"
-        @"try{d(navigator,'hardwareConcurrency',cores);}catch(e){}"
-        @"try{d(navigator,'deviceMemory',mem);}catch(e){}"
-        @"try{if(Intl&&Intl.DateTimeFormat){var _r=Intl.DateTimeFormat.prototype.resolvedOptions;"
-        @"Intl.DateTimeFormat.prototype.resolvedOptions=function(){var o=_r.apply(this,arguments)||{};o.timeZone=tz;return o;};}}catch(e){}"
-        @"d(screen,'width',sw);d(screen,'height',sh);"
-        @"d(screen,'availWidth',sw);d(screen,'availHeight',%d);"
-        @"d(screen,'colorDepth',24);d(screen,'pixelDepth',24);"
-        @"try{d(screen,'orientation',{type:'portrait-primary',angle:0});}catch(e){}"
-        @"d(window,'devicePixelRatio',dpr);"
-        @"d(window,'innerWidth',sw);d(window,'innerHeight',sh);"
-        @"d(window,'outerWidth',sw);d(window,'outerHeight',sh);"
-        @"try{if(window.visualViewport){d(window.visualViewport,'width',sw);d(window.visualViewport,'height',sh);d(window.visualViewport,'scale',1);}}catch(e){}"
-        /* WebGL vendor/renderer sync MetalDeviceName */
-        @"var patchGL=function(proto){if(!proto||!proto.getParameter)return;"
-        @"var gp=proto.getParameter;proto.getParameter=function(p){"
-        @"if(p===0x9245||p===37445)return 'Apple Inc.';"
-        @"if(p===0x9246||p===37446)return gpu;"
-        @"return gp.apply(this,arguments);};};"
-        @"try{if(window.WebGLRenderingContext)patchGL(WebGLRenderingContext.prototype);}catch(e){}"
-        @"try{if(window.WebGL2RenderingContext)patchGL(WebGL2RenderingContext.prototype);}catch(e){}"
-        /* canvas toDataURL micro-noise (profile seed) — not blank canvas */
-        @"try{var td=HTMLCanvasElement.prototype.toDataURL;"
-        @"HTMLCanvasElement.prototype.toDataURL=function(){try{"
-        @"var c=this.getContext('2d');if(c&&this.width>16&&this.height>16){"
-        @"var x=seed%%Math.max(1,this.width-1),y=(seed*3)%%Math.max(1,this.height-1);"
-        @"var im=c.getImageData(x,y,1,1);im.data[0]=(im.data[0]+seed)&255;c.putImageData(im,x,y);}"
-        @"}catch(e){}return td.apply(this,arguments);};}catch(e){}"
+        @"(function(){try{var ua='%@',sw=%d,sh=%d,dpr=%g,gpu='%@',hc=%d,lang='%@',tz='%@',s=%d;"
+        @"var D=function(o,k,v){try{Object.defineProperty(o,k,{get:function(){return v},configurable:true})}catch(e){}};"
+        @"D(navigator,'userAgent',ua);D(navigator,'platform','iPhone');D(navigator,'vendor','Apple Computer, Inc.');"
+        @"D(navigator,'maxTouchPoints',5);D(navigator,'language',lang);D(navigator,'languages',[lang,'en-US']);"
+        @"D(navigator,'hardwareConcurrency',hc);"
+        @"try{var R=Intl.DateTimeFormat.prototype.resolvedOptions;Intl.DateTimeFormat.prototype.resolvedOptions=function(){var o=R.apply(this,arguments)||{};o.timeZone=tz;return o}}catch(e){}"
+        @"D(screen,'width',sw);D(screen,'height',sh);D(screen,'availWidth',sw);D(screen,'availHeight',%d);"
+        @"D(screen,'colorDepth',24);D(window,'devicePixelRatio',dpr);D(window,'innerWidth',sw);D(window,'innerHeight',sh);"
+        @"var P=function(pr){if(!pr||!pr.getParameter)return;var g=pr.getParameter;pr.getParameter=function(p){"
+        @"if(p===37445)return 'Apple Inc.';if(p===37446)return gpu;return g.apply(this,arguments)}};"
+        @"try{P(WebGLRenderingContext.prototype)}catch(e){}try{P(WebGL2RenderingContext.prototype)}catch(e){}"
+        @"try{var T=HTMLCanvasElement.prototype.toDataURL;HTMLCanvasElement.prototype.toDataURL=function(){try{"
+        @"var c=this.getContext('2d');if(c&&this.width>16){var i=c.getImageData(s%%16,s%%16,1,1);i.data[0]=(i.data[0]+s)&255;c.putImageData(i,s%%16,s%%16)}}catch(e){}"
+        @"return T.apply(this,arguments)}}catch(e){}"
         @"}catch(e){}})();",
-        ua, sw, sh, sc, gpuEsc, cores, memGB, langEsc, tz, seed, availH];
+        ua, sw, sh, sc, gpuEsc, cores, langEsc, tz, seed, availH];
 }
 
 // Runtime WebKit (no hard link) — lab flat UA + WKUserScript for screen JS
