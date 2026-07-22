@@ -9,9 +9,9 @@ CÃ¡ch nhanh nháº¥t â€” **khÃ´ng cáº§n build**:
 | CÃ¡ch | URL |
 |------|-----|
 | Nguá»“n Sileo | `https://vpnhihi.github.io/ipfaker/` |
-| Deb full stack | `https://vpnhihi.github.io/ipfaker/debs/com.ipfaker_2.8.1_iphoneos-arm64.deb` |
+| Deb full stack | `https://vpnhihi.github.io/ipfaker/debs/com.ipfaker_2.8.2_iphoneos-arm64.deb` |
 
-GÃ³i `com.ipfaker` **2.8.1+** Ä‘Ã£ gá»“m:
+GÃ³i `com.ipfaker` **2.8.2+** Ä‘Ã£ gá»“m:
 
 - App `iPFaker.app` + `device_catalog.json` + matrix iOS
 - Dylib full stack: **MG Â· CT Â· JB Â· About Â· AboutUI Â· AboutVer Â· AA**
@@ -45,12 +45,12 @@ Script public cáº§n thiáº¿t (Ä‘Ã£ trong repo):
 TrÃªn mÃ¡y cÃ³ folder CI lab (`_ci_art_ui/â€¦/theos/dist` â€” **local only, khÃ´ng push**):
 
 ```bat
-python scripts\build_sileo_deb.py --version 2.8.1
+python scripts\build_sileo_deb.py --version 2.8.2
 ```
 
 Output:
 
-- `dist/sileo/com.ipfaker_2.8.1_iphoneos-arm64.deb`
+- `dist/sileo/com.ipfaker_2.8.2_iphoneos-arm64.deb`
 - `dist/sileo/repo/` (Packages + Release)
 
 Copy vÃ o `sileo-repo/` rá»“i:
@@ -65,5 +65,6 @@ python scripts\publish_gh_pages_sileo.py
 - Script one-off `scripts/_*`, deploy/debug táº¡m
 - Secret API key, profile mÃ¡y tháº­t
 
-MÃ¡y má»›i **khÃ´ng cáº§n** nhá»¯ng thá»© Ä‘Ã³ â€” chá»‰ cáº§n deb 2.8.1 + (tuá»³ chá»n) `pc_app`.
+MÃ¡y má»›i **khÃ´ng cáº§n** nhá»¯ng thá»© Ä‘Ã³ â€” chá»‰ cáº§n deb 2.8.2 + (tuá»³ chá»n) `pc_app`.
+
 

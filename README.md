@@ -11,7 +11,7 @@ Jailbreak tool (**Dopamine rootless**) â€” spoof device identity cho **Zalo
 | 1. Nguá»“n Sileo | **`https://vpnhihi.github.io/ipfaker/`** (chá»¯ thÆ°á»ng) |
 | 2. HÆ°á»›ng dáº«n cÃ i + key | **[INSTALL_KHACH.md](INSTALL_KHACH.md)** |
 | 3. Sheet license | **[docs/LICENSE_SHEET.md](docs/LICENSE_SHEET.md)** |
-| 4. Deb trá»±c tiáº¿p | `https://vpnhihi.github.io/ipfaker/debs/com.ipfaker_2.8.1_iphoneos-arm64.deb` |
+| 4. Deb trá»±c tiáº¿p | `https://vpnhihi.github.io/ipfaker/debs/com.ipfaker_2.8.2_iphoneos-arm64.deb` |
 | 5. Tools / mÃ¡y má»›i | **[tools/README.md](tools/README.md)** â€” full stack 1 láº§n = nhÆ° lab |
 
 > Repo GitHub: https://github.com/vpnhihi/ipfaker  
@@ -72,4 +72,5 @@ Secrets, settings API, lab inject scripts, logs, artifact build thÃ´ â€” 
 ## Legal
 
 Chá»‰ dÃ¹ng trÃªn thiáº¿t bá»‹ sá»Ÿ há»¯u / lab há»£p phÃ¡p. KhÃ´ng dÃ¹ng Ä‘á»ƒ lá»«a Ä‘áº£o, máº¡o danh, vi pháº¡m phÃ¡p luáº­t.
+
 

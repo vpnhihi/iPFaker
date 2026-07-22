@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="vi"><head><meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>iPFaker Sileo</title>
@@ -6,16 +6,35 @@
 body{font-family:-apple-system,sans-serif;max-width:640px;margin:2rem auto;padding:0 1rem;background:#0b0d10;color:#e8eaed}
 .url{background:#111;color:#4ade80;padding:1rem;border-radius:8px;word-break:break-all}
 a{color:#60a5fa}
-.note{color:#9ca3af;font-size:.9rem}
+.note{color:#9ca3af;font-size:.95rem;line-height:1.45}
+.box{background:#151820;border:1px solid #2a3140;border-radius:10px;padding:1rem;margin:1rem 0}
+code{background:#111;padding:.1rem .35rem;border-radius:4px}
 </style></head><body>
-<h1>iPFaker — nguồn Sileo</h1>
+<h1>iPFaker — nguồn Sileo (full lab)</h1>
 <p class="url">https://vpnhihi.github.io/ipfaker/</p>
-<p>Gói <b>com.ipfaker 2.8.1</b> · dual-arch arm64+arm64e · full stack · Dopamine rootless</p>
-<p class="note">Sửa crash máy A10/A11 (iPhone 7…): gói 2.8.0 chỉ arm64e. 2.8.1 chạy cả iPhone 7 và XS Max.</p>
+
+<div class="box">
+<p><b>Máy mới — cài đủ gói (thứ tự):</b></p>
+<ol>
+<li><b>ellekit</b> (bắt buộc — inject tweak)</li>
+<li><b>libplist3</b> · <b>ldid</b></li>
+<li><b>libsqlite3-1</b> · <b>sqlite3</b> (wipe keychain)</li>
+<li><b>iPFaker 2.8.2+</b></li>
+</ol>
+<p class="note">Sileo sẽ tự kéo Depends khi cài iPFaker 2.8.2 nếu đã add nguồn này. Sau cài: <b>Dopamine → Userspace Reboot</b>.</p>
+</div>
+
+<p>Gói <b>com.ipfaker 2.8.2</b> · dual-arch · full stack · rootless Dopamine</p>
 <ol>
 <li>Sileo → Sources → +</li>
-<li>Dán URL (chữ thường <b>ipfaker</b>) → Add</li>
-<li>Refresh → tìm <b>iPFaker</b> → Cài / Nâng cấp 2.8.1</li>
+<li>Dán URL (chữ thường <b>ipfaker</b>) → Add → Refresh</li>
+<li>Cài <b>ElleKit</b> + <b>iPFaker</b> (và sqlite/ldid nếu Sileo chưa kéo)</li>
+<li>Userspace Reboot → mở iPFaker → Apply / Đặt lại dữ liệu</li>
 </ol>
-<p><a href="debs/com.ipfaker_2.8.1_iphoneos-arm64.deb">Tải .deb 2.8.1 trực tiếp</a></p>
+<p>
+<a href="debs/com.ipfaker_2.8.2_iphoneos-arm64.deb">Deb iPFaker 2.8.2</a> ·
+<a href="debs/ellekit_1.1.3_iphoneos-arm64.deb">ElleKit</a> ·
+<a href="debs/sqlite3_3.34.1_iphoneos-arm64.deb">sqlite3</a> ·
+<a href="debs/ldid_2.1.5-procursus7_iphoneos-arm64.deb">ldid</a>
+</p>
 </body></html>

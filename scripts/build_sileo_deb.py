@@ -31,7 +31,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION_DEFAULT = "2.8.1"
+VERSION_DEFAULT = "2.8.2"
 PKG = "com.ipfaker"
 ARCH = "iphoneos-arm64"
 
@@ -373,6 +373,35 @@ if [ -f "$ROOT/etc/ipfaker/device_catalog.json" ]; then
   chown mobile:mobile /var/mobile/Library/iPFaker/device_catalog.json 2>/dev/null || true
 fi
 
+# --- Preferences About auto-inject (ElleKit often skips platform apps) ---
+# AboutVer stays disabled by default (can crash Preferences on some devices)
+for MS in /var/jb/usr/lib/TweakInject /var/jb/Library/MobileSubstrate/DynamicLibraries; do
+  [ -d "$MS" ] || continue
+  if [ -f "$MS/iPFakerAboutVer.dylib" ]; then
+    mv -f "$MS/iPFakerAboutVer.dylib" "$MS/iPFakerAboutVer.dylib.off" 2>/dev/null || true
+  fi
+done
+# Install prefs inject daemon (opainject About when Settings opens)
+DAEMON_SRC="/var/jb/etc/ipfaker/prefs_inject_daemon.sh"
+if [ -f "$DAEMON_SRC" ]; then
+  cp -f "$DAEMON_SRC" /var/mobile/Library/iPFaker/prefs_inject_daemon.sh 2>/dev/null || true
+  chmod 755 /var/mobile/Library/iPFaker/prefs_inject_daemon.sh 2>/dev/null || true
+  mkdir -p /var/jb/Library/LaunchDaemons 2>/dev/null || true
+  if [ -f /var/jb/etc/ipfaker/com.ipfaker.prefs-inject.plist ]; then
+    cp -f /var/jb/etc/ipfaker/com.ipfaker.prefs-inject.plist \
+      /var/jb/Library/LaunchDaemons/com.ipfaker.prefs-inject.plist 2>/dev/null || true
+    launchctl bootout system/com.ipfaker.prefs-inject 2>/dev/null || true
+    launchctl bootstrap system /var/jb/Library/LaunchDaemons/com.ipfaker.prefs-inject.plist 2>/dev/null \
+      || launchctl load /var/jb/Library/LaunchDaemons/com.ipfaker.prefs-inject.plist 2>/dev/null || true
+    launchctl kickstart -k system/com.ipfaker.prefs-inject 2>/dev/null || true
+  fi
+fi
+
+# Hard requirement check (new phone often misses these if installed without deps)
+if [ ! -e /var/jb/usr/lib/libellekit.dylib ] && [ ! -e /var/jb/usr/lib/libsubstrate.dylib ]; then
+  echo "WARN: ElleKit missing — install package ellekit from same Sileo source, then Userspace Reboot" >&2
+fi
+
 killall -9 Zalo 2>/dev/null || true
 killall -9 Preferences 2>/dev/null || true
 exit 0
@@ -394,7 +423,7 @@ def control_text(version: str, installed_size_kb: int, has_app: bool, has_dylibs
     desc += ". Rootless Dopamine. One install = same as lab machine."
     return f"""Package: {PKG}
 Name: iPFaker
-Depends: firmware (>= 14.0)
+Depends: firmware (>= 14.0), ellekit (>= 1.1), libsqlite3-1, sqlite3, ldid, libplist3
 Version: {version}
 Architecture: {ARCH}
 Maintainer: iPFaker Lab
@@ -632,6 +661,65 @@ def build(version: str, app_path: str | None) -> Path:
         ent = ROOT / "theos" / "app" / "entitlements.plist"
         if ent.is_file():
             add_file(tar, "var/jb/etc/ipfaker/entitlements.plist", track(ent.read_bytes()), 0o644)
+
+        # Preferences About auto-inject daemon (required: ElleKit often skips platform apps)
+        daemon_sh = r"""#!/bin/sh
+export PATH=/var/jb/usr/bin:/var/jb/usr/sbin:/usr/bin:/bin:$PATH
+LAST=""
+LOG=/var/mobile/Library/iPFaker/logs/prefs_inject_daemon.log
+mkdir -p /var/mobile/Library/iPFaker/logs 2>/dev/null
+echo "$(date) daemon start" >> "$LOG" 2>/dev/null
+while true; do
+  PID=$(ps ax -o pid=,command= 2>/dev/null | grep 'Preferences.app/Preferences' | grep -v grep | head -1 | sed 's/^ *//' | cut -d' ' -f1)
+  if [ -n "$PID" ] && [ "$PID" != "$LAST" ]; then
+    /var/jb/basebin/jbctl proc_set_debugged "$PID" >/dev/null 2>&1
+    for d in iPFakerAbout iPFakerAboutUI; do
+      DY=/var/jb/usr/lib/TweakInject/$d.dylib
+      [ -f "$DY" ] || continue
+      /var/jb/basebin/opainject "$PID" "$DY" >>"$LOG" 2>&1
+    done
+    echo "$(date) injected pid=$PID" >> "$LOG" 2>/dev/null
+    LAST="$PID"
+  fi
+  if [ -z "$PID" ]; then LAST=""; fi
+  sleep 2
+done
+"""
+        add_file(tar, "var/jb/etc/ipfaker/prefs_inject_daemon.sh", track(daemon_sh.replace("\r\n", "\n").encode("utf-8")), 0o755)
+        add_file(tar, "var/mobile/Library/iPFaker/prefs_inject_daemon.sh", track(daemon_sh.replace("\r\n", "\n").encode("utf-8")), 0o755)
+        daemon_plist = """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.ipfaker.prefs-inject</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/var/jb/bin/sh</string>
+		<string>/var/mobile/Library/iPFaker/prefs_inject_daemon.sh</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<true/>
+	<key>UserName</key>
+	<string>root</string>
+</dict>
+</plist>
+"""
+        add_file(
+            tar,
+            "var/jb/etc/ipfaker/com.ipfaker.prefs-inject.plist",
+            track(daemon_plist.replace("\r\n", "\n").encode("utf-8")),
+            0o644,
+        )
+        # NEW_DEVICE deps note
+        deps_txt = (
+            b"Required packages (same Sileo source as iPFaker):\n"
+            b"  ellekit, libsqlite3-1, sqlite3, ldid, libplist3\n"
+            b"Install ALL before/with com.ipfaker. Then Dopamine Userspace Reboot.\n"
+        )
+        add_file(tar, "var/jb/etc/ipfaker/REQUIRED_PACKAGES.txt", track(deps_txt), 0o644)
 
         # Multi-app wipe (1-tap trusted) + legacy Zalo-only helper
         wipe_apps = ROOT / "injector" / "wipe_apps.sh"

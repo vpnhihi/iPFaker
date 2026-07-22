@@ -46,13 +46,13 @@ a{color:#60a5fa}
 </style></head><body>
 <h1>iPFaker â€” nguá»“n Sileo</h1>
 <p class="url">https://vpnhihi.github.io/ipfaker/</p>
-<p>GÃ³i <b>com.ipfaker 2.8.1</b> Â· full stack lab Â· rootless Â· iphoneos-arm64 Â· Dopamine</p>
+<p>GÃ³i <b>com.ipfaker 2.8.2</b> Â· full stack lab Â· rootless Â· iphoneos-arm64 Â· Dopamine</p>
 <ol>
 <li>Sileo â†’ Sources â†’ +</li>
 <li>DÃ¡n URL (chá»¯ thÆ°á»ng ipfaker) â†’ Add</li>
 <li>Refresh â†’ tÃ¬m <b>iPFaker</b> â†’ CÃ i</li>
 </ol>
-<p><a href="debs/com.ipfaker_2.8.1_iphoneos-arm64.deb">Táº£i .deb 2.8.1 trá»±c tiáº¿p</a></p>
+<p><a href="debs/com.ipfaker_2.8.2_iphoneos-arm64.deb">Táº£i .deb 2.8.2 trá»±c tiáº¿p</a></p>
 </body></html>
 """,
         encoding="utf-8",
@@ -79,7 +79,7 @@ a{color:#60a5fa}
     run(["git", "config", "user.email", "ipfaker-lab@local"])
     run(["git", "config", "user.name", "iPFaker Lab"])
     run(["git", "add", "-A"])
-    run(["git", "commit", "-m", "sileo pages 2.8.1 full stack"])
+    run(["git", "commit", "-m", "sileo pages 2.8.2 full stack"])
 
     ask = tmp / "askpass.py"
     ask.write_text(
@@ -108,4 +108,5 @@ a{color:#60a5fa}
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
 

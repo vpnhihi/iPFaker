@@ -1,6 +1,57 @@
 Package: com.ipfaker
 Name: iPFaker
 Depends: firmware (>= 14.0)
+Version: 2.4.1
+Architecture: iphoneos-arm64
+Maintainer: iPFaker Lab
+Author: iPFaker Lab
+Section: Tweaks
+Priority: optional
+Homepage: https://github.com/vpnhihi/iPFaker
+Description: Lab device spoof for Zalo (MG+CT dylibs) + iPFaker.app (pick model/iOS, Apply profile). Rootless Dopamine. Synthetic profiles only. Does not inject Settings.
+Installed-Size: 425
+Filename: debs/com.ipfaker_2.4.1_iphoneos-arm64.deb
+Size: 48900
+MD5sum: e7896c1e9886902e6e76bb4f705859d7
+SHA256: c18b1fa60efc5348bd1f2645961a5c309fe418cf2aa3e7a73c45737b1e794c4c
+
+Package: com.ipfaker
+Name: iPFaker
+Depends: firmware (>= 14.0)
+Version: 2.7.0
+Architecture: iphoneos-arm64
+Maintainer: iPFaker Lab
+Author: iPFaker Lab
+Section: Tweaks
+Priority: optional
+Homepage: https://github.com/vpnhihi/iPFaker
+Description: Lab device identity tools (MG+CT dylibs) + iPFaker.app (device/iOS pool, Reset Data / Save). Rootless Dopamine. Synthetic profiles only. Does not inject Settings.
+Installed-Size: 1305
+Filename: debs/com.ipfaker_2.7.0_iphoneos-arm64.deb
+Size: 228594
+MD5sum: 07306da3c1d147fef91ba54bbd55d8db
+SHA256: 79dd96676d2e24db2563b8969fbcc54042fbd1260fbb25b2791a8bda54f9cc38
+
+Package: com.ipfaker
+Name: iPFaker
+Depends: firmware (>= 14.0)
+Version: 2.8.0
+Architecture: iphoneos-arm64
+Maintainer: iPFaker Lab
+Author: iPFaker Lab
+Section: Tweaks
+Priority: optional
+Homepage: https://github.com/vpnhihi/ipfaker
+Description: Full lab stack: MG+CT+JB+About+AboutUI+AboutVer+AA + iPFaker.app (pool, multi-app wipe, Save session). Rootless Dopamine. One install = same as lab machine.
+Installed-Size: 1981
+Filename: debs/com.ipfaker_2.8.0_iphoneos-arm64.deb
+Size: 328768
+MD5sum: 9cb5e4492820821099335b2c08ef7491
+SHA256: bf5c54d4b46b90c6777b096bc21a759c9793159978e33562c8fdf36c112760c1
+
+Package: com.ipfaker
+Name: iPFaker
+Depends: firmware (>= 14.0)
 Version: 2.8.1
 Architecture: iphoneos-arm64
 Maintainer: iPFaker Lab
@@ -14,4 +65,92 @@ Filename: debs/com.ipfaker_2.8.1_iphoneos-arm64.deb
 Size: 449142
 MD5sum: daace1d6692596374d345203a5c37b10
 SHA256: 93dd0dc2afdabe21accfd20603f6ef4ba713c1a2c7dd5ad28259db56f655b392
+
+Package: com.ipfaker
+Name: iPFaker
+Depends: firmware (>= 14.0), ellekit (>= 1.1), libsqlite3-1, sqlite3, ldid, libplist3
+Version: 2.8.2
+Architecture: iphoneos-arm64
+Maintainer: iPFaker Lab
+Author: iPFaker Lab
+Section: Tweaks
+Priority: optional
+Homepage: https://github.com/vpnhihi/ipfaker
+Description: Full lab stack: MG+CT+JB+About+AboutUI+AboutVer+AA + iPFaker.app (pool, multi-app wipe, Save session). Rootless Dopamine. One install = same as lab machine.
+Installed-Size: 3408
+Filename: debs/com.ipfaker_2.8.2_iphoneos-arm64.deb
+Size: 450842
+MD5sum: 6233ed0ab1608df00c117ecdb5683896
+SHA256: 2eb8676a47f5f3782b19c3945b9eb5a9f3a7b42a6b896c25bd45f1bab799efd5
+
+Package: ellekit
+Name: ElleKit
+Version: 1.1.3
+Architecture: iphoneos-arm64
+Maintainer: Dhinak G <dhinak@dhinak.net>
+Author: Evelyn
+Section: Tweak Injection
+Priority: optional
+Description: ElleKit tweak injection libraries and loader
+Filename: debs/ellekit_1.1.3_iphoneos-arm64.deb
+Size: 352628
+MD5sum: 600b4ddef6bd75c95ae868a7fed95c24
+SHA256: b6fa34a45629f1eba602678d3322ad06d077b52e015223f99a989883652b277b
+
+Package: libplist3
+Depends: libiosexec1 (>= 1.2.2)
+Version: 2.2.0+git20230130.4b50a5a
+Architecture: iphoneos-arm64
+Maintainer: Procursus Team <support@procurs.us>
+Section: Development
+Priority: standard
+Description: Library for handling Apple binary and XML property lists
+Installed-Size: 132
+Filename: debs/libplist3_2.2.0+git20230130.4b50a5a_iphoneos-arm64.deb
+Size: 44864
+MD5sum: bca322eba9e8f6b0c6ef8c9482241c72
+SHA256: 0cefd3bbb8b8fdd4df92f1ce09a137fa39d6496a22a3e252a5a9784ad3ff4f4f
+
+Package: libsqlite3-1
+Depends: libiosexec1 (>= 1.3.1)
+Version: 3.34.1
+Architecture: iphoneos-arm64
+Maintainer: Procursus Team <support@procurs.us>
+Section: Libraries
+Priority: standard
+Homepage: https://www.sqlite.org/
+Description: SQLite 3 shared library
+Installed-Size: 980
+Filename: debs/libsqlite3-1_3.34.1_iphoneos-arm64.deb
+Size: 471236
+MD5sum: 8f4e909686ca73b60ee749353ce3611b
+SHA256: b424be3b9ebd7b050693f2e950dbaec73a46708c627de5d7699acd2855bddcba
+
+Package: sqlite3
+Depends: libiosexec1 (>= 1.3.1), libsqlite3-1 (= 3.34.1), libreadline8, libncursesw6
+Version: 3.34.1
+Architecture: iphoneos-arm64
+Maintainer: Procursus Team <support@procurs.us>
+Section: Data_Storage
+Priority: standard
+Homepage: https://www.sqlite.org/
+Description: Command line interface for SQLite 3
+Installed-Size: 364
+Filename: debs/sqlite3_3.34.1_iphoneos-arm64.deb
+Size: 103598
+MD5sum: b6560b79e1c7fca0dd3cf29d043f0e6a
+SHA256: c953ad4daaf337bdafa3c38ba82416fd2d62b396d253ad3c936e8543719ceaf1
+
+Package: ldid
+Name: ldid
+Version: 2.1.5-procursus7
+Architecture: iphoneos-arm64
+Maintainer: Procursus Team
+Section: Development
+Description: pseudo-codesign Mach-O files
+Depends: libplist3
+Filename: debs/ldid_2.1.5-procursus7_iphoneos-arm64.deb
+Size: 69060
+MD5sum: 2c50700eb17c2eb66ecc3edae9ee792d
+SHA256: a0cced42e3b04c72cd1fb340a3d8197cafa6929f449a5c63e7a18920688833d6
 
