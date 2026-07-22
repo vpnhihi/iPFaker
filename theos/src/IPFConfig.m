@@ -174,6 +174,7 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
         @"DeviceColor", @"DeviceEnclosureColor", @"BasebandVersion",
         @"TotalDiskCapacity", @"FreeDiskSpace", @"UserAgent", @"HTTPUserAgent",
         @"MaxRefreshHz", @"EID", @"PartNumber", @"ModelNumberAxxxx",
+        @"BatteryLevel", @"BatteryState", @"ThermalState", @"BatteryMah",
         @"IDFA", @"IDFV", @"identifierForVendor", @"advertisingIdentifier",
         // BCP 47 / ISO 639-1 / ISO 3166-1 / IANA tz
         @"AppleLocale", @"AppleLanguages", @"LanguageCode", @"CountryCode",

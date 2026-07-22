@@ -175,8 +175,17 @@
     }
     if (productType.length && hostPT.length && ![productType isEqualToString:hostPT]) {
         [w addObject:[NSString stringWithFormat:
-                      @"⚠ Spoof model %@ ≠ host %@ — chip/GPU/sensor thật vẫn là host",
+                      @"⚠ Spoof model %@ ≠ host %@ — silicon IMU/GPU host; WebGL/name đã spoof theo catalog",
                       productType, hostPT]];
+        // Generation gap: iPhoneN,M vs host — large gap → higher risk FP
+        int spoofGen = 0, hostGen = 0;
+        sscanf(productType.UTF8String ?: "", "iPhone%d", &spoofGen);
+        sscanf(hostPT.UTF8String ?: "", "iPhone%d", &hostGen);
+        if (spoofGen > 0 && hostGen > 0 && spoofGen - hostGen >= 3) {
+            [w addObject:[NSString stringWithFormat:
+                          @"⚠ Spoof gen iPhone%d >> host iPhone%d — nên chọn model gần host (lab an toàn hơn)",
+                          spoofGen, hostGen]];
+        }
     }
     return w.count ? [w componentsJoinedByString:@"\n"] : @"";
 }
@@ -221,6 +230,7 @@
             @"BootTimeUnix", @"kern.boottime", @"TimeOffsetSeconds", @"TimeZoneName",
             @"kern.osrelease", @"kern.version", @"kern.osversion", @"kern.osproductversion",
             @"kern.ostype", @"uname.sysname",
+            @"BatteryLevel", @"BatteryState", @"ThermalState",
             // Locale
             @"PreferredLanguage", @"LocaleIdentifier", @"AppleLocale", @"AppleLanguages",
             @"LanguageCode", @"CountryCode", @"CurrencyCode", @"CalendarIdentifier",
@@ -547,6 +557,15 @@
                           arc4random_uniform(256),
                           2 + arc4random_uniform(250)];
 
+    // Battery level seed (sync UIDevice.batteryLevel hook)
+    uint32_t batH = 2166136261u;
+    const char *batS = serial.UTF8String ?: "x";
+    for (const unsigned char *p = (const unsigned char *)batS; *p; p++) {
+        batH ^= *p;
+        batH *= 16777619u;
+    }
+    double batLvl = 0.35 + ((batH & 0xFF) / 255.0) * 0.57;
+
     // Wi‑Fi SSID/BSSID — BSSID must equal WifiAddress (CNCopyCurrentNetworkInfo sync)
     NSArray *ssids = @[ @"Viettel-WiFi", @"Viettel", @"VNPT-Fiber", @"FPT-Telecom", @"MyWiFi" ];
     NSString *ssid = ssids[arc4random_uniform((u_int32_t)ssids.count)];
@@ -661,6 +680,9 @@
         @"MaxRefreshHz": @(maxHz),
         @"DeviceYear": device[@"year"] ?: @0,
         @"BatteryMah": device[@"batteryMah"] ?: @0,
+        @"BatteryLevel": @(batLvl),
+        @"BatteryState": @1,
+        @"ThermalState": @0,
         // Disk bytes (tier from catalog storageOptionsGB)
         @"DiskCapacityGB": @(storageGB),
         @"TotalDiskCapacity": @(totalDisk),
@@ -766,6 +788,55 @@
     if (wifi.length) {
         safeFlat[@"EthernetMacAddress"] = wifi;
         if (![safeFlat[@"BSSID"] description].length) safeFlat[@"BSSID"] = wifi;
+    }
+    // Environment consistency pack — no field may drift from catalog identity
+    {
+        NSString *pv = [safeFlat[@"ProductVersion"] description] ?: ios ?: @"15.0";
+        NSArray *parts = [pv componentsSeparatedByString:@"."];
+        NSString *maj = parts.count ? parts[0] : @"15";
+        NSString *min = parts.count > 1 ? parts[1] : @"0";
+        NSString *osUnd = [pv stringByReplacingOccurrencesOfString:@"." withString:@"_"];
+        NSString *safariUA = [NSString stringWithFormat:
+            @"Mozilla/5.0 (iPhone; CPU iPhone OS %@ like Mac OS X) "
+            @"AppleWebKit/605.1.15 (KHTML, like Gecko) Version/%@.%@ "
+            @"Mobile/15E148 Safari/604.1", osUnd, maj, min];
+        safeFlat[@"HTTPUserAgent"] = safariUA;
+        // Keep app UA if Zalo-style already set; else Safari
+        NSString *ua = [safeFlat[@"UserAgent"] description];
+        if (!ua.length || [ua.lowercaseString containsString:@"safari"])
+            safeFlat[@"UserAgent"] = safariUA;
+        NSString *chip = [safeFlat[@"ChipName"] description];
+        if (chip.length) {
+            safeFlat[@"MetalDeviceName"] = [self metalDeviceNameFromChip:chip];
+            safeFlat[@"GPUName"] = safeFlat[@"MetalDeviceName"];
+        }
+        if (![[safeFlat[@"MetalRegistryID"] description] length] && sn.length)
+            safeFlat[@"MetalRegistryID"] = [self metalRegistryIDForSerial:sn];
+        if (!safeFlat[@"BatteryLevel"]) {
+            uint32_t bh = 2166136261u;
+            const char *bs = (sn ?: @"x").UTF8String;
+            for (const unsigned char *p = (const unsigned char *)bs; *p; p++) { bh ^= *p; bh *= 16777619u; }
+            safeFlat[@"BatteryLevel"] = @(0.35 + ((bh & 0xFF) / 255.0) * 0.57);
+        }
+        if (!safeFlat[@"BatteryState"]) safeFlat[@"BatteryState"] = @1;
+        if (!safeFlat[@"ThermalState"]) safeFlat[@"ThermalState"] = @0;
+        safeFlat[@"kern.ostype"] = @"Darwin";
+        safeFlat[@"uname.sysname"] = @"Darwin";
+        // Darwin map if missing
+        if (![[safeFlat[@"kern.osrelease"] description] length]) {
+            NSDictionary *dk = [self darwinKernelKeysForIOS:pv board:safeFlat[@"HWModelStr"]];
+            [safeFlat addEntriesFromDictionary:dk];
+        }
+        if (safeFlat[@"BuildVersion"])
+            safeFlat[@"kern.osversion"] = safeFlat[@"BuildVersion"];
+        safeFlat[@"kern.osproductversion"] = pv;
+        // Mitigation flags always on for lab wall
+        for (NSString *fk in @[ @"FakeDevice", @"FakeHardware", @"FakeScreen", @"FakeBrowser",
+                                 @"FakeSensor", @"FakeSysctl", @"FakeSysOSVersion", @"DisableAppAttest",
+                                 @"FakeLocale", @"Enabled" ]) {
+            if (!safeFlat[fk]) safeFlat[fk] = @YES;
+        }
+        safeFlat[@"DisableAppAttest"] = @YES;
     }
     flat = [safeFlat copy];
 

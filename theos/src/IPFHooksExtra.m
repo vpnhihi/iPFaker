@@ -594,6 +594,19 @@ static NSString *stub_osVersionString(id self, SEL _cmd) {
 // Note: do NOT MSHook operatingSystemVersion (returns struct — arm64 stret risk).
 // Apps that need version numbers usually use UIDevice.systemVersion or the string form.
 
+// Thermal — nominal when spoofing (host thermal leaks silicon load fingerprint)
+static NSInteger (*orig_thermal)(id, SEL);
+static NSInteger stub_thermal(id self, SEL _cmd) {
+    if ([[IPFConfig shared] flag:@"FakeHardware" defaultYes:YES]
+        || [[IPFConfig shared] flag:@"FakeDevice" defaultYes:YES]) {
+        // NSProcessInfoThermalStateNominal = 0
+        NSInteger t = (NSInteger)[[IPFConfig shared] doubleForKey:@"ThermalState" fallback:0];
+        if (t < 0 || t > 3) t = 0;
+        return t;
+    }
+    return orig_thermal ? orig_thermal(self, _cmd) : 0;
+}
+
 #pragma mark - CNCopyCurrentNetworkInfo (SSID / BSSID ≡ profile)
 
 // Apple CaptiveNetwork (deprecated but still linked by many apps)
@@ -673,15 +686,17 @@ static NSString *IPFJSEscape(NSString *s) {
     return o;
 }
 
-/// JS spoof: navigator.userAgent + screen metrics + devicePixelRatio (sync catalog)
+/// JS spoof: UA + screen + WebGL renderer + canvas micro-noise + hwConcurrency
+/// (must stay in sync with UIScreen / MetalDeviceName / hw.ncpu / locale profile)
 static NSString *IPFWebSpoofJS(void) {
+    IPFConfig *cfg = [IPFConfig shared];
     NSString *ua = IPFJSEscape(IPFWebUA());
     // Logical CSS pixels (points) — same as UIScreen.bounds
-    double lw = [[IPFConfig shared] doubleForKey:@"LogicalScreenWidth" fallback:0];
-    double lh = [[IPFConfig shared] doubleForKey:@"LogicalScreenHeight" fallback:0];
-    double sc = [[IPFConfig shared] doubleForKey:@"main-screen-scale" fallback:0];
-    double nw = [[IPFConfig shared] doubleForKey:@"main-screen-width" fallback:0];
-    double nh = [[IPFConfig shared] doubleForKey:@"main-screen-height" fallback:0];
+    double lw = [cfg doubleForKey:@"LogicalScreenWidth" fallback:0];
+    double lh = [cfg doubleForKey:@"LogicalScreenHeight" fallback:0];
+    double sc = [cfg doubleForKey:@"main-screen-scale" fallback:0];
+    double nw = [cfg doubleForKey:@"main-screen-width" fallback:0];
+    double nh = [cfg doubleForKey:@"main-screen-height" fallback:0];
     if (sc < 1) sc = IPFScale();
     // Derive logical from native when missing — never hardcode one SKU (e.g. 15 Pro Max)
     if (lw < 1 && nw > 0 && sc > 0) lw = nw / sc;
@@ -693,16 +708,50 @@ static NSString *IPFWebSpoofJS(void) {
         if (lw < 1) lw = n.width / sc2;
         if (lh < 1) lh = n.height / sc2;
     }
-    // devicePixelRatio ≡ scale (MDN / CSS pixels vs device pixels)
     int sw = (int)llround(lw);
     int sh = (int)llround(lh);
-    // availHeight slightly less than height (status bar lab ~ never 0)
     int availH = sh > 44 ? sh - 0 : sh;
-    // JS screen ≡ UIScreen logical points; dpr ≡ scale (must match catalog device)
+    // WebGL UNMASKED_RENDERER ≡ MetalDeviceName / GPUName (sync catalog chip)
+    NSString *gpu = [cfg stringForKey:@"MetalDeviceName"]
+        ?: [cfg stringForKey:@"GPUName"]
+        ?: [cfg stringForKey:@"ChipName"]
+        ?: @"Apple GPU";
+    if ([gpu rangeOfString:@"GPU"].location == NSNotFound) {
+        NSString *c = [gpu stringByReplacingOccurrencesOfString:@" Bionic" withString:@""];
+        gpu = [NSString stringWithFormat:@"Apple %@ GPU", c];
+    } else if (![gpu hasPrefix:@"Apple "]) {
+        gpu = [@"Apple " stringByAppendingString:gpu];
+    }
+    NSString *gpuEsc = IPFJSEscape(gpu);
+    int cores = (int)llround([cfg doubleForKey:@"hw.ncpu" fallback:0]);
+    if (cores < 2) cores = (int)llround([cfg doubleForKey:@"hw.physicalcpu" fallback:6]);
+    if (cores < 2) cores = 6;
+    double ramMB = [cfg doubleForKey:@"PhysicalMemoryMB" fallback:0];
+    if (ramMB < 1) {
+        double bytes = [cfg doubleForKey:@"hw.memsize" fallback:0];
+        if (bytes > 0) ramMB = bytes / (1024.0 * 1024.0);
+    }
+    // deviceMemory is GB (Chrome); Safari may ignore — still set for consistency
+    int memGB = ramMB >= 1024 ? (int)llround(ramMB / 1024.0) : (ramMB >= 512 ? 1 : 0);
+    if (memGB < 1) memGB = 4;
+    NSString *lang = [cfg stringForKey:@"PreferredLanguage"]
+        ?: [cfg stringForKey:@"LocaleIdentifier"]
+        ?: @"vi-VN";
+    lang = [lang stringByReplacingOccurrencesOfString:@"_" withString:@"-"];
+    NSString *langEsc = IPFJSEscape(lang);
+    NSString *tz = IPFJSEscape([cfg stringForKey:@"TimeZoneName"] ?: @"Asia/Ho_Chi_Minh");
+    // Canvas seed from serial (stable per spoof profile)
+    NSString *serial = [cfg stringForKey:@"SerialNumber"] ?: @"iPhone";
+    uint32_t h = 2166136261u;
+    const char *ss = serial.UTF8String ?: "x";
+    for (const unsigned char *p = (const unsigned char *)ss; *p; p++) {
+        h ^= *p;
+        h *= 16777619u;
+    }
+    int seed = (int)(h & 0xFF);
     return [NSString stringWithFormat:
         @"(function(){try{"
-        @"var ua='%@';"
-        @"var sw=%d,sh=%d,dpr=%g;"
+        @"var ua='%@',sw=%d,sh=%d,dpr=%g,gpu='%@',cores=%d,mem=%d,lang='%@',tz='%@',seed=%d;"
         @"var d=function(o,k,v){try{Object.defineProperty(o,k,{get:function(){return v},configurable:true});}catch(e){}};"
         @"try{d(Navigator.prototype,'userAgent',ua);}catch(e){}"
         @"try{d(navigator,'userAgent',ua);}catch(e){}"
@@ -710,6 +759,12 @@ static NSString *IPFWebSpoofJS(void) {
         @"try{d(navigator,'platform','iPhone');}catch(e){}"
         @"try{d(navigator,'vendor','Apple Computer, Inc.');}catch(e){}"
         @"try{d(navigator,'maxTouchPoints',5);}catch(e){}"
+        @"try{d(navigator,'language',lang);}catch(e){}"
+        @"try{d(navigator,'languages',[lang,'en-US','en']);}catch(e){}"
+        @"try{d(navigator,'hardwareConcurrency',cores);}catch(e){}"
+        @"try{d(navigator,'deviceMemory',mem);}catch(e){}"
+        @"try{if(Intl&&Intl.DateTimeFormat){var _r=Intl.DateTimeFormat.prototype.resolvedOptions;"
+        @"Intl.DateTimeFormat.prototype.resolvedOptions=function(){var o=_r.apply(this,arguments)||{};o.timeZone=tz;return o;};}}catch(e){}"
         @"d(screen,'width',sw);d(screen,'height',sh);"
         @"d(screen,'availWidth',sw);d(screen,'availHeight',%d);"
         @"d(screen,'colorDepth',24);d(screen,'pixelDepth',24);"
@@ -718,8 +773,23 @@ static NSString *IPFWebSpoofJS(void) {
         @"d(window,'innerWidth',sw);d(window,'innerHeight',sh);"
         @"d(window,'outerWidth',sw);d(window,'outerHeight',sh);"
         @"try{if(window.visualViewport){d(window.visualViewport,'width',sw);d(window.visualViewport,'height',sh);d(window.visualViewport,'scale',1);}}catch(e){}"
+        /* WebGL vendor/renderer sync MetalDeviceName */
+        @"var patchGL=function(proto){if(!proto||!proto.getParameter)return;"
+        @"var gp=proto.getParameter;proto.getParameter=function(p){"
+        @"if(p===0x9245||p===37445)return 'Apple Inc.';"
+        @"if(p===0x9246||p===37446)return gpu;"
+        @"return gp.apply(this,arguments);};};"
+        @"try{if(window.WebGLRenderingContext)patchGL(WebGLRenderingContext.prototype);}catch(e){}"
+        @"try{if(window.WebGL2RenderingContext)patchGL(WebGL2RenderingContext.prototype);}catch(e){}"
+        /* canvas toDataURL micro-noise (profile seed) — not blank canvas */
+        @"try{var td=HTMLCanvasElement.prototype.toDataURL;"
+        @"HTMLCanvasElement.prototype.toDataURL=function(){try{"
+        @"var c=this.getContext('2d');if(c&&this.width>16&&this.height>16){"
+        @"var x=seed%%Math.max(1,this.width-1),y=(seed*3)%%Math.max(1,this.height-1);"
+        @"var im=c.getImageData(x,y,1,1);im.data[0]=(im.data[0]+seed)&255;c.putImageData(im,x,y);}"
+        @"}catch(e){}return td.apply(this,arguments);};}catch(e){}"
         @"}catch(e){}})();",
-        ua, sw, sh, sc, availH];
+        ua, sw, sh, sc, gpuEsc, cores, memGB, langEsc, tz, seed, availH];
 }
 
 // Runtime WebKit (no hard link) — lab flat UA + WKUserScript for screen JS
@@ -914,7 +984,9 @@ void IPFInstallExtraHooks(void) {
             if (class_getInstanceMethod(nspi, @selector(operatingSystemVersionString)))
                 pMSHookMessageEx(nspi, @selector(operatingSystemVersionString),
                                  (IMP)stub_osVersionString, (IMP *)&orig_osVersionString);
-            IPFExTrace(@"NSProcessInfo hostName/OS versionString OK");
+            if (class_getInstanceMethod(nspi, @selector(thermalState)))
+                pMSHookMessageEx(nspi, @selector(thermalState), (IMP)stub_thermal, (IMP *)&orig_thermal);
+            IPFExTrace(@"NSProcessInfo hostName/OS/thermal OK");
         }
     }
 
@@ -981,7 +1053,7 @@ void IPFInstallExtraHooks(void) {
         IPFConfig *cfg = [IPFConfig shared];
         NSString *row = [NSString stringWithFormat:
             @"SURFACE UIScreen: FakeScreen=%d native=%@x%@ scale=%@\n"
-            @"SURFACE WebView: FakeBrowser=%d UA/JS screen inject\n"
+            @"SURFACE WebView: FakeBrowser=%d UA/JS/WebGL/canvas inject\n"
             @"SURFACE Network: FakeWifi=%d getifaddrs/hostname\n"
             @"SURFACE JB hide: HideJailbreak=%d access/stat/lstat + JB dylib\n"
             @"SURFACE matrix OK (Extra)\n",
