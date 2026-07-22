@@ -278,6 +278,10 @@ static int stub_uname(struct utsname *buf) {
     if (rc != 0 || !buf) return rc;
     @autoreleasepool {
         IPFConfig *cfg = [IPFConfig shared];
+        // Always present as Darwin when OS/sysctl spoof is on (Apple userspace expectation)
+        if ([cfg flag:@"FakeSysOSVersion" defaultYes:YES] || [cfg flag:@"FakeSysctl" defaultYes:YES]) {
+            strlcpy(buf->sysname, "Darwin", sizeof(buf->sysname));
+        }
         if ([cfg flag:@"FakeDevice" defaultYes:YES]) {
             NSString *machine = [cfg mgValueForKey:@"ProductType"];
             // nodename ≡ gethostname ≡ Hostname (must match Extra hooks)

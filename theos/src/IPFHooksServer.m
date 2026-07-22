@@ -125,7 +125,8 @@ static void stub_setConnectionProxyDictionary(id self, SEL _cmd, NSDictionary *d
 #pragma mark - App Attest / DeviceCheck
 
 static BOOL IPFDisableAppAttest(void) {
-    return [[IPFConfig shared] flag:@"DisableAppAttest" defaultYes:NO];
+    // Lab default ON: block DeviceCheck/AppAttest tokens that bind host→server risk graph
+    return [[IPFConfig shared] flag:@"DisableAppAttest" defaultYes:YES];
 }
 
 static void (*orig_attestGenerateKey)(id, SEL, id);

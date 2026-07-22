@@ -70,7 +70,7 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
         @"ModelNumber", @"PartNumber", @"RegionInfo", @"RegionCode", @"RegulatoryModelNumber",
         @"ModelNumberAxxxx", @"PartNumberRegion",
         @"CPUArchitecture", @"HardwarePlatform", @"DeviceClass", @"ChipName",
-        @"MetalDeviceName", @"GPUName", @"DeviceSupportsMetal",
+        @"MetalDeviceName", @"GPUName", @"MetalRegistryID", @"DeviceSupportsMetal",
         @"InternationalMobileEquipmentIdentity", @"InternationalMobileEquipmentIdentity2",
         @"MobileEquipmentIdentifier", @"EID",
         @"WifiAddress", @"BluetoothAddress", @"EthernetMacAddress",
@@ -113,6 +113,10 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
         sys[@"kern.osrelease"] = flat[@"kern.osrelease"];
     if ([flat[@"kern.version"] isKindOfClass:[NSString class]])
         sys[@"kern.version"] = flat[@"kern.version"];
+    // Always advertise Darwin when spoofing OS (uname.sysname / kern.ostype)
+    sys[@"kern.ostype"] = flat[@"kern.ostype"] ?: @"Darwin";
+    if ([flat[@"MetalRegistryID"] isKindOfClass:[NSString class]] || [flat[@"MetalRegistryID"] isKindOfClass:[NSNumber class]])
+        mg[@"MetalRegistryID"] = flat[@"MetalRegistryID"];
     if (flat[@"DeviceName"] ?: flat[@"UserAssignedDeviceName"] ?: flat[@"Hostname"]) {
         id n = flat[@"UserAssignedDeviceName"] ?: flat[@"DeviceName"] ?: @"iPhone";
         mg[@"UserAssignedDeviceName"] = n;

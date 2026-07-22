@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Select an iPhone lab profile from device_catalog.json and write:
-  - config/config.plist  (HIOS flat for iPFakerMG/CT)
+  - config/config.plist  (lab flat for iPFakerMG/CT)
   - config/active_profile.json
   - config/selected_profile.json (snapshot)
 
@@ -748,6 +748,17 @@ def build_profile(device: dict, ios_ver: str, ios_meta: dict, name: str | None) 
         "hw.physicalcpu": int(device.get("cpuCores", 6)),
         "hw.logicalcpu": int(device.get("cpuCores", 6)),
         "ChipName": device.get("chip", ""),
+        "MetalDeviceName": (
+            f"Apple {str(device.get('chip', '')).replace(' Bionic', '').strip()} GPU"
+            if device.get("chip")
+            else "Apple GPU"
+        ),
+        "GPUName": (
+            f"Apple {str(device.get('chip', '')).replace(' Bionic', '').strip()} GPU"
+            if device.get("chip")
+            else "Apple GPU"
+        ),
+        "DeviceSupportsMetal": True,
         "DeviceCatalogId": device["id"],
         "LogicalScreenWidth": int(disp.get("LogicalWidth") or (disp["NativeWidth"] // max(1, disp["ScreenScale"]))),
         "LogicalScreenHeight": int(disp.get("LogicalHeight") or (disp["NativeHeight"] // max(1, disp["ScreenScale"]))),
@@ -929,7 +940,155 @@ def build_profile(device: dict, ios_ver: str, ios_meta: dict, name: str | None) 
     return {"flat": flat, "active": active}
 
 
+# Keep in sync with ProfileBuilder knownConfigKeySet (schema lock — no foreign keys)
+KNOWN_CONFIG_PREFIXES = (
+    "Fake",
+    "Enable",
+    "Disable",
+    "Hide",
+    "Proxy",
+    "carrier",
+    "hw.",
+    "kern.",
+)
+KNOWN_CONFIG_KEYS = frozenset(
+    {
+        "ProductType",
+        "HWModelStr",
+        "HardwareModel",
+        "DeviceName",
+        "UserAssignedDeviceName",
+        "MarketingName",
+        "SerialNumber",
+        "UniqueDeviceID",
+        "UniqueChipID",
+        "ProductVersion",
+        "BuildVersion",
+        "ProductBuildVersion",
+        "ModelNumber",
+        "PartNumber",
+        "RegionInfo",
+        "RegionCode",
+        "RegulatoryModelNumber",
+        "ModelNumberAxxxx",
+        "PartNumberRegion",
+        "CPUArchitecture",
+        "HardwarePlatform",
+        "DeviceClass",
+        "ChipName",
+        "MetalDeviceName",
+        "GPUName",
+        "MetalRegistryID",
+        "DeviceSupportsMetal",
+        "DeviceCatalogId",
+        "DeviceYear",
+        "BatteryMah",
+        "uname.sysname",
+        "InternationalMobileEquipmentIdentity",
+        "InternationalMobileEquipmentIdentity2",
+        "MobileEquipmentIdentifier",
+        "EID",
+        "ECID",
+        "WifiAddress",
+        "BluetoothAddress",
+        "EthernetMacAddress",
+        "BSSID",
+        "SSID",
+        "VolumeUUID",
+        "IOPlatformSerialNumber",
+        "MLBSerialNumber",
+        "Hostname",
+        "DeviceColor",
+        "DeviceEnclosureColor",
+        "BasebandVersion",
+        "IDFA",
+        "IDFV",
+        "identifierForVendor",
+        "advertisingIdentifier",
+        "serial-number",
+        "Serial",
+        "main-screen-width",
+        "main-screen-height",
+        "main-screen-scale",
+        "main-screen-pitch",
+        "LogicalScreenWidth",
+        "LogicalScreenHeight",
+        "ScreenDiagonalInches",
+        "MaxRefreshHz",
+        "PhysicalMemoryMB",
+        "PhysicalMemoryBytes",
+        "DiskCapacityGB",
+        "TotalDiskCapacity",
+        "FreeDiskSpace",
+        "BootTimeUnix",
+        "TimeOffsetSeconds",
+        "TimeZoneName",
+        "PreferredLanguage",
+        "LocaleIdentifier",
+        "AppleLocale",
+        "AppleLanguages",
+        "LanguageCode",
+        "CountryCode",
+        "CurrencyCode",
+        "CalendarIdentifier",
+        "ISOCountryCode",
+        "Latitude",
+        "Longitude",
+        "LocationAccuracy",
+        "Altitude",
+        "UserAgent",
+        "HTTPUserAgent",
+        "WebRTCLocalIP",
+        "CarrierName",
+        "MobileCountryCode",
+        "MobileNetworkCode",
+        "CurrentRadioAccessTechnology",
+        "RadioAccessTechnology",
+        "AllowsVOIP",
+        "Enabled",
+        "SyncGeoFromProxy",
+        "ProxyEgressIP",
+        "ProxyGeoCity",
+        "ProxyGeoCountry",
+        "ProxyGeoISP",
+        "ProxyGeoRegion",
+        "GeoSyncedAtUnix",
+        "jailbreakHide",
+        "jailbreak_hide",
+    }
+)
+
+
+def schema_lock_flat(flat: dict) -> tuple[dict, list[str]]:
+    """Drop unknown keys so config.plist never accumulates foreign pollution."""
+    out: dict = {}
+    dropped: list[str] = []
+    for k, v in (flat or {}).items():
+        ks = str(k)
+        if ks in KNOWN_CONFIG_KEYS or any(ks.startswith(p) for p in KNOWN_CONFIG_PREFIXES):
+            out[ks] = v
+        else:
+            dropped.append(ks)
+    # Identity multi-source sync
+    sn = out.get("SerialNumber")
+    if sn:
+        out["IOPlatformSerialNumber"] = sn
+        out["MLBSerialNumber"] = sn
+        out["serial-number"] = sn
+        out["Serial"] = sn
+    wifi = out.get("WifiAddress")
+    if wifi:
+        out["EthernetMacAddress"] = wifi
+        if not out.get("BSSID"):
+            out["BSSID"] = wifi
+    return out, dropped
+
+
 def write_plist(flat: dict, path: Path) -> None:
+    flat, dropped = schema_lock_flat(flat)
+    if dropped:
+        print(f"schema lock: dropped {len(dropped)} unknown key(s): {dropped[:8]}{'…' if len(dropped) > 8 else ''}")
+
     def esc(s: str) -> str:
         return (
             str(s)

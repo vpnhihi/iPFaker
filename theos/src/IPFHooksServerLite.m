@@ -53,7 +53,8 @@ static NSString *IPFLiteStr(NSString *k, NSString *def) {
     return def;
 }
 
-static BOOL IPFLiteDisableAA(void) { return IPFLiteFlag(@"DisableAppAttest", NO); }
+// Lab default: block AppAttest/DeviceCheck (server risk graph binds host silicon)
+static BOOL IPFLiteDisableAA(void) { return IPFLiteFlag(@"DisableAppAttest", YES); }
 
 // --- AppAttest ---
 static void (*o_genKey)(id, SEL, id);

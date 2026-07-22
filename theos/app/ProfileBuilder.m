@@ -43,6 +43,33 @@
 }
 
 /// Map iOS → Darwin release + a realistic utsname.version line (board from HWModelStr).
+/// Apple-style Metal GPU name from catalog chip string (A17 Pro → Apple A17 Pro GPU).
++ (NSString *)metalDeviceNameFromChip:(NSString *)chip {
+    if (![chip isKindOfClass:[NSString class]] || !chip.length) return @"Apple GPU";
+    NSString *c = [chip stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if ([c rangeOfString:@"GPU" options:NSCaseInsensitiveSearch].location != NSNotFound) {
+        if ([c hasPrefix:@"Apple "]) return c;
+        return [@"Apple " stringByAppendingString:c];
+    }
+    c = [c stringByReplacingOccurrencesOfString:@" Bionic" withString:@""];
+    c = [c stringByReplacingOccurrencesOfString:@"bionic" withString:@""];
+    if ([c hasPrefix:@"Apple "]) return [c stringByAppendingString:@" GPU"];
+    return [NSString stringWithFormat:@"Apple %@ GPU", c];
+}
+
+/// Synthetic Metal registryID (uint64 string) — deterministic from serial, not host GPU die.
++ (NSString *)metalRegistryIDForSerial:(NSString *)serial {
+    NSString *seed = serial.length ? serial : @"iPhone";
+    uint32_t h = 2166136261u;
+    const char *s = seed.UTF8String ?: "x";
+    for (const unsigned char *p = (const unsigned char *)s; *p; p++) {
+        h ^= *p;
+        h *= 16777619u;
+    }
+    uint64_t reg = 0x0000000100000000ULL | ((uint64_t)h << 8) | 0xA1ULL;
+    return [NSString stringWithFormat:@"0x%llx", (unsigned long long)reg];
+}
+
 + (NSDictionary *)darwinKernelKeysForIOS:(NSString *)iosVer board:(NSString *)board {
     NSString *iv = iosVer.length ? iosVer : @"15.0";
     int maj = 15, min = 0, pat = 0;
@@ -89,19 +116,38 @@
     if (dMaj == 22) stamp = @"Sun Aug 14 20:00:00 PDT 2022";
     if (dMaj == 23) stamp = @"Wed Sep  6 21:00:00 PDT 2023";
     if (dMaj >= 24) stamp = @"Mon Mar  4 20:00:00 PST 2024";
+    // Public-style xnu tags (identity strings for uname/sysctl — NOT byte-identical kernel binary)
     NSString *xnu = @"8020.101.4~15";
+    if (dMaj == 21 && dMin == 0) xnu = @"8020.40.9~2";
+    if (dMaj == 21 && dMin >= 1) xnu = @"8020.60.14~1";
+    if (dMaj == 21 && dMin >= 2) xnu = @"8020.80.33~1";
+    if (dMaj == 21 && dMin >= 3) xnu = @"8020.100.5~1";
+    if (dMaj == 21 && dMin >= 4) xnu = @"8020.101.4~15";
     if (dMaj == 21 && dMin >= 5) xnu = @"8020.122.1~1";
     if (dMaj == 21 && dMin >= 6) xnu = @"8020.140.41~1";
     if (dMaj == 22) xnu = @"8209.41.16~2";
-    if (dMaj >= 23) xnu = @"10002.1.13~1";
+    if (dMaj == 23) xnu = @"10002.1.13~1";
+    if (dMaj >= 24) xnu = @"11215.1.10~2";
+    // Expand board → SoC map (keep in sync with catalog HWModelStr)
+    NSDictionary *boardMap2 = @{
+        @"D79AP": @"T8122", @"D80AP": @"T8122", // 15 / 15 Pro-class samples
+        @"D83AP": @"T8130", @"D84AP": @"T8130",
+    };
+    if (boardMap2[b]) arm = boardMap2[b];
+    else if ([b hasPrefix:@"D7"] || [b hasPrefix:@"D8"]) {
+        if ([b hasPrefix:@"D83"] || [b hasPrefix:@"D84"]) arm = @"T8130";
+        else if ([b hasPrefix:@"D79"] || [b hasPrefix:@"D80"]) arm = @"T8122";
+    }
     NSString *ver = [NSString stringWithFormat:
                      @"Darwin Kernel Version %@: %@: root:xnu-%@/RELEASE_ARM64_%@",
                      rel, stamp, xnu, arm];
     return @{
         @"kern.osrelease": rel,
         @"kern.version": ver,
+        @"kern.ostype": @"Darwin",
         @"kern.osproductversion": iv,
         @"kern.osversion": @"", // filled by caller with BuildVersion if known
+        @"uname.sysname": @"Darwin",
     };
 }
 
@@ -153,7 +199,7 @@
             @"ModelNumber", @"PartNumber", @"RegionInfo", @"RegionCode", @"RegulatoryModelNumber",
             @"ModelNumberAxxxx", @"PartNumberRegion",
             @"CPUArchitecture", @"HardwarePlatform", @"DeviceClass", @"ChipName",
-            @"MetalDeviceName", @"GPUName", @"DeviceSupportsMetal",
+            @"MetalDeviceName", @"GPUName", @"MetalRegistryID", @"DeviceSupportsMetal",
             @"DeviceCatalogId", @"DeviceYear", @"BatteryMah",
             @"InternationalMobileEquipmentIdentity", @"InternationalMobileEquipmentIdentity2",
             @"MobileEquipmentIdentifier", @"EID",
@@ -174,6 +220,7 @@
             // Boot / time / Darwin kernel
             @"BootTimeUnix", @"kern.boottime", @"TimeOffsetSeconds", @"TimeZoneName",
             @"kern.osrelease", @"kern.version", @"kern.osversion", @"kern.osproductversion",
+            @"kern.ostype", @"uname.sysname",
             // Locale
             @"PreferredLanguage", @"LocaleIdentifier", @"AppleLocale", @"AppleLanguages",
             @"LanguageCode", @"CountryCode", @"CurrencyCode", @"CalendarIdentifier",
@@ -605,9 +652,10 @@
         @"hw.physicalcpu": @(cores),
         @"hw.logicalcpu": @(cores),
         @"ChipName": device[@"chip"] ?: @"",
-        // GPU/Metal identity label (string surface — silicon still host; apps reading MG/name sync to catalog)
-        @"MetalDeviceName": device[@"chip"] ?: device[@"MarketingName"] ?: @"Apple GPU",
-        @"GPUName": device[@"chip"] ?: @"",
+        // GPU/Metal identity (name + synthetic registryID synced to serial — not host die)
+        @"MetalDeviceName": [self metalDeviceNameFromChip:device[@"chip"]],
+        @"GPUName": [self metalDeviceNameFromChip:device[@"chip"]],
+        @"MetalRegistryID": [self metalRegistryIDForSerial:serial],
         @"DeviceSupportsMetal": @YES,
         @"DeviceCatalogId": device[@"id"] ?: @"",
         @"MaxRefreshHz": @(maxHz),
@@ -648,6 +696,8 @@
     NSDictionary *dk = [self darwinKernelKeysForIOS:iv board:device[@"HWModelStr"]];
     if (dk[@"kern.osrelease"]) m[@"kern.osrelease"] = dk[@"kern.osrelease"];
     if (dk[@"kern.version"]) m[@"kern.version"] = dk[@"kern.version"];
+    if (dk[@"kern.ostype"]) m[@"kern.ostype"] = dk[@"kern.ostype"];
+    if (dk[@"uname.sysname"]) m[@"uname.sysname"] = dk[@"uname.sysname"];
     if (m[@"BuildVersion"]) m[@"kern.osversion"] = m[@"BuildVersion"];
     if (iv.length) m[@"kern.osproductversion"] = iv;
     return m;
