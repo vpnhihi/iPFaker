@@ -1441,7 +1441,7 @@
         step([NSString stringWithFormat:@"Đóng: %@", bid.pathExtension.length ? bid : bid]);
         [self killAppBundleId:bid executable:nil];
     }
-    usleep(120 * 1000); // was 400ms — kill is enough for next wipe
+    usleep(60 * 1000); // kill is enough; keep short for Method A
     [log addObject:@"① Đã đóng tiến trình"];
 
     BOOL wipingZalo = NO;
@@ -1510,8 +1510,12 @@
     }
     [log addObject:[NSString stringWithFormat:@"⑤ Tuỳ chọn/bộ nhớ đệm ~%lu", (unsigned long)crumb]];
 
-    if (wipingZalo && !skipKeychain) {
-        step(@"Xóa keychain Zalo (cố gắng hết sức)…");
+    // Keychain: script tin cậy đã purge Zalo trong wipe_apps.sh — không lặp (đã đo rất chậm).
+    if (scriptTrusted && wipingZalo && !skipKeychain) {
+        [log addObject:@"⑥ Keychain Zalo: script đã dọn"];
+        step(@"Keychain: script đã dọn");
+    } else if (wipingZalo && !skipKeychain) {
+        step(@"Xóa keychain Zalo (1 SQL)…");
         NSString *sqlite = nil;
         for (NSString *c in @[ @"/var/jb/usr/bin/sqlite3", @"/usr/bin/sqlite3" ]) {
             if ([fm isExecutableFileAtPath:c]) { sqlite = c; break; }
@@ -1521,31 +1525,21 @@
             if ([fm isReadableFileAtPath:p]) { kcDB = p; break; }
         }
         if (sqlite && kcDB) {
-            // Zalo binding: svce/acct + agrp group.keychain.vn.com.vng.zalo
-            NSArray *pats = @[
-                @"zalo", @"Zalo", @"zing.zalo", @"vng.zalo", @"zingalo",
-                @"group.keychain.vn.com.vng.zalo",
-                @"group.keychain.vn.com.vng.zingalo",
-                @"group.vn.com.vng.zingalo",
-                @"group.com.zing.zalo",
-                @"keychain.vn.com.vng.zalo",
-                @"vn.com.vng.zingalo",
-                @"com.zing.zalo",
-            ];
-            for (NSString *pat in pats) {
-                for (NSString *tbl in @[ @"genp", @"inet" ]) {
-                    NSString *sql = [NSString stringWithFormat:
-                        @"DELETE FROM %@ WHERE svce LIKE '%%%@%%' OR acct LIKE '%%%@%%' OR agrp LIKE '%%%@%%';",
-                        tbl, pat, pat, pat];
-                    pid_t pid = 0;
-                    const char *argv[] = { sqlite.UTF8String, kcDB.UTF8String, sql.UTF8String, NULL };
-                    if (posix_spawn(&pid, sqlite.UTF8String, NULL, NULL, (char *const *)argv, NULL) == 0 && pid > 0) {
-                        int st = 0; waitpid(pid, &st, 0);
-                    }
+            // One statement per table (was 12×2 spawns)
+            NSString *where =
+                @"svce LIKE '%zalo%' OR acct LIKE '%zalo%' OR agrp LIKE '%zalo%' OR "
+                 "svce LIKE '%zing%' OR acct LIKE '%zing%' OR agrp LIKE '%zing%' OR "
+                 "agrp LIKE '%vng.zalo%' OR agrp LIKE '%vng.zingalo%' OR agrp LIKE '%com.zing.zalo%'";
+            for (NSString *tbl in @[ @"genp", @"inet" ]) {
+                NSString *sql = [NSString stringWithFormat:@"DELETE FROM %@ WHERE %@;", tbl, where];
+                pid_t pid = 0;
+                const char *argv[] = { sqlite.UTF8String, kcDB.UTF8String, sql.UTF8String, NULL };
+                if (posix_spawn(&pid, sqlite.UTF8String, NULL, NULL, (char *const *)argv, NULL) == 0 && pid > 0) {
+                    int st = 0; waitpid(pid, &st, 0);
                 }
             }
-            [log addObject:@"⑥ Keychain Zalo (group.keychain… binding) đã dọn"];
-            step(@"Keychain Zalo group/binding: đã dọn");
+            [log addObject:@"⑥ Keychain Zalo (1 SQL) đã dọn"];
+            step(@"Keychain Zalo: đã dọn");
         } else {
             step(@"Keychain: bỏ qua");
             [log addObject:@"⑥ Keychain: bỏ qua"];
