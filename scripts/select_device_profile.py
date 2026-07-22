@@ -372,6 +372,23 @@ def random_imei() -> str:
     return body14 + _luhn_check_digit(body14)
 
 
+def radio_for_product_type(product_type: str) -> str:
+    """Radio era from ProductType digit (aligned with catalog + Apple 5G intro).
+
+    ProductType iPhoneN,* : N is internal product family, not marketing name.
+      iPhone7,*  = iPhone 6/6 Plus     → LTE
+      iPhone12,* = iPhone 11           → LTE
+      iPhone13,* = iPhone 12 series    → 5G NR first
+    """
+    m = re.search(r"iPhone(\d+)", product_type or "", re.I)
+    gen = int(m.group(1)) if m else 10
+    if gen >= 13:  # iPhone 12 and later (ProductType iPhone13+)
+        return "CTRadioAccessTechnologyNR"
+    if gen >= 7:  # iPhone 6 / 6s … 11 (iPhone7,* … iPhone12,*)
+        return "CTRadioAccessTechnologyLTE"
+    return "CTRadioAccessTechnologyWCDMA"
+
+
 def validate_identity(flat: dict, device: dict | None = None, ios_meta: dict | None = None) -> list[str]:
     """Return list of problems (empty = OK). Lab format + catalog cross-field consistency.
 
@@ -507,6 +524,31 @@ def validate_identity(flat: dict, device: dict | None = None, ios_meta: dict | N
             ua_os = pv.replace(".", "_")
             if ua_os not in ua:
                 errs.append(f"UserAgent missing OS {ua_os!r}")
+    # --- One-profile SoT: analytics aliases must match Class A ---
+    pt = str(flat.get("ProductType") or "")
+    pv = str(flat.get("ProductVersion") or "")
+    for alias in ("mod", "AnalyticsMod", "hw.machine"):
+        if flat.get(alias) and str(flat.get(alias)) != pt:
+            errs.append(f"{alias} {flat.get(alias)!r} != ProductType {pt!r}")
+    for alias in ("osv", "AnalyticsOsv", "kern.osproductversion"):
+        if flat.get(alias) and str(flat.get(alias)) != pv:
+            errs.append(f"{alias} {flat.get(alias)!r} != ProductVersion {pv!r}")
+    try:
+        nw = int(flat.get("main-screen-width") or 0)
+        nh = int(flat.get("main-screen-height") or 0)
+        want_ss = f"{nw}x{nh}" if nw and nh else ""
+        for alias in ("ss", "AnalyticsSs", "ScreenSizeString", "ScreenResolution"):
+            if flat.get(alias) and want_ss and str(flat.get(alias)) != want_ss:
+                errs.append(f"{alias} {flat.get(alias)!r} != native {want_ss!r}")
+    except (TypeError, ValueError):
+        pass
+    # Radio must not be 5G on pre-12-series hardware
+    radio = str(flat.get("carrierRadioAccess") or flat.get("CurrentRadioAccessTechnology") or "")
+    if pt and radio:
+        expect = radio_for_product_type(pt)
+        # Allow NRNSA only when expect is NR
+        if "NR" in radio and expect != "CTRadioAccessTechnologyNR":
+            errs.append(f"radio {radio!r} invalid for {pt} (expect no 5G)")
     return errs
 
 
@@ -655,13 +697,23 @@ def build_profile(device: dict, ios_ver: str, ios_meta: dict, name: str | None) 
     c_name, c_mcc, c_mnc, c_iso = carrier
     region_code = _PART_REGION_TO_CODE.get(part_region, "VN")
     region_info = f"{region_code}/A"
-    radio = random.choice(
-        (
-            "CTRadioAccessTechnologyNR",
-            "CTRadioAccessTechnologyLTE",
-            "CTRadioAccessTechnologyNRNSA",
-        )
-    )
+    # Radio must match device generation (same rule as ProfileBuilder.radioAccessTechnologyForDevice)
+    radio = radio_for_product_type(device.get("ProductType") or "")
+
+    # Display SoT (catalog native — used by UIScreen + Zalo body "ss")
+    native_w = int(disp["NativeWidth"])
+    native_h = int(disp["NativeHeight"])
+    screen_ss = f"{native_w}x{native_h}"  # Zalo analytics field "ss"
+    pv = ios_meta["ProductVersion"]
+    bv = ios_meta["BuildVersion"]
+    # Darwin major ≈ iOS major + 6 (lab convention, matches ProfileBuilder)
+    try:
+        ios_maj = int(str(pv).split(".")[0])
+    except ValueError:
+        ios_maj = 15
+    darwin_maj = ios_maj + 6
+    kern_osrelease = f"{darwin_maj}.0.0"
+    pt = device["ProductType"]
 
     flat = {
         "Enabled": True,
@@ -701,9 +753,23 @@ def build_profile(device: dict, ios_ver: str, ios_meta: dict, name: str | None) 
         "UniqueChipID": ecid_hex,
         "ECID": ecid_dec,
         "ChipID": ecid_dec,
-        "ProductVersion": ios_meta["ProductVersion"],
-        "BuildVersion": ios_meta["BuildVersion"],
-        "ProductBuildVersion": ios_meta["BuildVersion"],
+        "ProductVersion": pv,
+        "BuildVersion": bv,
+        "ProductBuildVersion": bv,
+        # --- One-profile SoT aliases (Zalo analytics + hooks must match) ---
+        "mod": pt,  # centralized body field ≡ ProductType
+        "osv": pv,  # centralized body field ≡ ProductVersion
+        "ss": screen_ss,  # centralized body field ≡ native WxH
+        "ScreenSizeString": screen_ss,
+        "ScreenResolution": screen_ss,
+        "AnalyticsMod": pt,
+        "AnalyticsOsv": pv,
+        "AnalyticsSs": screen_ss,
+        "SpoofSettingsAbout": True,
+        "hw.machine": pt,  # sysctlbyname alias ≡ ProductType
+        "kern.osversion": bv,  # build string often returned here
+        "kern.osrelease": kern_osrelease,
+        "kern.osproductversion": pv,
         "IDFA": idfa,
         "IDFV": idfv,
         "identifierForVendor": idfv,
@@ -735,12 +801,14 @@ def build_profile(device: dict, ios_ver: str, ios_meta: dict, name: str | None) 
         "carrierMNC": c_mnc,
         "carrierISO": c_iso,
         "carrierRadioAccess": radio,
+        "RadioAccessTechnology": radio,
+        "CurrentRadioAccessTechnology": radio,
         "CarrierName": c_name,
         "MobileCountryCode": c_mcc,
         "MobileNetworkCode": c_mnc,
         "ISOCountryCode": c_iso,
-        "main-screen-width": int(disp["NativeWidth"]),
-        "main-screen-height": int(disp["NativeHeight"]),
+        "main-screen-width": native_w,
+        "main-screen-height": native_h,
         "main-screen-scale": int(disp["ScreenScale"]),
         "main-screen-pitch": int(disp.get("Pitch", 460)),
         # extra for hooks
@@ -788,13 +856,13 @@ def build_profile(device: dict, ios_ver: str, ios_meta: dict, name: str | None) 
         "BasebandStatus": "BBUpdateStatusSuccess",
         "UserAgent": (
             f"Mozilla/5.0 (iPhone; CPU iPhone OS "
-            f"{ios_meta['ProductVersion'].replace('.', '_')} like Mac OS X) "
+            f"{pv.replace('.', '_')} like Mac OS X) "
             f"AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 "
             f"Zalo/{random.randint(420, 480)}.0.0"
         ),
         "HTTPUserAgent": (
             f"Mozilla/5.0 (iPhone; CPU iPhone OS "
-            f"{ios_meta['ProductVersion'].replace('.', '_')} like Mac OS X) "
+            f"{pv.replace('.', '_')} like Mac OS X) "
             f"AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
         ),
         # boot seconds ago → consumers convert to absolute; we store absolute unix
@@ -1055,6 +1123,7 @@ KNOWN_CONFIG_KEYS = frozenset(
         "RadioAccessTechnology",
         "AllowsVOIP",
         "Enabled",
+        "SpoofSettingsAbout",
         "SyncGeoFromProxy",
         "ProxyEgressIP",
         "ProxyGeoCity",
@@ -1064,6 +1133,25 @@ KNOWN_CONFIG_KEYS = frozenset(
         "GeoSyncedAtUnix",
         "jailbreakHide",
         "jailbreak_hide",
+        # One-profile SoT (Zalo analytics + sysctl aliases — any catalog device)
+        "mod",
+        "osv",
+        "ss",
+        "ScreenSizeString",
+        "ScreenResolution",
+        "AnalyticsMod",
+        "AnalyticsOsv",
+        "AnalyticsSs",
+        "AdvertisingIdentifier",
+        "ECID",
+        "ChipID",
+        "unique-device-id",
+        "DeviceUniqueIdentifier",
+        "carrierName",
+        "carrierMCC",
+        "carrierMNC",
+        "carrierISO",
+        "carrierRadioAccess",
     }
 )
 

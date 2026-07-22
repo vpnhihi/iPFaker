@@ -335,6 +335,13 @@
             @"HideJailbreak", @"FakeLocale", @"FakeDateTime", @"FakeLocation", @"FakeSensor",
             @"SpoofSettingsAbout",
             @"FakeWebRTC", @"DisableWebRTC", @"FakeProxy", @"DisableAppAttest",
+            // One-profile SoT (Zalo analytics mod/osv/ss ≡ Class A — all catalog devices)
+            @"mod", @"osv", @"ss",
+            @"ScreenSizeString", @"ScreenResolution",
+            @"AnalyticsMod", @"AnalyticsOsv", @"AnalyticsSs",
+            @"hw.machine",
+            @"ECID", @"ChipID",
+            @"unique-device-id", @"DeviceUniqueIdentifier", @"AdvertisingIdentifier",
             // Proxy / AppAttest / geo meta
             @"EnableProxy", @"ProxyHost", @"ProxyPort", @"ProxyType",
             @"ProxyUsername", @"ProxyPassword",
@@ -795,6 +802,17 @@
         @"ProductVersion": iosMeta[@"ProductVersion"] ?: iosVer,
         @"BuildVersion": iosMeta[@"BuildVersion"] ?: @"",
         @"ProductBuildVersion": iosMeta[@"BuildVersion"] ?: @"",
+        // One-profile SoT aliases (Zalo analytics mod/osv/ss ≡ Class A — any catalog device)
+        @"mod": device[@"ProductType"] ?: @"",
+        @"osv": iosMeta[@"ProductVersion"] ?: iosVer ?: @"",
+        @"ss": [NSString stringWithFormat:@"%ldx%ld", (long)w, (long)h],
+        @"ScreenSizeString": [NSString stringWithFormat:@"%ldx%ld", (long)w, (long)h],
+        @"ScreenResolution": [NSString stringWithFormat:@"%ldx%ld", (long)w, (long)h],
+        @"AnalyticsMod": device[@"ProductType"] ?: @"",
+        @"AnalyticsOsv": iosMeta[@"ProductVersion"] ?: iosVer ?: @"",
+        @"AnalyticsSs": [NSString stringWithFormat:@"%ldx%ld", (long)w, (long)h],
+        @"hw.machine": device[@"ProductType"] ?: @"",
+        @"SpoofSettingsAbout": @YES,
         // Darwin (iOS N.M → (N+6).M.0) filled after dict build — see below
         // UUID v4 uppercase (Apple IDFA / IDFV)
         @"IDFA": idfa,

@@ -76,7 +76,22 @@ static NSData *IPFRewritePayload(NSData *data) {
         if (!s) return data; // binary body — skip
         NSString *pt = IPFFakePT();
         NSString *hw = IPFFakeHW();
-        if (!pt.length && !hw.length) return data; // no profile → do not rewrite to a fixed SKU
+        // One-profile SoT: osv / ss / ProductVersion from same config as MG
+        IPFConfig *cfg = [IPFConfig shared];
+        NSString *osv = [cfg stringForKey:@"osv"]
+            ?: [cfg stringForKey:@"ProductVersion"]
+            ?: [cfg stringForKey:@"AnalyticsOsv"];
+        NSString *ss = [cfg stringForKey:@"ss"]
+            ?: [cfg stringForKey:@"AnalyticsSs"]
+            ?: [cfg stringForKey:@"ScreenSizeString"];
+        if (!ss.length) {
+            NSString *nw = [cfg stringForKey:@"main-screen-width"];
+            NSString *nh = [cfg stringForKey:@"main-screen-height"];
+            if (nw.length && nh.length)
+                ss = [NSString stringWithFormat:@"%@x%@", nw, nh];
+        }
+        if (!pt.length && !hw.length && !osv.length && !ss.length)
+            return data; // no profile → do not rewrite to a fixed SKU
         NSString *out = s;
         BOOL changed = NO;
         // Rewrite common real fingerprints → current profile ProductType / board (any device)
@@ -91,6 +106,7 @@ static NSData *IPFRewritePayload(NSData *data) {
             @"iPhone14,7", @"iPhone14,8", @"iPhone15,2", @"iPhone15,3",
             @"iPhone15,4", @"iPhone15,5", @"iPhone16,1", @"iPhone16,2",
             @"iPhone17,1", @"iPhone17,2", @"iPhone17,3", @"iPhone17,4", @"iPhone17,5",
+            @"iPhone18,1", @"iPhone18,2", @"iPhone18,3", @"iPhone18,4", @"iPhone18,5",
         ];
         NSArray *realHW = @[
             @"N61AP", @"N56AP", @"N71AP", @"N66AP", @"D10AP", @"D11AP",
@@ -120,7 +136,7 @@ static NSData *IPFRewritePayload(NSData *data) {
                 }
             }
         }
-        NSString *mk = [[IPFConfig shared] mgValueForKey:@"MarketingName"];
+        NSString *mk = [cfg mgValueForKey:@"MarketingName"];
         if (mk.length) {
             // Rewrite any common marketing names → current fake (incl. prior spoof names)
             NSArray *realNames = @[
@@ -141,8 +157,85 @@ static NSData *IPFRewritePayload(NSData *data) {
                 }
             }
         }
+        // Zalo analytics: "osv":"15.8.4" / osv=15.8.4  → profile ProductVersion
+        // Only replace when body looks like analytics/reg (avoid breaking unrelated API version numbers)
+        if (osv.length) {
+            BOOL analyticsish =
+                [out rangeOfString:@"osv"].location != NSNotFound
+                || [out rangeOfString:@"centralized"].location != NSNotFound
+                || [out rangeOfString:@"deviceUUID"].location != NSNotFound
+                || [out rangeOfString:@"mod="].location != NSNotFound
+                || [out rangeOfString:@"\\\"mod\\\""].location != NSNotFound
+                || [out rangeOfString:@"\"mod\""].location != NSNotFound;
+            if (analyticsish) {
+                // Match real JSON quotes: "osv":"15.8.4"  (ObjC @"\"osv\"..." not \\\")
+                NSError *rxErr = nil;
+                NSRegularExpression *reOsvJson = [NSRegularExpression
+                    regularExpressionWithPattern:@"\"osv\"\\s*:\\s*\"[0-9.]+\""
+                                         options:0 error:&rxErr];
+                if (reOsvJson) {
+                    // Escape $ \ in osv for template safety (versions are digits/dots only)
+                    NSString *safeOsv = [[osv componentsSeparatedByCharactersInSet:
+                        [[NSCharacterSet characterSetWithCharactersInString:@"0123456789."] invertedSet]]
+                        componentsJoinedByString:@""];
+                    if (!safeOsv.length) safeOsv = osv;
+                    NSString *replOsvJson = [NSString stringWithFormat:@"\"osv\":\"%@\"", safeOsv];
+                    NSString *tmp = [reOsvJson stringByReplacingMatchesInString:out
+                                                                       options:0
+                                                                         range:NSMakeRange(0, out.length)
+                                                                  withTemplate:replOsvJson];
+                    if (tmp && ![tmp isEqualToString:out]) { out = tmp; changed = YES; }
+                }
+                // form / query: osv=15.8.4
+                NSRegularExpression *reOsvForm = [NSRegularExpression
+                    regularExpressionWithPattern:@"osv=[0-9.]+"
+                                         options:0 error:nil];
+                if (reOsvForm) {
+                    NSString *safeOsv = [[osv componentsSeparatedByCharactersInSet:
+                        [[NSCharacterSet characterSetWithCharactersInString:@"0123456789."] invertedSet]]
+                        componentsJoinedByString:@""];
+                    if (!safeOsv.length) safeOsv = osv;
+                    NSString *replOsvForm = [NSString stringWithFormat:@"osv=%@", safeOsv];
+                    NSString *tmp = [reOsvForm stringByReplacingMatchesInString:out
+                                                              options:0
+                                                                range:NSMakeRange(0, out.length)
+                                                         withTemplate:replOsvForm];
+                    if (tmp && ![tmp isEqualToString:out]) { out = tmp; changed = YES; }
+                }
+            }
+        }
+        // Zalo analytics: "ss":"750x1334" / ss=750x1334 → native WxH from profile
+        if (ss.length && ([out rangeOfString:@"ss"].location != NSNotFound)) {
+            NSString *safeSs = [[ss componentsSeparatedByCharactersInSet:
+                [[NSCharacterSet characterSetWithCharactersInString:@"0123456789xX"] invertedSet]]
+                componentsJoinedByString:@""];
+            if (!safeSs.length) safeSs = ss;
+            NSRegularExpression *reSsJson = [NSRegularExpression
+                regularExpressionWithPattern:@"\"ss\"\\s*:\\s*\"[0-9]+x[0-9]+\""
+                                     options:0 error:nil];
+            if (reSsJson) {
+                NSString *replSsJson = [NSString stringWithFormat:@"\"ss\":\"%@\"", safeSs];
+                NSString *tmp = [reSsJson stringByReplacingMatchesInString:out
+                                                                   options:0
+                                                                     range:NSMakeRange(0, out.length)
+                                                              withTemplate:replSsJson];
+                if (tmp && ![tmp isEqualToString:out]) { out = tmp; changed = YES; }
+            }
+            NSRegularExpression *reSsForm = [NSRegularExpression
+                regularExpressionWithPattern:@"ss=[0-9]+x[0-9]+"
+                                     options:0 error:nil];
+            if (reSsForm) {
+                NSString *replSsForm = [NSString stringWithFormat:@"ss=%@", safeSs];
+                NSString *tmp = [reSsForm stringByReplacingMatchesInString:out
+                                                         options:0
+                                                           range:NSMakeRange(0, out.length)
+                                                    withTemplate:replSsForm];
+                if (tmp && ![tmp isEqualToString:out]) { out = tmp; changed = YES; }
+            }
+        }
         if (changed) {
-            IPFLog([NSString stringWithFormat:@"NET rewrite body len %lu → fakePT=%@", (unsigned long)data.length, pt ?: @"(nil)"]);
+            IPFLog([NSString stringWithFormat:@"NET rewrite body len %lu → PT=%@ osv=%@ ss=%@",
+                    (unsigned long)data.length, pt ?: @"?", osv ?: @"?", ss ?: @"?"]);
             return [out dataUsingEncoding:NSUTF8StringEncoding];
         }
     }
