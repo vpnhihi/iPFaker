@@ -1119,13 +1119,25 @@
     NSString *wantPT = [flat[@"ProductType"] description] ?: @"";
     NSString *wantMkt = [flat[@"MarketingName"] description] ?: @"";
     NSString *wantHW = [flat[@"HWModelStr"] description] ?: [flat[@"HardwareModel"] description] ?: @"";
-    if (!wantPT.length && !wantMkt.length) return @"";
+    NSString *wantPV = [flat[@"ProductVersion"] description] ?: @"";
+    NSString *wantBV = [flat[@"BuildVersion"] description]
+        ?: [flat[@"ProductBuildVersion"] description] ?: @"";
+    NSString *wantMN = [flat[@"ModelNumber"] description] ?: [flat[@"PartNumber"] description] ?: @"";
+    // Settings concatenates ModelNumber+RegionInfo → empty RegionInfo in cache avoids …/ATH/A
+    NSString *wantRI = @"";
+    NSString *wantRC = [flat[@"RegionCode"] description] ?: [flat[@"PartNumberRegion"] description] ?: @"";
+    if (!wantPT.length && !wantMkt.length && !wantPV.length && !wantMN.length) return @"";
 
-    // Public reverse-engineered obfuscated keys (AppleWiki / guesstalt)
+    // Public reverse-engineered obfuscated keys (MD5("MGCopyAnswer"+name) base64)
     NSString *kPT = @"h9jDsbgj7xIVeIQ8S3/X3Q";
     NSString *kMkt = @"Z/dqyWS6OZTRy10UcmUAhw";
     NSString *kArt = @"bbtR9jQx50Fv5Af/affNtA";
     NSString *kHW = @"/YYygAofPDbhrwToVsXdeA";
+    NSString *kPV = @"qNNddlUK+B/YlooNoymwgA";       // ProductVersion
+    NSString *kBV = @"mZfUC7qo4pURNhyMHZ62RQ";       // BuildVersion
+    NSString *kMN = @"D0cJ8r7U5zve6uA6QbOiLA";       // ModelNumber
+    NSString *kRI = @"zHeENZu+wbg7PUprwNwBWg";       // RegionInfo
+    NSString *kRC = @"h63QSdBCiT/z0WU6rdQv6Q";       // RegionCode
     NSInteger changed = 0;
 
     NSMutableArray *stack = [NSMutableArray arrayWithObject:root];
@@ -1159,6 +1171,19 @@
             } else if ([k isEqualToString:kHW] || [k isEqualToString:@"HWModelStr"]
                        || [k isEqualToString:@"HardwareModel"]) {
                 if (wantHW.length && ![s isEqualToString:wantHW]) nv = wantHW;
+            } else if ([k isEqualToString:kPV] || [k isEqualToString:@"ProductVersion"]) {
+                if (wantPV.length && ![s isEqualToString:wantPV]) nv = wantPV;
+            } else if ([k isEqualToString:kBV] || [k isEqualToString:@"BuildVersion"]
+                       || [k isEqualToString:@"ProductBuildVersion"]) {
+                if (wantBV.length && ![s isEqualToString:wantBV]) nv = wantBV;
+            } else if ([k isEqualToString:kMN] || [k isEqualToString:@"ModelNumber"]
+                       || [k isEqualToString:@"PartNumber"]) {
+                if (wantMN.length && ![s isEqualToString:wantMN]) nv = wantMN;
+            } else if ([k isEqualToString:kRI] || [k isEqualToString:@"RegionInfo"]) {
+                // Always clear RegionInfo in cache so About "Số máy" is single MxxxxRR/A
+                if (![s isEqualToString:wantRI]) nv = wantRI;
+            } else if ([k isEqualToString:kRC] || [k isEqualToString:@"RegionCode"]) {
+                if (wantRC.length && ![s isEqualToString:wantRC]) nv = wantRC;
             } else if (wantPT.length && ([s isEqualToString:@"iPhone11,6"] || [s isEqualToString:@"iPhone8,1"])
                        && ![s isEqualToString:wantPT] && [s containsString:@","]) {
                 nv = wantPT;
@@ -1190,6 +1215,17 @@
     if (wantMkt.length && ![ex[kMkt] isEqual:wantMkt]) { ex[kMkt] = wantMkt; changed++; }
     if (wantMkt.length && ![ex[kArt] isEqual:wantMkt]) { ex[kArt] = wantMkt; changed++; }
     if (wantHW.length && ![ex[kHW] isEqual:wantHW]) { ex[kHW] = wantHW; changed++; }
+    if (wantPV.length && ![ex[kPV] isEqual:wantPV]) { ex[kPV] = wantPV; changed++; }
+    if (wantBV.length && ![ex[kBV] isEqual:wantBV]) { ex[kBV] = wantBV; changed++; }
+    if (wantMN.length && ![ex[kMN] isEqual:wantMN]) { ex[kMN] = wantMN; changed++; }
+    if (![ex[kRI] isEqual:wantRI]) { ex[kRI] = wantRI; changed++; }
+    if (wantRC.length && ![ex[kRC] isEqual:wantRC]) { ex[kRC] = wantRC; changed++; }
+    // Plain key mirrors (some readers use non-obfuscated CacheExtra entries)
+    if (wantPV.length) { ex[@"ProductVersion"] = wantPV; }
+    if (wantBV.length) { ex[@"BuildVersion"] = wantBV; }
+    if (wantMN.length) { ex[@"ModelNumber"] = wantMN; ex[@"PartNumber"] = wantMN; }
+    ex[@"RegionInfo"] = wantRI;
+    if (wantRC.length) { ex[@"RegionCode"] = wantRC; }
 
     if (changed == 0) return @"MG-cache: already in sync";
 

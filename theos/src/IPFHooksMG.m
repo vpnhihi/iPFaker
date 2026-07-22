@@ -113,9 +113,12 @@ static BOOL IPFAllowMGKey(NSString *k) {
     if ([lk containsString:@"wifi"] || [lk containsString:@"bluetooth"]
         || [lk containsString:@"ethernetmac"] || [lk isEqualToString:@"bssid"])
         return [c flag:@"FakeWifi" defaultYes:YES];
-    // OS version / build
+    // OS version / build (plain + known obfuscated MG keys)
     if ([lk containsString:@"productversion"] || [lk containsString:@"buildversion"]
-        || [lk containsString:@"productbuild"] || [lk isEqualToString:@"os-version"])
+        || [lk containsString:@"productbuild"] || [lk isEqualToString:@"os-version"]
+        || [k isEqualToString:@"qNNddlUK+B/YlooNoymwgA"]   // ProductVersion
+        || [k isEqualToString:@"mZfUC7qo4pURNhyMHZ62RQ"]   // BuildVersion
+        || [k isEqualToString:@"FbsJngVSVXK87pG0SJtlNg"])  // ProductBuildVersion
         return [c flag:@"FakeSysOSVersion" defaultYes:YES];
     // Screen MG keys
     if ([lk containsString:@"screen"] || [lk containsString:@"display"])
@@ -136,6 +139,65 @@ static NSString *gHostMarketingName;
 static NSString *gHostModelNumber;
 static NSString *gHostHWModel;
 static NSString *gHostSerial;
+static NSString *gHostProductVersion;
+static NSString *gHostBuildVersion;
+
+/// Apple sales part: [MNFP] + 4 alnum + 2-letter region + /A  (exactly one slash)
+static NSString *IPFSanitizeModelNumber(NSString *mn) {
+    if (![mn isKindOfClass:[NSString class]] || mn.length == 0) return mn;
+    NSString *s = [mn stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    // Collapse double region form MEGGJTH/ATH/A or Mxxxx/RR/A
+    NSArray *parts = [s componentsSeparatedByString:@"/"];
+    if (parts.count > 2) {
+        NSString *head = parts.firstObject ?: @"MXXXXLL";
+        s = [head hasSuffix:@"/A"] ? head : [head stringByAppendingString:@"/A"];
+    }
+    // Accept already-correct MxxxxRR/A
+    static NSRegularExpression *re;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        re = [NSRegularExpression regularExpressionWithPattern:@"^[MNFP][A-Z0-9]{4}[A-Z]{2}/A$"
+                                                       options:0 error:nil];
+    });
+    if (re) {
+        NSTextCheckingResult *m = [re firstMatchInString:s options:0 range:NSMakeRange(0, s.length)];
+        if (m) return s;
+    }
+    // Strip non-alnum except slash; rebuild if possible
+    NSMutableString *alnum = [NSMutableString string];
+    for (NSUInteger i = 0; i < s.length; i++) {
+        unichar c = [s characterAtIndex:i];
+        if (c >= 'a' && c <= 'z') c = (unichar)(c - 32);
+        if ((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'))
+            [alnum appendFormat:@"%C", c];
+    }
+    if (alnum.length >= 7) {
+        // prefix(1) + body(4) + region(2) from end
+        NSString *pfx = [alnum substringToIndex:1];
+        if (![@[@"M", @"N", @"F", @"P"] containsObject:pfx]) pfx = @"M";
+        NSString *body = [alnum substringWithRange:NSMakeRange(1, MIN((NSUInteger)4, alnum.length - 1))];
+        while (body.length < 4) body = [body stringByAppendingString:@"0"];
+        NSString *reg = alnum.length >= 7 ? [alnum substringWithRange:NSMakeRange(alnum.length - 2, 2)] : @"LL";
+        return [NSString stringWithFormat:@"%@%@%@/A", pfx, body, reg];
+    }
+    return s.length ? s : @"MXXXXLL/A";
+}
+
+static BOOL IPFIsRegionInfoKey(NSString *k) {
+    if (!k.length) return NO;
+    return [k isEqualToString:@"RegionInfo"]
+        || [k isEqualToString:@"region-info"]
+        || [k isEqualToString:@"zHeENZu+wbg7PUprwNwBWg"]; // obfuscated RegionInfo
+}
+
+static BOOL IPFIsModelNumberKey(NSString *k) {
+    if (!k.length) return NO;
+    return [k isEqualToString:@"ModelNumber"]
+        || [k isEqualToString:@"model-number"]
+        || [k isEqualToString:@"PartNumber"]
+        || [k isEqualToString:@"D0cJ8r7U5zve6uA6QbOiLA"]  // obfuscated ModelNumber
+        || [k isEqualToString:@"KHQ5j06k5v3WxY4r14oqRQ"]; // obfuscated PartNumber
+}
 
 static void IPFCaptureHostIdentity(void) {
     if (gHostProductType) return;
@@ -152,6 +214,8 @@ static void IPFCaptureHostIdentity(void) {
         CFTypeRef hw = take(CFSTR("HWModelStr"));
         if (!hw) hw = take(CFSTR("HardwareModel"));
         CFTypeRef sn = take(CFSTR("SerialNumber"));
+        CFTypeRef pv = take(CFSTR("ProductVersion"));
+        CFTypeRef bv = take(CFSTR("BuildVersion"));
         if (pt && CFGetTypeID(pt) == CFStringGetTypeID())
             gHostProductType = [[NSString alloc] initWithString:(__bridge NSString *)pt];
         if (mk && CFGetTypeID(mk) == CFStringGetTypeID())
@@ -162,14 +226,21 @@ static void IPFCaptureHostIdentity(void) {
             gHostHWModel = [[NSString alloc] initWithString:(__bridge NSString *)hw];
         if (sn && CFGetTypeID(sn) == CFStringGetTypeID())
             gHostSerial = [[NSString alloc] initWithString:(__bridge NSString *)sn];
+        if (pv && CFGetTypeID(pv) == CFStringGetTypeID())
+            gHostProductVersion = [[NSString alloc] initWithString:(__bridge NSString *)pv];
+        if (bv && CFGetTypeID(bv) == CFStringGetTypeID())
+            gHostBuildVersion = [[NSString alloc] initWithString:(__bridge NSString *)bv];
         if (pt) CFRelease(pt);
         if (mk) CFRelease(mk);
         if (mn) CFRelease(mn);
         if (hw) CFRelease(hw);
         if (sn) CFRelease(sn);
-        IPFTrace([NSString stringWithFormat:@"host wash PT=%@ Mkt=%@ Model#=%@ HW=%@",
+        if (pv) CFRelease(pv);
+        if (bv) CFRelease(bv);
+        IPFTrace([NSString stringWithFormat:@"host wash PT=%@ Mkt=%@ Model#=%@ HW=%@ iOS=%@ build=%@",
                   gHostProductType ?: @"?", gHostMarketingName ?: @"?",
-                  gHostModelNumber ?: @"?", gHostHWModel ?: @"?"]);
+                  gHostModelNumber ?: @"?", gHostHWModel ?: @"?",
+                  gHostProductVersion ?: @"?", gHostBuildVersion ?: @"?"]);
     }
 }
 
@@ -202,6 +273,14 @@ static CFTypeRef IPFWashHostMGValue(NSString *k, CFTypeRef real) {
     } else if (gHostSerial.length && [rs isEqualToString:gHostSerial]) {
         repl = [cfg mgValueForKey:@"SerialNumber"];
         why = @"hostSN";
+    } else if (gHostProductVersion.length && [rs isEqualToString:gHostProductVersion]
+               && [[IPFConfig shared] flag:@"FakeSysOSVersion" defaultYes:YES]) {
+        repl = [cfg mgValueForKey:@"ProductVersion"];
+        why = @"hostPV";
+    } else if (gHostBuildVersion.length && [rs isEqualToString:gHostBuildVersion]
+               && [[IPFConfig shared] flag:@"FakeSysOSVersion" defaultYes:YES]) {
+        repl = [cfg mgValueForKey:@"BuildVersion"] ?: [cfg mgValueForKey:@"ProductBuildVersion"];
+        why = @"hostBV";
     } else if ([rs hasPrefix:@"iPhone "] && gHostMarketingName.length == 0) {
         // Fallback: any marketing-looking iPhone name when host mkt unknown → use spoof MarketingName
         // Only when key hints identity (or value looks like full marketing model, not "iPhone")
@@ -227,7 +306,8 @@ static CFTypeRef stub_MGCopyAnswer(CFStringRef key) {
         NSString *k = key ? (__bridge NSString *)key : @"(null)";
         // Settings → About "Số máy" can render ModelNumber+RegionInfo as one string:
         //   "MEGGJTH/A" + "TH/A" => "MEGGJTH/ATH/A". Empty RegionInfo only in Preferences.
-        if (([k isEqualToString:@"RegionInfo"] || [k isEqualToString:@"region-info"])
+        // Also match obfuscated RegionInfo key (Settings often uses hash form).
+        if (IPFIsRegionInfoKey(k)
             && [[IPFConfig shared] flag:@"FakeDevice" defaultYes:YES]) {
             NSString *bid = [[NSBundle mainBundle] bundleIdentifier] ?: @"";
             if ([bid isEqualToString:@"com.apple.Preferences"]) {
@@ -237,18 +317,13 @@ static CFTypeRef stub_MGCopyAnswer(CFStringRef key) {
         }
         id fake = (key && IPFAllowMGKey(k)) ? [[IPFConfig shared] mgValueForKey:k] : nil;
         if (fake) {
-            // Never return double-slash model numbers
-            if (([k isEqualToString:@"ModelNumber"] || [k isEqualToString:@"PartNumber"]
-                 || [k isEqualToString:@"model-number"])
-                && [fake isKindOfClass:[NSString class]]) {
-                NSString *mn = (NSString *)fake;
-                NSArray *parts = [mn componentsSeparatedByString:@"/"];
-                if (parts.count > 2) {
-                    // Collapse broken form X/Y/A → use first segment + /A if needed
-                    NSString *head = parts.firstObject ?: @"MXXXXLL";
-                    fake = [head hasSuffix:@"/A"] ? head : [head stringByAppendingString:@"/A"];
-                    IPFTrace([NSString stringWithFormat:@"MG ModelNumber collapsed %@ => %@", mn, fake]);
+            // Always sanitize model# → single MxxxxRR/A (never MEGGJTH/ATH/A)
+            if (IPFIsModelNumberKey(k) && [fake isKindOfClass:[NSString class]]) {
+                NSString *clean = IPFSanitizeModelNumber((NSString *)fake);
+                if (clean.length && ![clean isEqualToString:(NSString *)fake]) {
+                    IPFTrace([NSString stringWithFormat:@"MG ModelNumber sanitize %@ => %@", fake, clean]);
                 }
+                fake = clean ?: fake;
             }
             IPFTrace([NSString stringWithFormat:@"MG FAKE %@ => %@", k, fake]);
             CFTypeRef cf = IPFMakeCF(fake);

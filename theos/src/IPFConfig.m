@@ -438,15 +438,33 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
             @"ProductBuildVersion": @"ProductBuildVersion",
             @"ModelNumber": @"ModelNumber",
             @"model-number": @"ModelNumber",
+            @"PartNumber": @"PartNumber",
             @"RegulatoryModelNumber": @"RegulatoryModelNumber",
             @"regulatory-model-number": @"RegulatoryModelNumber",
             @"RegionInfo": @"RegionInfo",
             @"region-info": @"RegionInfo",
+            @"RegionCode": @"RegionCode",
             @"InternationalMobileEquipmentIdentity": @"InternationalMobileEquipmentIdentity",
             @"MobileEquipmentIdentifier": @"MobileEquipmentIdentifier",
             @"EID": @"EID",
             @"WifiAddress": @"WifiAddress",
             @"BluetoothAddress": @"BluetoothAddress",
+            // Obfuscated MG keys (MD5("MGCopyAnswer"+name) → base64 without ==)
+            // Settings → About often queries these instead of plain names.
+            @"qNNddlUK+B/YlooNoymwgA": @"ProductVersion",
+            @"mZfUC7qo4pURNhyMHZ62RQ": @"BuildVersion",
+            @"FbsJngVSVXK87pG0SJtlNg": @"ProductBuildVersion",
+            @"D0cJ8r7U5zve6uA6QbOiLA": @"ModelNumber",
+            @"KHQ5j06k5v3WxY4r14oqRQ": @"PartNumber",
+            @"zHeENZu+wbg7PUprwNwBWg": @"RegionInfo",
+            @"h63QSdBCiT/z0WU6rdQv6Q": @"RegionCode",
+            @"97JDvERpVwO+GHtthIh7hA": @"RegulatoryModelNumber",
+            @"h9jDsbgj7xIVeIQ8S3/X3Q": @"ProductType",
+            @"/YYygAofPDbhrwToVsXdeA": @"HWModelStr",
+            @"Z/dqyWS6OZTRy10UcmUAhw": @"MarketingName",
+            @"bbtR9jQx50Fv5Af/affNtA": @"MarketingName",
+            @"aS/S7hCcobxbRgwdTuv4bw": @"MarketingName",
+            @"ghpAuGJlPoauWijdtPi7sQ": @"UserAssignedDeviceName",
         };
     });
     NSString *canon = aliases[key];
