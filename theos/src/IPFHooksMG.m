@@ -220,8 +220,28 @@ static CFTypeRef IPFWashHostMGValue(NSString *k, CFTypeRef real) {
 static CFTypeRef stub_MGCopyAnswer(CFStringRef key) {
     @autoreleasepool {
         NSString *k = key ? (__bridge NSString *)key : @"(null)";
+        // Settings → About "Số máy" can render ModelNumber+RegionInfo as one string:
+        //   "MEGGJTH/A" + "TH/A" => "MEGGJTH/ATH/A". RegionInfo empty keeps Số máy = full part number only.
+        if (([k isEqualToString:@"RegionInfo"] || [k isEqualToString:@"region-info"])
+            && [[IPFConfig shared] flag:@"FakeDevice" defaultYes:YES]) {
+            IPFTrace(@"MG FAKE RegionInfo => (empty, avoid Số máy concat)");
+            return CFBridgingRetain(@"");
+        }
         id fake = (key && IPFAllowMGKey(k)) ? [[IPFConfig shared] mgValueForKey:k] : nil;
         if (fake) {
+            // Never return double-slash model numbers
+            if (([k isEqualToString:@"ModelNumber"] || [k isEqualToString:@"PartNumber"]
+                 || [k isEqualToString:@"model-number"])
+                && [fake isKindOfClass:[NSString class]]) {
+                NSString *mn = (NSString *)fake;
+                NSArray *parts = [mn componentsSeparatedByString:@"/"];
+                if (parts.count > 2) {
+                    // Collapse broken form X/Y/A → use first segment + /A if needed
+                    NSString *head = parts.firstObject ?: @"MXXXXLL";
+                    fake = [head hasSuffix:@"/A"] ? head : [head stringByAppendingString:@"/A"];
+                    IPFTrace([NSString stringWithFormat:@"MG ModelNumber collapsed %@ => %@", mn, fake]);
+                }
+            }
             IPFTrace([NSString stringWithFormat:@"MG FAKE %@ => %@", k, fake]);
             CFTypeRef cf = IPFMakeCF(fake);
             if (cf) return cf;
@@ -638,9 +658,71 @@ static int stub_sysctlbyname_lite(const char *name, void *oldp, size_t *oldlenp,
     return orig_sysctlbyname ? orig_sysctlbyname(name, oldp, oldlenp, newp, newlen) : -1;
 }
 
-// Settings About: MG + UIDevice + sysctl (machine + osproductversion).
-// CFCopySystemVersionDictionary intentionally NOT hooked here — AMFI CODESIGN kill on Preferences.
-// No WithError/uname (PAC/stability).
+// SystemVersion.plist — Settings About "Phiên bản phần mềm" often loads this file directly.
+static id (*orig_dictWithContentsOfFile)(Class, SEL, NSString *);
+static id stub_dictWithContentsOfFile(Class cls, SEL sel, NSString *path) {
+    id real = orig_dictWithContentsOfFile ? orig_dictWithContentsOfFile(cls, sel, path) : nil;
+    if (![path isKindOfClass:[NSString class]] || !path.length) return real;
+    if ([path rangeOfString:@"SystemVersion.plist" options:NSCaseInsensitiveSearch].location == NSNotFound)
+        return real;
+    if (![[IPFConfig shared] flag:@"FakeSysOSVersion" defaultYes:YES]) return real;
+    if (![real isKindOfClass:[NSDictionary class]]) return real;
+    NSMutableDictionary *m = [real mutableCopy];
+    NSString *pv = [[IPFConfig shared] stringForKey:@"ProductVersion"];
+    NSString *bv = [[IPFConfig shared] stringForKey:@"BuildVersion"]
+        ?: [[IPFConfig shared] stringForKey:@"ProductBuildVersion"];
+    if (pv.length) {
+        m[@"ProductVersion"] = pv;
+        m[@"ProductVersionExtra"] = @"";
+    }
+    if (bv.length) {
+        m[@"ProductBuildVersion"] = bv;
+        m[@"BuildVersion"] = bv; // some readers
+    }
+    IPFTrace([NSString stringWithFormat:@"SystemVersion.plist FAKE iOS=%@ build=%@", pv ?: @"?", bv ?: @"?"]);
+    return m;
+}
+
+static id (*orig_initWithContentsOfFile)(id, SEL, NSString *);
+static id stub_initWithContentsOfFile(id self, SEL sel, NSString *path) {
+    id real = orig_initWithContentsOfFile ? orig_initWithContentsOfFile(self, sel, path) : nil;
+    if (![path isKindOfClass:[NSString class]] || !path.length) return real;
+    if ([path rangeOfString:@"SystemVersion.plist" options:NSCaseInsensitiveSearch].location == NSNotFound)
+        return real;
+    if (![[IPFConfig shared] flag:@"FakeSysOSVersion" defaultYes:YES]) return real;
+    if (![real isKindOfClass:[NSDictionary class]]) return real;
+    NSMutableDictionary *m = [real mutableCopy];
+    NSString *pv = [[IPFConfig shared] stringForKey:@"ProductVersion"];
+    NSString *bv = [[IPFConfig shared] stringForKey:@"BuildVersion"]
+        ?: [[IPFConfig shared] stringForKey:@"ProductBuildVersion"];
+    if (pv.length) {
+        m[@"ProductVersion"] = pv;
+        m[@"ProductVersionExtra"] = @"";
+    }
+    if (bv.length) {
+        m[@"ProductBuildVersion"] = bv;
+        m[@"BuildVersion"] = bv;
+    }
+    IPFTrace([NSString stringWithFormat:@"SystemVersion.plist init FAKE iOS=%@ build=%@", pv ?: @"?", bv ?: @"?"]);
+    return m;
+}
+
+static NSString *(*orig_lite_osVersionString)(id, SEL);
+static NSString *stub_lite_osVersionString(id self, SEL _cmd) {
+    if (![[IPFConfig shared] flag:@"FakeSysOSVersion" defaultYes:YES])
+        return orig_lite_osVersionString ? orig_lite_osVersionString(self, _cmd) : @"Version 15.0";
+    NSString *pv = [[IPFConfig shared] stringForKey:@"ProductVersion"] ?: @"15.0";
+    NSString *bv = [[IPFConfig shared] stringForKey:@"BuildVersion"]
+        ?: [[IPFConfig shared] stringForKey:@"ProductBuildVersion"] ?: @"";
+    NSString *out = bv.length
+        ? [NSString stringWithFormat:@"Version %@ (Build %@)", pv, bv]
+        : [NSString stringWithFormat:@"Version %@", pv];
+    IPFTrace([NSString stringWithFormat:@"NSProcessInfo.OSVersionString FAKE %@", out]);
+    return out;
+}
+
+// Settings About: MG + UIDevice + sysctl OS + SystemVersion.plist + NSProcessInfo OS string.
+// No CFCopySystemVersionDictionary / WithError / uname (AMFI/PAC stability).
 void IPFInstallMGHooksLite(void) {
     IPFTrace(@"IPFInstallMGHooksLite begin");
     IPFResolveSubstrate();
@@ -677,6 +759,24 @@ void IPFInstallMGHooksLite(void) {
                 pMSHookMessageEx(uid, @selector(systemName), (IMP)stub_systemName, (IMP *)&orig_systemName);
             pMSHookMessageEx(uid, @selector(systemVersion), (IMP)stub_systemVersion, (IMP *)&orig_systemVersion);
             IPFTrace(@"Lite UIDevice hooks OK");
+        }
+        Class nspi = objc_getClass("NSProcessInfo");
+        if (nspi && class_getInstanceMethod(nspi, @selector(operatingSystemVersionString))) {
+            pMSHookMessageEx(nspi, @selector(operatingSystemVersionString),
+                             (IMP)stub_lite_osVersionString, (IMP *)&orig_lite_osVersionString);
+            IPFTrace(@"Lite NSProcessInfo.operatingSystemVersionString OK");
+        }
+        Class dictCls = objc_getMetaClass("NSDictionary");
+        if (dictCls && class_getClassMethod(dictCls, @selector(dictionaryWithContentsOfFile:))) {
+            pMSHookMessageEx(dictCls, @selector(dictionaryWithContentsOfFile:),
+                             (IMP)stub_dictWithContentsOfFile, (IMP *)&orig_dictWithContentsOfFile);
+            IPFTrace(@"Lite NSDictionary.dictionaryWithContentsOfFile OK");
+        }
+        Class dictInst = objc_getClass("NSDictionary");
+        if (dictInst && class_getInstanceMethod(dictInst, @selector(initWithContentsOfFile:))) {
+            pMSHookMessageEx(dictInst, @selector(initWithContentsOfFile:),
+                             (IMP)stub_initWithContentsOfFile, (IMP *)&orig_initWithContentsOfFile);
+            IPFTrace(@"Lite NSDictionary.initWithContentsOfFile OK");
         }
     }
     IPFTrace(@"IPFInstallMGHooksLite done");
