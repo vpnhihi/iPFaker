@@ -742,19 +742,26 @@ static int stub_sysctlbyname_lite(const char *name, void *oldp, size_t *oldlenp,
 }
 
 #if IPF_ABOUT_LITE
-// SystemVersion.plist — Settings About "Phiên bản phần mềm" (only in iPFakerAbout dylib)
-static id (*orig_dictWithContentsOfFile)(Class, SEL, NSString *);
-static id stub_dictWithContentsOfFile(Class cls, SEL sel, NSString *path) {
-    id real = orig_dictWithContentsOfFile ? orig_dictWithContentsOfFile(cls, sel, path) : nil;
-    if (![path isKindOfClass:[NSString class]] || !path.length) return real;
-    if ([path rangeOfString:@"SystemVersion.plist" options:NSCaseInsensitiveSearch].location == NSNotFound)
-        return real;
-    if (![[IPFConfig shared] flag:@"FakeSysOSVersion" defaultYes:YES]) return real;
+// SystemVersion.plist — Settings About "Phiên bản phần mềm" (only in iPFakerAbout dylib).
+// Preferences often loads this via NSData / URL / CF, NOT only NSDictionary file APIs.
+// MG ProductVersion may still be queried (and faked) while the UI row reads SystemVersion.
+
+static BOOL IPFIsSystemVersionPath(id pathOrURL) {
+    NSString *path = nil;
+    if ([pathOrURL isKindOfClass:[NSString class]]) path = (NSString *)pathOrURL;
+    else if ([pathOrURL isKindOfClass:[NSURL class]]) path = [(NSURL *)pathOrURL path];
+    if (!path.length) return NO;
+    return [path rangeOfString:@"SystemVersion.plist" options:NSCaseInsensitiveSearch].location != NSNotFound;
+}
+
+static NSDictionary *IPFSpoofSystemVersionDict(NSDictionary *real) {
     if (![real isKindOfClass:[NSDictionary class]]) return real;
-    NSMutableDictionary *m = [real mutableCopy];
+    if (![[IPFConfig shared] flag:@"FakeSysOSVersion" defaultYes:YES]) return real;
     NSString *pv = [[IPFConfig shared] stringForKey:@"ProductVersion"];
     NSString *bv = [[IPFConfig shared] stringForKey:@"BuildVersion"]
         ?: [[IPFConfig shared] stringForKey:@"ProductBuildVersion"];
+    if (!pv.length && !bv.length) return real;
+    NSMutableDictionary *m = [real mutableCopy];
     if (pv.length) {
         m[@"ProductVersion"] = pv;
         m[@"ProductVersionExtra"] = @"";
@@ -767,28 +774,82 @@ static id stub_dictWithContentsOfFile(Class cls, SEL sel, NSString *path) {
     return m;
 }
 
+static NSData *IPFSpoofSystemVersionData(NSData *real) {
+    if (![real isKindOfClass:[NSData class]] || real.length == 0) return real;
+    if (![[IPFConfig shared] flag:@"FakeSysOSVersion" defaultYes:YES]) return real;
+    id obj = [NSPropertyListSerialization propertyListWithData:real options:0 format:NULL error:NULL];
+    if (![obj isKindOfClass:[NSDictionary class]]) return real;
+    NSDictionary *spoofed = IPFSpoofSystemVersionDict((NSDictionary *)obj);
+    if (spoofed == obj) return real;
+    NSData *out = [NSPropertyListSerialization dataWithPropertyList:spoofed
+                                                             format:NSPropertyListXMLFormat_v1_0
+                                                            options:0
+                                                              error:NULL];
+    return out ?: real;
+}
+
+static id (*orig_dictWithContentsOfFile)(Class, SEL, NSString *);
+static id stub_dictWithContentsOfFile(Class cls, SEL sel, NSString *path) {
+    id real = orig_dictWithContentsOfFile ? orig_dictWithContentsOfFile(cls, sel, path) : nil;
+    if (!IPFIsSystemVersionPath(path)) return real;
+    return IPFSpoofSystemVersionDict(real);
+}
+
 static id (*orig_initWithContentsOfFile)(id, SEL, NSString *);
 static id stub_initWithContentsOfFile(id self, SEL sel, NSString *path) {
     id real = orig_initWithContentsOfFile ? orig_initWithContentsOfFile(self, sel, path) : nil;
-    if (![path isKindOfClass:[NSString class]] || !path.length) return real;
-    if ([path rangeOfString:@"SystemVersion.plist" options:NSCaseInsensitiveSearch].location == NSNotFound)
-        return real;
-    if (![[IPFConfig shared] flag:@"FakeSysOSVersion" defaultYes:YES]) return real;
-    if (![real isKindOfClass:[NSDictionary class]]) return real;
-    NSMutableDictionary *m = [real mutableCopy];
-    NSString *pv = [[IPFConfig shared] stringForKey:@"ProductVersion"];
-    NSString *bv = [[IPFConfig shared] stringForKey:@"BuildVersion"]
-        ?: [[IPFConfig shared] stringForKey:@"ProductBuildVersion"];
-    if (pv.length) {
-        m[@"ProductVersion"] = pv;
-        m[@"ProductVersionExtra"] = @"";
-    }
-    if (bv.length) {
-        m[@"ProductBuildVersion"] = bv;
-        m[@"BuildVersion"] = bv;
-    }
-    IPFTrace([NSString stringWithFormat:@"SystemVersion.plist init FAKE iOS=%@ build=%@", pv ?: @"?", bv ?: @"?"]);
-    return m;
+    if (!IPFIsSystemVersionPath(path)) return real;
+    // init returns self; replace contents by returning spoofed dict via side path is hard —
+    // if real is the initialized dict (common for convenience), spoof it.
+    if ([real isKindOfClass:[NSDictionary class]])
+        return IPFSpoofSystemVersionDict(real);
+    return real;
+}
+
+static id (*orig_dictWithContentsOfURL)(Class, SEL, NSURL *);
+static id stub_dictWithContentsOfURL(Class cls, SEL sel, NSURL *url) {
+    id real = orig_dictWithContentsOfURL ? orig_dictWithContentsOfURL(cls, sel, url) : nil;
+    if (!IPFIsSystemVersionPath(url)) return real;
+    return IPFSpoofSystemVersionDict(real);
+}
+
+static id (*orig_initWithContentsOfURL)(id, SEL, NSURL *);
+static id stub_initWithContentsOfURL(id self, SEL sel, NSURL *url) {
+    id real = orig_initWithContentsOfURL ? orig_initWithContentsOfURL(self, sel, url) : nil;
+    if (!IPFIsSystemVersionPath(url)) return real;
+    if ([real isKindOfClass:[NSDictionary class]])
+        return IPFSpoofSystemVersionDict(real);
+    return real;
+}
+
+static id (*orig_dataWithContentsOfFile)(Class, SEL, NSString *);
+static id stub_dataWithContentsOfFile(Class cls, SEL sel, NSString *path) {
+    id real = orig_dataWithContentsOfFile ? orig_dataWithContentsOfFile(cls, sel, path) : nil;
+    if (!IPFIsSystemVersionPath(path)) return real;
+    NSData *spoofed = IPFSpoofSystemVersionData(real);
+    if (spoofed != real)
+        IPFTrace(@"SystemVersion.plist NSData FAKE");
+    return spoofed;
+}
+
+static id (*orig_dataInitWithContentsOfFile)(id, SEL, NSString *);
+static id stub_dataInitWithContentsOfFile(id self, SEL sel, NSString *path) {
+    id real = orig_dataInitWithContentsOfFile ? orig_dataInitWithContentsOfFile(self, sel, path) : nil;
+    if (!IPFIsSystemVersionPath(path) || ![real isKindOfClass:[NSData class]]) return real;
+    NSData *spoofed = IPFSpoofSystemVersionData(real);
+    if (spoofed != real)
+        IPFTrace(@"SystemVersion.plist NSData-init FAKE");
+    return spoofed;
+}
+
+static id (*orig_dataWithContentsOfURL)(Class, SEL, NSURL *);
+static id stub_dataWithContentsOfURL(Class cls, SEL sel, NSURL *url) {
+    id real = orig_dataWithContentsOfURL ? orig_dataWithContentsOfURL(cls, sel, url) : nil;
+    if (!IPFIsSystemVersionPath(url)) return real;
+    NSData *spoofed = IPFSpoofSystemVersionData(real);
+    if (spoofed != real)
+        IPFTrace(@"SystemVersion.plist NSData-URL FAKE");
+    return spoofed;
 }
 
 static NSString *(*orig_lite_osVersionString)(id, SEL);
@@ -803,6 +864,35 @@ static NSString *stub_lite_osVersionString(id self, SEL _cmd) {
         : [NSString stringWithFormat:@"Version %@", pv];
     IPFTrace([NSString stringWithFormat:@"NSProcessInfo.OSVersionString FAKE %@", out]);
     return out;
+}
+
+// Settings may use operatingSystemVersion (struct) — NOT the string.
+// On arm64, 3x NSInteger (24B) uses sret; ElleKit MSHookMessageEx handles it for ObjC methods.
+static NSOperatingSystemVersion (*orig_lite_osVersion)(id, SEL);
+static NSOperatingSystemVersion stub_lite_osVersion(id self, SEL _cmd) {
+    NSOperatingSystemVersion v = {15, 0, 0};
+    if (![[IPFConfig shared] flag:@"FakeSysOSVersion" defaultYes:YES])
+        return orig_lite_osVersion ? orig_lite_osVersion(self, _cmd) : v;
+    NSString *pv = [[IPFConfig shared] stringForKey:@"ProductVersion"] ?: @"15.0";
+    NSArray *parts = [pv componentsSeparatedByString:@"."];
+    if (parts.count > 0) v.majorVersion = [parts[0] integerValue];
+    if (parts.count > 1) v.minorVersion = [parts[1] integerValue];
+    if (parts.count > 2) v.patchVersion = [parts[2] integerValue];
+    IPFTrace([NSString stringWithFormat:@"NSProcessInfo.operatingSystemVersion FAKE %ld.%ld.%ld",
+              (long)v.majorVersion, (long)v.minorVersion, (long)v.patchVersion]);
+    return v;
+}
+
+// CFCopySystemVersionDictionary — CoreFoundation path used by NSProcessInfo / Preferences
+static CFDictionaryRef (*orig_CFCopySystemVersionDictionary)(void);
+static CFDictionaryRef stub_CFCopySystemVersionDictionary(void) {
+    CFDictionaryRef real = orig_CFCopySystemVersionDictionary
+        ? orig_CFCopySystemVersionDictionary() : NULL;
+    if (![[IPFConfig shared] flag:@"FakeSysOSVersion" defaultYes:YES]) return real;
+    if (!real) return real;
+    NSDictionary *ns = CFBridgingRelease(real);
+    NSDictionary *spoofed = IPFSpoofSystemVersionDict(ns);
+    return CFBridgingRetain(spoofed);
 }
 #endif // IPF_ABOUT_LITE
 
@@ -842,24 +932,82 @@ void IPFInstallMGHooksLite(void) {
         }
 #if IPF_ABOUT_LITE
         Class nspi = objc_getClass("NSProcessInfo");
-        if (nspi && class_getInstanceMethod(nspi, @selector(operatingSystemVersionString))) {
-            pMSHookMessageEx(nspi, @selector(operatingSystemVersionString),
-                             (IMP)stub_lite_osVersionString, (IMP *)&orig_lite_osVersionString);
-            IPFTrace(@"Lite NSProcessInfo.operatingSystemVersionString OK");
+        if (nspi) {
+            if (class_getInstanceMethod(nspi, @selector(operatingSystemVersionString))) {
+                pMSHookMessageEx(nspi, @selector(operatingSystemVersionString),
+                                 (IMP)stub_lite_osVersionString, (IMP *)&orig_lite_osVersionString);
+                IPFTrace(@"Lite NSProcessInfo.operatingSystemVersionString OK");
+            }
+            if (class_getInstanceMethod(nspi, @selector(operatingSystemVersion))) {
+                pMSHookMessageEx(nspi, @selector(operatingSystemVersion),
+                                 (IMP)stub_lite_osVersion, (IMP *)&orig_lite_osVersion);
+                IPFTrace(@"Lite NSProcessInfo.operatingSystemVersion OK");
+            }
         }
         Class dictCls = objc_getMetaClass("NSDictionary");
-        if (dictCls && class_getClassMethod(dictCls, @selector(dictionaryWithContentsOfFile:))) {
-            pMSHookMessageEx(dictCls, @selector(dictionaryWithContentsOfFile:),
-                             (IMP)stub_dictWithContentsOfFile, (IMP *)&orig_dictWithContentsOfFile);
-            IPFTrace(@"Lite NSDictionary.dictionaryWithContentsOfFile OK");
+        if (dictCls) {
+            if (class_getClassMethod(dictCls, @selector(dictionaryWithContentsOfFile:))) {
+                pMSHookMessageEx(dictCls, @selector(dictionaryWithContentsOfFile:),
+                                 (IMP)stub_dictWithContentsOfFile, (IMP *)&orig_dictWithContentsOfFile);
+                IPFTrace(@"Lite NSDictionary.dictionaryWithContentsOfFile OK");
+            }
+            if (class_getClassMethod(dictCls, @selector(dictionaryWithContentsOfURL:))) {
+                pMSHookMessageEx(dictCls, @selector(dictionaryWithContentsOfURL:),
+                                 (IMP)stub_dictWithContentsOfURL, (IMP *)&orig_dictWithContentsOfURL);
+                IPFTrace(@"Lite NSDictionary.dictionaryWithContentsOfURL OK");
+            }
         }
         Class dictInst = objc_getClass("NSDictionary");
-        if (dictInst && class_getInstanceMethod(dictInst, @selector(initWithContentsOfFile:))) {
-            pMSHookMessageEx(dictInst, @selector(initWithContentsOfFile:),
-                             (IMP)stub_initWithContentsOfFile, (IMP *)&orig_initWithContentsOfFile);
-            IPFTrace(@"Lite NSDictionary.initWithContentsOfFile OK");
+        if (dictInst) {
+            if (class_getInstanceMethod(dictInst, @selector(initWithContentsOfFile:))) {
+                pMSHookMessageEx(dictInst, @selector(initWithContentsOfFile:),
+                                 (IMP)stub_initWithContentsOfFile, (IMP *)&orig_initWithContentsOfFile);
+                IPFTrace(@"Lite NSDictionary.initWithContentsOfFile OK");
+            }
+            if (class_getInstanceMethod(dictInst, @selector(initWithContentsOfURL:))) {
+                pMSHookMessageEx(dictInst, @selector(initWithContentsOfURL:),
+                                 (IMP)stub_initWithContentsOfURL, (IMP *)&orig_initWithContentsOfURL);
+                IPFTrace(@"Lite NSDictionary.initWithContentsOfURL OK");
+            }
+        }
+        // NSData paths — Preferences / NSProcessInfo often load SystemVersion as raw data then parse
+        Class dataMeta = objc_getMetaClass("NSData");
+        if (dataMeta) {
+            if (class_getClassMethod(dataMeta, @selector(dataWithContentsOfFile:))) {
+                pMSHookMessageEx(dataMeta, @selector(dataWithContentsOfFile:),
+                                 (IMP)stub_dataWithContentsOfFile, (IMP *)&orig_dataWithContentsOfFile);
+                IPFTrace(@"Lite NSData.dataWithContentsOfFile OK");
+            }
+            if (class_getClassMethod(dataMeta, @selector(dataWithContentsOfURL:))) {
+                pMSHookMessageEx(dataMeta, @selector(dataWithContentsOfURL:),
+                                 (IMP)stub_dataWithContentsOfURL, (IMP *)&orig_dataWithContentsOfURL);
+                IPFTrace(@"Lite NSData.dataWithContentsOfURL OK");
+            }
+        }
+        Class dataInst = objc_getClass("NSData");
+        if (dataInst && class_getInstanceMethod(dataInst, @selector(initWithContentsOfFile:))) {
+            pMSHookMessageEx(dataInst, @selector(initWithContentsOfFile:),
+                             (IMP)stub_dataInitWithContentsOfFile, (IMP *)&orig_dataInitWithContentsOfFile);
+            IPFTrace(@"Lite NSData.initWithContentsOfFile OK");
         }
 #endif
     }
+#if IPF_ABOUT_LITE
+    // CFCopySystemVersionDictionary (private CF) — primary source for ProcessInfo / Preferences version
+    if (pMSHookFunction) {
+        void *cf = dlsym(RTLD_DEFAULT, "CFCopySystemVersionDictionary");
+        if (!cf) {
+            void *cfb = dlopen("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation", RTLD_NOW);
+            if (cfb) cf = dlsym(cfb, "CFCopySystemVersionDictionary");
+        }
+        if (cf) {
+            pMSHookFunction(cf, (void *)stub_CFCopySystemVersionDictionary,
+                            (void **)&orig_CFCopySystemVersionDictionary);
+            IPFTrace([NSString stringWithFormat:@"Lite CFCopySystemVersionDictionary %p", cf]);
+        } else {
+            IPFTrace(@"Lite CFCopySystemVersionDictionary missing");
+        }
+    }
+#endif
     IPFTrace(@"IPFInstallMGHooksLite done");
 }
