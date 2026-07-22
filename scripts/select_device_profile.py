@@ -729,6 +729,8 @@ def build_profile(device: dict, ios_ver: str, ios_meta: dict, name: str | None) 
         "FakeSysOSVersion": True,
         "HideJailbreak": True,
         "FakeBrowser": True,
+        # Lean MG in Zalo (skip Extra) — stable on A10–A11 rootless; Extra still for Safari filter
+        "SkipExtraForZalo": True,
         "ProductType": device["ProductType"],
         "MarketingName": device["MarketingName"],
         "DeviceName": "iPhone",
@@ -1124,6 +1126,7 @@ KNOWN_CONFIG_KEYS = frozenset(
         "AllowsVOIP",
         "Enabled",
         "SpoofSettingsAbout",
+        "SkipExtraForZalo",
         "SyncGeoFromProxy",
         "ProxyEgressIP",
         "ProxyGeoCity",

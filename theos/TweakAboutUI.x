@@ -55,36 +55,78 @@ static BOOL IPFUIEnabled(NSDictionary *cfg) {
     return YES;
 }
 
-static NSInteger IPFUIWashView(UIView *root, NSString *hostPV, NSString *wantPV) {
+// Host iOS labels seen on jailbroken lab phones (any major still on device)
+static NSArray<NSString *> *IPFUIHostVersionTokens(void) {
+    return @[
+        @"15.5", @"15.5.0", @"15.8", @"15.8.1", @"15.8.2", @"15.8.3", @"15.8.4", @"15.8.5",
+        @"16.0", @"16.1", @"16.2", @"16.3", @"16.4", @"16.5", @"16.6", @"16.7",
+        @"16.7.10", @"16.7.11", @"16.7.12", @"16.7.16",
+        @"18.0", @"18.1", @"18.5", @"18.6", @"18.7", @"18.7.9",
+    ];
+}
+
+static BOOL IPFUIShouldReplaceVersion(NSString *t, NSString *wantPV, NSArray *hosts) {
+    if (!t.length || !wantPV.length) return NO;
+    if ([t isEqualToString:wantPV]) return NO;
+    for (NSString *h in hosts) {
+        if ([t isEqualToString:h]) return YES;
+    }
+    // UIDevice.currentDevice.systemVersion as host when != want
+    @try {
+        NSString *real = UIDevice.currentDevice.systemVersion;
+        if (real.length && [t isEqualToString:real] && ![t isEqualToString:wantPV])
+            return YES;
+    } @catch (__unused NSException *ex) {}
+    return NO;
+}
+
+static BOOL IPFUIShouldReplaceModel(NSString *t, NSString *wantMk) {
+    if (!t.length || !wantMk.length) return NO;
+    if ([t isEqualToString:wantMk]) return NO;
+    // Common host marketing labels on old jailbreaks
+    static NSArray *hosts;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        hosts = @[
+            @"iPhone 6", @"iPhone 6s", @"iPhone 6s Plus", @"iPhone 7", @"iPhone 7 Plus",
+            @"iPhone 8", @"iPhone 8 Plus", @"iPhone X", @"iPhone XR", @"iPhone XS", @"iPhone XS Max",
+            @"iPhone SE", @"iPhone",
+        ];
+    });
+    for (NSString *h in hosts) {
+        if ([t isEqualToString:h]) return YES;
+        // "iPhone 7 (GSM)" etc.
+        if ([t hasPrefix:h] && t.length < h.length + 12) return YES;
+    }
+    return NO;
+}
+
+static NSInteger IPFUIWashView(UIView *root, NSString *wantPV, NSString *wantMk, NSArray *hostVers) {
     if (!root || !wantPV.length) return 0;
-    NSInteger n = 0;
+    __block NSInteger n = 0;
     NSMutableArray *stack = [NSMutableArray arrayWithObject:root];
     while (stack.count) {
         UIView *v = stack.lastObject;
         [stack removeLastObject];
-        if ([v isKindOfClass:[UILabel class]]) {
-            UILabel *lab = (UILabel *)v;
+        void (^fixLabel)(UILabel *) = ^(UILabel *lab) {
+            if (![lab isKindOfClass:[UILabel class]]) return;
             NSString *t = lab.text;
-            if (![t isKindOfClass:[NSString class]] || !t.length) {
-                // fallthrough
-            } else if ([t isEqualToString:@"15.5"] || [t isEqualToString:@"15.5.0"]
-                       || (hostPV.length && [t isEqualToString:hostPV] && ![t isEqualToString:wantPV])) {
+            if (![t isKindOfClass:[NSString class]] || !t.length) return;
+            if (IPFUIShouldReplaceVersion(t, wantPV, hostVers)) {
                 lab.text = wantPV;
                 n++;
-                IPFUILog([NSString stringWithFormat:@"label %@ => %@", t, wantPV]);
+                IPFUILog([NSString stringWithFormat:@"label ver %@ => %@", t, wantPV]);
+            } else if (wantMk.length && IPFUIShouldReplaceModel(t, wantMk)) {
+                lab.text = wantMk;
+                n++;
+                IPFUILog([NSString stringWithFormat:@"label model %@ => %@", t, wantMk]);
             }
-        }
+        };
+        if ([v isKindOfClass:[UILabel class]])
+            fixLabel((UILabel *)v);
         if ([v respondsToSelector:@selector(detailTextLabel)]) {
             UILabel *d = ((UILabel *(*)(id, SEL))objc_msgSend)(v, @selector(detailTextLabel));
-            if ([d isKindOfClass:[UILabel class]]) {
-                NSString *t = d.text;
-                if ([t isEqualToString:@"15.5"] || [t isEqualToString:@"15.5.0"]
-                    || (hostPV.length && [t isEqualToString:hostPV] && ![t isEqualToString:wantPV])) {
-                    d.text = wantPV;
-                    n++;
-                    IPFUILog([NSString stringWithFormat:@"detail %@ => %@", t, wantPV]);
-                }
-            }
+            fixLabel(d);
         }
         if (v.subviews.count) [stack addObjectsFromArray:v.subviews];
     }
@@ -95,9 +137,9 @@ static void IPFUIWashAllWindows(void) {
     NSDictionary *cfg = IPFUIConfig();
     if (!IPFUIEnabled(cfg)) return;
     NSString *want = [cfg[@"ProductVersion"] description];
-    if (!want.length || [want isEqualToString:@"15.5"]) return;
-    // Host is always lab 15.5 for wash targets
-    NSString *host = @"15.5";
+    if (!want.length) return;
+    NSString *wantMk = [cfg[@"MarketingName"] description] ?: @"";
+    NSArray *hostVers = IPFUIHostVersionTokens();
 
     NSInteger total = 0;
     NSArray *windows = nil;
@@ -113,19 +155,17 @@ static void IPFUIWashAllWindows(void) {
     if (!windows.count)
         windows = UIApplication.sharedApplication.windows;
     for (UIWindow *w in windows) {
-        total += IPFUIWashView(w, host, want);
-        // also key root VC view
+        total += IPFUIWashView(w, want, wantMk, hostVers);
         UIViewController *r = w.rootViewController;
-        if (r.view) total += IPFUIWashView(r.view, host, want);
-        // presented
+        if (r.view) total += IPFUIWashView(r.view, want, wantMk, hostVers);
         UIViewController *p = r.presentedViewController;
         while (p) {
-            if (p.view) total += IPFUIWashView(p.view, host, want);
+            if (p.view) total += IPFUIWashView(p.view, want, wantMk, hostVers);
             p = p.presentedViewController;
         }
     }
     if (total > 0)
-        IPFUILog([NSString stringWithFormat:@"washed %ld label(s) -> %@", (long)total, want]);
+        IPFUILog([NSString stringWithFormat:@"washed %ld label(s) -> %@ / %@", (long)total, wantMk, want]);
 }
 
 static void IPFUIScheduleWashes(void) {

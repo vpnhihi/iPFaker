@@ -335,6 +335,7 @@
             @"HideJailbreak", @"FakeLocale", @"FakeDateTime", @"FakeLocation", @"FakeSensor",
             @"SpoofSettingsAbout",
             @"FakeWebRTC", @"DisableWebRTC", @"FakeProxy", @"DisableAppAttest",
+            @"SkipExtraForZalo", // MG lean in Zalo (A10+ stability); Extra still on Safari when injected
             // One-profile SoT (Zalo analytics mod/osv/ss ≡ Class A — all catalog devices)
             @"mod", @"osv", @"ss",
             @"ScreenSizeString", @"ScreenResolution",
@@ -813,6 +814,8 @@
         @"AnalyticsSs": [NSString stringWithFormat:@"%ldx%ld", (long)w, (long)h],
         @"hw.machine": device[@"ProductType"] ?: @"",
         @"SpoofSettingsAbout": @YES,
+        // Lean MG inside Zalo (skip Extra) — stable A10–A11 rootless; Safari still gets Extra via filter
+        @"SkipExtraForZalo": @YES,
         // Darwin (iOS N.M → (N+6).M.0) filled after dict build — see below
         // UUID v4 uppercase (Apple IDFA / IDFV)
         @"IDFA": idfa,

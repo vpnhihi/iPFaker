@@ -80,14 +80,31 @@ static void IPFMark(const char *msg) {
             IPFMark("CTOR_NO_FILE_CONFIG_USE_EMBED");
         }
 
+        // Core spoof always (all rootless iPhones: A10 arm64 … A18 arm64e)
         IPFInstallMGHooks();
-        IPFInstallExtraHooks();
-        // Module cover: MG+Extra here; CT+Deep; JB+Server
+
+        // Extra (UIScreen/getifaddrs/WK/path-hide): crash/hang risk on some A10 apps (Zalo).
+        // Default: skip Extra inside Zalo; keep Extra for Safari/WebKit when filter injects there.
+        // Override: config SkipExtraForZalo=0 to force Extra in Zalo (lab stress).
+        BOOL isZalo = [bid isEqualToString:@"vn.com.vng.zingalo"]
+            || [bid isEqualToString:@"com.zing.zalo"]
+            || [bid containsString:@"zingalo"];
+        BOOL skipExtra = isZalo && [[IPFConfig shared] flag:@"SkipExtraForZalo" defaultYes:YES];
+        if (!skipExtra) {
+            IPFInstallExtraHooks();
+            IPFMark("CTOR_MG_PLUS_EXTRA");
+        } else {
+            IPFMark("CTOR_MG_LEAN_NO_EXTRA_ZALO");
+        }
+
+        // Module cover: MG(+Extra) · CT+Deep · JB+Server
         @try {
             NSString *mod = [NSString stringWithFormat:
-                @"MODULE IPFHooksMG: MGCopyAnswer(+Error) sysctl uname UIDevice IDFA/IDFV boottime Fake* gates; MSHook primary (fishhook fallback only if miss)\n"
-                @"MODULE IPFHooksExtra: UIScreen disk path-hide canOpenURL UA getifaddrs hostname WKWebView\n"
-                @"MODULE stack: MG+Extra · CT+Deep · JB+Server · bid=%@\n",
+                @"MODULE IPFHooksMG: MGCopyAnswer(+Error) sysctl uname UIDevice IDFA/IDFV boottime Fake* gates; MSHook primary\n"
+                @"MODULE IPFHooksExtra: %@\n"
+                @"MODULE stack: MG%@ · CT+Deep · JB+Server · bid=%@\n",
+                skipExtra ? @"(skipped in Zalo — SkipExtraForZalo)" : @"UIScreen disk path-hide canOpenURL UA getifaddrs hostname WKWebView",
+                skipExtra ? @" lean" : @"+Extra",
                 bid];
             NSString *home = NSHomeDirectory();
             if (home.length)
