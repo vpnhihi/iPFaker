@@ -199,7 +199,14 @@
             vc.device = [self currentDevice];
             vc.iosVer = self.selectedIOS;
             vc.iosMeta = [self currentIOSMeta];
-            vc.flat = self.lastFlat;
+            // Live dual-path config so Lab About matches Settings About / disk SoT
+            NSDictionary *live = [ProfileBuilder loadCurrentFlat];
+            if (live.count) {
+                vc.flat = live;
+                self.lastFlat = live;
+            } else {
+                vc.flat = self.lastFlat;
+            }
             [self.navigationController pushViewController:vc animated:YES];
         }
         return;

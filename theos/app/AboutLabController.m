@@ -2,6 +2,7 @@
 #import "AppTheme.h"
 #import "IPFLicenseManager.h"
 #import "AppDelegate.h"
+#import "ProfileBuilder.h"
 
 @implementation AboutLabController
 
@@ -15,6 +16,16 @@
     self.tableView.allowsSelection = YES;
     self.view.backgroundColor = AppTheme.bg;
     self.tableView.backgroundColor = AppTheme.bg;
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    // Refresh from dual-path disk SoT every time (Settings ↔ Lab stay in sync)
+    NSDictionary *live = [ProfileBuilder loadCurrentFlat];
+    if (live.count) {
+        self.flat = live;
+        [self.tableView reloadData];
+    }
 }
 
 - (NSArray<NSArray<NSArray<NSString *> *> *> *)profileRows {

@@ -266,6 +266,10 @@ static CFTypeRef IPFWashHostMGValue(NSString *k, CFTypeRef real) {
     NSString *rs = (__bridge NSString *)real;
     if (rs.length == 0) return real;
     IPFConfig *cfg = [IPFConfig shared];
+    // Never wash the assigned device name (Settings "Tên") into MarketingName
+    NSString *wantName = [cfg stringForKey:@"UserAssignedDeviceName"]
+        ?: [cfg stringForKey:@"DeviceName"];
+    if (wantName.length && [rs isEqualToString:wantName]) return real;
     id repl = nil;
     NSString *why = nil;
     if (gHostProductType.length && [rs isEqualToString:gHostProductType]) {

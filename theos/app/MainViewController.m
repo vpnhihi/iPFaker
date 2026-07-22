@@ -611,7 +611,14 @@
     vc.device = [AppState.shared currentDevice];
     vc.iosVer = AppState.shared.selectedIOS;
     vc.iosMeta = [AppState.shared currentIOSMeta];
-    vc.flat = AppState.shared.lastFlat;
+    // Live dual-path SoT (disk) so Lab About matches Settings / config.plist — not stale lastFlat
+    NSDictionary *live = [self liveFlatForSoT];
+    if (live.count) {
+        vc.flat = live;
+        AppState.shared.lastFlat = live;
+    } else {
+        vc.flat = AppState.shared.lastFlat;
+    }
     self.navigationController.navigationBarHidden = NO;
     [self.navigationController pushViewController:vc animated:YES];
 }

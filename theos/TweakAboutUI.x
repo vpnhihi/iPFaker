@@ -97,10 +97,16 @@ static BOOL IPFUIShouldReplaceVersion(NSString *t, NSString *wantPV, NSArray *ho
     return NO;
 }
 
-static BOOL IPFUIShouldReplaceModel(NSString *t, NSString *wantMk) {
+// Only wash real host marketing model labels → config MarketingName.
+// MUST NOT touch UserAssignedDeviceName (Settings "Tên") — custom names like
+// "iPhone lock 🎮" / "vip chùa" used to match bare "iPhone" prefix and get replaced.
+static BOOL IPFUIShouldReplaceModel(NSString *t, NSString *wantMk, NSString *wantName) {
     if (!t.length || !wantMk.length) return NO;
     if ([t isEqualToString:wantMk]) return NO;
+    // Protect assigned device name (exact match)
+    if (wantName.length && [t isEqualToString:wantName]) return NO;
     // Common host marketing labels on rootless JB hosts (any gen still used as host)
+    // Exact match preferred; short regional suffix only for multi-token names (never bare "iPhone").
     static NSArray *hosts;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
@@ -116,20 +122,22 @@ static BOOL IPFUIShouldReplaceModel(NSString *t, NSString *wantMk) {
             @"iPhone 15", @"iPhone 15 Plus", @"iPhone 15 Pro", @"iPhone 15 Pro Max",
             @"iPhone 16", @"iPhone 16 Plus", @"iPhone 16 Pro", @"iPhone 16 Pro Max", @"iPhone 16e",
             @"iPhone SE", @"iPhone SE (2nd generation)", @"iPhone SE (3rd generation)",
-            @"iPhone",
+            // bare "iPhone" intentionally omitted — would wash custom UserAssignedDeviceName
         ];
     });
     for (NSString *h in hosts) {
         if ([t isEqualToString:h]) return YES;
-        // "iPhone 7 (GSM)" / regional suffixes
-        if ([t hasPrefix:h] && t.length < h.length + 14) return YES;
+        // "iPhone 7 (GSM)" / regional suffixes — require real marketing base (≥ "iPhone N")
+        if (h.length >= 8 && [t hasPrefix:h] && t.length < h.length + 14
+            && ![t isEqualToString:wantName])
+            return YES;
     }
-    // Generic marketing line: "iPhone N …" (About model name cell only — short, no serial/part)
-    if ([t hasPrefix:@"iPhone"] && t.length >= 6 && t.length <= 36
+    // Generic marketing line only: "iPhone" + SE/Air/digit/X… (not free-form custom names)
+    if ([t hasPrefix:@"iPhone"] && t.length >= 8 && t.length <= 36
         && [t rangeOfString:@"/"].location == NSNotFound
         && [t rangeOfString:@"@"].location == NSNotFound) {
         NSRegularExpression *re = [NSRegularExpression
-            regularExpressionWithPattern:@"^iPhone(\\s+(SE|Air|\\d+e?|X[RS]?).*)?$"
+            regularExpressionWithPattern:@"^iPhone\\s+(SE|Air|\\d+e?|X[RS]?)(\\s+.*)?$"
                                  options:0 error:nil];
         if (re && [re numberOfMatchesInString:t options:0 range:NSMakeRange(0, t.length)] > 0)
             return YES;
@@ -137,7 +145,8 @@ static BOOL IPFUIShouldReplaceModel(NSString *t, NSString *wantMk) {
     return NO;
 }
 
-static NSInteger IPFUIWashView(UIView *root, NSString *wantPV, NSString *wantMk, NSArray *hostVers) {
+static NSInteger IPFUIWashView(UIView *root, NSString *wantPV, NSString *wantMk,
+                               NSString *wantName, NSArray *hostVers) {
     if (!root || !wantPV.length) return 0;
     __block NSInteger n = 0;
     NSMutableArray *stack = [NSMutableArray arrayWithObject:root];
@@ -148,11 +157,13 @@ static NSInteger IPFUIWashView(UIView *root, NSString *wantPV, NSString *wantMk,
             if (![lab isKindOfClass:[UILabel class]]) return;
             NSString *t = lab.text;
             if (![t isKindOfClass:[NSString class]] || !t.length) return;
+            // Never rewrite the user-assigned name cell
+            if (wantName.length && [t isEqualToString:wantName]) return;
             if (IPFUIShouldReplaceVersion(t, wantPV, hostVers)) {
                 lab.text = wantPV;
                 n++;
                 IPFUILog([NSString stringWithFormat:@"label ver %@ => %@", t, wantPV]);
-            } else if (wantMk.length && IPFUIShouldReplaceModel(t, wantMk)) {
+            } else if (wantMk.length && IPFUIShouldReplaceModel(t, wantMk, wantName)) {
                 lab.text = wantMk;
                 n++;
                 IPFUILog([NSString stringWithFormat:@"label model %@ => %@", t, wantMk]);
@@ -175,6 +186,8 @@ static void IPFUIWashAllWindows(void) {
     NSString *want = [cfg[@"ProductVersion"] description];
     if (!want.length) return;
     NSString *wantMk = [cfg[@"MarketingName"] description] ?: @"";
+    NSString *wantName = [cfg[@"UserAssignedDeviceName"] description]
+        ?: [cfg[@"DeviceName"] description] ?: @"";
     NSArray *hostVers = IPFUIHostVersionTokens();
 
     NSInteger total = 0;
@@ -191,17 +204,18 @@ static void IPFUIWashAllWindows(void) {
     if (!windows.count)
         windows = UIApplication.sharedApplication.windows;
     for (UIWindow *w in windows) {
-        total += IPFUIWashView(w, want, wantMk, hostVers);
+        total += IPFUIWashView(w, want, wantMk, wantName, hostVers);
         UIViewController *r = w.rootViewController;
-        if (r.view) total += IPFUIWashView(r.view, want, wantMk, hostVers);
+        if (r.view) total += IPFUIWashView(r.view, want, wantMk, wantName, hostVers);
         UIViewController *p = r.presentedViewController;
         while (p) {
-            if (p.view) total += IPFUIWashView(p.view, want, wantMk, hostVers);
+            if (p.view) total += IPFUIWashView(p.view, want, wantMk, wantName, hostVers);
             p = p.presentedViewController;
         }
     }
     if (total > 0)
-        IPFUILog([NSString stringWithFormat:@"washed %ld label(s) -> %@ / %@", (long)total, wantMk, want]);
+        IPFUILog([NSString stringWithFormat:@"washed %ld label(s) -> mk=%@ ver=%@ (name protected=%@)",
+                  (long)total, wantMk, want, wantName.length ? wantName : @"-"]);
 }
 
 static void IPFUIScheduleWashes(void) {
