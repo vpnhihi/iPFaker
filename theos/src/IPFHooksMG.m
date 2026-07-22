@@ -18,6 +18,7 @@
 #import <dlfcn.h>
 #import <string.h>
 #import <stdio.h>
+#import <errno.h>
 #import <pthread.h>
 
 #if IPF_FISHHOOK_FALLBACK
