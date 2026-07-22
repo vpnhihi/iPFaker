@@ -156,17 +156,23 @@
     return [[v componentsSeparatedByString:@"."].firstObject integerValue];
 }
 
-/// Lab rule: spoof iOS never > host; never major-gap ≥ 2 below host (forces host iOS).
+/// Soft host prefer (2.10.7): do NOT hard-rewrite spoof iOS.
+/// - Empty → host (fallback only)
+/// - spoof > host / major gap: keep spoof (caller scores + warns). Matrix still owns validity.
+/// Hard clamp removed so Full-model (vd. 17 Pro Max + iOS 26) and old iOS still possible.
 + (NSString *)clampSpoofIOSToHost:(NSString *)spoofIOS {
+    NSString *host = [self hostSystemVersion];
+    if (!spoofIOS.length) return host.length ? host : @"15.0";
+    return spoofIOS;
+}
+
+/// Soft preference only: if spoof > host, return host for “prefer” paths; never used to invent matrix.
++ (NSString *)preferIOSAtMostHost:(NSString *)spoofIOS {
     NSString *host = [self hostSystemVersion];
     if (!spoofIOS.length) return host.length ? host : @"15.0";
     if (!host.length) return spoofIOS;
     if ([self compareVersion:spoofIOS toVersion:host] == NSOrderedDescending)
         return host;
-    NSInteger sm = [self ipfMajorFromVersion:spoofIOS];
-    NSInteger hm = [self ipfMajorFromVersion:host];
-    if (hm > 0 && sm > 0 && (hm - sm) >= 2)
-        return host; // e.g. spoof 12.x on host 15.x → clamp 15.x (WebKit/UA sync)
     return spoofIOS;
 }
 
@@ -185,7 +191,8 @@
 }
 
 + (NSString *)labHonestClaimFooter {
-    return @"Lab «Thật nhất»: Full model OK · iOS ≤ host & gần host · radio/màn/UA/Darwin sync.\n"
+    return @"Lab soft-host: Full model OK · ưu tiên iOS ≤ host khi máy hỗ trợ · "
+           @"cho phép iOS catalog (kể cả > host) · radio/màn/UA/Darwin theo spoof.\n"
            @"KHÔNG claim: server risk VNG · silicon SE/GPU die · App Attest token thật.";
 }
 
@@ -198,29 +205,28 @@
 }
 
 + (NSInteger)labRealismScoreForProductType:(NSString *)productType ios:(NSString *)ios {
-    // Higher = safer on this host (API/OS/silicon class closer). Full catalog still allowed.
+    // Higher = closer to host (weighted pick). Full catalog still allowed with lower weight.
     NSString *hostIOS = [self hostSystemVersion] ?: @"15.0";
     NSString *hostPT = [self hostProductType] ?: @"";
     NSInteger score = 100;
-    NSString *useIOS = ios.length ? [self clampSpoofIOSToHost:ios] : hostIOS;
+    NSString *useIOS = ios.length ? ios : hostIOS;
     NSInteger hm = [self ipfMajorFromVersion:hostIOS];
     NSInteger sm = [self ipfMajorFromVersion:useIOS];
     if (hm > 0 && sm > 0) {
-        score -= labs(hm - sm) * 18; // major iOS gap hurts WebKit story
-        // minor: prefer closer to host string
-        if ([self compareVersion:useIOS toVersion:hostIOS] == NSOrderedAscending)
-            score -= 3;
+        score -= labs(hm - sm) * 12; // soft: major gap penalty (was 18 + hard clamp)
+        if ([self compareVersion:useIOS toVersion:hostIOS] == NSOrderedDescending)
+            score -= 10; // spoof OS > host (WebKit/host API skew)
+        else if ([self compareVersion:useIOS toVersion:hostIOS] == NSOrderedAscending)
+            score -= 2;
     }
     NSInteger hg = [self productTypeGeneration:hostPT];
     NSInteger sg = [self productTypeGeneration:productType];
     if (hg > 0 && sg > 0) {
         NSInteger gap = labs(hg - sg);
-        // Soft: model far from host still OK but lower weight (Full catalog)
-        score -= (NSInteger)MIN(gap * 8, 48);
-        // Spoof much newer than host silicon = riskier than slightly older
-        if (sg > hg) score -= (sg - hg) * 4;
+        score -= (NSInteger)MIN(gap * 6, 40); // soft model-distance
+        if (sg > hg) score -= (sg - hg) * 3;
     } else if (productType.length && hostPT.length && ![productType isEqualToString:hostPT]) {
-        score -= 15;
+        score -= 12;
     }
     if (score < 1) score = 1;
     if (score > 100) score = 100;
@@ -231,23 +237,19 @@
     NSMutableArray *w = [NSMutableArray array];
     NSString *hostIOS = [self hostSystemVersion];
     NSString *hostPT = [self hostProductType];
-    NSString *aligned = spoofIOS.length ? [self clampSpoofIOSToHost:spoofIOS] : spoofIOS;
-    if (spoofIOS.length && aligned.length && ![aligned isEqualToString:spoofIOS]) {
-        [w addObject:[NSString stringWithFormat:
-                      @"✓ Đã kẹp iOS %@ → %@ (khớp host, chống lệch WebKit/UA)",
-                      spoofIOS, aligned]];
-    }
+    NSString *aligned = spoofIOS.length ? spoofIOS : @"";
     if (aligned.length && hostIOS.length) {
         NSComparisonResult c = [self compareVersion:aligned toVersion:hostIOS];
         if (c == NSOrderedDescending) {
             [w addObject:[NSString stringWithFormat:
-                          @"⚠ Spoof iOS %@ > host iOS %@", aligned, hostIOS]];
+                          @"⚠ Soft-host: spoof iOS %@ > host %@ (matrix máy OK, WebKit/host API có thể lệch)",
+                          aligned, hostIOS]];
         } else if (c == NSOrderedAscending) {
             NSInteger sm = [self ipfMajorFromVersion:aligned];
             NSInteger hm = [self ipfMajorFromVersion:hostIOS];
-            if (hm - sm >= 1) {
+            if (hm - sm >= 2) {
                 [w addObject:[NSString stringWithFormat:
-                              @"⚠ Spoof iOS %@ < host %@ — đã cố đồng bộ major",
+                              @"⚠ Soft-host: spoof iOS %@ << host %@ (major gap ≥ 2, điểm thật thấp hơn)",
                               aligned, hostIOS]];
             }
         }

@@ -609,30 +609,37 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
 
 #pragma mark - Apply / random pool
 
-/// Best iOS for device: highest catalog version that device supports AND ≤ host.
-/// Returns nil if this device cannot run any iOS ≤ host (e.g. iPhone 17 on host 15.5).
-/// NEVER invent host iOS for a device that does not support it.
+/// Best iOS for device (soft-host 2.10.7):
+/// 1) Prefer highest catalog iOS that device supports AND ≤ host
+/// 2) Else catalog-native: lowest supported (may be > host, e.g. 17 Pro Max → 26.x)
+/// NEVER invent host iOS if not on device matrix.
 - (NSString *)bestHostAlignedIOSForDevice:(NSDictionary *)dev {
     if (!dev) return nil;
     NSString *host = [ProfileBuilder hostSystemVersion] ?: @"15.0";
     NSArray *iosOpts = [self selectedIOSCompatibleWithDevice:dev];
     if (iosOpts.count == 0)
         iosOpts = [Catalog.shared supportedIOSForDevice:dev];
-    NSString *best = nil;
+    NSString *bestLeHost = nil;
+    NSString *lowestAny = nil;
     for (NSString *v in iosOpts) {
         if (!Catalog.shared.iosReleases[v]) continue;
-        // Must be on device matrix AND ≤ host (no clamp-up inventing host on unsupported phone)
-        if ([ProfileBuilder compareVersion:v toVersion:host] == NSOrderedDescending) continue;
         if (![Catalog.shared device:dev supportsIOS:v]) continue;
-        if (!best || [ProfileBuilder compareVersion:v toVersion:best] == NSOrderedDescending)
-            best = v;
+        if (!lowestAny || [ProfileBuilder compareVersion:v toVersion:lowestAny] == NSOrderedAscending)
+            lowestAny = v;
+        if ([ProfileBuilder compareVersion:v toVersion:host] == NSOrderedDescending)
+            continue; // > host — keep for fallback only
+        if (!bestLeHost || [ProfileBuilder compareVersion:v toVersion:bestLeHost] == NSOrderedDescending)
+            bestLeHost = v;
     }
-    // If host itself is on the matrix for this device, prefer host when equal/best
-    if ([Catalog.shared device:dev supportsIOS:host] && Catalog.shared.iosReleases[host]) {
-        if (!best || [ProfileBuilder compareVersion:host toVersion:best] != NSOrderedAscending)
-            best = host;
+    if (bestLeHost) {
+        // Prefer host string when it is on matrix
+        if ([Catalog.shared device:dev supportsIOS:host] && Catalog.shared.iosReleases[host]
+            && [ProfileBuilder compareVersion:host toVersion:bestLeHost] != NSOrderedAscending)
+            return host;
+        return bestLeHost;
     }
-    return best; // nil = device incompatible with this host OS lab
+    // Soft: allow catalog-native iOS > host (weighted pick still prefers near-host models)
+    return lowestAny;
 }
 
 /// Pick random pair — Full catalog OK; weighted toward host-realism (iOS≤host, model gen near host).
@@ -661,10 +668,7 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
         totalW += w;
     }
     if (pairs.count == 0) {
-        if (err) *err = [NSString stringWithFormat:
-            @"Không có máy nào trong pool chạy được iOS ≤ host %@.\n"
-            @"Bỏ máy chỉ hỗ trợ iOS mới (vd. iPhone 17 = iOS 26+) hoặc thêm đời máy hỗ trợ 15.x.",
-            [ProfileBuilder hostSystemVersion] ?: @"?"];
+        if (err) *err = @"Không có cặp máy+iOS hợp lệ trong pool (thiếu matrix / catalog).";
         return NO;
     }
     NSDictionary *pick = nil;
@@ -686,56 +690,43 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     if (!dev) return @"Danh mục máy trống";
     NSString *iosRequested = [ios copy];
     NSString *hostIOS = [ProfileBuilder hostSystemVersion] ?: @"?";
-    // Lab «Thật nhất»: iOS must be on device matrix AND ≤ host. Never force host OS on
-    // phones that never shipped it (e.g. iPhone 17 Pro Max + 15.5).
+    // Soft-host: matrix first. Prefer ≤ host; else catalog-native (may be > host).
+    // Never invent host iOS for phones that never shipped it (17 Pro Max ≠ 15.5).
     NSString *aligned = [self bestHostAlignedIOSForDevice:dev];
     if (!aligned.length) {
-        // Try another device from selected pool that works on this host
-        NSDictionary *alt = nil;
-        NSString *altIOS = nil;
-        NSString *pickErr = nil;
-        if ([self pickRandomPairDevice:&alt ios:&altIOS error:&pickErr] && alt && altIOS.length) {
-            return [NSString stringWithFormat:
-                    @"⚠ %@ không có iOS ≤ host %@ trong matrix.\n"
-                    @"→ Tự chuyển: %@ + iOS %@\n%@",
-                    dev[@"MarketingName"] ?: dev[@"id"],
-                    hostIOS,
-                    alt[@"MarketingName"] ?: alt[@"id"],
-                    altIOS,
-                    [self applyWithDevice:alt ios:altIOS]];
-        }
         return [NSString stringWithFormat:
-                @"❌ %@ không chạy được iOS ≤ host %@.\n"
-                @"Chọn đời máy hỗ trợ iOS 15.x (vd. XS Max / 11 / 12…) trong «Chọn máy».",
-                dev[@"MarketingName"] ?: dev[@"id"], hostIOS];
+                @"❌ %@ không có iOS nào trong matrix catalog.",
+                dev[@"MarketingName"] ?: dev[@"id"]];
     }
-    // Requested iOS only if also supported ≤ host; else best aligned
-    NSString *clampedReq = ios.length ? [ProfileBuilder clampSpoofIOSToHost:ios] : aligned;
-    if (clampedReq.length && [Catalog.shared device:dev supportsIOS:clampedReq]
-        && Catalog.shared.iosReleases[clampedReq]
-        && [ProfileBuilder compareVersion:clampedReq toVersion:hostIOS] != NSOrderedDescending) {
-        if ([ProfileBuilder compareVersion:clampedReq toVersion:aligned] == NSOrderedDescending)
-            ios = clampedReq;
-        else
-            ios = aligned;
+    // Requested iOS if on matrix; else aligned (soft — may be > host)
+    if (ios.length && [Catalog.shared device:dev supportsIOS:ios]
+        && Catalog.shared.iosReleases[ios]) {
+        // Prefer requested when user/pool chose it; still valid on matrix
+        // Soft: if requested ≤ host and aligned ≤ host, pick higher (nearer host)
+        if ([ProfileBuilder compareVersion:ios toVersion:hostIOS] != NSOrderedDescending
+            && [ProfileBuilder compareVersion:aligned toVersion:hostIOS] != NSOrderedDescending) {
+            if ([ProfileBuilder compareVersion:ios toVersion:aligned] == NSOrderedAscending)
+                ios = aligned; // bump toward host when both ≤ host
+        }
+        // else keep requested (including > host catalog-native)
     } else {
         ios = aligned;
     }
     NSDictionary *meta = Catalog.shared.iosReleases[ios];
     if (!meta) {
-        ios = [self bestHostAlignedIOSForDevice:dev];
+        ios = aligned;
         meta = Catalog.shared.iosReleases[ios];
     }
     if (!meta) return [NSString stringWithFormat:@"Không có iOS %@ trong catalog", ios ?: @"?"];
 
-    // Strict matrix guard — never use unsupported version
+    // Matrix guard — never use unsupported version
     if (![Catalog.shared device:dev supportsIOS:ios]) {
-        ios = [self bestHostAlignedIOSForDevice:dev];
+        ios = aligned;
         meta = Catalog.shared.iosReleases[ios];
         if (!meta || ![Catalog.shared device:dev supportsIOS:ios]) {
             return [NSString stringWithFormat:
-                    @"❌ Không có iOS hợp lệ cho %@ trên host %@",
-                    dev[@"MarketingName"] ?: dev[@"id"], hostIOS];
+                    @"❌ Không có iOS hợp lệ cho %@",
+                    dev[@"MarketingName"] ?: dev[@"id"]];
         }
     }
 

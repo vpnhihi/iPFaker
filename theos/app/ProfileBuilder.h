@@ -22,8 +22,10 @@ typedef void (^IPFWipeProgress)(NSString *step);
 /// Lab warnings: spoof iOS > host, model ≠ host, etc.
 + (NSString *)labMismatchWarningForSpoofIOS:(NSString *)spoofIOS
                                  productType:(nullable NSString *)productType;
-/// Clamp spoof iOS to host so UA/WebKit/OS client không lệch (lab “no OS skew”).
+/// Soft host prefer (2.10.7): empty → host; otherwise keep spoof (no hard rewrite).
 + (NSString *)clampSpoofIOSToHost:(NSString *)spoofIOS;
+/// Prefer min(spoof, host) when a “at most host” choice is needed (optional helper).
++ (NSString *)preferIOSAtMostHost:(NSString *)spoofIOS;
 /// Random Settings device name from lab pool (iPhone / iPhone vip / iPhone của Linh…).
 + (NSString *)randomUserDeviceName;
 /// Radio RAT string matching device year (no NR on pre-5G phones).
