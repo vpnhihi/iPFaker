@@ -119,10 +119,24 @@ static NSData *IPFRewritePayload(NSData *data) {
             @"D47AP", @"D48AP", @"D93AP", @"D94AP", @"D23AP",
         ];
         if (pt.length) {
+            // Plain + URL-encoded (Zalo: data=%7B...iPhone9%2C1...) — one-profile SoT
+            NSString *ptEnc = [pt stringByReplacingOccurrencesOfString:@"," withString:@"%2C"];
+            NSString *ptEncLower = [pt stringByReplacingOccurrencesOfString:@"," withString:@"%2c"];
             for (NSString *r in realPT) {
                 if ([r isEqualToString:pt]) continue;
                 if ([out rangeOfString:r].location != NSNotFound) {
                     out = [out stringByReplacingOccurrencesOfString:r withString:pt];
+                    changed = YES;
+                }
+                NSString *rEnc = [r stringByReplacingOccurrencesOfString:@"," withString:@"%2C"];
+                NSString *rEncL = [r stringByReplacingOccurrencesOfString:@"," withString:@"%2c"];
+                if (rEnc.length && ![rEnc isEqualToString:ptEnc] && [out rangeOfString:rEnc].location != NSNotFound) {
+                    out = [out stringByReplacingOccurrencesOfString:rEnc withString:ptEnc];
+                    changed = YES;
+                }
+                if (rEncL.length && ![rEncL isEqualToString:ptEncLower]
+                    && [out rangeOfString:rEncL].location != NSNotFound) {
+                    out = [out stringByReplacingOccurrencesOfString:rEncL withString:ptEncLower];
                     changed = YES;
                 }
             }
@@ -162,50 +176,53 @@ static NSData *IPFRewritePayload(NSData *data) {
         if (osv.length) {
             BOOL analyticsish =
                 [out rangeOfString:@"osv"].location != NSNotFound
+                || [out rangeOfString:@"%22osv%22"].location != NSNotFound
                 || [out rangeOfString:@"centralized"].location != NSNotFound
                 || [out rangeOfString:@"deviceUUID"].location != NSNotFound
+                || [out rangeOfString:@"deviceUUID" options:NSCaseInsensitiveSearch].location != NSNotFound
                 || [out rangeOfString:@"mod="].location != NSNotFound
-                || [out rangeOfString:@"\\\"mod\\\""].location != NSNotFound
+                || [out rangeOfString:@"%22mod%22"].location != NSNotFound
                 || [out rangeOfString:@"\"mod\""].location != NSNotFound;
             if (analyticsish) {
-                // Match real JSON quotes: "osv":"15.8.4"  (ObjC @"\"osv\"..." not \\\")
-                NSError *rxErr = nil;
+                NSString *safeOsv = [[osv componentsSeparatedByCharactersInSet:
+                    [[NSCharacterSet characterSetWithCharactersInString:@"0123456789."] invertedSet]]
+                    componentsJoinedByString:@""];
+                if (!safeOsv.length) safeOsv = osv;
+                // Plain JSON: "osv":"15.8.4"
                 NSRegularExpression *reOsvJson = [NSRegularExpression
                     regularExpressionWithPattern:@"\"osv\"\\s*:\\s*\"[0-9.]+\""
-                                         options:0 error:&rxErr];
+                                         options:0 error:nil];
                 if (reOsvJson) {
-                    // Escape $ \ in osv for template safety (versions are digits/dots only)
-                    NSString *safeOsv = [[osv componentsSeparatedByCharactersInSet:
-                        [[NSCharacterSet characterSetWithCharactersInString:@"0123456789."] invertedSet]]
-                        componentsJoinedByString:@""];
-                    if (!safeOsv.length) safeOsv = osv;
-                    NSString *replOsvJson = [NSString stringWithFormat:@"\"osv\":\"%@\"", safeOsv];
-                    NSString *tmp = [reOsvJson stringByReplacingMatchesInString:out
-                                                                       options:0
-                                                                         range:NSMakeRange(0, out.length)
-                                                                  withTemplate:replOsvJson];
+                    NSString *repl = [NSString stringWithFormat:@"\"osv\":\"%@\"", safeOsv];
+                    NSString *tmp = [reOsvJson stringByReplacingMatchesInString:out options:0
+                        range:NSMakeRange(0, out.length) withTemplate:repl];
                     if (tmp && ![tmp isEqualToString:out]) { out = tmp; changed = YES; }
                 }
-                // form / query: osv=15.8.4
+                // form: osv=15.8.4
                 NSRegularExpression *reOsvForm = [NSRegularExpression
-                    regularExpressionWithPattern:@"osv=[0-9.]+"
-                                         options:0 error:nil];
+                    regularExpressionWithPattern:@"osv=[0-9.]+" options:0 error:nil];
                 if (reOsvForm) {
-                    NSString *safeOsv = [[osv componentsSeparatedByCharactersInSet:
-                        [[NSCharacterSet characterSetWithCharactersInString:@"0123456789."] invertedSet]]
-                        componentsJoinedByString:@""];
-                    if (!safeOsv.length) safeOsv = osv;
-                    NSString *replOsvForm = [NSString stringWithFormat:@"osv=%@", safeOsv];
-                    NSString *tmp = [reOsvForm stringByReplacingMatchesInString:out
-                                                              options:0
-                                                                range:NSMakeRange(0, out.length)
-                                                         withTemplate:replOsvForm];
+                    NSString *repl = [NSString stringWithFormat:@"osv=%@", safeOsv];
+                    NSString *tmp = [reOsvForm stringByReplacingMatchesInString:out options:0
+                        range:NSMakeRange(0, out.length) withTemplate:repl];
+                    if (tmp && ![tmp isEqualToString:out]) { out = tmp; changed = YES; }
+                }
+                // URL-encoded JSON fragment: %22osv%22%3A%2215.8.4%22
+                NSRegularExpression *reOsvPct = [NSRegularExpression
+                    regularExpressionWithPattern:@"%22osv%22%3A%22[0-9.]+%22"
+                                         options:NSRegularExpressionCaseInsensitive error:nil];
+                if (reOsvPct) {
+                    NSString *repl = [NSString stringWithFormat:@"%%22osv%%22%%3A%%22%@%%22", safeOsv];
+                    NSString *tmp = [reOsvPct stringByReplacingMatchesInString:out options:0
+                        range:NSMakeRange(0, out.length) withTemplate:repl];
                     if (tmp && ![tmp isEqualToString:out]) { out = tmp; changed = YES; }
                 }
             }
         }
-        // Zalo analytics: "ss":"750x1334" / ss=750x1334 → native WxH from profile
-        if (ss.length && ([out rangeOfString:@"ss"].location != NSNotFound)) {
+        // Zalo analytics: "ss":"750x1334" / ss=750x1334 / %22ss%22%3A%22750x1334%22
+        if (ss.length && ([out rangeOfString:@"ss"].location != NSNotFound
+                          || [out rangeOfString:@"%22ss%22"].location != NSNotFound
+                          || [out rangeOfString:@"%22SS%22"].location != NSNotFound)) {
             NSString *safeSs = [[ss componentsSeparatedByCharactersInSet:
                 [[NSCharacterSet characterSetWithCharactersInString:@"0123456789xX"] invertedSet]]
                 componentsJoinedByString:@""];
@@ -214,22 +231,26 @@ static NSData *IPFRewritePayload(NSData *data) {
                 regularExpressionWithPattern:@"\"ss\"\\s*:\\s*\"[0-9]+x[0-9]+\""
                                      options:0 error:nil];
             if (reSsJson) {
-                NSString *replSsJson = [NSString stringWithFormat:@"\"ss\":\"%@\"", safeSs];
-                NSString *tmp = [reSsJson stringByReplacingMatchesInString:out
-                                                                   options:0
-                                                                     range:NSMakeRange(0, out.length)
-                                                              withTemplate:replSsJson];
+                NSString *repl = [NSString stringWithFormat:@"\"ss\":\"%@\"", safeSs];
+                NSString *tmp = [reSsJson stringByReplacingMatchesInString:out options:0
+                    range:NSMakeRange(0, out.length) withTemplate:repl];
                 if (tmp && ![tmp isEqualToString:out]) { out = tmp; changed = YES; }
             }
             NSRegularExpression *reSsForm = [NSRegularExpression
-                regularExpressionWithPattern:@"ss=[0-9]+x[0-9]+"
-                                     options:0 error:nil];
+                regularExpressionWithPattern:@"ss=[0-9]+x[0-9]+" options:0 error:nil];
             if (reSsForm) {
-                NSString *replSsForm = [NSString stringWithFormat:@"ss=%@", safeSs];
-                NSString *tmp = [reSsForm stringByReplacingMatchesInString:out
-                                                         options:0
-                                                           range:NSMakeRange(0, out.length)
-                                                    withTemplate:replSsForm];
+                NSString *repl = [NSString stringWithFormat:@"ss=%@", safeSs];
+                NSString *tmp = [reSsForm stringByReplacingMatchesInString:out options:0
+                    range:NSMakeRange(0, out.length) withTemplate:repl];
+                if (tmp && ![tmp isEqualToString:out]) { out = tmp; changed = YES; }
+            }
+            NSRegularExpression *reSsPct = [NSRegularExpression
+                regularExpressionWithPattern:@"%22ss%22%3A%22[0-9]+x[0-9]+%22"
+                                     options:NSRegularExpressionCaseInsensitive error:nil];
+            if (reSsPct) {
+                NSString *repl = [NSString stringWithFormat:@"%%22ss%%22%%3A%%22%@%%22", safeSs];
+                NSString *tmp = [reSsPct stringByReplacingMatchesInString:out options:0
+                    range:NSMakeRange(0, out.length) withTemplate:repl];
                 if (tmp && ![tmp isEqualToString:out]) { out = tmp; changed = YES; }
             }
         }
