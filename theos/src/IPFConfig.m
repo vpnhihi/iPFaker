@@ -505,7 +505,6 @@ static NSArray<NSString *> *IPFJSONCandidates(void) {
             @"aS/S7hCcobxbRgwdTuv4bw": @"MarketingName",
             // Artwork / product description (Zalo + Settings marketing row)
             @"ArtworkDeviceProductDescription": @"MarketingName",
-            @"MarketingNameString": @"MarketingName",
             @"DeviceProductDescription": @"MarketingName",
             @"ghpAuGJlPoauWijdtPi7sQ": @"UserAssignedDeviceName",
             // Settings → About network / modem / eSIM (hashed)
