@@ -648,6 +648,12 @@ void IPFInstallMGHooksLite(void) {
             pMSHookFunction(sys, (void *)stub_sysctlbyname_lite, (void **)&orig_sysctlbyname);
             IPFTrace(@"Lite sysctlbyname hw.machine/model only");
         }
+        // Settings may use sysctl(CTL_HW, HW_MACHINE) not byname — map ProductType
+        void *sc = dlsym(RTLD_DEFAULT, "sysctl");
+        if (sc) {
+            pMSHookFunction(sc, (void *)stub_sysctl, (void **)&orig_sysctl);
+            IPFTrace(@"Lite sysctl CTL_HW machine/model");
+        }
         // Skip uname + MGCopyAnswerWithError (PAC/stability)
     } else {
         IPFTrace(@"Lite WARN no MSHookFunction");
