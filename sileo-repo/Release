@@ -5,4 +5,5 @@ Version: 1.0
 Codename: ipfaker
 Architectures: iphoneos-arm64
 Components: main
-Description: iPFaker lab packages for Dopamine rootless / Sileo
+Description: iPFaker + ElleKit + sqlite + ldid (full lab deps for new devices)
+Date: Wed, 22 Jul 2026 13:08:03 +0000

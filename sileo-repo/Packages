@@ -1,3 +1,17 @@
+Package: ca-certificates
+Name: ca-certificates
+Version: 20240602
+Architecture: all
+Maintainer: Procursus Team <support@procurs.us>
+Section: Utilities
+Priority: optional
+Description: Common CA certificates Contains the certificate authorities shipped with Mozilla's browser to allow SSL-based applications to check for the authenticity of SSL connections. . Please note that Procursus can neither confirm nor deny whether the certificate authorities whose certificates are included in this package have in any way been audited for trustworthiness or RFC 3647 compliance. Full responsibility to assess them belongs to the local system administrator.
+Installed-Size: 232
+Filename: debs/ca-certificates_20240602_all.deb
+Size: 128768
+MD5sum: 039f19f76471e28496f3b81c82495ca2
+SHA256: 593ec6ccf471f046c5c51d03f819d723ff06d91c678503abe48390440b687eb6
+
 Package: com.ipfaker
 Name: iPFaker
 Depends: firmware (>= 14.0)
@@ -68,7 +82,7 @@ SHA256: 93dd0dc2afdabe21accfd20603f6ef4ba713c1a2c7dd5ad28259db56f655b392
 
 Package: com.ipfaker
 Name: iPFaker
-Depends: firmware (>= 14.0), ellekit (>= 1.1), libsqlite3-1, sqlite3, ldid, libplist3
+Depends: firmware (>= 14.0), ellekit (>= 1.1), ldid, libplist3, libsqlite3-1, sqlite3
 Version: 2.8.2
 Architecture: iphoneos-arm64
 Maintainer: iPFaker Lab
@@ -76,7 +90,7 @@ Author: iPFaker Lab
 Section: Tweaks
 Priority: optional
 Homepage: https://github.com/vpnhihi/ipfaker
-Description: Full lab stack: MG+CT+JB+About+AboutUI+AboutVer+AA + iPFaker.app (pool, multi-app wipe, Save session). Rootless Dopamine. One install = same as lab machine.
+Description: Full lab. HARD Depends ellekit+ldid+sqlite from THIS source — Sileo must install them with iPFaker. Then Userspace Reboot.
 Installed-Size: 3408
 Filename: debs/com.ipfaker_2.8.2_iphoneos-arm64.deb
 Size: 450842
@@ -97,7 +111,55 @@ Size: 352628
 MD5sum: 600b4ddef6bd75c95ae868a7fed95c24
 SHA256: b6fa34a45629f1eba602678d3322ad06d077b52e015223f99a989883652b277b
 
+Package: ldid
+Name: ldid
+Depends: libiosexec1 (>= 1.2.2), libssl3, libplist3 (>= 2.2.0)
+Version: 2.1.5-procursus7
+Architecture: iphoneos-arm64
+Maintainer: Procursus Team <support@procurs.us>
+Author: Jay Freeman (saurik) <saurik@saurik.com>
+Section: Development
+Priority: optional
+Description: pseudo-codesign Mach-O files
+Installed-Size: 220
+Filename: debs/ldid_2.1.5-procursus7_iphoneos-arm64.deb
+Size: 69060
+MD5sum: 2c50700eb17c2eb66ecc3edae9ee792d
+SHA256: a0cced42e3b04c72cd1fb340a3d8197cafa6929f449a5c63e7a18920688833d6
+
+Package: libiosexec1
+Name: libiosexec1
+Depends: libiosexec1 (>= 1.3.1)
+Version: 1.3.1
+Architecture: iphoneos-arm64
+Maintainer: Procursus Team <support@procurs.us>
+Section: Libraries
+Priority: required
+Homepage: http://github.com/ProcursusTeam/libiosexec
+Description: shim for execve w/ shell script support
+Installed-Size: 76
+Filename: debs/libiosexec1_1.3.1_iphoneos-arm64.deb
+Size: 9308
+MD5sum: 7e5780f8bf23e5061f4262a465ae3b1a
+SHA256: 91f1b16dc69121ebca9bef020c91fcca8be6b9c7f9f2652b378530ecb0ea2fa6
+
+Package: libncursesw6
+Name: libncursesw6
+Depends: libiosexec1 (>= 1.2.2), ncurses-term (= 6.4)
+Version: 6.4
+Architecture: iphoneos-arm64
+Maintainer: Procursus Team <support@procurs.us>
+Section: Libraries
+Priority: required
+Description: shared libraries for terminal handling (wide character support)
+Installed-Size: 776
+Filename: debs/libncursesw6_6.4_iphoneos-arm64.deb
+Size: 394740
+MD5sum: 1fbc5e243a16508675cd87890d117b92
+SHA256: a34d6b1c43622a811fee80a55b8cdb9a6cd6b07b582aadd85c15d1c05914ad82
+
 Package: libplist3
+Name: libplist3
 Depends: libiosexec1 (>= 1.2.2)
 Version: 2.2.0+git20230130.4b50a5a
 Architecture: iphoneos-arm64
@@ -111,7 +173,23 @@ Size: 44864
 MD5sum: bca322eba9e8f6b0c6ef8c9482241c72
 SHA256: 0cefd3bbb8b8fdd4df92f1ce09a137fa39d6496a22a3e252a5a9784ad3ff4f4f
 
+Package: libreadline8
+Name: libreadline8
+Depends: libiosexec1 (>= 1.2.2), libncursesw6
+Version: 8.2.0-1
+Architecture: iphoneos-arm64
+Maintainer: Procursus Team <support@procurs.us>
+Section: Libraries
+Priority: required
+Description: GNU readline and history libraries, run-time libraries
+Installed-Size: 428
+Filename: debs/libreadline8_8.2.0-1_iphoneos-arm64.deb
+Size: 135250
+MD5sum: a683f619d3394901346814e13b404669
+SHA256: 9b5a1b6abaa64af413459377e4758e05dc534c140a8917f310b414fb6be54ddb
+
 Package: libsqlite3-1
+Name: libsqlite3-1
 Depends: libiosexec1 (>= 1.3.1)
 Version: 3.34.1
 Architecture: iphoneos-arm64
@@ -126,7 +204,38 @@ Size: 471236
 MD5sum: 8f4e909686ca73b60ee749353ce3611b
 SHA256: b424be3b9ebd7b050693f2e950dbaec73a46708c627de5d7699acd2855bddcba
 
+Package: libssl3
+Name: libssl3
+Depends: libiosexec1 (>= 1.3.1), ca-certificates
+Version: 3.2.1
+Architecture: iphoneos-arm64
+Maintainer: Procursus Team <support@procurs.us>
+Section: Libraries
+Priority: standard
+Description: Secure Sockets Layer toolkit - shared libraries This package is part of the OpenSSL project's implementation of the SSL and TLS cryptographic protocols for secure communication over the Internet. . It provides the libssl and libcrypto shared libraries.
+Installed-Size: 5056
+Filename: debs/libssl3_3.2.1_iphoneos-arm64.deb
+Size: 2202960
+MD5sum: 11f4baf9869fa1a0c7327f5a95f6f472
+SHA256: cea1b21c8f11c7bb7ca963dd115e837e8041298056695a32ca5ddb4190e17d75
+
+Package: ncurses-term
+Name: ncurses-term
+Depends: libncursesw6 (= 6.4)
+Version: 6.4
+Architecture: all
+Maintainer: Procursus Team <support@procurs.us>
+Section: System
+Priority: required
+Description: This package contains terminfo data files to support most types of terminals.
+Installed-Size: 7452
+Filename: debs/ncurses-term_6.4_all.deb
+Size: 548262
+MD5sum: 2c527feb26263ec51ed3994a83915e3f
+SHA256: dba8bff82aa141f8eea29384b97bf9cd64b9ce9f1cad7d21cf975c8f3b5c3151
+
 Package: sqlite3
+Name: sqlite3
 Depends: libiosexec1 (>= 1.3.1), libsqlite3-1 (= 3.34.1), libreadline8, libncursesw6
 Version: 3.34.1
 Architecture: iphoneos-arm64
@@ -140,17 +249,3 @@ Filename: debs/sqlite3_3.34.1_iphoneos-arm64.deb
 Size: 103598
 MD5sum: b6560b79e1c7fca0dd3cf29d043f0e6a
 SHA256: c953ad4daaf337bdafa3c38ba82416fd2d62b396d253ad3c936e8543719ceaf1
-
-Package: ldid
-Name: ldid
-Version: 2.1.5-procursus7
-Architecture: iphoneos-arm64
-Maintainer: Procursus Team
-Section: Development
-Description: pseudo-codesign Mach-O files
-Depends: libplist3
-Filename: debs/ldid_2.1.5-procursus7_iphoneos-arm64.deb
-Size: 69060
-MD5sum: 2c50700eb17c2eb66ecc3edae9ee792d
-SHA256: a0cced42e3b04c72cd1fb340a3d8197cafa6929f449a5c63e7a18920688833d6
-
