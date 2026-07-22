@@ -400,42 +400,7 @@ static NSUUID *stub_idfa(id self, SEL _cmd) {
     return orig_idfa ? orig_idfa(self, _cmd) : nil;
 }
 
-// Battery — profile-seeded level (not host); state Unplugged by default for lab consistency
-static float (*orig_batteryLevel)(id, SEL);
-static float stub_batteryLevel(id self, SEL _cmd) {
-    if (![[IPFConfig shared] flag:@"FakeHardware" defaultYes:YES]
-        && ![[IPFConfig shared] flag:@"FakeDevice" defaultYes:YES])
-        return orig_batteryLevel ? orig_batteryLevel(self, _cmd) : -1.f;
-    double lvl = [[IPFConfig shared] doubleForKey:@"BatteryLevel" fallback:-1];
-    if (lvl >= 0.05 && lvl <= 1.0) return (float)lvl;
-    // Deterministic from serial when not in flat
-    NSString *seed = [[IPFConfig shared] stringForKey:@"SerialNumber"] ?: @"iPhone";
-    uint32_t h = 2166136261u;
-    const char *s = seed.UTF8String ?: "x";
-    for (const unsigned char *p = (const unsigned char *)s; *p; p++) {
-        h ^= *p; h *= 16777619u;
-    }
-    // 0.35 – 0.92
-    return (float)(0.35 + ((h & 0xFF) / 255.0) * 0.57);
-}
-
-static NSInteger (*orig_batteryState)(id, SEL);
-static NSInteger stub_batteryState(id self, SEL _cmd) {
-    if (![[IPFConfig shared] flag:@"FakeHardware" defaultYes:YES]
-        && ![[IPFConfig shared] flag:@"FakeDevice" defaultYes:YES])
-        return orig_batteryState ? orig_batteryState(self, _cmd) : 0;
-    // 0 unknown, 1 unplugged, 2 charging, 3 full — prefer unplugged for stable lab FP
-    NSInteger st = (NSInteger)[[IPFConfig shared] doubleForKey:@"BatteryState" fallback:1];
-    if (st < 0 || st > 3) st = 1;
-    return st;
-}
-
-static BOOL (*orig_batteryMon)(id, SEL);
-static BOOL stub_batteryMon(id self, SEL _cmd) {
-    // Always report monitoring available when spoofing hardware
-    if ([[IPFConfig shared] flag:@"FakeHardware" defaultYes:YES]) return YES;
-    return orig_batteryMon ? orig_batteryMon(self, _cmd) : NO;
-}
+// Battery hooks live in IPFHooksEnv (CT) — keep MG AMFI-lean.
 
 static void *IPFFindMG(const char *name) {
     void *p = dlsym(RTLD_DEFAULT, name);
@@ -510,13 +475,7 @@ void IPFInstallMGHooks(void) {
                 pMSHookMessageEx(uid, @selector(systemName), (IMP)stub_systemName, (IMP *)&orig_systemName);
             pMSHookMessageEx(uid, @selector(systemVersion), (IMP)stub_systemVersion, (IMP *)&orig_systemVersion);
             pMSHookMessageEx(uid, @selector(identifierForVendor), (IMP)stub_idfv, (IMP *)&orig_idfv);
-            if (class_getInstanceMethod(uid, @selector(batteryLevel)))
-                pMSHookMessageEx(uid, @selector(batteryLevel), (IMP)stub_batteryLevel, (IMP *)&orig_batteryLevel);
-            if (class_getInstanceMethod(uid, @selector(batteryState)))
-                pMSHookMessageEx(uid, @selector(batteryState), (IMP)stub_batteryState, (IMP *)&orig_batteryState);
-            if (class_getInstanceMethod(uid, @selector(isBatteryMonitoringEnabled)))
-                pMSHookMessageEx(uid, @selector(isBatteryMonitoringEnabled), (IMP)stub_batteryMon, (IMP *)&orig_batteryMon);
-            IPFTrace(@"UIDevice hooks OK (+battery)");
+            IPFTrace(@"UIDevice hooks OK (name/model/systemVersion/idfv)");
         }
         Class asid = objc_getClass("ASIdentifierManager");
         if (asid)

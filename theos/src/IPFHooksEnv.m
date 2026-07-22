@@ -396,6 +396,35 @@ static uint64_t stub_mtl_regid(id self, SEL _cmd) {
     return orig_mtl_regid ? orig_mtl_regid(self, _cmd) : 0;
 }
 
+#pragma mark - Battery (CT pack — keeps MG AMFI-lean)
+
+static float (*orig_batteryLevel)(id, SEL);
+static float stub_batteryLevel(id self, SEL _cmd) {
+    if (![[IPFConfig shared] flag:@"FakeHardware" defaultYes:YES]
+        && ![[IPFConfig shared] flag:@"FakeDevice" defaultYes:YES])
+        return orig_batteryLevel ? orig_batteryLevel(self, _cmd) : -1.f;
+    double lvl = [[IPFConfig shared] doubleForKey:@"BatteryLevel" fallback:-1];
+    if (lvl >= 0.05 && lvl <= 1.0) return (float)lvl;
+    uint32_t h = IPFSensorHash();
+    return (float)(0.35 + ((h & 0xFF) / 255.0) * 0.57);
+}
+
+static NSInteger (*orig_batteryState)(id, SEL);
+static NSInteger stub_batteryState(id self, SEL _cmd) {
+    if (![[IPFConfig shared] flag:@"FakeHardware" defaultYes:YES]
+        && ![[IPFConfig shared] flag:@"FakeDevice" defaultYes:YES])
+        return orig_batteryState ? orig_batteryState(self, _cmd) : 0;
+    NSInteger st = (NSInteger)[[IPFConfig shared] doubleForKey:@"BatteryState" fallback:1];
+    if (st < 0 || st > 3) st = 1;
+    return st;
+}
+
+static BOOL (*orig_batteryMon)(id, SEL);
+static BOOL stub_batteryMon(id self, SEL _cmd) {
+    if ([[IPFConfig shared] flag:@"FakeHardware" defaultYes:YES]) return YES;
+    return orig_batteryMon ? orig_batteryMon(self, _cmd) : NO;
+}
+
 #pragma mark - Install
 
 void IPFInstallEnvHooks(void) {
@@ -542,6 +571,17 @@ void IPFInstallEnvHooks(void) {
         }
     }
     IPFEnvTrace([NSString stringWithFormat:@"Metal hooks classes~%d name=%@", mtlHooked, IPFMetalName() ?: @"—"]);
+
+    Class uid = objc_getClass("UIDevice");
+    if (uid) {
+        if (class_getInstanceMethod(uid, @selector(batteryLevel)))
+            pMSHookMessageExEnv(uid, @selector(batteryLevel), (IMP)stub_batteryLevel, (IMP *)&orig_batteryLevel);
+        if (class_getInstanceMethod(uid, @selector(batteryState)))
+            pMSHookMessageExEnv(uid, @selector(batteryState), (IMP)stub_batteryState, (IMP *)&orig_batteryState);
+        if (class_getInstanceMethod(uid, @selector(isBatteryMonitoringEnabled)))
+            pMSHookMessageExEnv(uid, @selector(isBatteryMonitoringEnabled), (IMP)stub_batteryMon, (IMP *)&orig_batteryMon);
+        IPFEnvTrace(@"UIDevice battery hooks OK");
+    }
 
     IPFEnvTrace(@"IPFInstallEnvHooks done");
 }
