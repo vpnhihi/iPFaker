@@ -11,6 +11,18 @@ typedef void (^IPFWipeProgress)(NSString *step);
                                iosMeta:(NSDictionary *)iosMeta
                               deviceName:(nullable NSString *)name;
 
+/// Host ProductVersion (SystemVersion.plist / UIDevice).
++ (NSString *)hostSystemVersion;
+/// Host ProductType (sysctl hw.machine).
++ (NSString *)hostProductType;
+/// Compare dotted versions: NSOrderedAscending if a < b.
++ (NSComparisonResult)compareVersion:(NSString *)a toVersion:(NSString *)b;
+/// Darwin kern.osrelease + kern.version for spoof iOS (realistic map).
++ (NSDictionary *)darwinKernelKeysForIOS:(NSString *)iosVer board:(nullable NSString *)board;
+/// Lab warnings: spoof iOS > host, model ≠ host, etc.
++ (NSString *)labMismatchWarningForSpoofIOS:(NSString *)spoofIOS
+                                 productType:(nullable NSString *)productType;
+
 /// Write config.plist + active_profile.json to lab paths. Returns error message or nil.
 + (nullable NSString *)applyFlatProfile:(NSDictionary *)flat deviceId:(NSString *)deviceId ios:(NSString *)ios;
 

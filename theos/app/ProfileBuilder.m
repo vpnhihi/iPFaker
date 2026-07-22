@@ -6,8 +6,134 @@
 #import <unistd.h>
 #import <time.h>
 #import <stdlib.h>
+#import <sys/sysctl.h>
+#import <string.h>
 
 @implementation ProfileBuilder
+
+#pragma mark - Host / Darwin kernel helpers
+
++ (NSString *)hostSystemVersion {
+    NSDictionary *sv = [NSDictionary dictionaryWithContentsOfFile:
+                        @"/System/Library/CoreServices/SystemVersion.plist"];
+    NSString *v = sv[@"ProductVersion"];
+    if (v.length) return v;
+    return UIDevice.currentDevice.systemVersion ?: @"0";
+}
+
++ (NSString *)hostProductType {
+    char buf[64] = {0};
+    size_t len = sizeof(buf);
+    if (sysctlbyname("hw.machine", buf, &len, NULL, 0) == 0 && buf[0])
+        return [NSString stringWithUTF8String:buf];
+    return @"";
+}
+
++ (NSComparisonResult)compareVersion:(NSString *)a toVersion:(NSString *)b {
+    NSArray *pa = [[a description] componentsSeparatedByString:@"."];
+    NSArray *pb = [[b description] componentsSeparatedByString:@"."];
+    NSUInteger n = MAX(pa.count, pb.count);
+    for (NSUInteger i = 0; i < n; i++) {
+        NSInteger va = i < pa.count ? [pa[i] integerValue] : 0;
+        NSInteger vb = i < pb.count ? [pb[i] integerValue] : 0;
+        if (va < vb) return NSOrderedAscending;
+        if (va > vb) return NSOrderedDescending;
+    }
+    return NSOrderedSame;
+}
+
+/// Map iOS → Darwin release + a realistic utsname.version line (board from HWModelStr).
++ (NSDictionary *)darwinKernelKeysForIOS:(NSString *)iosVer board:(NSString *)board {
+    NSString *iv = iosVer.length ? iosVer : @"15.0";
+    int maj = 15, min = 0, pat = 0;
+    sscanf(iv.UTF8String ?: "15.0", "%d.%d.%d", &maj, &min, &pat);
+    // Apple: Darwin major ≈ iOS major + 6
+    int dMaj = maj + 6;
+    int dMin = min;
+    int dPat = 0;
+    // Known fine-tunes (common public Darwin minors for iOS 15.x family)
+    if (maj == 15) {
+        if (min <= 0) { dMin = 0; dPat = 0; }
+        else if (min == 1) { dMin = 1; }
+        else if (min == 2) { dMin = 2; }
+        else if (min == 3) { dMin = 3; }
+        else if (min == 4) { dMin = 4; }
+        else if (min == 5) { dMin = 5; }
+        else if (min >= 6) { dMin = 6; } // 15.6–15.8 often ship 21.6.x line
+    } else if (maj == 16) {
+        dMin = MIN(min, 6);
+    } else if (maj == 17) {
+        dMin = MIN(min, 6);
+    } else if (maj >= 18) {
+        dMin = MIN(min, 5);
+    }
+    NSString *rel = [NSString stringWithFormat:@"%d.%d.%d", dMaj, dMin, dPat];
+    // Board → RELEASE_ARM64_* suffix (common AP board codes)
+    NSString *b = board.length ? board : @"T8020";
+    NSString *arm = @"T8020";
+    NSDictionary *boardMap = @{
+        @"D20AP": @"T8015", @"D21AP": @"T8015", @"D22AP": @"T8015", // 8 / 8+ / X
+        @"D321AP": @"T8020", @"D331AP": @"T8020", @"D331pAP": @"T8020", // XR / XS / XS Max
+        @"N841AP": @"T8020", @"D421AP": @"T8030", @"D431AP": @"T8030",
+        @"D52gAP": @"T8101", @"D53gAP": @"T8101", @"D53pAP": @"T8101",
+        @"D63AP": @"T8110", @"D64AP": @"T8110",
+        @"D73AP": @"T8120", @"D74AP": @"T8120",
+    };
+    if (boardMap[b]) arm = boardMap[b];
+    else if ([b hasPrefix:@"D20"] || [b hasPrefix:@"D21"] || [b hasPrefix:@"D22"]) arm = @"T8015";
+    else if ([b hasPrefix:@"D33"] || [b hasPrefix:@"N84"] || [b hasPrefix:@"D32"]) arm = @"T8020";
+    // Stamp strings approximate public Darwin release notes (lab identity, not byte-identical xnu)
+    NSString *stamp = @"Fri Mar 18 00:48:17 PDT 2022";
+    if (dMaj == 21 && dMin >= 5) stamp = @"Thu Apr 21 21:50:10 PDT 2022";
+    if (dMaj == 21 && dMin >= 6) stamp = @"Sun Jun  5 20:10:15 PDT 2022";
+    if (dMaj == 22) stamp = @"Sun Aug 14 20:00:00 PDT 2022";
+    if (dMaj == 23) stamp = @"Wed Sep  6 21:00:00 PDT 2023";
+    if (dMaj >= 24) stamp = @"Mon Mar  4 20:00:00 PST 2024";
+    NSString *xnu = @"8020.101.4~15";
+    if (dMaj == 21 && dMin >= 5) xnu = @"8020.122.1~1";
+    if (dMaj == 21 && dMin >= 6) xnu = @"8020.140.41~1";
+    if (dMaj == 22) xnu = @"8209.41.16~2";
+    if (dMaj >= 23) xnu = @"10002.1.13~1";
+    NSString *ver = [NSString stringWithFormat:
+                     @"Darwin Kernel Version %@: %@: root:xnu-%@/RELEASE_ARM64_%@",
+                     rel, stamp, xnu, arm];
+    return @{
+        @"kern.osrelease": rel,
+        @"kern.version": ver,
+        @"kern.osproductversion": iv,
+        @"kern.osversion": @"", // filled by caller with BuildVersion if known
+    };
+}
+
++ (NSString *)labMismatchWarningForSpoofIOS:(NSString *)spoofIOS productType:(NSString *)productType {
+    NSMutableArray *w = [NSMutableArray array];
+    NSString *hostIOS = [self hostSystemVersion];
+    NSString *hostPT = [self hostProductType];
+    if (spoofIOS.length && hostIOS.length) {
+        NSComparisonResult c = [self compareVersion:spoofIOS toVersion:hostIOS];
+        if (c == NSOrderedDescending) {
+            [w addObject:[NSString stringWithFormat:
+                          @"⚠ Spoof iOS %@ > host iOS %@ — WebView/zBox/fingerprint rủi ro cao",
+                          spoofIOS, hostIOS]];
+        } else if (c == NSOrderedAscending) {
+            NSArray *sp = [spoofIOS componentsSeparatedByString:@"."];
+            NSArray *hp = [hostIOS componentsSeparatedByString:@"."];
+            NSInteger sm = sp.count ? [sp[0] integerValue] : 0;
+            NSInteger hm = hp.count ? [hp[0] integerValue] : 0;
+            if (hm - sm >= 2) {
+                [w addObject:[NSString stringWithFormat:
+                              @"⚠ Spoof iOS %@ << host %@ — UA/WebKit lệch lớn",
+                              spoofIOS, hostIOS]];
+            }
+        }
+    }
+    if (productType.length && hostPT.length && ![productType isEqualToString:hostPT]) {
+        [w addObject:[NSString stringWithFormat:
+                      @"⚠ Spoof model %@ ≠ host %@ — chip/GPU/sensor thật vẫn là host",
+                      productType, hostPT]];
+    }
+    return w.count ? [w componentsJoinedByString:@"\n"] : @"";
+}
 
 // Apple-like synthetic identity (match scripts/select_device_profile.py):
 // Serial: no I/O/0/1; pre-2021=12, modern~10; IDFA/IDFV UUID v4; UDID 40 hex; IMEI 8-digit TAC+Luhn
@@ -512,13 +638,13 @@
         // FakeWebRTC / DisableWebRTC / FakeSensor / HideJailbreak / FakeWifi set above once
         @"DisableAppAttest": @YES,
     } mutableCopy];
-    // Darwin kernel: iOS N.M → (N+6).M.0 (must not leave host uname)
+    // Darwin kernel map (realistic release + version stamp; not host uname)
     NSString *iv = iosMeta[@"ProductVersion"] ?: iosVer ?: @"15.0";
-    int dMaj = 15, dMin = 0, dPat = 0;
-    sscanf(iv.UTF8String ?: "15.0", "%d.%d.%d", &dMaj, &dMin, &dPat);
-    NSString *darwinRel = [NSString stringWithFormat:@"%d.%d.%d", dMaj + 6, dMin, dPat];
-    m[@"kern.osrelease"] = darwinRel;
-    m[@"kern.version"] = [NSString stringWithFormat:@"Darwin Kernel Version %@: root:xnu-spoof", darwinRel];
+    NSDictionary *dk = [self darwinKernelKeysForIOS:iv board:device[@"HWModelStr"]];
+    if (dk[@"kern.osrelease"]) m[@"kern.osrelease"] = dk[@"kern.osrelease"];
+    if (dk[@"kern.version"]) m[@"kern.version"] = dk[@"kern.version"];
+    if (m[@"BuildVersion"]) m[@"kern.osversion"] = m[@"BuildVersion"];
+    if (iv.length) m[@"kern.osproductversion"] = iv;
     return m;
 }
 

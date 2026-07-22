@@ -476,46 +476,17 @@ void IPFInstallMGHooks(void) {
             pMSHookMessageEx(asid, @selector(advertisingIdentifier), (IMP)stub_idfa, (IMP *)&orig_idfa);
     }
 
-    // Self-test + 7-surface matrix markers (synced with Extra surfaces)
+#if !IPF_NO_MG_DEBUG
+    // Lean self-test (one short log) — full surface dump bloated MG past AMFI
     @autoreleasepool {
         IPFConfig *cfg = [IPFConfig shared];
-        NSString *cfgPT = [cfg mgValueForKey:@"ProductType"] ?: @"(nil)";
-        NSString *cfgMK = [cfg mgValueForKey:@"MarketingName"] ?: @"(nil)";
-        NSString *cfgSN = [cfg mgValueForKey:@"SerialNumber"] ?: @"(nil)";
-        NSString *cfgVer = [cfg stringForKey:@"ProductVersion"] ?: @"(nil)";
-        NSString *cfgBuild = [cfg stringForKey:@"BuildVersion"] ?: @"(nil)";
-        NSString *cfgIDFA = [cfg stringForKey:@"IDFA"] ?: @"(nil)";
-        CFStringRef k = CFSTR("ProductType");
-        CFTypeRef ans = stub_MGCopyAnswer(k);
-        NSString *got = ans ? [(__bridge id)ans description] : @"(null)";
-        if (ans) CFRelease(ans);
-        IPFTrace([NSString stringWithFormat:@"SELFTEST cfgPT=%@ cfgMK=%@ stubPT=%@", cfgPT, cfgMK, got]);
-        // Dual path: MSHook primary; fishhook only when MSHook miss (rc!=-3)
-        NSString *mspath = pMSHookFunction ? @"MSHook=ON" : @"MSHook=OFF";
-        NSString *fhpath = (fishhook_rc == -3) ? @"fishhook=IDLE(MSHook)"
-            : (fishhook_rc == 0) ? @"fishhook=ON(fallback)"
-            : [NSString stringWithFormat:@"fishhook=FAIL(rc=%d)", fishhook_rc];
-        NSString *dbg = [NSString stringWithFormat:
-            @"hooks cfgPT=%@ cfgMK=%@ stubPT=%@ fishhook_rc=%d MSHook=%p\n"
-            @"SURFACE dual_hook: %@ · %@ (ctor log both paths)\n"
-            @"SURFACE MobileGestalt: ProductType=%@ Version=%@ Build=%@ Serial=%@ IDFA=%@\n"
-            @"SURFACE sysctl/uname: hw.machine=%@ FakeSysctl=%d\n"
-            @"SURFACE UIDevice: name/model/systemVersion/idfv (log spoof)\n",
-            cfgPT, cfgMK, got, fishhook_rc, pMSHookFunction,
-            mspath, fhpath,
-            cfgPT, cfgVer, cfgBuild, cfgSN, cfgIDFA,
-            cfgPT, [cfg flag:@"FakeSysctl" defaultYes:YES] ? 1 : 0];
-        NSString *home = NSHomeDirectory();
-        if (home.length) {
-            [dbg writeToFile:[home stringByAppendingPathComponent:@"Documents/v3_mg_debug.log"]
-                  atomically:YES encoding:NSUTF8StringEncoding error:nil];
-            [dbg writeToFile:[home stringByAppendingPathComponent:@"Documents/ipfaker_surfaces.log"]
-                  atomically:YES encoding:NSUTF8StringEncoding error:nil];
-        }
+        NSString *cfgPT = [cfg mgValueForKey:@"ProductType"] ?: @"?";
+        NSString *cfgVer = [cfg stringForKey:@"ProductVersion"] ?: @"?";
+        NSString *rel = [cfg stringForKey:@"kern.osrelease"] ?: @"?";
+        NSString *dbg = [NSString stringWithFormat:@"MG ok PT=%@ iOS=%@ darwin=%@ fh=%d\n",
+                         cfgPT, cfgVer, rel, fishhook_rc];
         [dbg writeToFile:@"/var/mobile/Library/iPFaker/v3_mg_debug.log"
               atomically:YES encoding:NSUTF8StringEncoding error:nil];
-        [dbg writeToFile:@"/var/mobile/Library/iPFaker/ipfaker_surfaces.log"
-              atomically:YES encoding:NSUTF8StringEncoding error:nil];
     }
-    IPFTrace(@"IPFInstallMGHooks done");
+#endif
 }

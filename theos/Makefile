@@ -28,10 +28,11 @@ iPFakerAA_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerAA.dylib -W
 # MG: spoof + Extra core only. Proven inject ≤128k on lab AMFI.
 # Env (locale/location) optional — enable via IPF_WITH_ENV=1 if budget allows.
 iPFakerMG_FILES = TweakMG.x src/IPFConfig.m src/IPFHooksMG.m src/IPFHooksExtra.m
-iPFakerMG_CFLAGS = -fobjc-arc -Os -fvisibility=hidden -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
+# IPF_NO_MG_DEBUG=1 strips verbose ctor logs (AMFI size)
+iPFakerMG_CFLAGS = -fobjc-arc -Os -fvisibility=hidden -DIPF_NO_MG_DEBUG=1 -ffunction-sections -fdata-sections -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
 iPFakerMG_FRAMEWORKS = UIKit Foundation AdSupport
 iPFakerMG_LIBRARIES = substrate
-iPFakerMG_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerMG.dylib -Wl,-dead_strip
+iPFakerMG_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerMG.dylib -Wl,-dead_strip -Wl,-x
 
 # CT lean: telephony + Deep (~105k inject OK)
 iPFakerCT_FILES = TweakCT.x src/IPFConfig.m src/IPFHooksCT.m src/IPFHooksDeep.m

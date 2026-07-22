@@ -696,14 +696,22 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     NSString *filt = [ProfileBuilder applySpoofFiltersForBundles:[self filterSpoofTargets] progress:nil];
     NSMutableDictionary *m2 = [flat mutableCopy];
     [m2 addEntriesFromDictionary:[self proxyAppAttestFlatKeys]];
+    // Ensure Darwin keys present (schema-safe)
+    NSDictionary *dk = [ProfileBuilder darwinKernelKeysForIOS:ios board:dev[@"HWModelStr"]];
+    [m2 addEntriesFromDictionary:dk];
+    if (flat[@"BuildVersion"]) m2[@"kern.osversion"] = flat[@"BuildVersion"];
     flat = m2;
     (void)[ProfileBuilder applyFlatProfile:flat deviceId:dev[@"id"] ios:ios];
     self.lastFlat = flat;
-    self.statusText = [NSString stringWithFormat:@"%@ · %@ / iOS %@\n%@",
+    NSString *warn = [ProfileBuilder labMismatchWarningForSpoofIOS:ios
+                                                       productType:dev[@"ProductType"]];
+    self.statusText = [NSString stringWithFormat:@"%@ · %@ / iOS %@\n%@%@%@",
                        result ?: @"OK",
                        dev[@"MarketingName"] ?: dev[@"id"],
                        ios,
-                       filt ?: @""];
+                       filt ?: @"",
+                       warn.length ? @"\n" : @"",
+                       warn ?: @""];
     [self postDidChange];
     return self.statusText;
 }
@@ -853,23 +861,47 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
 
     NSString *applyMsg = nil;
     @try {
-        // applyWithDevice already writes flags + proxy keys dual-path
+        // applyWithDevice already writes flags + proxy keys dual-path + Darwin kernel
         applyMsg = [self applyRandomFromPool];
     } @catch (NSException *ex) {
         applyMsg = [NSString stringWithFormat:@"apply EX: %@", ex.reason ?: @"?"];
     }
     [log addObject:applyMsg ?: @"apply"];
+    // Surface host vs spoof mismatch (iOS/model) — do not force proxy (Shadowrocket OK)
+    {
+        NSDictionary *flatNow = [ProfileBuilder loadCurrentFlat] ?: @{};
+        NSString *warn = [ProfileBuilder labMismatchWarningForSpoofIOS:flatNow[@"ProductVersion"]
+                                                           productType:flatNow[@"ProductType"]];
+        if (warn.length) {
+            [log addObject:warn];
+            if (progress) progress(@"⚠ Lệch host/spoof — xem log");
+        }
+        NSString *kr = flatNow[@"kern.osrelease"];
+        NSString *kv = flatNow[@"kern.version"];
+        if (kr.length)
+            [log addObject:[NSString stringWithFormat:@"Kernel spoof: Darwin %@ · host %@ · %@",
+                            kr, [ProfileBuilder hostSystemVersion],
+                            kv.length > 60 ? [[kv substringToIndex:60] stringByAppendingString:@"…"] : (kv ?: @"")]];
+    }
 
-    // Light re-merge proxy only (skip heavy geo on reset — Method A)
-    if (progress) progress(@"③ Khóa proxy dual-path…");
+    // Light re-merge proxy keys only (geo = nút Location; proxy VPN app = user tự lo)
+    if (progress) progress(@"③ Khóa proxy dual-path (không bắt buộc ON)…");
     NSMutableDictionary *mit = [[self proxyAppAttestFlatKeys] mutableCopy] ?: [NSMutableDictionary dictionary];
     mit[@"WebRTCLocalIP"] = @"10.0.0.2";
     mit[@"FakeWebRTC"] = @YES;
     mit[@"DisableAppAttest"] = @YES;
+    // Re-assert Darwin keys after merge
+    {
+        NSDictionary *flatNow = [ProfileBuilder loadCurrentFlat] ?: self.lastFlat ?: @{};
+        NSDictionary *dk = [ProfileBuilder darwinKernelKeysForIOS:flatNow[@"ProductVersion"] ?: @"15.0"
+                                                            board:flatNow[@"HWModelStr"]];
+        [mit addEntriesFromDictionary:dk];
+        if (flatNow[@"BuildVersion"]) mit[@"kern.osversion"] = flatNow[@"BuildVersion"];
+    }
     NSString *m2 = [ProfileBuilder mergeKeysIntoConfig:mit progress:progress];
     [log addObject:m2 ?: @"proxy"];
     if (!hasProxy)
-        [log addObject:@"⚠ Proxy chưa bật — Location: dùng nút «Đồng bộ Location» khi cần."];
+        [log addObject:@"Proxy iPFaker OFF — OK nếu dùng Shadowrocket/VPN app khác."];
     else
         [log addObject:@"Geo: bấm «Đồng bộ Location» nếu cần Map/Thời tiết."];
 
