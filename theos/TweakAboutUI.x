@@ -55,13 +55,30 @@ static BOOL IPFUIEnabled(NSDictionary *cfg) {
     return YES;
 }
 
-// Host iOS labels seen on jailbroken lab phones (any major still on device)
+// Host iOS labels seen on jailbroken rootless phones (Dopamine 14.x–18.x / lab).
+// UIDevice.systemVersion is also matched dynamically in IPFUIShouldReplaceVersion.
 static NSArray<NSString *> *IPFUIHostVersionTokens(void) {
     return @[
-        @"15.5", @"15.5.0", @"15.8", @"15.8.1", @"15.8.2", @"15.8.3", @"15.8.4", @"15.8.5",
-        @"16.0", @"16.1", @"16.2", @"16.3", @"16.4", @"16.5", @"16.6", @"16.7",
+        // iOS 14 (checkra1n / older rootless labs)
+        @"14.0", @"14.1", @"14.2", @"14.3", @"14.4", @"14.5", @"14.6", @"14.7", @"14.8",
+        @"14.8.1",
+        // iOS 15 (A10–A11 common: 15.8.x)
+        @"15.0", @"15.1", @"15.2", @"15.3", @"15.4", @"15.5", @"15.5.0", @"15.6", @"15.7",
+        @"15.7.1", @"15.7.2", @"15.7.3", @"15.7.4", @"15.7.5", @"15.7.6", @"15.7.7", @"15.7.8", @"15.7.9",
+        @"15.8", @"15.8.1", @"15.8.2", @"15.8.3", @"15.8.4", @"15.8.5",
+        // iOS 16
+        @"16.0", @"16.1", @"16.1.1", @"16.1.2", @"16.2", @"16.3", @"16.3.1", @"16.4", @"16.4.1",
+        @"16.5", @"16.5.1", @"16.6", @"16.6.1", @"16.7", @"16.7.1", @"16.7.2", @"16.7.3",
+        @"16.7.4", @"16.7.5", @"16.7.6", @"16.7.7", @"16.7.8", @"16.7.9",
         @"16.7.10", @"16.7.11", @"16.7.12", @"16.7.16",
-        @"18.0", @"18.1", @"18.5", @"18.6", @"18.7", @"18.7.9",
+        // iOS 17 (arm64e hosts)
+        @"17.0", @"17.0.1", @"17.0.2", @"17.0.3", @"17.1", @"17.1.1", @"17.1.2",
+        @"17.2", @"17.2.1", @"17.3", @"17.3.1", @"17.4", @"17.4.1", @"17.5", @"17.5.1",
+        @"17.6", @"17.6.1", @"17.7", @"17.7.1", @"17.7.2",
+        // iOS 18
+        @"18.0", @"18.0.1", @"18.1", @"18.1.1", @"18.2", @"18.2.1", @"18.3", @"18.3.1", @"18.3.2",
+        @"18.4", @"18.4.1", @"18.5", @"18.6", @"18.6.1", @"18.6.2", @"18.7", @"18.7.1", @"18.7.2",
+        @"18.7.9",
     ];
 }
 
@@ -83,20 +100,39 @@ static BOOL IPFUIShouldReplaceVersion(NSString *t, NSString *wantPV, NSArray *ho
 static BOOL IPFUIShouldReplaceModel(NSString *t, NSString *wantMk) {
     if (!t.length || !wantMk.length) return NO;
     if ([t isEqualToString:wantMk]) return NO;
-    // Common host marketing labels on old jailbreaks
+    // Common host marketing labels on rootless JB hosts (any gen still used as host)
     static NSArray *hosts;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
         hosts = @[
-            @"iPhone 6", @"iPhone 6s", @"iPhone 6s Plus", @"iPhone 7", @"iPhone 7 Plus",
-            @"iPhone 8", @"iPhone 8 Plus", @"iPhone X", @"iPhone XR", @"iPhone XS", @"iPhone XS Max",
-            @"iPhone SE", @"iPhone",
+            @"iPhone 6", @"iPhone 6s", @"iPhone 6s Plus",
+            @"iPhone 7", @"iPhone 7 Plus",
+            @"iPhone 8", @"iPhone 8 Plus",
+            @"iPhone X", @"iPhone XR", @"iPhone XS", @"iPhone XS Max",
+            @"iPhone 11", @"iPhone 11 Pro", @"iPhone 11 Pro Max",
+            @"iPhone 12", @"iPhone 12 mini", @"iPhone 12 Pro", @"iPhone 12 Pro Max",
+            @"iPhone 13", @"iPhone 13 mini", @"iPhone 13 Pro", @"iPhone 13 Pro Max",
+            @"iPhone 14", @"iPhone 14 Plus", @"iPhone 14 Pro", @"iPhone 14 Pro Max",
+            @"iPhone 15", @"iPhone 15 Plus", @"iPhone 15 Pro", @"iPhone 15 Pro Max",
+            @"iPhone 16", @"iPhone 16 Plus", @"iPhone 16 Pro", @"iPhone 16 Pro Max", @"iPhone 16e",
+            @"iPhone SE", @"iPhone SE (2nd generation)", @"iPhone SE (3rd generation)",
+            @"iPhone",
         ];
     });
     for (NSString *h in hosts) {
         if ([t isEqualToString:h]) return YES;
-        // "iPhone 7 (GSM)" etc.
-        if ([t hasPrefix:h] && t.length < h.length + 12) return YES;
+        // "iPhone 7 (GSM)" / regional suffixes
+        if ([t hasPrefix:h] && t.length < h.length + 14) return YES;
+    }
+    // Generic marketing line: "iPhone N …" (About model name cell only — short, no serial/part)
+    if ([t hasPrefix:@"iPhone"] && t.length >= 6 && t.length <= 36
+        && [t rangeOfString:@"/"].location == NSNotFound
+        && [t rangeOfString:@"@"].location == NSNotFound) {
+        NSRegularExpression *re = [NSRegularExpression
+            regularExpressionWithPattern:@"^iPhone(\\s+(SE|Air|\\d+e?|X[RS]?).*)?$"
+                                 options:0 error:nil];
+        if (re && [re numberOfMatchesInString:t options:0 range:NSMakeRange(0, t.length)] > 0)
+            return YES;
     }
     return NO;
 }
