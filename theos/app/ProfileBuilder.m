@@ -1084,6 +1084,8 @@
     // Settings → Giới thiệu: MobileGestalt on-disk cache holds MarketingNameString/ProductType
     // (Preferences may not re-query live MG for Tên kiểu máy). Patch dual with spoof flat.
     NSString *mgCacheNote = [self patchMobileGestaltCacheWithFlat:flat];
+    // Flush Preferences + gestalt helpers so About re-reads ProductVersion / ModelNumber / RegionInfo
+    NSString *bounceNote = [self bounceSettingsAboutConsumers];
 
     NSString *mk = flat[@"MarketingName"] ?: @"?";
     NSString *pt = flat[@"ProductType"] ?: @"?";
@@ -1093,6 +1095,8 @@
                      [okPaths componentsJoinedByString:@", "]];
     if (mgCacheNote.length)
         msg = [msg stringByAppendingFormat:@"\n%@", mgCacheNote];
+    if (bounceNote.length)
+        msg = [msg stringByAppendingFormat:@"\n%@", bounceNote];
     if (!jbOk) {
         msg = [msg stringByAppendingString:
                @"\n⚠ CHƯA ghi /var/jb/etc/ipfaker — app đích vẫn đọc cấu hình cũ. "
@@ -1101,6 +1105,64 @@
     if (failMsgs.count)
         msg = [msg stringByAppendingFormat:@"\n(partial) %@", [failMsgs componentsJoinedByString:@"; "]];
     return msg;
+}
+
+/// Kill Settings + MobileGestalt helpers so next open of Giới thiệu re-queries spoofed keys
+/// (ProductVersion / ModelNumber / empty RegionInfo). No-op if killall missing.
++ (NSString *)bounceSettingsAboutConsumers {
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSArray *bins = @[
+        @"/var/jb/usr/bin/killall",
+        @"/usr/bin/killall",
+        @"/var/jb/bin/killall",
+    ];
+    NSString *killall = nil;
+    for (NSString *b in bins) {
+        if ([fm isExecutableFileAtPath:b]) { killall = b; break; }
+    }
+    if (!killall.length) return @"About-bounce: skip (no killall)";
+
+    // Prefer sudo -n (app may have passwordless root via Dopamine); fallback plain killall.
+    NSArray *targets = @[
+        @"Preferences",
+        @"mobilegestalthelper",
+        @"MobileGestaltHelper",
+    ];
+    NSInteger killed = 0;
+    for (NSString *name in targets) {
+        NSString *script = [NSString stringWithFormat:
+                            @"#!/bin/sh\n"
+                            @"%@ -9 '%@' 2>/dev/null || true\n"
+                            @"echo OK\n",
+                            killall, name];
+        NSString *path = [NSString stringWithFormat:@"/var/mobile/Library/iPFaker/bounce_%@.sh", name];
+        [script writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        [fm setAttributes:@{ NSFilePosixPermissions: @0755 } ofItemAtPath:path error:nil];
+        int rc = -1;
+        for (NSString *sudoBin in @[ @"/var/jb/usr/bin/sudo", @"/usr/bin/sudo" ]) {
+            if (![fm isExecutableFileAtPath:sudoBin]) continue;
+            pid_t pid = 0;
+            const char *argv[] = { sudoBin.UTF8String, "-n", "sh", path.UTF8String, NULL };
+            if (posix_spawn(&pid, sudoBin.UTF8String, NULL, NULL, (char *const *)argv, NULL) == 0 && pid > 0) {
+                int st = 0;
+                waitpid(pid, &st, 0);
+                if (WIFEXITED(st)) rc = WEXITSTATUS(st);
+                if (rc == 0) break;
+            }
+        }
+        if (rc != 0) {
+            // Best-effort without sudo (same-user Preferences only)
+            pid_t pid = 0;
+            const char *argv[] = { killall.UTF8String, "-9", name.UTF8String, NULL };
+            if (posix_spawn(&pid, killall.UTF8String, NULL, NULL, (char *const *)argv, NULL) == 0 && pid > 0) {
+                int st = 0;
+                waitpid(pid, &st, 0);
+                if (WIFEXITED(st) && WEXITSTATUS(st) == 0) rc = 0;
+            }
+        }
+        if (rc == 0) killed++;
+    }
+    return [NSString stringWithFormat:@"About-bounce: refreshed %ld consumer(s)", (long)killed];
 }
 
 /// Patch system MobileGestalt cache so Settings About marketing name follows spoof.
