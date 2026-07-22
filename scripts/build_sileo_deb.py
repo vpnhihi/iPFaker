@@ -31,7 +31,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION_DEFAULT = "2.8.0"
+VERSION_DEFAULT = "2.8.1"
 PKG = "com.ipfaker"
 ARCH = "iphoneos-arm64"
 
@@ -52,6 +52,7 @@ def _ci_dist_bases() -> list[Path]:
     bases: list[Path] = []
     # Newest first among known lab snapshots
     for name in (
+        "_ci_art_dual",
         "_ci_art_ui",
         "_ci_art_swver2",
         "_ci_art_swver",
@@ -119,6 +120,7 @@ def find_app(explicit: str | None) -> Path | None:
         p = Path(explicit)
         return p if p.is_dir() else None
     for p in [
+        ROOT / "_ci_art_dual" / "ipfaker-sileo" / "theos" / "dist" / "app" / "iPFaker.app",
         ROOT / "_ci_art_ui" / "ipfaker-sileo" / "theos" / "dist" / "app" / "iPFaker.app",
         ROOT / "_ci_art_ui" / "theos" / "dist" / "app" / "iPFaker.app",
         ROOT / "theos" / "dist" / "app" / "iPFaker.app",
@@ -623,9 +625,13 @@ def build(version: str, app_path: str | None) -> Path:
             b"iPFaker lab config dir (new device = same as dev).\n"
             b"- config.plist + active_profile.json from iPFaker.app Apply\n"
             b"- Stack: MG CT JB About AboutUI AboutVer AA + wipe_apps.sh\n"
+            b"- Dual-arch: arm64 (A9-A11) + arm64e (A12+)\n"
             b"- Mirror: /var/mobile/Library/iPFaker/\n"
         )
         add_file(tar, "var/jb/etc/ipfaker/README.txt", track(readme), 0o644)
+        ent = ROOT / "theos" / "app" / "entitlements.plist"
+        if ent.is_file():
+            add_file(tar, "var/jb/etc/ipfaker/entitlements.plist", track(ent.read_bytes()), 0o644)
 
         # Multi-app wipe (1-tap trusted) + legacy Zalo-only helper
         wipe_apps = ROOT / "injector" / "wipe_apps.sh"

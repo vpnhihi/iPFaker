@@ -1,27 +1,27 @@
-# Tools — máy mới tải 1 lần
+﻿# Tools â€” mÃ¡y má»›i táº£i 1 láº§n
 
-Mục tiêu: clone / tải repo **một lần** là đủ chạy như máy lab (không cần copy dylib tay).
+Má»¥c tiÃªu: clone / táº£i repo **má»™t láº§n** lÃ  Ä‘á»§ cháº¡y nhÆ° mÃ¡y lab (khÃ´ng cáº§n copy dylib tay).
 
-## 1. Máy iPhone (Dopamine rootless)
+## 1. MÃ¡y iPhone (Dopamine rootless)
 
-Cách nhanh nhất — **không cần build**:
+CÃ¡ch nhanh nháº¥t â€” **khÃ´ng cáº§n build**:
 
-| Cách | URL |
+| CÃ¡ch | URL |
 |------|-----|
-| Nguồn Sileo | `https://vpnhihi.github.io/ipfaker/` |
-| Deb full stack | `https://vpnhihi.github.io/ipfaker/debs/com.ipfaker_2.8.0_iphoneos-arm64.deb` |
+| Nguá»“n Sileo | `https://vpnhihi.github.io/ipfaker/` |
+| Deb full stack | `https://vpnhihi.github.io/ipfaker/debs/com.ipfaker_2.8.1_iphoneos-arm64.deb` |
 
-Gói `com.ipfaker` **2.8.0+** đã gồm:
+GÃ³i `com.ipfaker` **2.8.1+** Ä‘Ã£ gá»“m:
 
 - App `iPFaker.app` + `device_catalog.json` + matrix iOS
-- Dylib full stack: **MG · CT · JB · About · AboutUI · AboutVer · AA**
-- Filter đúng lab (About* = Preferences only; CT + CommCenter)
+- Dylib full stack: **MG Â· CT Â· JB Â· About Â· AboutUI Â· AboutVer Â· AA**
+- Filter Ä‘Ãºng lab (About* = Preferences only; CT + CommCenter)
 - Wipe multi-app: `wipe_apps.sh` / `wipe_zalo_session.sh` (libexec + dual-path)
 - `postinst`: trustcache + chmod filter 0666 (app Fake ghi inject list live)
 
-Hướng dẫn khách: [../INSTALL_KHACH.md](../INSTALL_KHACH.md)
+HÆ°á»›ng dáº«n khÃ¡ch: [../INSTALL_KHACH.md](../INSTALL_KHACH.md)
 
-## 2. Máy PC (Windows) — dev / điều khiển SSH
+## 2. MÃ¡y PC (Windows) â€” dev / Ä‘iá»u khiá»ƒn SSH
 
 ```bat
 cd pc_app
@@ -29,40 +29,41 @@ pip install -r requirements.txt
 CHAY_APP.bat
 ```
 
-Script public cần thiết (đã trong repo):
+Script public cáº§n thiáº¿t (Ä‘Ã£ trong repo):
 
-| Script | Việc |
+| Script | Viá»‡c |
 |--------|------|
-| `scripts/build_sileo_deb.py` | Đóng gói deb full stack |
-| `scripts/publish_gh_pages_sileo.py` | Đẩy nguồn Sileo (gh-pages) |
+| `scripts/build_sileo_deb.py` | ÄÃ³ng gÃ³i deb full stack |
+| `scripts/publish_gh_pages_sileo.py` | Äáº©y nguá»“n Sileo (gh-pages) |
 | `scripts/select_device_profile.py` | Sinh profile identity (PC) |
 | `scripts/gen_app_icons.py` | Icon app |
-| `injector/wipe_apps.sh` | Wipe multi-app (source, cũng nằm trong deb) |
+| `injector/wipe_apps.sh` | Wipe multi-app (source, cÅ©ng náº±m trong deb) |
 | `pc_app/*` | App Windows SSH + pipeline |
 
-## 3. Build lại deb từ source (khi có artifact)
+## 3. Build láº¡i deb tá»« source (khi cÃ³ artifact)
 
-Trên máy có folder CI lab (`_ci_art_ui/…/theos/dist` — **local only, không push**):
+TrÃªn mÃ¡y cÃ³ folder CI lab (`_ci_art_ui/â€¦/theos/dist` â€” **local only, khÃ´ng push**):
 
 ```bat
-python scripts\build_sileo_deb.py --version 2.8.0
+python scripts\build_sileo_deb.py --version 2.8.1
 ```
 
 Output:
 
-- `dist/sileo/com.ipfaker_2.8.0_iphoneos-arm64.deb`
+- `dist/sileo/com.ipfaker_2.8.1_iphoneos-arm64.deb`
 - `dist/sileo/repo/` (Packages + Release)
 
-Copy vào `sileo-repo/` rồi:
+Copy vÃ o `sileo-repo/` rá»“i:
 
 ```bat
 python scripts\publish_gh_pages_sileo.py
 ```
 
-## 4. Không có trên GitHub (cố ý)
+## 4. KhÃ´ng cÃ³ trÃªn GitHub (cá»‘ Ã½)
 
-- `_ci_art*`, `dist/`, `*.dylib` thô, logs, lab notes
-- Script one-off `scripts/_*`, deploy/debug tạm
-- Secret API key, profile máy thật
+- `_ci_art*`, `dist/`, `*.dylib` thÃ´, logs, lab notes
+- Script one-off `scripts/_*`, deploy/debug táº¡m
+- Secret API key, profile mÃ¡y tháº­t
 
-Máy mới **không cần** những thứ đó — chỉ cần deb 2.8.0 + (tuỳ chọn) `pc_app`.
+MÃ¡y má»›i **khÃ´ng cáº§n** nhá»¯ng thá»© Ä‘Ã³ â€” chá»‰ cáº§n deb 2.8.1 + (tuá»³ chá»n) `pc_app`.
+

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """Force-push sileo-repo/ to branch gh-pages for https://vpnhihi.github.io/ipfaker/"""
 from __future__ import annotations
 
@@ -44,15 +44,15 @@ body{font-family:-apple-system,sans-serif;max-width:640px;margin:2rem auto;paddi
 .url{background:#111;color:#4ade80;padding:1rem;border-radius:8px;word-break:break-all}
 a{color:#60a5fa}
 </style></head><body>
-<h1>iPFaker — nguồn Sileo</h1>
+<h1>iPFaker â€” nguá»“n Sileo</h1>
 <p class="url">https://vpnhihi.github.io/ipfaker/</p>
-<p>Gói <b>com.ipfaker 2.8.0</b> · full stack lab · rootless · iphoneos-arm64 · Dopamine</p>
+<p>GÃ³i <b>com.ipfaker 2.8.1</b> Â· full stack lab Â· rootless Â· iphoneos-arm64 Â· Dopamine</p>
 <ol>
-<li>Sileo → Sources → +</li>
-<li>Dán URL (chữ thường ipfaker) → Add</li>
-<li>Refresh → tìm <b>iPFaker</b> → Cài</li>
+<li>Sileo â†’ Sources â†’ +</li>
+<li>DÃ¡n URL (chá»¯ thÆ°á»ng ipfaker) â†’ Add</li>
+<li>Refresh â†’ tÃ¬m <b>iPFaker</b> â†’ CÃ i</li>
 </ol>
-<p><a href="debs/com.ipfaker_2.8.0_iphoneos-arm64.deb">Tải .deb 2.8.0 trực tiếp</a></p>
+<p><a href="debs/com.ipfaker_2.8.1_iphoneos-arm64.deb">Táº£i .deb 2.8.1 trá»±c tiáº¿p</a></p>
 </body></html>
 """,
         encoding="utf-8",
@@ -79,7 +79,7 @@ a{color:#60a5fa}
     run(["git", "config", "user.email", "ipfaker-lab@local"])
     run(["git", "config", "user.name", "iPFaker Lab"])
     run(["git", "add", "-A"])
-    run(["git", "commit", "-m", "sileo pages 2.8.0 full stack"])
+    run(["git", "commit", "-m", "sileo pages 2.8.1 full stack"])
 
     ask = tmp / "askpass.py"
     ask.write_text(
@@ -108,3 +108,4 @@ a{color:#60a5fa}
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

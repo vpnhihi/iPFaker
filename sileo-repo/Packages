@@ -1,7 +1,7 @@
 Package: com.ipfaker
 Name: iPFaker
 Depends: firmware (>= 14.0)
-Version: 2.8.0
+Version: 2.8.1
 Architecture: iphoneos-arm64
 Maintainer: iPFaker Lab
 Author: iPFaker Lab
@@ -9,9 +9,9 @@ Section: Tweaks
 Priority: optional
 Homepage: https://github.com/vpnhihi/ipfaker
 Description: Full lab stack: MG+CT+JB+About+AboutUI+AboutVer+AA + iPFaker.app (pool, multi-app wipe, Save session). Rootless Dopamine. One install = same as lab machine.
-Installed-Size: 1981
-Filename: debs/com.ipfaker_2.8.0_iphoneos-arm64.deb
-Size: 328768
-MD5sum: 9cb5e4492820821099335b2c08ef7491
-SHA256: bf5c54d4b46b90c6777b096bc21a759c9793159978e33562c8fdf36c112760c1
+Installed-Size: 3406
+Filename: debs/com.ipfaker_2.8.1_iphoneos-arm64.deb
+Size: 449142
+MD5sum: daace1d6692596374d345203a5c37b10
+SHA256: 93dd0dc2afdabe21accfd20603f6ef4ba713c1a2c7dd5ad28259db56f655b392
 
