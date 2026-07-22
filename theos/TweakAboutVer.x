@@ -353,12 +353,21 @@ static void *IPFFindMG(const char *name) {
         IPFVerMark("CTOR_ENTER");
         IPFVerResolve();
 
-        // Capture REAL host PV from SystemVersion.plist BEFORE any of our hooks
-        // (do not use MGCopyAnswer — About may already be hooked alphabetically).
+        // Capture REAL host PV from SystemVersion.plist BEFORE our hooks.
+        // Use NSData (About 2109 only hooks NSDictionary file APIs — not NSData).
+        // Avoid NSDictionary dictionaryWithContentsOfFile — may already be hooked by About.
         if (!gHostPV) {
-            NSDictionary *sv = [NSDictionary dictionaryWithContentsOfFile:
-                                @"/System/Library/CoreServices/SystemVersion.plist"];
-            NSString *hp = [sv[@"ProductVersion"] description];
+            NSData *raw = [NSData dataWithContentsOfFile:
+                           @"/System/Library/CoreServices/SystemVersion.plist"];
+            NSString *hp = nil;
+            if (raw.length) {
+                id obj = [NSPropertyListSerialization propertyListWithData:raw
+                                                                   options:0
+                                                                    format:NULL
+                                                                     error:NULL];
+                if ([obj isKindOfClass:[NSDictionary class]])
+                    hp = [obj[@"ProductVersion"] description];
+            }
             gHostPV = hp.length ? [hp copy] : @"15.5";
             IPFVerLog([NSString stringWithFormat:@"hostPV=%@", gHostPV]);
         }
