@@ -144,30 +144,6 @@ static CFDictionaryRef stub_CFCopySysVer(void) {
     return CFBridgingRetain(IPFVerSpoofDict(ns));
 }
 
-// Last-resort UI wash: Settings About row often shows host "15.5" even when MG is spoofed.
-static void (*orig_setText)(id, SEL, NSString *);
-static void stub_setText(id self, SEL _cmd, NSString *text) {
-    if ([text isKindOfClass:[NSString class]] && text.length) {
-        NSDictionary *cfg = IPFVerLoadConfig();
-        if (IPFVerEnabled(cfg)) {
-            NSString *pv = [cfg[@"ProductVersion"] description];
-            // Replace exact host version tokens commonly shown on About
-            if (pv.length && ![pv isEqualToString:text]) {
-                if ([text isEqualToString:@"15.5"] || [text isEqualToString:@"15.5.0"]
-                    || [text isEqualToString:@"Version 15.5"]
-                    || [text hasPrefix:@"15.5 ("]) {
-                    text = [text hasPrefix:@"Version "]
-                        ? [NSString stringWithFormat:@"Version %@", pv]
-                        : ([text containsString:@"("]
-                           ? [text stringByReplacingOccurrencesOfString:@"15.5" withString:pv]
-                           : pv);
-                }
-            }
-        }
-    }
-    if (orig_setText) orig_setText(self, _cmd, text);
-}
-
 static void IPFVerResolve(void) {
     if (pMSHookFunction) return;
     const char *libs[] = {
@@ -230,10 +206,6 @@ static void IPFVerResolve(void) {
             if (cf)
                 pMSHookFunction(cf, (void *)stub_CFCopySysVer, (void **)&orig_CFCopySysVer);
         }
-        // UILabel last resort for Phiên bản phần mềm row
-        Class uil = objc_getClass("UILabel");
-        if (uil && class_getInstanceMethod(uil, @selector(setText:)) && pMSHookMessageEx)
-            pMSHookMessageEx(uil, @selector(setText:), (IMP)stub_setText, (IMP *)&orig_setText);
         IPFVerMark("CTOR_OK");
     }
 }
