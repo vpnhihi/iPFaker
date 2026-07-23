@@ -902,7 +902,8 @@ static id stub_wkInitCoder(id self, SEL _cmd, id coder) {
 #pragma mark - Install
 
 void IPFInstallExtraNetLeanHooks(void) {
-    // Checklist D (wifi/getifaddrs) + E medium (canOpenURL) without full Extra crash surface.
+    // Zalo A10-safe lean: identity surfaces that FAIL without Extra full (ProcessInfo/Screen).
+    // Still skip WebKit/disk/access-stat (historical hang/crash under Zalo load).
     IPFResolve();
     IPFExTrace(@"IPFInstallExtraNetLeanHooks begin");
     if (pMSHookMessageEx) {
@@ -912,9 +913,30 @@ void IPFInstallExtraNetLeanHooks(void) {
             IPFExTrace(@"lean canOpenURL OK");
         }
         Class nspi = objc_getClass("NSProcessInfo");
-        if (nspi && class_getInstanceMethod(nspi, @selector(hostName))) {
-            pMSHookMessageEx(nspi, @selector(hostName), (IMP)stub_hostName, (IMP *)&orig_hostName);
-            IPFExTrace(@"lean hostName OK");
+        if (nspi) {
+            if (class_getInstanceMethod(nspi, @selector(hostName))) {
+                pMSHookMessageEx(nspi, @selector(hostName), (IMP)stub_hostName, (IMP *)&orig_hostName);
+                IPFExTrace(@"lean hostName OK");
+            }
+            // Critical: Zalo + Frida saw host 15.8.4 here while UIDevice was spoofed
+            if (class_getInstanceMethod(nspi, @selector(operatingSystemVersionString))) {
+                pMSHookMessageEx(nspi, @selector(operatingSystemVersionString),
+                                 (IMP)stub_osVersionString, (IMP *)&orig_osVersionString);
+                IPFExTrace(@"lean ProcessInfo OS string OK");
+            }
+        }
+        // Screen native/bounds — SoT ss (e.g. 1290x2796). No continuous side effects.
+        Class scr = objc_getClass("UIScreen");
+        if (scr && IPFScreenOn()) {
+            if (class_getInstanceMethod(scr, @selector(nativeBounds)))
+                pMSHookMessageEx(scr, @selector(nativeBounds), (IMP)stub_nativeBounds, (IMP *)&orig_nativeBounds);
+            if (class_getInstanceMethod(scr, @selector(scale)))
+                pMSHookMessageEx(scr, @selector(scale), (IMP)stub_scale, (IMP *)&orig_scale);
+            if (class_getInstanceMethod(scr, @selector(nativeScale)))
+                pMSHookMessageEx(scr, @selector(nativeScale), (IMP)stub_nativeScale, (IMP *)&orig_nativeScale);
+            if (class_getInstanceMethod(scr, @selector(bounds)))
+                pMSHookMessageEx(scr, @selector(bounds), (IMP)stub_bounds, (IMP *)&orig_bounds);
+            IPFExTrace(@"lean UIScreen OK");
         }
     }
     if (pMSHookFunction) {
@@ -929,7 +951,7 @@ void IPFInstallExtraNetLeanHooks(void) {
             IPFExTrace(@"lean gethostname OK");
         }
     }
-    IPFExTrace(@"IPFInstallExtraNetLeanHooks done");
+    IPFExTrace(@"IPFInstallExtraNetLeanHooks done (ProcessInfo+UIScreen)");
 }
 
 void IPFInstallExtraHooks(void) {

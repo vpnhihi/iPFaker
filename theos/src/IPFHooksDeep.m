@@ -292,6 +292,43 @@ static NSData *IPFRewritePayload(NSData *data) {
                 if (tmp && ![tmp isEqualToString:out]) { out = tmp; changed = YES; }
             }
         }
+        // UA / os_version / Zalo short model in body (plain)
+        if (osv.length) {
+            NSRegularExpression *reIOS = [NSRegularExpression
+                regularExpressionWithPattern:@"iOS [0-9]+(?:\\.[0-9]+)*" options:0 error:nil];
+            if (reIOS) {
+                NSString *repl = [NSString stringWithFormat:@"iOS %@", osv];
+                NSString *tmp = [reIOS stringByReplacingMatchesInString:out options:0
+                    range:NSMakeRange(0, out.length) withTemplate:repl];
+                if (tmp && ![tmp isEqualToString:out]) { out = tmp; changed = YES; }
+            }
+            for (NSString *k in @[ @"os_version", @"osVersion" ]) {
+                NSRegularExpression *rk = [NSRegularExpression
+                    regularExpressionWithPattern:[NSString stringWithFormat:
+                        @"\\\"%@\\\"\\s*:\\s*\\\"[0-9.]+\\\"", k]
+                                         options:0 error:nil];
+                if (!rk) continue;
+                NSString *repl = [NSString stringWithFormat:@"\"%@\":\"%@\"", k, osv];
+                NSString *tmp = [rk stringByReplacingMatchesInString:out options:0
+                    range:NSMakeRange(0, out.length) withTemplate:repl];
+                if (tmp && ![tmp isEqualToString:out]) { out = tmp; changed = YES; }
+            }
+            NSRegularExpression *reIp = [NSRegularExpression
+                regularExpressionWithPattern:@"iP[0-9]+_@[0-9.]+_@[A-Za-z0-9]+" options:0 error:nil];
+            if (reIp && pt.length) {
+                NSString *tag = @"iP";
+                NSRegularExpression *rpt = [NSRegularExpression
+                    regularExpressionWithPattern:@"iPhone([0-9]+)" options:0 error:nil];
+                NSTextCheckingResult *m = rpt
+                    ? [rpt firstMatchInString:pt options:0 range:NSMakeRange(0, pt.length)] : nil;
+                if (m && m.numberOfRanges > 1)
+                    tag = [NSString stringWithFormat:@"iP%@", [pt substringWithRange:[m rangeAtIndex:1]]];
+                NSString *repl = [NSString stringWithFormat:@"%@_@%@_@NJ", tag, osv];
+                NSString *tmp = [reIp stringByReplacingMatchesInString:out options:0
+                    range:NSMakeRange(0, out.length) withTemplate:repl];
+                if (tmp && ![tmp isEqualToString:out]) { out = tmp; changed = YES; }
+            }
+        }
         // ── B Network P0: deviceUUID / dId / adId (centralized.zaloapp.com) ──
         // Docs: adId ≡ IDFA, dId ≡ IDFV-like, deviceUUID ≡ UniqueDeviceID (UDID).
         // Only rewrite when field already present (analytics-ish).
@@ -470,6 +507,53 @@ static NSURL *IPFRewriteURL(NSURL *url) {
     return url;
 }
 
+// Forward — full impl after IPFRewriteHeaderValue
+static NSString *IPFRewriteIdentityHeader(NSString *field, NSString *value);
+
+// Zalo centralized puts identity in HTTP header `extInfo` JSON (mod/osv/ss),
+// not only in body. Deep body hooks miss that path → host mod leak.
+static NSString *IPFRewriteHeaderValue(NSString *value) {
+    if (!value.length) return value;
+    @try {
+        // Only touch analytics-ish header values (extInfo JSON, form, etc.)
+        BOOL hit =
+            [value rangeOfString:@"\"mod\""].location != NSNotFound
+            || [value rangeOfString:@"\"osv\""].location != NSNotFound
+            || [value rangeOfString:@"\"ss\""].location != NSNotFound
+            || [value rangeOfString:@"mod="].location != NSNotFound
+            || [value rangeOfString:@"osv="].location != NSNotFound
+            || [value rangeOfString:@"iPhone"].location != NSNotFound;
+        if (!hit) return value;
+        NSData *d = [value dataUsingEncoding:NSUTF8StringEncoding];
+        if (!d.length) return value;
+        NSData *nd = IPFRewritePayload(d);
+        if (!nd || nd == d) return value;
+        NSString *nv = [[NSString alloc] initWithData:nd encoding:NSUTF8StringEncoding];
+        return nv.length ? nv : value;
+    } @catch (__unused NSException *ex) {
+        return value;
+    }
+}
+
+static void IPFRewriteRequestHeaders(NSMutableURLRequest *m) {
+    if (!m) return;
+    @try {
+        NSDictionary *hdrs = [m allHTTPHeaderFields];
+        if (![hdrs isKindOfClass:[NSDictionary class]] || hdrs.count == 0) return;
+        [hdrs enumerateKeysAndObjectsUsingBlock:^(id key, id obj, BOOL *stop) {
+            if (![key isKindOfClass:[NSString class]] || ![obj isKindOfClass:[NSString class]])
+                return;
+            // Prefer full identity rewrite (UA / osVersion / model / extInfo)
+            NSString *nv = IPFRewriteIdentityHeader((NSString *)key, (NSString *)obj);
+            if (!nv) nv = IPFRewriteHeaderValue((NSString *)obj);
+            if (nv && ![nv isEqualToString:(NSString *)obj]) {
+                [m setValue:nv forHTTPHeaderField:(NSString *)key];
+                IPFLog([NSString stringWithFormat:@"NET rewrite header %@ (mod/osv/ss/UA)", key]);
+            }
+        }];
+    } @catch (__unused NSException *ex) {}
+}
+
 static id IPFRewriteRequest(id req) {
     if (!req) return req;
     @try {
@@ -480,6 +564,7 @@ static id IPFRewriteRequest(id req) {
             NSData *b = m.HTTPBody;
             NSData *nb = IPFRewritePayload(b);
             if (nb != b && nb) m.HTTPBody = nb;
+            IPFRewriteRequestHeaders(m);
             return m;
         }
         if ([req isKindOfClass:[NSURLRequest class]]) {
@@ -489,10 +574,25 @@ static id IPFRewriteRequest(id req) {
             NSData *nb = IPFRewritePayload(b);
             BOOL urlCh = u && ![u.absoluteString isEqualToString:r.URL.absoluteString];
             BOOL bodyCh = nb && nb != b;
-            if (urlCh || bodyCh) {
+            // Always check headers for extInfo even if body/url unchanged
+            NSDictionary *hdrs = [r allHTTPHeaderFields];
+            BOOL hdrNeed = NO;
+            if ([hdrs isKindOfClass:[NSDictionary class]]) {
+                for (id k in hdrs) {
+                    id v = hdrs[k];
+                    if (![v isKindOfClass:[NSString class]]) continue;
+                    NSString *nv = IPFRewriteHeaderValue((NSString *)v);
+                    if (nv && ![nv isEqualToString:(NSString *)v]) {
+                        hdrNeed = YES;
+                        break;
+                    }
+                }
+            }
+            if (urlCh || bodyCh || hdrNeed) {
                 NSMutableURLRequest *m = [r mutableCopy];
                 if (urlCh) m.URL = u;
                 if (bodyCh) m.HTTPBody = nb;
+                IPFRewriteRequestHeaders(m);
                 return m;
             }
         }
@@ -503,6 +603,7 @@ static id IPFRewriteRequest(id req) {
 static void (*orig_setHTTPBody)(id, SEL, NSData *);
 static NSData *(*orig_HTTPBody)(id, SEL);
 static void (*orig_setURL)(id, SEL, NSURL *);
+static void (*orig_setValueForHTTPHeaderField)(id, SEL, NSString *, NSString *);
 
 static void stub_setHTTPBody(id self, SEL _cmd, NSData *body) {
     NSData *b = IPFRewritePayload(body);
@@ -516,6 +617,96 @@ static NSData *stub_HTTPBody(id self, SEL _cmd) {
 
 static void stub_setURL(id self, SEL _cmd, NSURL *url) {
     if (orig_setURL) orig_setURL(self, _cmd, IPFRewriteURL(url));
+}
+
+// User-Agent / osVersion / Zalo model=iP7_@15.8.4_@NJ → SoT
+static NSString *IPFRewriteIdentityHeader(NSString *field, NSString *value) {
+    if (![field isKindOfClass:[NSString class]] || ![value isKindOfClass:[NSString class]] || !value.length)
+        return value;
+    IPFConfig *cfg = [IPFConfig shared];
+    NSString *osv = [cfg stringForKey:@"osv"]
+        ?: [cfg stringForKey:@"ProductVersion"]
+        ?: [cfg stringForKey:@"AnalyticsOsv"];
+    NSString *pt = IPFFakePT();
+    if (!osv.length && !pt.length) return value;
+
+    NSString *out = value;
+    BOOL ch = NO;
+    NSString *fl = field.lowercaseString ?: @"";
+
+    // Zalo/260701 (iPhone; iOS 15.8.4; Scale/2.00) → profile iOS
+    if (osv.length) {
+        NSRegularExpression *reUA = [NSRegularExpression
+            regularExpressionWithPattern:@"iOS [0-9]+(?:\\.[0-9]+)*"
+                                 options:0 error:nil];
+        if (reUA) {
+            NSString *repl = [NSString stringWithFormat:@"iOS %@", osv];
+            NSString *tmp = [reUA stringByReplacingMatchesInString:out options:0
+                range:NSMakeRange(0, out.length) withTemplate:repl];
+            if (tmp && ![tmp isEqualToString:out]) { out = tmp; ch = YES; }
+        }
+        for (NSString *k in @[ @"osVersion", @"os_version" ]) {
+            NSRegularExpression *rk = [NSRegularExpression
+                regularExpressionWithPattern:[NSString stringWithFormat:@"%@=[0-9.]+", k]
+                                     options:0 error:nil];
+            if (!rk) continue;
+            NSString *repl = [NSString stringWithFormat:@"%@=%@", k, osv];
+            NSString *tmp = [rk stringByReplacingMatchesInString:out options:0
+                range:NSMakeRange(0, out.length) withTemplate:repl];
+            if (tmp && ![tmp isEqualToString:out]) { out = tmp; ch = YES; }
+        }
+        if ([fl isEqualToString:@"osversion"] || [fl isEqualToString:@"os_version"]) {
+            if (![out isEqualToString:osv]) { out = osv; ch = YES; }
+        }
+        // device_model=iP7_@15.8.4_@NJ
+        NSRegularExpression *reMod = [NSRegularExpression
+            regularExpressionWithPattern:@"iP[0-9]+_@[0-9.]+_@[A-Za-z0-9]+"
+                                 options:0 error:nil];
+        if (reMod) {
+            NSString *tag = @"iP";
+            if (pt.length) {
+                NSRegularExpression *rpt = [NSRegularExpression
+                    regularExpressionWithPattern:@"iPhone([0-9]+)" options:0 error:nil];
+                NSTextCheckingResult *m = rpt
+                    ? [rpt firstMatchInString:pt options:0 range:NSMakeRange(0, pt.length)]
+                    : nil;
+                if (m && m.numberOfRanges > 1) {
+                    NSString *maj = [pt substringWithRange:[m rangeAtIndex:1]];
+                    tag = [NSString stringWithFormat:@"iP%@", maj];
+                }
+            }
+            NSString *repl = [NSString stringWithFormat:@"%@_@%@_@NJ", tag, osv];
+            NSString *tmp = [reMod stringByReplacingMatchesInString:out options:0
+                range:NSMakeRange(0, out.length) withTemplate:repl];
+            if (tmp && ![tmp isEqualToString:out]) { out = tmp; ch = YES; }
+        }
+    }
+    NSString *jsonish = IPFRewriteHeaderValue(out);
+    if (jsonish && ![jsonish isEqualToString:out]) { out = jsonish; ch = YES; }
+    if (ch) IPFLog([NSString stringWithFormat:@"NET rewrite identity hdr %@", field]);
+    return out;
+}
+
+// Catch Zalo setValue:forHTTPHeaderField:@"extInfo" with JSON mod/osv + UA/osVersion/model
+static void stub_setValueForHTTPHeaderField(id self, SEL _cmd, NSString *value, NSString *field) {
+    NSString *v = value;
+    if ([field isKindOfClass:[NSString class]] && [value isKindOfClass:[NSString class]]) {
+        NSString *fl = field.lowercaseString;
+        if ([field caseInsensitiveCompare:@"extInfo"] == NSOrderedSame
+            || [fl isEqualToString:@"user-agent"]
+            || [fl isEqualToString:@"osversion"]
+            || [fl isEqualToString:@"os_version"]
+            || [fl isEqualToString:@"model"]
+            || [fl isEqualToString:@"device_model"]
+            || [value rangeOfString:@"\"mod\""].location != NSNotFound
+            || [value rangeOfString:@"\"osv\""].location != NSNotFound
+            || [value rangeOfString:@"iOS "].location != NSNotFound
+            || [value rangeOfString:@"iP7_@"].location != NSNotFound) {
+            v = IPFRewriteIdentityHeader(field, value);
+        }
+    }
+    if (orig_setValueForHTTPHeaderField)
+        orig_setValueForHTTPHeaderField(self, _cmd, v, field);
 }
 
 // NSURLSession uploadTaskWithRequest:fromData:
@@ -558,7 +749,11 @@ void IPFInstallDeepHooks(void) {
             pMSHookMessageEx(req, @selector(setHTTPBody:), (IMP)stub_setHTTPBody, (IMP *)&orig_setHTTPBody);
             if (class_getInstanceMethod(req, @selector(setURL:)))
                 pMSHookMessageEx(req, @selector(setURL:), (IMP)stub_setURL, (IMP *)&orig_setURL);
-            IPFLog(@"NSMutableURLRequest body+URL rewrite hooked");
+            if (class_getInstanceMethod(req, @selector(setValue:forHTTPHeaderField:)))
+                pMSHookMessageEx(req, @selector(setValue:forHTTPHeaderField:),
+                                 (IMP)stub_setValueForHTTPHeaderField,
+                                 (IMP *)&orig_setValueForHTTPHeaderField);
+            IPFLog(@"NSMutableURLRequest body+URL+header rewrite hooked");
         }
         Class ureq = objc_getClass("NSURLRequest");
         if (ureq) {
@@ -572,13 +767,13 @@ void IPFInstallDeepHooks(void) {
                 pMSHookMessageEx(sess, s1, (IMP)stub_dataTaskReq, (IMP *)&orig_dataTaskReq);
             if (class_getInstanceMethod(sess, s2))
                 pMSHookMessageEx(sess, s2, (IMP)stub_uploadFromData, (IMP *)&orig_uploadFromData);
-            IPFLog(@"NSURLSession task hooks OK (body+query)");
+            IPFLog(@"NSURLSession task hooks OK (body+query+header)");
         }
     }
     // Module cover marker
     @try {
         NSString *line =
-            @"MODULE IPFHooksDeep: HTTP body/query ProductType/HW rewrite + IOKit serial/model\n";
+            @"MODULE IPFHooksDeep: HTTP body/query/header ProductType/HW rewrite + IOKit serial/model\n";
         NSString *home = NSHomeDirectory();
         if (home.length) {
             NSString *p = [home stringByAppendingPathComponent:@"Documents/ipfaker_modules.log"];

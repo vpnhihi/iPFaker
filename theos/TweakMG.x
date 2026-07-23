@@ -106,8 +106,8 @@ static void IPFMark(const char *msg) {
                 @"MODULE IPFHooksMG: MGCopyAnswer(+Error) sysctl uname UIDevice IDFA/IDFV boottime Fake* gates; MSHook primary\n"
                 @"MODULE IPFHooksExtra: %@\n"
                 @"MODULE stack: MG%@ · CT+Deep · JB+Server · bid=%@\n",
-                skipExtra ? @"(lean net: getifaddrs+canOpenURL+hostname — no UIScreen)" : @"UIScreen disk path-hide canOpenURL UA getifaddrs hostname WKWebView",
-                skipExtra ? @" lean+net" : @"+Extra",
+                skipExtra ? @"(lean: ProcessInfo+UIScreen+getifaddrs+canOpenURL — no WebKit/disk/path-hide)" : @"UIScreen disk path-hide canOpenURL UA getifaddrs hostname WKWebView",
+                skipExtra ? @" lean+id" : @"+Extra",
                 bid];
             NSString *home = NSHomeDirectory();
             if (home.length)
