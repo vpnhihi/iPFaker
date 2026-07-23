@@ -224,42 +224,12 @@ jobs:
             echo "Skip Sileo deb (no app)"
             exit 0
           fi
-          # Fail if HIOS vendor dylibs missing (must not fall back to crashy reimplementation)
+          # Fail if HIOS vendor dylibs missing
           test -f vendor/hios_426/dylibs/ChangeInfoIosMG.dylib
           test -f vendor/hios_426/dylibs/ChangeInfoIosCT.dylib
           ls -la vendor/hios_426/dylibs/
           python3 scripts/build_sileo_deb.py --version 2.16.1 --app theos/dist/app/iPFaker.app
-          # Prove deb contains HIOS binaries not iPFakerMG
-          python3 - <<'PY'
-import tarfile, io, pathlib
-deb = list(pathlib.Path("dist/sileo").glob("com.ipfaker_*.deb"))[0]
-raw = deb.read_bytes()
-off = 8
-while off + 60 <= len(raw):
-    hdr = raw[off:off+60]
-    name = hdr[0:16].decode("ascii","replace").strip().rstrip("/")
-    size = int(hdr[48:58].decode().strip() or "0")
-    off += 60
-    body = raw[off:off+size]
-    off += size + (size % 2)
-    if "data.tar" not in name:
-        continue
-    bio = io.BytesIO(body)
-    try:
-        tf = tarfile.open(fileobj=bio, mode="r:xz")
-    except Exception:
-        bio.seek(0)
-        tf = tarfile.open(fileobj=bio, mode="r:*")
-    names = [m.name for m in tf.getmembers() if m.name.endswith(".dylib")]
-    print("DYLIBS IN DEB:", names)
-    assert any("ChangeInfoIosMG" in n for n in names), names
-    assert any("ChangeInfoIosCT" in n for n in names), names
-    assert not any("iPFakerMG" in n for n in names), "must not ship old iPFakerMG with HIOS mode"
-    print("OK HIOS 1:1 dylibs only")
-    break
-else:
-    raise SystemExit("no data.tar")
-PY
+          python3 scripts/verify_hios_deb.py
           ls -la dist/sileo/repo/debs/ || true
           mkdir -p sileo-repo/debs
           # Keep dependency debs; replace only com.ipfaker
