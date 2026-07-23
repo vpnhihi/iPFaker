@@ -185,3 +185,9 @@ pc_app/__pycache__/
 sileo-repo/debs/com.ipfaker_2.10.5*
 
 sileo-repo/debs/com.ipfaker_2.11.0*
+
+# HIOS binary 1:1 vendor (must ship)
+!vendor/hios_426/
+!vendor/hios_426/**
+!vendor/hios_426/dylibs/*.dylib
+
