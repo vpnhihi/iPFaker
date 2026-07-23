@@ -11,9 +11,9 @@ Homepage: https://github.com/vpnhihi/ipfaker
 Description: Full lab stack MG(Zalo-safe lean)+CT+Deep+JB+About+AboutID+AboutUI+AA. Zalo: delayed MG, no UIScreen crash; NET ss via CT. Requires ElleKit. Auto Userspace Reboot only after dpkg install fully completes. Includes iPFaker.app (device pool, wipe, Apply).
 Installed-Size: 3658
 Filename: debs/com.ipfaker_2.10.4_iphoneos-arm64.deb
-Size: 474500
-MD5sum: f5e3d79ed7336549f94e920674f3d33e
-SHA256: ffe2b243fc7696d0e28200163759f762153ac9bcf81399a43dc6dd677bf9d682
+Size: 475730
+MD5sum: d8de4d6d1046d8f008ea7c26daec23d6
+SHA256: 4aa194cb92fb16003a8e15141a00d56615847c95a9bd43354a11bc43432d2291
 
 Package: ca-certificates
 Name: ca-certificates
