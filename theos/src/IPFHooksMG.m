@@ -105,12 +105,25 @@ static void IPFResolveSubstrate(void) {
 static CFTypeRef (*orig_MGCopyAnswer)(CFStringRef key);
 static CFTypeRef (*orig_MGCopyAnswerWithError)(CFStringRef key, int *err);
 
+static BOOL IPFIsZaloProcess(void) {
+    NSString *bid = [[NSBundle mainBundle] bundleIdentifier] ?: @"";
+    return [bid isEqualToString:@"vn.com.vng.zingalo"]
+        || [bid isEqualToString:@"com.zing.zalo"]
+        || [bid containsString:@"zingalo"];
+}
+
 /// Gate MG key by Settings Fake* flags (written into config.plist on Apply).
 static BOOL IPFAllowMGKey(NSString *k) {
     IPFConfig *c = [IPFConfig shared];
     if (!c.enabled) return NO;
     if (!k.length) return NO;
     NSString *lk = k.lowercaseString;
+    // Zalo: NEVER spoof screen/display via MG — returns Pro Max dims → UIFont/IsCompactDevice SIGABRT on A10.
+    // NET field `ss` is rewritten by iPFakerCT Deep instead.
+    if (IPFIsZaloProcess()
+        && ([lk containsString:@"screen"] || [lk containsString:@"display"]
+            || [lk containsString:@"screendimension"]))
+        return NO;
     // IDFA / IDFV — Apple advertisingIdentifier / identifierForVendor (UUID v4)
     if ([lk containsString:@"advertising"] || [lk isEqualToString:@"idfa"]
         || [lk containsString:@"identifierforvendor"] || [lk isEqualToString:@"idfv"])
@@ -129,7 +142,7 @@ static BOOL IPFAllowMGKey(NSString *k) {
         || [k isEqualToString:@"mZfUC7qo4pURNhyMHZ62RQ"]   // BuildVersion
         || [k isEqualToString:@"FbsJngVSVXK87pG0SJtlNg"])  // ProductBuildVersion
         return [c flag:@"FakeSysOSVersion" defaultYes:YES];
-    // Screen MG keys
+    // Screen MG keys (non-Zalo only — Zalo blocked above)
     if ([lk containsString:@"screen"] || [lk containsString:@"display"])
         return [c flag:@"FakeScreen" defaultYes:YES] || [c flag:@"FakeRealScreen" defaultYes:NO];
     // Hardware identity (+ eSIM EID, Secure Element SEID, baseband/modem)
@@ -352,8 +365,9 @@ static CFTypeRef stub_MGCopyAnswer(CFStringRef key) {
         if (!fake && key) {
             NSString *lk = k.lowercaseString;
             IPFConfig *cfg = [IPFConfig shared];
-            // Composite screen-dimensions dict (Zalo probes this; host returns 750×1334 on iPhone 7)
-            if (([lk containsString:@"screen-dimension"] || [lk isEqualToString:@"screen-dimensions"]
+            // Composite screen-dimensions — skip on Zalo (SIGABRT IsCompactDevice/UIFont on A10)
+            if (!IPFIsZaloProcess()
+                && ([lk containsString:@"screen-dimension"] || [lk isEqualToString:@"screen-dimensions"]
                  || [lk containsString:@"screendimension"])
                 && ([cfg flag:@"FakeScreen" defaultYes:YES] || [cfg flag:@"FakeRealScreen" defaultYes:NO])) {
                 id w = [cfg mgValueForKey:@"main-screen-width"] ?: cfg.flat[@"main-screen-width"];

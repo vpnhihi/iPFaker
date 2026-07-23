@@ -6,10 +6,11 @@ extern "C" {
 #endif
 
 void IPFInstallExtraHooks(void);
-/// Lean Zalo path (SkipExtraForZalo): identity that must not crash A10.
-/// getifaddrs · gethostname · canOpenURL · NSProcessInfo OS/host · UIScreen.
-/// Skips: WebKit inject, disk, access/stat path-hide storm.
+/// Legacy lean (Safari-ish): getifaddrs · canOpenURL · ProcessInfo · optional UIScreen.
 void IPFInstallExtraNetLeanHooks(void);
+/// Zalo-safe only: NSProcessInfo OS string + hostName. No UIScreen / getifaddrs / path hide.
+/// (UIScreen + MG screen-dimensions spoof crash Zalo UIFont/IsCompactDevice on A10.)
+void IPFInstallExtraZaloSafeHooks(void);
 
 #ifdef __cplusplus
 }

@@ -1,5 +1,5 @@
-// iPFakerMG — lab reference-stackMG style entry
-// Marker written FIRST so we can detect load vs config failure.
+// iPFakerMG — rootless Dopamine, all arm64/arm64e iPhones
+// Zalo: delayed MG install + ProcessInfo-only lean (no UIScreen / no MG screen dims)
 
 #import <Foundation/Foundation.h>
 #import <stdio.h>
@@ -8,7 +8,6 @@
 #import "IPFHooksExtra.h"
 
 static void IPFMark(const char *msg) {
-    // Sandbox-safe first (Zalo Documents/tmp), then jailbreak paths
     NSString *bid = [[NSBundle mainBundle] bundleIdentifier] ?: @"(nil)";
     NSString *body = [NSString stringWithFormat:@"%s bid=%@\n", msg, bid];
     NSMutableArray *paths = [NSMutableArray array];
@@ -29,7 +28,6 @@ static void IPFMark(const char *msg) {
     ]];
     for (NSString *p in paths) {
         [body writeToFile:p atomically:YES encoding:NSUTF8StringEncoding error:nil];
-        // C fallback (sometimes works when NS fails)
         FILE *f = fopen(p.UTF8String, "w");
         if (f) {
             fputs(body.UTF8String, f);
@@ -39,14 +37,34 @@ static void IPFMark(const char *msg) {
     NSLog(@"[iPFakerMG] %s bid=%@", msg, bid);
 }
 
+static BOOL IPFIsZaloBid(NSString *bid) {
+    if (!bid.length) return NO;
+    return [bid isEqualToString:@"vn.com.vng.zingalo"]
+        || [bid isEqualToString:@"com.zing.zalo"]
+        || [bid containsString:@"zingalo"];
+}
+
+static void IPFInstallZaloStack(void) {
+    @autoreleasepool {
+        @try {
+            // Core identity: MG + UIDevice + sysctl/uname (no screen dims — see IPFAllowMGKey)
+            IPFInstallMGHooks();
+            // ProcessInfo OS string only (no UIScreen / getifaddrs)
+            IPFInstallExtraZaloSafeHooks();
+            IPFMark("CTOR_ZALO_MG_LEAN_OK");
+        } @catch (NSException *ex) {
+            IPFMark([[NSString stringWithFormat:@"CTOR_ZALO_EXC %@", ex.reason ?: @"?"] UTF8String]);
+        }
+    }
+}
+
 %ctor {
     @autoreleasepool {
         IPFMark("CTOR_ENTER");
 
         NSString *bid = [[NSBundle mainBundle] bundleIdentifier] ?: @"";
-        // Multi-app: ElleKit Filter.plist scopes inject.
-        // Settings (Preferences): MG-only for Cài đặt → Cài đặt chung → Giới thiệu.
-        // Skip Extra/WebKit/getifaddrs here — historical crash risk when full Extra runs in Settings.
+
+        // Settings → About: lite only
         if (bid.length > 0 && [bid isEqualToString:@"com.apple.Preferences"]) {
             BOOL okPrefs = [[IPFConfig shared] reload];
             if (!okPrefs || ![IPFConfig shared].enabled) {
@@ -57,7 +75,6 @@ static void IPFMark(const char *msg) {
                 IPFMark("CTOR_PREFS_FLAG_OFF");
                 return;
             }
-            // Prefer Lite if ever injected into Preferences (full stack PAC-crashes CoreRepair)
             IPFInstallMGHooksLite();
             IPFMark("CTOR_PREFS_MG_LITE");
             return;
@@ -75,47 +92,25 @@ static void IPFMark(const char *msg) {
         [dbg writeToFile:@"/var/jb/etc/ipfaker/v3_mg_debug.log"
               atomically:YES encoding:NSUTF8StringEncoding error:nil];
 
-        if (!ok) {
-            // lab always has config.plist; still install embedded fallback hooks
+        if (!ok)
             IPFMark("CTOR_NO_FILE_CONFIG_USE_EMBED");
+
+        // ─── Zalo: delay hooks until after first UI frame (avoids launch SIGABRT) ───
+        if (IPFIsZaloBid(bid)) {
+            BOOL skipExtra = [[IPFConfig shared] flag:@"SkipExtraForZalo" defaultYes:YES];
+            (void)skipExtra;
+            IPFMark("CTOR_ZALO_DELAY_SCHEDULE");
+            // 400ms: past scene connect / nav bar init that crashed with screen spoof
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.4 * NSEC_PER_SEC)),
+                           dispatch_get_main_queue(), ^{
+                IPFInstallZaloStack();
+            });
+            return;
         }
 
-        // Core spoof always (all rootless iPhones: A10 arm64 … A18 arm64e)
+        // ─── Other apps (Safari, etc.): immediate full stack ───
         IPFInstallMGHooks();
-
-        // Extra (UIScreen/getifaddrs/WK/path-hide): crash/hang risk on some A10 apps (Zalo).
-        // Default: skip Extra inside Zalo; keep Extra for Safari/WebKit when filter injects there.
-        // Override: config SkipExtraForZalo=0 to force Extra in Zalo (lab stress).
-        BOOL isZalo = [bid isEqualToString:@"vn.com.vng.zingalo"]
-            || [bid isEqualToString:@"com.zing.zalo"]
-            || [bid containsString:@"zingalo"];
-        BOOL skipExtra = isZalo && [[IPFConfig shared] flag:@"SkipExtraForZalo" defaultYes:YES];
-        if (!skipExtra) {
-            IPFInstallExtraHooks();
-            IPFMark("CTOR_MG_PLUS_EXTRA");
-        } else {
-            // Lean net only: getifaddrs + canOpenURL + hostname (checklist D/E medium).
-            // Still skip UIScreen/WebKit/disk path-hide (A10 crash history).
-            IPFInstallExtraNetLeanHooks();
-            IPFMark("CTOR_MG_LEAN_NET_ZALO");
-        }
-
-        // Module cover: MG(+Extra) · CT+Deep · JB+Server
-        @try {
-            NSString *mod = [NSString stringWithFormat:
-                @"MODULE IPFHooksMG: MGCopyAnswer(+Error) sysctl uname UIDevice IDFA/IDFV boottime Fake* gates; MSHook primary\n"
-                @"MODULE IPFHooksExtra: %@\n"
-                @"MODULE stack: MG%@ · CT+Deep · JB+Server · bid=%@\n",
-                skipExtra ? @"(lean: ProcessInfo+UIScreen+getifaddrs+canOpenURL — no WebKit/disk/path-hide)" : @"UIScreen disk path-hide canOpenURL UA getifaddrs hostname WKWebView",
-                skipExtra ? @" lean+id" : @"+Extra",
-                bid];
-            NSString *home = NSHomeDirectory();
-            if (home.length)
-                [mod writeToFile:[home stringByAppendingPathComponent:@"Documents/ipfaker_modules.log"]
-                      atomically:YES encoding:NSUTF8StringEncoding error:nil];
-            [mod writeToFile:@"/var/mobile/Library/iPFaker/ipfaker_modules.log"
-                  atomically:YES encoding:NSUTF8StringEncoding error:nil];
-        } @catch (__unused NSException *ex) {}
-        IPFMark("CTOR_HOOKS_DONE");
+        IPFInstallExtraHooks();
+        IPFMark("CTOR_MG_PLUS_EXTRA");
     }
 }
