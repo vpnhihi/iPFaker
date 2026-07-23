@@ -77,13 +77,44 @@ jobs:
           mkdir -p dist
           find .theos/obj -name 'iPFaker*.dylib' 2>/dev/null | head -20
           for name in iPFakerAA iPFakerAbout iPFakerAboutID iPFakerAboutUI iPFakerAboutVer iPFakerMG iPFakerCT iPFakerJB; do
-            f=$(find .theos -path '*debug*' -prune -o -name "${name}.dylib" -print 2>/dev/null | head -1)
-            if [ -z "$f" ]; then f=$(find .theos -name "${name}.dylib" | head -1); fi
+            # Prefer fat (cafebabe) FINALPACKAGE dylib — never thin arm64e-only (breaks A10/A11)
+            f=""
+            best=""
+            bestsz=0
+            while IFS= read -r cand; do
+              [ -f "$cand" ] || continue
+              # skip intermediate arch-specific dirs if a larger fat exists
+              sz=$(wc -c < "$cand" | tr -d ' ')
+              magic=$(xxd -p -l 4 "$cand" 2>/dev/null || true)
+              if [ "$magic" = "cafebabe" ] || [ "$magic" = "bebafeca" ]; then
+                f="$cand"
+                break
+              fi
+              if [ "$sz" -gt "$bestsz" ]; then
+                best="$cand"
+                bestsz=$sz
+              fi
+            done < <(find .theos -name "${name}.dylib" 2>/dev/null | grep -v '/debug/' | sort)
             if [ -z "$f" ]; then
+              while IFS= read -r cand; do
+                [ -f "$cand" ] || continue
+                magic=$(xxd -p -l 4 "$cand" 2>/dev/null || true)
+                if [ "$magic" = "cafebabe" ] || [ "$magic" = "bebafeca" ]; then
+                  f="$cand"
+                  break
+                fi
+                sz=$(wc -c < "$cand" | tr -d ' ')
+                if [ "$sz" -gt "$bestsz" ]; then best="$cand"; bestsz=$sz; fi
+              done < <(find .theos -name "${name}.dylib" 2>/dev/null | sort)
+            fi
+            if [ -z "$f" ]; then f="$best"; fi
+            if [ -z "$f" ] || [ ! -f "$f" ]; then
               echo "FATAL: missing ${name}.dylib"
               exit 1
             fi
+            echo "collect ${name} <= $f ($(wc -c < "$f") bytes, magic=$(xxd -p -l 4 "$f"))"
             cp -f "$f" "dist/${name}.dylib"
+            file "dist/${name}.dylib" || true
           done
           cp -f layout/Library/MobileSubstrate/DynamicLibraries/*.plist dist/ 2>/dev/null || true
           cp -f iPFakerAA.plist dist/ 2>/dev/null || true

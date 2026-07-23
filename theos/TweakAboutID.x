@@ -69,14 +69,26 @@ static BOOL IPFIDIsModelNum(NSString *t) {
     if (!t.length || t.length > 18) return NO;
     if ([t rangeOfString:@":"].location != NSNotFound) return NO;
     if ([t rangeOfString:@" "].location != NSNotFound) return NO;
-    if ([t rangeOfString:@"/"].location != NSNotFound) return t.length >= 5;
+    // Part number: Mxxxx…/A (must contain digit + slash)
+    if ([t rangeOfString:@"/"].location != NSNotFound) {
+        if (t.length < 5) return NO;
+        BOOL digit = NO;
+        for (NSUInteger i = 0; i < t.length; i++) {
+            unichar c = [t characterAtIndex:i];
+            if (c >= '0' && c <= '9') digit = YES;
+        }
+        return digit;
+    }
+    // Short host codes e.g. MN8G2 — require letter+digit, never pure words (iPhone/Video)
     if (t.length < 4 || t.length > 8) return NO;
+    BOOL digit = NO, letter = NO;
     for (NSUInteger i = 0; i < t.length; i++) {
         unichar c = [t characterAtIndex:i];
-        if (!((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')))
-            return NO;
+        if (c >= '0' && c <= '9') digit = YES;
+        else if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) letter = YES;
+        else return NO;
     }
-    return YES;
+    return digit && letter;
 }
 
 static NSInteger IPFIDWash(UIView *root, NSString *wantName, NSString *wantMN,
