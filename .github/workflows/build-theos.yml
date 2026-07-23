@@ -159,7 +159,8 @@ jobs:
             echo "FATAL: MG $MGSIZE > 360000 — unexpected fat size"
             exit 1
           fi
-          if [ "$AASIZE" -gt 200000 ]; then
+          # Fat arm64+arm64e + SecItem/DeviceCheck: allow ~280k (was 200k pre-P0)
+          if [ "$AASIZE" -gt 280000 ]; then
             echo "FATAL: AA $AASIZE too large for lite dylib (fat)"
             exit 1
           fi
