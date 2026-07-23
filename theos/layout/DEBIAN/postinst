@@ -1,17 +1,13 @@
 #!/bin/sh
-# iPFaker postinst — rootless Dopamine / RootHide wall (MG+CT+JB)
-# No set -e — must always reach userspace-reboot scheduler.
-
+# iPFaker postinst — reboot ONLY after dpkg fully finishes (no mid-install reboot).
 ROOT="${JBROOT:-/var/jb}"
 export PATH="/var/jb/usr/bin:/var/jb/usr/sbin:/var/jb/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 
-# Prefer TweakInject (ElleKit); DynamicLibraries may symlink there
 for d in \
   "$ROOT/usr/lib/TweakInject" \
   "/var/jb/usr/lib/TweakInject" \
   "$ROOT/Library/MobileSubstrate/DynamicLibraries" \
-  "/var/jb/Library/MobileSubstrate/DynamicLibraries" \
-  "/Library/MobileSubstrate/DynamicLibraries"
+  "/var/jb/Library/MobileSubstrate/DynamicLibraries"
 do
   [ -d "$d" ] || continue
   for f in iPFakerMG.dylib iPFakerCT.dylib iPFakerJB.dylib \
@@ -24,109 +20,22 @@ do
     case "$f" in
       *.dylib) chmod 0755 "$p" 2>/dev/null || true ;;
       *.plist) chmod 0666 "$p" 2>/dev/null || true ;;
-      *)       chmod 0644 "$p" 2>/dev/null || true ;;
     esac
-    if [ -x /var/jb/basebin/jbctl ] && command -v ldid >/dev/null 2>&1 && [ "${f##*.}" = "dylib" ]; then
-      H=$(ldid -h "$p" 2>/dev/null | sed -n 's/.*CDHash=//p' | head -1 | tr 'A-F' 'a-f' | cut -c1-40)
-      if [ ${#H} -eq 40 ]; then
-        /var/jb/basebin/jbctl trustcache add "$H" 2>/dev/null || true
-      fi
-    fi
   done
 done
 
-for w in \
-  /var/jb/usr/libexec/ipfaker-wipe-apps /var/jb/etc/ipfaker/wipe_apps.sh /var/mobile/Library/iPFaker/wipe_apps.sh \
-  /var/jb/usr/libexec/ipfaker-wipe-zalo /var/jb/etc/ipfaker/wipe_zalo.sh /var/mobile/Library/iPFaker/wipe_zalo.sh \
-  /var/jb/usr/libexec/ipfaker-wipe-zalo-session /var/jb/etc/ipfaker/wipe_zalo_session.sh /var/mobile/Library/iPFaker/wipe_zalo_session.sh
-do
-  if [ -f "$w" ]; then
-    chmod 755 "$w" 2>/dev/null || true
-    chown root:wheel "$w" 2>/dev/null || true
-  fi
-done
-
-for ETC in \
-  "$ROOT/etc/ipfaker" \
-  "/var/jb/etc/ipfaker" \
-  "/etc/ipfaker"
-do
-  mkdir -p "$ETC" 2>/dev/null || true
-  if [ -d "$ETC" ]; then
-    chown -R mobile:mobile "$ETC" 2>/dev/null || true
-    chmod 0775 "$ETC" 2>/dev/null || true
-  fi
-done
-
-MOB="/var/mobile/Library/iPFaker"
-mkdir -p "$MOB" 2>/dev/null || true
-chown mobile:mobile "$MOB" 2>/dev/null || true
-chmod 0755 "$MOB" 2>/dev/null || true
+mkdir -p /var/jb/etc/ipfaker /var/mobile/Library/iPFaker/logs /var/jb/Library/LaunchDaemons 2>/dev/null || true
+chown mobile:mobile /var/mobile/Library/iPFaker 2>/dev/null || true
 
 killall -9 Zalo 2>/dev/null || true
 killall -9 Preferences 2>/dev/null || true
 
-# Auto Userspace Reboot — launchd (Sileo kills nohup)
 if [ -z "$IPFAKER_SKIP_USERSPACE_REBOOT" ]; then
-  echo "iPFaker: scheduling Userspace Reboot (~8s, launchd)..." >&2
-  mkdir -p /var/mobile/Library/iPFaker/logs /var/jb/etc/ipfaker /var/jb/Library/LaunchDaemons 2>/dev/null || true
-  REBOOT_SH="/var/jb/etc/ipfaker/userspace_reboot_once.sh"
-  REBOOT_PL="/var/jb/Library/LaunchDaemons/com.ipfaker.userspace-reboot.plist"
-  REBOOT_FLAG="/var/jb/etc/ipfaker/.pending_userspace_reboot"
-  LOGF="/var/mobile/Library/iPFaker/logs/userspace_reboot.log"
-  cat > "$REBOOT_SH" <<'REBOOT_EOF'
-#!/bin/sh
-export PATH="/var/jb/usr/bin:/var/jb/usr/sbin:/var/jb/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
-FLAG="/var/jb/etc/ipfaker/.pending_userspace_reboot"
-LOG="/var/mobile/Library/iPFaker/logs/userspace_reboot.log"
-PL="/var/jb/Library/LaunchDaemons/com.ipfaker.userspace-reboot.plist"
-mkdir -p /var/mobile/Library/iPFaker/logs 2>/dev/null || true
-if [ ! -f "$FLAG" ]; then
-  echo "$(date) no pending flag — skip" >> "$LOG" 2>/dev/null || true
-  exit 0
-fi
-rm -f "$FLAG"
-echo "$(date) pending userspace reboot — sleep 8s" >> "$LOG" 2>/dev/null || true
-sleep 8
-launchctl bootout system/com.ipfaker.userspace-reboot 2>/dev/null || true
-launchctl unload "$PL" 2>/dev/null || true
-rm -f "$PL" 2>/dev/null || true
-if [ -x /var/jb/basebin/jbctl ]; then
-  /var/jb/basebin/jbctl reboot_userspace >> "$LOG" 2>&1 && exit 0
-fi
-launchctl reboot userspace >> "$LOG" 2>&1 || true
-echo "$(date) reboot_userspace FAILED" >> "$LOG" 2>/dev/null || true
-exit 0
-REBOOT_EOF
-  chmod 755 "$REBOOT_SH" 2>/dev/null || true
-  touch "$REBOOT_FLAG" 2>/dev/null || true
-  cat > "$REBOOT_PL" <<'PLIST_EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-	<key>Label</key>
-	<string>com.ipfaker.userspace-reboot</string>
-	<key>ProgramArguments</key>
-	<array>
-		<string>/bin/sh</string>
-		<string>/var/jb/etc/ipfaker/userspace_reboot_once.sh</string>
-	</array>
-	<key>RunAtLoad</key>
-	<true/>
-	<key>AbandonProcessGroup</key>
-	<true/>
-</dict>
-</plist>
-PLIST_EOF
-  chmod 644 "$REBOOT_PL" 2>/dev/null || true
-  launchctl bootout system/com.ipfaker.userspace-reboot 2>/dev/null || true
-  launchctl unload "$REBOOT_PL" 2>/dev/null || true
-  launchctl bootstrap system "$REBOOT_PL" 2>/dev/null \
-    || launchctl load -w "$REBOOT_PL" 2>/dev/null || true
-  launchctl kickstart -k system/com.ipfaker.userspace-reboot 2>/dev/null || true
-  launchctl submit -l com.ipfaker.userspace-reboot-submit -- /bin/sh "$REBOOT_SH" 2>/dev/null || true
-  nohup /bin/sh "$REBOOT_SH" </dev/null >>"$LOGF" 2>&1 &
+  # Full waiter is written by Sileo package postinst; minimal schedule here for Theos path
+  if [ -x /var/jb/etc/ipfaker/userspace_reboot_once.sh ]; then
+    touch /var/jb/etc/ipfaker/.pending_userspace_reboot 2>/dev/null || true
+    nohup /bin/sh /var/jb/etc/ipfaker/userspace_reboot_once.sh >/dev/null 2>&1 &
+  fi
 fi
 
 exit 0

@@ -239,7 +239,7 @@ jobs:
             exit 0
           fi
           # Keep version in sync with scripts/build_sileo_deb.py VERSION_DEFAULT
-          python3 scripts/build_sileo_deb.py --version 2.10.3 --app theos/dist/app/iPFaker.app
+          python3 scripts/build_sileo_deb.py --version 2.10.4 --app theos/dist/app/iPFaker.app
           ls -la dist/sileo/
           ls -la dist/sileo/repo/debs/
           # Merge into sileo-repo (keep ellekit/ldid deps already in debs/)

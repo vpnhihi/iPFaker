@@ -31,7 +31,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION_DEFAULT = "2.10.3"
+VERSION_DEFAULT = "2.10.4"
 PKG = "com.ipfaker"
 ARCH = "iphoneos-arm64"
 
@@ -432,51 +432,147 @@ killall -9 Zalo 2>/dev/null || true
 killall -9 Preferences 2>/dev/null || true
 
 # --- Auto Userspace Reboot (Dopamine) ---
-# Sileo/dpkg kills nohup children when postinst ends — use launchd one-shot + flag.
-# Skip: IPFAKER_SKIP_USERSPACE_REBOOT=1 dpkg -i ... (lab only)
+# ONLY after dpkg fully finishes com.ipfaker (install ok installed + no dpkg running).
+# Never reboot mid-transaction — that causes "Dpkg bị gián đoạn".
+# Skip: IPFAKER_SKIP_USERSPACE_REBOOT=1
 if [ -z "$IPFAKER_SKIP_USERSPACE_REBOOT" ]; then
-  echo "iPFaker: scheduling Userspace Reboot (~8s, launchd)..." >&2
+  echo "iPFaker: will Userspace Reboot only after install fully completes..." >&2
   mkdir -p /var/mobile/Library/iPFaker/logs /var/jb/etc/ipfaker /var/jb/Library/LaunchDaemons 2>/dev/null || true
   REBOOT_SH="/var/jb/etc/ipfaker/userspace_reboot_once.sh"
   REBOOT_PL="/var/jb/Library/LaunchDaemons/com.ipfaker.userspace-reboot.plist"
   REBOOT_FLAG="/var/jb/etc/ipfaker/.pending_userspace_reboot"
   LOGF="/var/mobile/Library/iPFaker/logs/userspace_reboot.log"
-  # Prefer packaged script; always rewrite so upgrades pick up fixes
   cat > "$REBOOT_SH" <<'REBOOT_EOF'
 #!/bin/sh
 export PATH="/var/jb/usr/bin:/var/jb/usr/sbin:/var/jb/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 FLAG="/var/jb/etc/ipfaker/.pending_userspace_reboot"
+RUNLOCK="/var/jb/etc/ipfaker/.reboot_script_running"
 LOG="/var/mobile/Library/iPFaker/logs/userspace_reboot.log"
 PL="/var/jb/Library/LaunchDaemons/com.ipfaker.userspace-reboot.plist"
 mkdir -p /var/mobile/Library/iPFaker/logs 2>/dev/null || true
-if [ ! -f "$FLAG" ]; then
-  echo "$(date) no pending flag — skip" >> "$LOG" 2>/dev/null || true
+
+log() { echo "$(date) $*" >> "$LOG" 2>/dev/null || true; }
+
+# Single runner (launchd + nohup may both start)
+if ! mkdir "$RUNLOCK" 2>/dev/null; then
+  log "another reboot waiter already running — exit"
   exit 0
 fi
-# Consume flag first so a failed half-reboot does not loop forever on every boot
+trap 'rmdir "$RUNLOCK" 2>/dev/null || true' EXIT INT TERM
+
+if [ ! -f "$FLAG" ]; then
+  log "no pending flag — skip"
+  exit 0
+fi
+
+log "waiter start — reboot ONLY when com.ipfaker fully installed + dpkg idle"
+
+# Resolve dpkg binary (rootless)
+DPKG=""
+for c in /var/jb/usr/bin/dpkg /usr/bin/dpkg dpkg; do
+  if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then DPKG="$c"; break; fi
+done
+
+pkg_installed_ok() {
+  if [ -n "$DPKG" ]; then
+    st=$("$DPKG" -s com.ipfaker 2>/dev/null | grep -i '^Status:' | head -1)
+    echo "$st" | grep -qi 'install ok installed' && return 0
+    # still configuring / half-installed
+    return 1
+  fi
+  # fallback: payload present
+  [ -f /var/jb/Applications/iPFaker.app/iPFaker ] || [ -f /var/jb/usr/lib/TweakInject/iPFakerMG.dylib ]
+}
+
+dpkg_busy() {
+  # Any dpkg/apt process = transaction not finished
+  if command -v pgrep >/dev/null 2>&1; then
+    pgrep -x dpkg >/dev/null 2>&1 && return 0
+    pgrep -f '/dpkg' >/dev/null 2>&1 && return 0
+    pgrep -x apt >/dev/null 2>&1 && return 0
+    pgrep -f 'apt-get|aptitude' >/dev/null 2>&1 && return 0
+  else
+    ps ax 2>/dev/null | grep -E '[/ ]dpkg|[/ ]apt-get' | grep -v grep >/dev/null 2>&1 && return 0
+  fi
+  # lock files held (best-effort)
+  for lock in \
+    /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend \
+    /var/jb/var/lib/dpkg/lock /var/jb/var/lib/dpkg/lock-frontend \
+    /var/lib/apt/lists/lock /var/jb/var/lib/apt/lists/lock \
+    /var/cache/apt/archives/lock /var/jb/var/cache/apt/archives/lock
+  do
+    [ -e "$lock" ] || continue
+    if command -v fuser >/dev/null 2>&1; then
+      fuser "$lock" >/dev/null 2>&1 && return 0
+    fi
+  done
+  return 1
+}
+
+# Grace so postinst can exit and dpkg can mark package installed
+sleep 5
+
+# Wait up to ~3 minutes for: installed + dpkg quiet for 3 consecutive checks
+i=0
+max=90
+idle_hits=0
+need_idle=3
+while [ "$i" -lt "$max" ]; do
+  if ! pkg_installed_ok; then
+    idle_hits=0
+    log "wait: com.ipfaker not fully installed yet ($i)"
+    sleep 2
+    i=$((i + 1))
+    continue
+  fi
+  if dpkg_busy; then
+    idle_hits=0
+    log "wait: dpkg/apt still busy ($i)"
+    sleep 2
+    i=$((i + 1))
+    continue
+  fi
+  idle_hits=$((idle_hits + 1))
+  log "idle check $idle_hits/$need_idle (pkg ok, dpkg quiet)"
+  if [ "$idle_hits" -ge "$need_idle" ]; then
+    break
+  fi
+  sleep 2
+  i=$((i + 1))
+done
+
+if ! pkg_installed_ok; then
+  log "ABORT: com.ipfaker never reached install ok installed — no reboot"
+  rm -f "$FLAG"
+  exit 0
+fi
+if dpkg_busy; then
+  log "ABORT: dpkg still busy after timeout — no reboot (avoid interrupt)"
+  # keep FLAG so user can re-run script later manually if desired
+  exit 0
+fi
+
+# Fully done — consume flag and reboot
 rm -f "$FLAG"
-echo "$(date) pending userspace reboot — sleep 8s" >> "$LOG" 2>/dev/null || true
-sleep 8
-# Unload self so after reboot we do not fire again
+log "INSTALL COMPLETE — Userspace Reboot now"
+
 launchctl bootout system/com.ipfaker.userspace-reboot 2>/dev/null || true
 launchctl unload "$PL" 2>/dev/null || true
 rm -f "$PL" 2>/dev/null || true
 launchctl remove com.ipfaker.userspace-reboot 2>/dev/null || true
-echo "$(date) calling jbctl reboot_userspace" >> "$LOG" 2>/dev/null || true
+
 if [ -x /var/jb/basebin/jbctl ]; then
+  log "jbctl reboot_userspace"
   /var/jb/basebin/jbctl reboot_userspace >> "$LOG" 2>&1 && exit 0
-fi
-if [ -x /var/jb/basebin/jbctl ]; then
-  # older builds may only accept via help-hidden path; try again with full path env
-  /var/jb/basebin/jbctl reboot_userspace >> "$LOG" 2>&1 || true
 fi
 launchctl reboot userspace >> "$LOG" 2>&1 || true
 /bin/launchctl reboot userspace >> "$LOG" 2>&1 || true
-echo "$(date) reboot_userspace FAILED — open Dopamine → Reboot Userspace" >> "$LOG" 2>/dev/null || true
+log "reboot_userspace FAILED — open Dopamine → Reboot Userspace"
 exit 0
 REBOOT_EOF
   chmod 755 "$REBOOT_SH" 2>/dev/null || true
   cp -f "$REBOOT_SH" /var/mobile/Library/iPFaker/userspace_reboot_once.sh 2>/dev/null || true
+  rmdir /var/jb/etc/ipfaker/.reboot_script_running 2>/dev/null || true
   touch "$REBOOT_FLAG" 2>/dev/null || true
   chmod 644 "$REBOOT_FLAG" 2>/dev/null || true
   cat > "$REBOOT_PL" <<'PLIST_EOF'
@@ -503,20 +599,14 @@ REBOOT_EOF
 </plist>
 PLIST_EOF
   chmod 644 "$REBOOT_PL" 2>/dev/null || true
-  # load via launchd (survives Sileo/dpkg killing postinst process group)
+  # Schedule only — do NOT reboot inside postinst. Waiter runs after dpkg exits.
   launchctl bootout system/com.ipfaker.userspace-reboot 2>/dev/null || true
   launchctl unload "$REBOOT_PL" 2>/dev/null || true
   launchctl bootstrap system "$REBOOT_PL" 2>/dev/null \
     || launchctl load -w "$REBOOT_PL" 2>/dev/null || true
-  launchctl kickstart -k system/com.ipfaker.userspace-reboot 2>/dev/null || true
-  # One-shot submit (some Dopamine builds)
-  launchctl submit -l com.ipfaker.userspace-reboot-submit -- /bin/sh "$REBOOT_SH" 2>/dev/null || true
-  # Extra detach methods (if launchd load failed on weird hosts)
-  if command -v setsid >/dev/null 2>&1; then
-    setsid /bin/sh "$REBOOT_SH" </dev/null >>"$LOGF" 2>&1 &
-  fi
+  # Fallback if launchd load failed (Sileo may kill this; launchd is primary)
   nohup /bin/sh "$REBOOT_SH" </dev/null >>"$LOGF" 2>&1 &
-  echo "$(date) scheduled userspace reboot (flag+launchd+nohup)" >> "$LOGF" 2>/dev/null || true
+  echo "$(date) scheduled reboot-after-install-complete waiter" >> "$LOGF" 2>/dev/null || true
 else
   echo "iPFaker: skip auto Userspace Reboot (IPFAKER_SKIP_USERSPACE_REBOOT set)" >&2
 fi
@@ -537,7 +627,7 @@ def control_text(version: str, installed_size_kb: int, has_app: bool, has_dylibs
     desc = (
         "Full lab stack MG(Zalo-safe lean)+CT+Deep+JB+About+AboutID+AboutUI+AA. "
         "Zalo: delayed MG, no UIScreen crash; NET ss via CT. "
-        "Requires ElleKit. Auto Userspace Reboot ~8s via launchd after install (Dopamine jbctl)."
+        "Requires ElleKit. Auto Userspace Reboot only after dpkg install fully completes."
     )
     if has_app:
         desc += " Includes iPFaker.app (device pool, wipe, Apply)."

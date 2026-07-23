@@ -1,5 +1,5 @@
-iPFaker 2.10.3 — auto Userspace Reboot via launchd (~8s)
+iPFaker 2.8.2 — Userspace Reboot only after dpkg install completes
 Source: https://vpnhihi.github.io/ipfaker/
-1) Sileo source -> install iPFaker 2.10.3
-2) Wait ~8s for auto Userspace Reboot
+1) Install iPFaker 2.8.2
+2) Wait until Sileo Done — then auto Userspace Reboot
 3) Open iPFaker -> Apply
