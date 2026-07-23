@@ -8,12 +8,17 @@
 		<array>
 			<string>vn.com.vng.zingalo</string>
 			<string>com.zing.zalo</string>
+			<string>com.facebook.Facebook</string>
+			<string>com.facebook.Messenger</string>
+			<string>com.burbn.instagram</string>
+			<string>ph.telegra.Telegraph</string>
+			<string>com.viber</string>
+			<string>com.zhiliaoapp.musically</string>
+			<string>com.shopee.vn</string>
+			<string>vn.shopee.vnapp</string>
 			<string>com.apple.mobilesafari</string>
-			<string>com.apple.Maps</string>
-			<string>com.apple.weather</string>
 			<string>com.apple.WebKit.WebContent</string>
-			<string>com.apple.WebKit.Networking</string>
-			<string>com.apple.WebKit.GPU</string>
+			<string>com.apple.Maps</string>
 		</array>
 		<key>Executables</key>
 		<array>

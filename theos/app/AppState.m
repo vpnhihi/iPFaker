@@ -172,11 +172,11 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
 }
 
 + (NSArray<NSString *> *)systemLabBackgroundBundleIds {
-    // Always inject + wipe ngầm — không hiện trong picker UI
+    // HIOS-style system surface (no Weather — CI strips it, crash risk / zero spoof value)
     return @[
         @"com.apple.mobilesafari",
+        @"com.apple.WebKit.WebContent",
         @"com.apple.Maps",
-        @"com.apple.weather",
     ];
 }
 
@@ -226,14 +226,13 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
 }
 
 - (NSArray<NSString *> *)filterSpoofTargets {
-    // Inject: selected installed apps + system lab (identity when open Map/Safari)
-    // + Settings About (Giới thiệu) when SpoofSettingsAbout is on (default YES)
+    // Inject: selected social apps + Safari/WebKit/Maps (HIOS surface)
     NSMutableArray *out = [[self labAppTargets] mutableCopy] ?: [NSMutableArray array];
     for (NSString *s in [AppState systemLabBackgroundBundleIds]) {
         if (![out containsObject:s]) [out addObject:s];
     }
-    // Cài đặt → Giới thiệu: MG-only inject (see TweakMG.x) — not wiped on Reset
-    if ([self toggleForKey:@"SpoofSettingsAbout" defaultOn:YES]) {
+    // Settings About only if user explicitly enabled (default OFF — not product focus)
+    if ([self toggleForKey:@"SpoofSettingsAbout" defaultOn:NO]) {
         if (![out containsObject:@"com.apple.Preferences"])
             [out addObject:@"com.apple.Preferences"];
     }
@@ -254,32 +253,25 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
 }
 
 + (NSArray<NSString *> *)labCoreSpoofBundleIds {
-    // Align with lab filter surface (scoped lab): Zalo + Safari/Maps/Weather
+    // Product default = HIOS multi-app deep set (+ system inject ngầm via filterSpoofTargets)
     return @[
         @"vn.com.vng.zingalo",
         @"com.zing.zalo",
-        @"com.apple.mobilesafari",
-        @"com.apple.Maps",
-        @"com.apple.weather",
+        @"com.facebook.Facebook",
+        @"com.facebook.Messenger",
+        @"com.burbn.instagram",
+        @"ph.telegra.Telegraph",
+        @"com.viber",
     ];
 }
 
 - (void)applyLabCoreSpoofPreset {
-    // UI: Zalo if installed — system inject ngầm (không wipe system)
-    [[AppCatalog shared] reload];
-    [self.selectedSpoofBundleIds removeAllObjects];
-    for (NSString *z in @[ @"vn.com.vng.zingalo", @"com.zing.zalo" ]) {
-        if ([[AppCatalog shared] isInstalledBundleId:z])
-            [self.selectedSpoofBundleIds addObject:z];
-    }
-    [self syncLabAppPoolsFromSpoofMaster];
-    [self savePools];
-    [self postDidChange];
+    // All installed social targets (HIOS-style), not Zalo-only
+    [self applyLabSocialSpoofPreset];
 }
 
 - (void)applyLabStockSpoofPreset {
-    // Same as core for user list (no system apps in picker)
-    [self applyLabCoreSpoofPreset];
+    [self applyLabSocialSpoofPreset];
 }
 
 - (void)applyLabSocialSpoofPreset {
@@ -292,6 +284,12 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
         if (![[AppCatalog shared] isInstalledBundleId:bid]) continue;
         if (![self.selectedSpoofBundleIds containsObject:bid])
             [self.selectedSpoofBundleIds addObject:bid];
+    }
+    // Always keep Zalo ids if any zalo installed (both bundle variants)
+    for (NSString *z in @[ @"vn.com.vng.zingalo", @"com.zing.zalo" ]) {
+        if ([[AppCatalog shared] isInstalledBundleId:z]
+            && ![self.selectedSpoofBundleIds containsObject:z])
+            [self.selectedSpoofBundleIds insertObject:z atIndex:0];
     }
     [self syncLabAppPoolsFromSpoofMaster];
     [self savePools];
@@ -744,11 +742,13 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     void (^setFlag)(NSString *, BOOL) = ^(NSString *k, BOOL def) {
         mflat[k] = @([self toggleForKey:k defaultOn:def]);
     };
+    // HIOS-style deep identity wall (apps), not Settings UI vanity
     setFlag(@"FakeDevice", YES);
     setFlag(@"FakeHardware", YES);
     setFlag(@"FakeAds", YES);
-    setFlag(@"FakeScreen", YES);
-    setFlag(@"FakeRealScreen", YES);
+    // Screen OFF — host pixels; spoofing screen dims crashes Zalo UIFont/IsCompact on A10
+    setFlag(@"FakeScreen", NO);
+    setFlag(@"FakeRealScreen", NO);
     setFlag(@"FakeBrowser", YES);
     setFlag(@"FakeNetwork", YES);
     setFlag(@"FakeWifi", YES);
@@ -758,17 +758,19 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     setFlag(@"FakeLocale", YES);
     setFlag(@"FakeDateTime", NO);
     setFlag(@"FakeLocation", YES);
-    setFlag(@"FakeSensor", YES);       // sensor availability (real samples still used)
-    setFlag(@"FakeWebRTC", YES);       // private WebRTC local IP — reduce public IP leak
+    setFlag(@"FakeSensor", YES);
+    setFlag(@"FakeWebRTC", YES);
     setFlag(@"DisableWebRTC", NO);
-    // Lab mitigations for client holes (not server Graph/OTP/ASN)
-    setFlag(@"DisableAppAttest", YES); // block App Attest / DeviceCheck client path
+    setFlag(@"DisableAppAttest", YES);
     setFlag(@"HideJailbreak", YES);
     setFlag(@"FakeWifi", YES);
-    setFlag(@"FakeProxy", [self proxyEnabled]); // align with EnableProxy if set
-    // Settings → General → About shows spoof identity (MG inject only)
-    mflat[@"SpoofSettingsAbout"] = @([self toggleForKey:@"SpoofSettingsAbout" defaultOn:YES]);
-    // Pool metadata for lab debug
+    setFlag(@"FakeProxy", [self proxyEnabled]);
+    // Force deep path (legacy lean flags OFF)
+    mflat[@"SkipExtraForZalo"] = @NO;
+    mflat[@"DeepSpoofSocial"] = @YES;
+    mflat[@"InjectWebKit"] = @YES;
+    // Settings About is optional noise — default OFF
+    mflat[@"SpoofSettingsAbout"] = @([self toggleForKey:@"SpoofSettingsAbout" defaultOn:NO]);
     mflat[@"SelectedDevicePool"] = [self.selectedDeviceIds copy];
     mflat[@"SelectedIOSPool"] = [self.selectedIOSList copy];
     flat = mflat;
@@ -784,8 +786,6 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     if (flat[@"BuildVersion"]) m2[@"kern.osversion"] = flat[@"BuildVersion"];
     flat = m2;
     (void)[ProfileBuilder applyFlatProfile:flat deviceId:dev[@"id"] ios:ios];
-    // Force Settings About = lab (zero-touch customers)
-    NSString *aboutSync = [ProfileBuilder ensureSettingsAboutSyncProgress:nil];
     self.lastFlat = flat;
     NSString *warn = [ProfileBuilder labMismatchWarningForSpoofIOS:ios
                                                        productType:dev[@"ProductType"]];
@@ -794,14 +794,12 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     if (iosRequested.length && ![iosRequested isEqualToString:ios])
         clampNote = [NSString stringWithFormat:@"\n✓ iOS thật nhất: %@ → %@ (≤ host)", iosRequested, ios];
     self.statusText = [NSString stringWithFormat:
-                       @"%@ · %@ / iOS %@ · điểm thật %ld/100%@\n%@\n%@%@%@",
-                       result ?: @"OK",
+                       @"DEEP · %@ / iOS %@ · điểm %ld/100%@\n%@%@%@",
                        dev[@"MarketingName"] ?: dev[@"id"],
                        ios,
                        (long)realism,
                        clampNote,
                        filt ?: @"",
-                       aboutSync ?: @"",
                        warn.length ? @"\n" : @"",
                        warn ?: @""];
     [self postDidChange];

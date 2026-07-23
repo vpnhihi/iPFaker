@@ -31,7 +31,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION_DEFAULT = "2.10.5"
+VERSION_DEFAULT = "2.11.0"
 PKG = "com.ipfaker"
 ARCH = "iphoneos-arm64"
 
@@ -143,15 +143,20 @@ def find_app(explicit: str | None) -> Path | None:
 
 
 def lab_core_bundles_xml() -> str:
-    """Lab-core inject surface (Zalo + Safari/Maps/Weather/WebKit; not mass multi-acc)."""
+    """HIOS-style deep multi-app inject surface (social + Safari/WebKit/Maps)."""
     return """			<string>vn.com.vng.zingalo</string>
 			<string>com.zing.zalo</string>
+			<string>com.facebook.Facebook</string>
+			<string>com.facebook.Messenger</string>
+			<string>com.burbn.instagram</string>
+			<string>ph.telegra.Telegraph</string>
+			<string>com.viber</string>
+			<string>com.zhiliaoapp.musically</string>
+			<string>com.shopee.vn</string>
+			<string>vn.shopee.vnapp</string>
 			<string>com.apple.mobilesafari</string>
-			<string>com.apple.Maps</string>
-			<string>com.apple.weather</string>
 			<string>com.apple.WebKit.WebContent</string>
-			<string>com.apple.WebKit.Networking</string>
-			<string>com.apple.WebKit.GPU</string>"""
+			<string>com.apple.Maps</string>"""
 
 
 def zalo_only_plist() -> bytes:
@@ -391,11 +396,17 @@ for MS in /var/jb/usr/lib/TweakInject /var/jb/Library/MobileSubstrate/DynamicLib
   fi
 done
 
-# Ensure SpoofSettingsAbout default on seed config if missing
+# Product flags: deep multi-app ON; Settings About OFF by default
 for CFG in /var/jb/etc/ipfaker/config.plist /var/mobile/Library/iPFaker/config.plist; do
   if [ -f "$CFG" ] && command -v plutil >/dev/null 2>&1; then
-    plutil -replace SpoofSettingsAbout -bool true "$CFG" 2>/dev/null || true
     plutil -replace Enabled -bool true "$CFG" 2>/dev/null || true
+    plutil -replace DeepSpoofSocial -bool true "$CFG" 2>/dev/null || true
+    plutil -replace InjectWebKit -bool true "$CFG" 2>/dev/null || true
+    plutil -replace SkipExtraForZalo -bool false "$CFG" 2>/dev/null || true
+    plutil -replace FakeScreen -bool false "$CFG" 2>/dev/null || true
+    plutil -replace FakeRealScreen -bool false "$CFG" 2>/dev/null || true
+    # Do not force SpoofSettingsAbout on — product is app deep spoof
+    plutil -replace SpoofSettingsAbout -bool false "$CFG" 2>/dev/null || true
   fi
 done
 
@@ -631,9 +642,9 @@ exit 0
 
 def control_text(version: str, installed_size_kb: int, has_app: bool, has_dylibs: bool) -> str:
     desc = (
-        "Full lab stack MG(Zalo-safe lean)+CT+Deep+JB+About+AboutID+AboutUI+AA. "
-        "Zalo: delayed MG, no UIScreen crash; NET ss via CT. "
-        "Requires ElleKit. Auto Userspace Reboot only after dpkg install fully completes."
+        "HIOS-style deep multi-app spoof: Zalo/FB/IG/Telegram/Viber + WebKit + CommCenter. "
+        "Full MG+Extra (no lean delay). Screen spoof off (stable). Wipe+Apply. "
+        "Requires ElleKit. Userspace Reboot after dpkg completes."
     )
     if has_app:
         desc += " Includes iPFaker.app (device pool, wipe, Apply)."

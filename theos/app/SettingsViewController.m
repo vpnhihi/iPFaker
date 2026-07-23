@@ -37,7 +37,7 @@
             @{ @"t": @"Giả lập sysctl", @"k": @"FakeSysctl", @"d": @YES },
             @{ @"t": @"Giả lập phiên bản hệ thống", @"k": @"FakeSysOSVersion", @"d": @YES },
             @{ @"t": @"Ẩn jailbreak", @"k": @"HideJailbreak", @"d": @YES },
-            @{ @"t": @"Hiện spoof trong Cài đặt → Giới thiệu", @"k": @"SpoofSettingsAbout", @"d": @YES },
+            @{ @"t": @"Spoof Cài đặt → Giới thiệu (tùy chọn, mặc định TẮT)", @"k": @"SpoofSettingsAbout", @"d": @NO },
         ],
         @[
             @{ @"t": @"Giả lập ngôn ngữ / múi giờ", @"k": @"FakeLocale", @"d": @YES },

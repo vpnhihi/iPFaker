@@ -147,19 +147,21 @@
 }
 
 + (NSArray<NSArray *> *)labSocialSpoofApps {
+    // HIOS/ChangeInfo target set — multi-app deep spoof
     return @[
         @[ @"vn.com.vng.zingalo", @"Zalo" ],
         @[ @"com.zing.zalo", @"Zalo (alt)" ],
         @[ @"com.facebook.Facebook", @"Facebook" ],
         @[ @"com.facebook.Messenger", @"Messenger" ],
         @[ @"com.burbn.instagram", @"Instagram" ],
+        @[ @"ph.telegra.Telegraph", @"Telegram" ],
+        @[ @"com.viber", @"Viber" ],
         @[ @"com.zhiliaoapp.musically", @"TikTok" ],
         @[ @"com.ss.iphone.ugc.Ame", @"TikTok (Asia)" ],
-        @[ @"vn.shopee.app", @"Shopee VN" ],
+        @[ @"com.shopee.vn", @"Shopee" ],
+        @[ @"vn.shopee.vnapp", @"Shopee VN" ],
         @[ @"com.shopee.ShopeeVN", @"Shopee VN (alt)" ],
-        @[ @"ph.telegra.Telegraph", @"Telegram" ],
-        @[ @"net.whatsapp.WhatsApp", @"WhatsApp" ],
-        @[ @"com.google.ios.youtube", @"YouTube" ],
+        @[ @"vn.shopee.app", @"Shopee app" ],
     ];
 }
 

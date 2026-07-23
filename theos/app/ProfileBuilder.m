@@ -2537,18 +2537,34 @@
         [bids addObject:@"com.zing.zalo"];
     [bids removeObject:@"com.apple.Preferences"];
 
-    // Do NOT inject full MG/CT/JB into WebKit.WebContent/Networking/GPU by default.
-    // Full stack on WebContent causes lag/white hybrid WebViews (Zalo zBox / in-app browser).
-    // Safari main process still spoofed when listed; WKWebView in Zalo uses Zalo process hooks.
-    for (NSString *wk in @[
-             @"com.apple.WebKit.WebContent",
-             @"com.apple.WebKit.Networking",
-             @"com.apple.WebKit.GPU",
-         ]) {
-        [bids removeObject:wk];
+    // HIOS-style: inject WebKit.WebContent so hybrid WebViews (Zalo/FB) share identity.
+    // Networking/GPU optional — include WebContent always for deep multi-app.
+    BOOL injectWK = YES;
+    @try {
+        NSDictionary *cfg = [NSDictionary dictionaryWithContentsOfFile:@"/var/jb/etc/ipfaker/config.plist"]
+            ?: [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/iPFaker/config.plist"];
+        if (cfg[@"InjectWebKit"] != nil)
+            injectWK = [cfg[@"InjectWebKit"] boolValue];
+    } @catch (__unused NSException *ex) {}
+    if (injectWK) {
+        if (![bids containsObject:@"com.apple.WebKit.WebContent"])
+            [bids addObject:@"com.apple.WebKit.WebContent"];
+        if (![bids containsObject:@"com.apple.mobilesafari"])
+            [bids addObject:@"com.apple.mobilesafari"];
+        if (![bids containsObject:@"com.apple.Maps"])
+            [bids addObject:@"com.apple.Maps"];
+    } else {
+        for (NSString *wk in @[
+                 @"com.apple.WebKit.WebContent",
+                 @"com.apple.WebKit.Networking",
+                 @"com.apple.WebKit.GPU",
+             ]) {
+            [bids removeObject:wk];
+        }
     }
 
-    step([NSString stringWithFormat:@"Chuẩn bị filter %lu app (CT + CommCenter, no WebKit helpers)…", (unsigned long)bids.count]);
+    step([NSString stringWithFormat:@"Chuẩn bị filter %lu app (CT+CommCenter%@)…",
+          (unsigned long)bids.count, injectWK ? @"+WebKit" : @""]);
 
     NSFileManager *fm = [NSFileManager defaultManager];
     NSString *stage = @"/var/mobile/Library/iPFaker";
@@ -2665,8 +2681,16 @@
         [self killAppBundleId:bid executable:nil];
     [self killAppBundleId:@"com.apple.Preferences" executable:nil];
 
-    // Zero-touch: Cài đặt → Giới thiệu must match lab without SSH
-    NSString *aboutSync = [self ensureSettingsAboutSyncProgress:progress];
+    // Settings About optional only — product focus is multi-app deep spoof
+    NSString *aboutSync = @"";
+    BOOL wantAbout = NO;
+    @try {
+        NSDictionary *cfg = [NSDictionary dictionaryWithContentsOfFile:@"/var/jb/etc/ipfaker/config.plist"]
+            ?: [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/iPFaker/config.plist"];
+        wantAbout = [cfg[@"SpoofSettingsAbout"] boolValue];
+    } @catch (__unused NSException *ex) {}
+    if (wantAbout)
+        aboutSync = [self ensureSettingsAboutSyncProgress:progress];
 
     NSString *preview = bids.count <= 6
         ? [bids componentsJoinedByString:@", "]
@@ -2674,12 +2698,14 @@
            [[bids subarrayWithRange:NSMakeRange(0, 4)] componentsJoinedByString:@", "],
            (unsigned long)(bids.count - 4)];
     return [NSString stringWithFormat:
-            @"Multi-app spoof: %lu app · CT CommCenter=ON · Settings About=ON\n%@\n"
-            @"Filter LIVE=%@ · mở lại app = spoof active\n"
-            @"%@\nrc=%d",
-            (unsigned long)bids.count, preview,
+            @"Deep multi-app: %lu target · CT CommCenter · WebKit %@\n%@\n"
+            @"Filter LIVE=%@ · kill+reopen apps = spoof active\n"
+            @"%@rc=%d",
+            (unsigned long)bids.count,
+            injectWK ? @"ON" : @"OFF",
+            preview,
             liveOK ? @"OK" : [NSString stringWithFormat:@"THIẾU %lu", (unsigned long)missing],
-            aboutSync ?: @"About sync ?",
+            aboutSync.length ? [aboutSync stringByAppendingString:@"\n"] : @"",
             rc];
 }
 

@@ -1,5 +1,6 @@
-// iPFakerMG — rootless Dopamine, all arm64/arm64e iPhones
-// Zalo: delayed MG install + ProcessInfo-only lean (no UIScreen / no MG screen dims)
+// iPFakerMG — HIOS-style deep spoof for social apps (Zalo/FB/IG/Telegram/Viber/…)
+// Full MG + Extra identity stack. Screen spoof OFF by default (FakeScreen=NO) to avoid
+// Zalo UIFont/IsCompactDevice crash; identity/network/sysctl still full.
 
 #import <Foundation/Foundation.h>
 #import <stdio.h>
@@ -37,23 +38,46 @@ static void IPFMark(const char *msg) {
     NSLog(@"[iPFakerMG] %s bid=%@", msg, bid);
 }
 
-static BOOL IPFIsZaloBid(NSString *bid) {
+/// Apps that need full identity wall (HIOS target set)
+static BOOL IPFIsDeepSpoofBid(NSString *bid) {
     if (!bid.length) return NO;
-    return [bid isEqualToString:@"vn.com.vng.zingalo"]
-        || [bid isEqualToString:@"com.zing.zalo"]
-        || [bid containsString:@"zingalo"];
+    static NSArray *kDeep;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        kDeep = @[
+            @"vn.com.vng.zingalo", @"com.zing.zalo",
+            @"com.facebook.Facebook", @"com.facebook.Messenger",
+            @"com.burbn.instagram",
+            @"com.zhiliaoapp.musically", @"com.ss.iphone.ugc.Ame",
+            @"ph.telegra.Telegraph",
+            @"com.viber",
+            @"com.shopee.vn", @"vn.shopee.vnapp", @"com.shopee.ShopeeVN", @"vn.shopee.app",
+            @"com.apple.mobilesafari",
+            @"com.apple.WebKit.WebContent",
+            @"com.apple.Maps",
+        ];
+    });
+    if ([kDeep containsObject:bid]) return YES;
+    NSString *l = bid.lowercaseString;
+    if ([l containsString:@"zingalo"] || [l containsString:@"zalo"]) return YES;
+    if ([l containsString:@"facebook"] || [l containsString:@"instagram"]) return YES;
+    if ([l containsString:@"telegram"] || [l containsString:@"viber"]) return YES;
+    if ([l containsString:@"musically"] || [l containsString:@"tiktok"]) return YES;
+    if ([l containsString:@"shopee"]) return YES;
+    return NO;
 }
 
-static void IPFInstallZaloStack(void) {
+static void IPFInstallDeepStack(const char *tag) {
     @autoreleasepool {
         @try {
-            // Core identity: MG + UIDevice + sysctl/uname (no screen dims — see IPFAllowMGKey)
+            // Full MG (screen keys still gated by FakeScreen / Zalo MG block in IPFAllowMGKey)
             IPFInstallMGHooks();
-            // ProcessInfo OS string only (no UIScreen / getifaddrs)
-            IPFInstallExtraZaloSafeHooks();
-            IPFMark("CTOR_ZALO_MG_LEAN_OK");
+            // Full Extra: ifaddrs/hostname/sysctl/JB paths/ProcessInfo — UIScreen only if FakeScreen ON
+            IPFInstallExtraHooks();
+            IPFMark(tag);
         } @catch (NSException *ex) {
-            IPFMark([[NSString stringWithFormat:@"CTOR_ZALO_EXC %@", ex.reason ?: @"?"] UTF8String]);
+            NSString *m = [NSString stringWithFormat:@"CTOR_DEEP_EXC %@", ex.reason ?: @"?"];
+            IPFMark(m.UTF8String);
         }
     }
 }
@@ -64,14 +88,14 @@ static void IPFInstallZaloStack(void) {
 
         NSString *bid = [[NSBundle mainBundle] bundleIdentifier] ?: @"";
 
-        // Settings → About: lite only
+        // Settings About optional — off by default (not product focus)
         if (bid.length > 0 && [bid isEqualToString:@"com.apple.Preferences"]) {
             BOOL okPrefs = [[IPFConfig shared] reload];
             if (!okPrefs || ![IPFConfig shared].enabled) {
                 IPFMark("CTOR_PREFS_NO_CONFIG");
                 return;
             }
-            if (![[IPFConfig shared] flag:@"SpoofSettingsAbout" defaultYes:YES]) {
+            if (![[IPFConfig shared] flag:@"SpoofSettingsAbout" defaultYes:NO]) {
                 IPFMark("CTOR_PREFS_FLAG_OFF");
                 return;
             }
@@ -82,11 +106,12 @@ static void IPFInstallZaloStack(void) {
 
         BOOL ok = [[IPFConfig shared] reload];
         NSString *dbg = [NSString stringWithFormat:
-            @"reload=%d path=%@ ProductType=%@ enabled=%d\n",
+            @"reload=%d path=%@ ProductType=%@ enabled=%d deep=%d\n",
             ok,
             [IPFConfig shared].profilePath ?: @"(none)",
             [[IPFConfig shared] mgValueForKey:@"ProductType"] ?: @"(nil)",
-            [IPFConfig shared].enabled];
+            [IPFConfig shared].enabled,
+            IPFIsDeepSpoofBid(bid)];
         [dbg writeToFile:@"/var/mobile/Library/iPFaker/v3_mg_debug.log"
               atomically:YES encoding:NSUTF8StringEncoding error:nil];
         [dbg writeToFile:@"/var/jb/etc/ipfaker/v3_mg_debug.log"
@@ -95,22 +120,8 @@ static void IPFInstallZaloStack(void) {
         if (!ok)
             IPFMark("CTOR_NO_FILE_CONFIG_USE_EMBED");
 
-        // ─── Zalo: delay hooks until after first UI frame (avoids launch SIGABRT) ───
-        if (IPFIsZaloBid(bid)) {
-            BOOL skipExtra = [[IPFConfig shared] flag:@"SkipExtraForZalo" defaultYes:YES];
-            (void)skipExtra;
-            IPFMark("CTOR_ZALO_DELAY_SCHEDULE");
-            // 400ms: past scene connect / nav bar init that crashed with screen spoof
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.4 * NSEC_PER_SEC)),
-                           dispatch_get_main_queue(), ^{
-                IPFInstallZaloStack();
-            });
-            return;
-        }
-
-        // ─── Other apps (Safari, etc.): immediate full stack ───
-        IPFInstallMGHooks();
-        IPFInstallExtraHooks();
-        IPFMark("CTOR_MG_PLUS_EXTRA");
+        // HIOS-style: full deep stack immediately for all injected apps (incl. Zalo)
+        // No lean/delay path — that under-spoofed and failed app detection.
+        IPFInstallDeepStack(IPFIsDeepSpoofBid(bid) ? "CTOR_DEEP_SOCIAL_OK" : "CTOR_DEEP_FULL_OK");
     }
 }

@@ -181,3 +181,5 @@ pc_app/_stderr.txt
 pc_app/last_captcha.png
 pc_app/workflow_data/config.json
 pc_app/__pycache__/
+
+sileo-repo/debs/com.ipfaker_2.10.5*
