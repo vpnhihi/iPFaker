@@ -751,29 +751,30 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     setFlag(@"FakeWifi", YES);
     setFlag(@"FakeSysctl", YES);
     setFlag(@"FakeSysOSVersion", YES);
-    setFlag(@"HideJailbreak", YES);
+    setFlag(@"HideJailbreak", NO);
     setFlag(@"FakeLocale", YES);
     setFlag(@"FakeDateTime", NO);
-    setFlag(@"FakeLocation", YES);
-    setFlag(@"FakeSensor", YES);
-    setFlag(@"FakeWebRTC", YES);
+    setFlag(@"FakeLocation", NO);
+    setFlag(@"FakeSensor", NO);
+    setFlag(@"FakeWebRTC", NO);
     setFlag(@"DisableWebRTC", NO);
     setFlag(@"DisableAppAttest", YES);
-    setFlag(@"HideJailbreak", YES);
     setFlag(@"FakeWifi", YES);
     setFlag(@"FakeProxy", [self proxyEnabled]);
-    // Stable social: lean Extra (no UIScreen). Deep/JB deferred in TweakMG.
+    // CRASH-SAFE product defaults — MG identity only on social (no Deep/JB/SecItem)
+    mflat[@"CrashSafeMode"] = @YES;
+    mflat[@"AllowDeepSocial"] = @NO;
+    mflat[@"AllowEnvSocial"] = @NO;
     mflat[@"SkipExtraForZalo"] = @YES;
     mflat[@"StableSocialHooks"] = @YES;
-    mflat[@"DeepSpoofSocial"] = @YES;
+    mflat[@"DeepSpoofSocial"] = @NO;
     mflat[@"InjectWebKit"] = @YES;
-    mflat[@"KeychainSpoof"] = @YES;
+    mflat[@"KeychainSpoof"] = @NO;
     mflat[@"WipeResidueHIOS"] = @YES;
-    // fake_keychain = rewrite only. NEVER ClearKeychainOnLaunch every open (crashes apps).
-    mflat[@"fake_keychain"] = @YES;
+    mflat[@"fake_keychain"] = @NO;
     mflat[@"ClearKeychainOnLaunch"] = @NO;
-    mflat[@"BlockFork"] = @YES;
-    mflat[@"HideJailbreak"] = @YES;
+    mflat[@"BlockFork"] = @NO;
+    mflat[@"HideJailbreak"] = @NO;
     // Settings About is optional noise — default OFF
     mflat[@"SpoofSettingsAbout"] = @([self toggleForKey:@"SpoofSettingsAbout" defaultOn:NO]);
     mflat[@"SelectedDevicePool"] = [self.selectedDeviceIds copy];
@@ -946,14 +947,17 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     NSArray *flagsOn = @[
         @"FakeDevice", @"FakeHardware", @"FakeAds",
         @"FakeBrowser", @"FakeNetwork", @"FakeWifi", @"FakeSysctl", @"FakeSysOSVersion",
-        @"HideJailbreak", @"FakeLocale", @"FakeLocation", @"FakeSensor",
-        @"FakeWebRTC", @"DisableAppAttest", @"Enabled",
+        @"FakeLocale", @"DisableAppAttest", @"Enabled",
     ];
     for (NSString *k in flagsOn)
         [self setToggle:YES forKey:k];
-    // Screen spoof OFF — UIFont/IsCompact crash Zalo/FB on A10 when dims mismatch host
+    // Crash-safe: no screen / sensor / location hooks / JB / deep
     [self setToggle:NO forKey:@"FakeScreen"];
     [self setToggle:NO forKey:@"FakeRealScreen"];
+    [self setToggle:NO forKey:@"FakeLocation"];
+    [self setToggle:NO forKey:@"FakeSensor"];
+    [self setToggle:NO forKey:@"FakeWebRTC"];
+    [self setToggle:NO forKey:@"HideJailbreak"];
     [self setToggle:NO forKey:@"DisableWebRTC"];
     [self setToggle:NO forKey:@"ClearKeychainOnLaunch"];
     [self savePools];
@@ -962,7 +966,6 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
 
     NSString *applyMsg = nil;
     @try {
-        // applyWithDevice already writes flags + proxy keys dual-path + Darwin kernel
         applyMsg = [self applyRandomFromPool];
     } @catch (NSException *ex) {
         applyMsg = [NSString stringWithFormat:@"apply EX: %@", ex.reason ?: @"?"];
@@ -1083,13 +1086,16 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     NSArray *flagsOn = @[
         @"FakeDevice", @"FakeHardware", @"FakeAds",
         @"FakeBrowser", @"FakeNetwork", @"FakeWifi", @"FakeSysctl", @"FakeSysOSVersion",
-        @"HideJailbreak", @"FakeLocale", @"FakeLocation", @"FakeSensor",
-        @"FakeWebRTC", @"DisableAppAttest", @"Enabled",
+        @"FakeLocale", @"DisableAppAttest", @"Enabled",
     ];
     for (NSString *k in flagsOn)
         [self setToggle:YES forKey:k];
     [self setToggle:NO forKey:@"FakeScreen"];
     [self setToggle:NO forKey:@"FakeRealScreen"];
+    [self setToggle:NO forKey:@"FakeLocation"];
+    [self setToggle:NO forKey:@"FakeSensor"];
+    [self setToggle:NO forKey:@"FakeWebRTC"];
+    [self setToggle:NO forKey:@"HideJailbreak"];
     [self setToggle:NO forKey:@"DisableWebRTC"];
     [self setToggle:NO forKey:@"ClearKeychainOnLaunch"];
     [self savePools];

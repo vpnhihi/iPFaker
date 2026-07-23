@@ -31,7 +31,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION_DEFAULT = "2.13.4"
+VERSION_DEFAULT = "2.14.0"
 PKG = "com.ipfaker"
 ARCH = "iphoneos-arm64"
 
@@ -409,11 +409,18 @@ for CFG in /var/jb/etc/ipfaker/config.plist /var/mobile/Library/iPFaker/config.p
     plutil -replace Enabled -bool true "$CFG" 2>/dev/null || true
     plutil -replace DeepSpoofSocial -bool true "$CFG" 2>/dev/null || true
     plutil -replace InjectWebKit -bool true "$CFG" 2>/dev/null || true
+    plutil -replace CrashSafeMode -bool true "$CFG" 2>/dev/null || true
+    plutil -replace AllowDeepSocial -bool false "$CFG" 2>/dev/null || true
+    plutil -replace AllowEnvSocial -bool false "$CFG" 2>/dev/null || true
     plutil -replace SkipExtraForZalo -bool true "$CFG" 2>/dev/null || true
     plutil -replace StableSocialHooks -bool true "$CFG" 2>/dev/null || true
+    plutil -replace DeepSpoofSocial -bool false "$CFG" 2>/dev/null || true
     plutil -replace FakeScreen -bool false "$CFG" 2>/dev/null || true
     plutil -replace FakeRealScreen -bool false "$CFG" 2>/dev/null || true
     plutil -replace ClearKeychainOnLaunch -bool false "$CFG" 2>/dev/null || true
+    plutil -replace HideJailbreak -bool false "$CFG" 2>/dev/null || true
+    plutil -replace BlockFork -bool false "$CFG" 2>/dev/null || true
+    plutil -replace fake_keychain -bool false "$CFG" 2>/dev/null || true
     plutil -replace SpoofSettingsAbout -bool false "$CFG" 2>/dev/null || true
   fi
 done
@@ -637,8 +644,8 @@ exit 0
 
 def control_text(version: str, installed_size_kb: int, has_app: bool, has_dylibs: bool) -> str:
     desc = (
-        "HIOS 2-dylib: MG(full wall)+CT. Contacts seed/clear + RRS backup/restore + "
-        "dyldHide/fork/SecItem/DC/IOKit. Multi-app Zalo/FB/IG/TG/Viber. Requires ElleKit."
+        "2.14 crash-safe: MG identity + CT only on social (no UIScreen/dyld/fork/KC wipe). "
+        "Multi-app Zalo/FB/IG/TG/Viber. Requires ElleKit + Userspace Reboot."
     )
     if has_app:
         desc += " Includes iPFaker.app (device pool, wipe, Apply)."
