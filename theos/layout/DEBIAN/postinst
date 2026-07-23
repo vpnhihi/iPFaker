@@ -76,4 +76,20 @@ chown mobile:mobile "$MOB" 2>/dev/null || true
 chmod 0755 "$MOB" 2>/dev/null || true
 
 killall -9 Zalo 2>/dev/null || true
+killall -9 Preferences 2>/dev/null || true
+
+# Auto Userspace Reboot (Dopamine) — delay so package manager finishes first
+if [ -z "$IPFAKER_SKIP_USERSPACE_REBOOT" ]; then
+  echo "iPFaker: Userspace Reboot in ~6s..." >&2
+  mkdir -p /var/mobile/Library/iPFaker/logs 2>/dev/null || true
+  nohup /bin/sh -c '
+    sleep 6
+    echo "$(date) auto userspace reboot start" >> /var/mobile/Library/iPFaker/logs/userspace_reboot.log 2>/dev/null || true
+    if [ -x /var/jb/basebin/jbctl ]; then
+      /var/jb/basebin/jbctl reboot_userspace >> /var/mobile/Library/iPFaker/logs/userspace_reboot.log 2>&1 && exit 0
+    fi
+    launchctl reboot userspace >> /var/mobile/Library/iPFaker/logs/userspace_reboot.log 2>&1 || true
+  ' >/dev/null 2>&1 &
+fi
+
 exit 0

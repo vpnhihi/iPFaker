@@ -41,11 +41,53 @@ frida/*.bundle.js
 frida/FridaGadget*
 frida/lab_*.js
 
-# Allow sileo-repo current customer packages only
+# Sileo: never track old com.ipfaker versions / root duplicates / lab helpers
+sileo-repo/com.ipfaker_*.deb
+sileo-repo/debs/com.ipfaker_2.0.*
+sileo-repo/debs/com.ipfaker_2.1.*
+sileo-repo/debs/com.ipfaker_2.2.*
 sileo-repo/debs/com.ipfaker_2.3.*
 sileo-repo/debs/com.ipfaker_2.4.*
 sileo-repo/debs/com.ipfaker_2.5.*
 sileo-repo/debs/com.ipfaker_2.6.*
+sileo-repo/debs/com.ipfaker_2.7.*
+sileo-repo/debs/com.ipfaker_2.8.*
+sileo-repo/debs/com.ipfaker_2.9.*
+sileo-repo/debs/com.ipfaker_2.10.0*
+sileo-repo/debs/com.ipfaker_2.10.1*
+sileo-repo/fix_*.sh
+sileo-repo/*.sh
+
+# ── Lab / reverse / Frida (do not publish) ──────────────
+frida/
+!frida/.gitkeep
+injector/deploy.ps1
+injector/wipe_*.sh
+injector/iPFaker.js
+scripts/fix_about_prefs_ondevice.sh
+scripts/install_deb_device.py
+scripts/vuot_zalo_lab_run.py
+scripts/zalo_reg_*.py
+scripts/zalo_*.py
+scripts/_wipe_*.py
+scripts/pull_logs.ps1
+scripts/wipe_zalo.ps1
+scripts/ipfaker_zalo_stable.py
+scripts/clean_sileo_repo_*.py
+docs/OFFLINE_REVERSE.md
+docs/REG_PLAYBOOK.md
+docs/VUOT_ZALO*
+docs/GETIFADDRS*
+docs/LICENSE_SHEET.md
+docs/MEMORY.md
+pc_app/auto_reg.py
+pc_app/reg_pipeline.py
+pc_app/achicaptcha.py
+pc_app/bossotp.py
+pc_app/captcha_*.py
+pc_app/sms_api.py
+pc_app/rotaproxy.py
+pc_app/phone_pool.py
 
 # ── Generated device identity ───────────────────────────
 config/active_profile.json

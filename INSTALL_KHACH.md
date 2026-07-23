@@ -26,15 +26,16 @@ Sileo → **Nguồn** → **+** → dán URL → **Add** → refresh.
 | **libplist3** | Phụ thuộc ldid | ✅ |
 | **ldid** | Ký / trustcache | ✅ |
 | **libsqlite3-1** + **sqlite3** | Wipe keychain session | ✅ |
-| **com.ipfaker 2.10.0+** | App + MG lean Zalo-safe + CT Deep + AA + About* + wipe | ✅ (sau publish) |
+| **com.ipfaker 2.10.2+** | App + MG lean Zalo-safe + CT Deep + AA + About* + wipe + **auto Userspace Reboot** | ✅ (sau publish) |
 
-**Cách nhanh:** cài **iPFaker 2.10.0** — Depends kéo ElleKit + sqlite + ldid.
+**Cách nhanh:** cài **iPFaker 2.10.2+** — Depends kéo ElleKit + sqlite + ldid.
 
-**Thứ tự an toàn:** ElleKit → sqlite/ldid → iPFaker → **Dopamine → Userspace Reboot** (bắt buộc, không skip).
+**Thứ tự:** ElleKit → sqlite/ldid → iPFaker.  
+Từ **2.10.2**, sau khi Sileo xong cài (~6 giây) máy **tự Userspace Reboot** (Dopamine `jbctl reboot_userspace`) — không cần mở Dopamine bấm tay. Đợi logo / màn hình về Home rồi mở iPFaker.
 
 ### Deb trực tiếp
 
-- iPFaker: `https://vpnhihi.github.io/ipfaker/debs/com.ipfaker_2.10.0_iphoneos-arm64.deb`
+- iPFaker: `https://vpnhihi.github.io/ipfaker/debs/com.ipfaker_2.10.2_iphoneos-arm64.deb`
 - ElleKit: `https://vpnhihi.github.io/ipfaker/debs/ellekit_1.1.3_iphoneos-arm64.deb`
 
 ### Máy dev vs máy khách (vì sao “thiếu chức năng”)
@@ -46,9 +47,9 @@ Sileo → **Nguồn** → **+** → dán URL → **Add** → refresh.
 | CT Deep `ss`/UA | Có | Thiếu / cũ |
 | AboutID | Có | Có thể thiếu |
 
-→ **Máy khác phải cài / nâng lên 2.10.0+** rồi Userspace Reboot — không chỉ copy app.
+→ **Máy khác phải cài / nâng lên 2.10.2+** — postinst tự Userspace Reboot; không chỉ copy app.
 
-## 3. Sau reboot
+## 3. Sau reboot (tự động ~6s sau cài 2.10.2+)
 
 1. Mở **iPFaker** → key  
 2. **Chọn máy** (không chọn đúng đời host nếu muốn nhìn khác)  

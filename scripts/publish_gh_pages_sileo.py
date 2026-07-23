@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """Force-push sileo-repo/ to branch gh-pages for https://vpnhihi.github.io/ipfaker/"""
 from __future__ import annotations
 
@@ -33,30 +33,19 @@ def main() -> int:
     if not SRC.is_dir():
         print("missing sileo-repo/")
         return 1
+
+    # Sanity: only one com.ipfaker deb
+    debs = sorted((SRC / "debs").glob("com.ipfaker_*.deb"))
+    root_debs = sorted(SRC.glob("com.ipfaker_*.deb"))
+    if root_debs:
+        print("ERROR: root-level com.ipfaker debs must be removed:", [p.name for p in root_debs])
+        return 3
+    if len(debs) != 1:
+        print("ERROR: expected exactly 1 com.ipfaker deb in debs/, got:", [p.name for p in debs])
+        return 4
+    print("publishing", debs[0].name)
+
     (SRC / ".nojekyll").write_text("", encoding="utf-8")
-    (SRC / "index.html").write_text(
-        """<!DOCTYPE html>
-<html lang="vi"><head><meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>iPFaker Sileo</title>
-<style>
-body{font-family:-apple-system,sans-serif;max-width:640px;margin:2rem auto;padding:0 1rem;background:#0b0d10;color:#e8eaed}
-.url{background:#111;color:#4ade80;padding:1rem;border-radius:8px;word-break:break-all}
-a{color:#60a5fa}
-</style></head><body>
-<h1>iPFaker â€” nguá»“n Sileo</h1>
-<p class="url">https://vpnhihi.github.io/ipfaker/</p>
-<p>GÃ³i <b>com.ipfaker 2.8.2</b> Â· full stack lab Â· rootless Â· iphoneos-arm64 Â· Dopamine</p>
-<ol>
-<li>Sileo â†’ Sources â†’ +</li>
-<li>DÃ¡n URL (chá»¯ thÆ°á»ng ipfaker) â†’ Add</li>
-<li>Refresh â†’ tÃ¬m <b>iPFaker</b> â†’ CÃ i</li>
-</ol>
-<p><a href="debs/com.ipfaker_2.8.2_iphoneos-arm64.deb">Táº£i .deb 2.8.2 trá»±c tiáº¿p</a></p>
-</body></html>
-""",
-        encoding="utf-8",
-    )
 
     user, password = git_cred()
     if not password:
@@ -65,6 +54,10 @@ a{color:#60a5fa}
 
     tmp = Path(tempfile.mkdtemp(prefix="ipf-pages-"))
     for item in SRC.iterdir():
+        # never publish lab helpers
+        if item.name.startswith("fix_") or item.name.endswith(".sh"):
+            print("skip", item.name)
+            continue
         dest = tmp / item.name
         if item.is_dir():
             shutil.copytree(item, dest)
@@ -79,7 +72,7 @@ a{color:#60a5fa}
     run(["git", "config", "user.email", "ipfaker-lab@local"])
     run(["git", "config", "user.name", "iPFaker Lab"])
     run(["git", "add", "-A"])
-    run(["git", "commit", "-m", "sileo pages 2.8.2 full stack"])
+    run(["git", "commit", "-m", f"sileo pages {debs[0].name} only"])
 
     ask = tmp / "askpass.py"
     ask.write_text(
@@ -101,12 +94,10 @@ a{color:#60a5fa}
         cwd=tmp,
         env=env,
     )
-    print("OK: gh-pages updated")
+    print("OK: gh-pages updated (force, single version)")
     print("Sileo source: https://vpnhihi.github.io/ipfaker/")
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
-

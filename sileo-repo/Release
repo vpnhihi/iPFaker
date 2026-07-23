@@ -2,7 +2,7 @@ Origin: iPFaker Lab
 Label: iPFaker
 Suite: stable
 Version: 1.0
-Codename: rootless
+Codename: ipfaker
 Architectures: iphoneos-arm64
 Components: main
-Description: iPFaker full stack for Dopamine rootless — match lab/dev
+Description: iPFaker packages for Dopamine rootless / Sileo

@@ -1,8 +1,9 @@
-﻿iPFaker 2.10.1 — same stack as lab/dev
+iPFaker 2.10.2 — full stack (same as lab)
 Source: https://vpnhihi.github.io/ipfaker/
-1) Sileo -> Sources -> https://vpnhihi.github.io/ipfaker/
-2) Install iPFaker 2.10.1 (pulls ellekit/ldid/sqlite)
-3) Dopamine -> Userspace Reboot (REQUIRED)
-4) Open iPFaker -> Apply device -> Reset app data -> Zalo
-MG Zalo-safe lean (no UIScreen crash). CT Deep for mod/osv/ss on NET.
 
+1) Sileo -> Sources -> https://vpnhihi.github.io/ipfaker/
+2) Install iPFaker 2.10.2 (pulls ellekit/ldid/sqlite)
+3) Wait ~6s — auto Userspace Reboot (Dopamine)
+4) Open iPFaker -> pick device -> Apply -> Reset app data -> Zalo
+
+MG Zalo-safe lean. CT Deep. About inject daemon. Auto reboot after install.

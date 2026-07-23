@@ -31,7 +31,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION_DEFAULT = "2.10.1"
+VERSION_DEFAULT = "2.10.2"
 PKG = "com.ipfaker"
 ARCH = "iphoneos-arm64"
 
@@ -422,7 +422,7 @@ fi
 
 # Hard requirement check (new phone often misses these if installed without deps)
 if [ ! -e /var/jb/usr/lib/libellekit.dylib ] && [ ! -e /var/jb/usr/lib/libsubstrate.dylib ]; then
-  echo "WARN: ElleKit missing — install package ellekit from same Sileo source, then Userspace Reboot" >&2
+  echo "WARN: ElleKit missing — install package ellekit from same Sileo source" >&2
 fi
 if [ ! -x /var/jb/basebin/opainject ]; then
   echo "WARN: opainject missing — Settings About spoof needs opainject (Dopamine basebin)" >&2
@@ -430,6 +430,35 @@ fi
 
 killall -9 Zalo 2>/dev/null || true
 killall -9 Preferences 2>/dev/null || true
+
+# --- Auto Userspace Reboot (Dopamine) ---
+# Tweaks only inject after launchd userspace restart. Delay so Sileo/dpkg can
+# finish the transaction and show Done before reboot3 runs.
+# Skip: IPFAKER_SKIP_USERSPACE_REBOOT=1 dpkg -i ... (lab only)
+if [ -z "$IPFAKER_SKIP_USERSPACE_REBOOT" ]; then
+  echo "iPFaker: Userspace Reboot in ~6s (tweak inject + About daemon)..." >&2
+  mkdir -p /var/mobile/Library/iPFaker/logs 2>/dev/null || true
+  # Detach fully so package manager exits cleanly (no hang on open fd)
+  nohup /bin/sh -c '
+    sleep 6
+    echo "$(date) auto userspace reboot start" >> /var/mobile/Library/iPFaker/logs/userspace_reboot.log 2>/dev/null || true
+    # Official Dopamine path: jbctl reboot_userspace → reboot3(RB2_USERREBOOT)
+    if [ -x /var/jb/basebin/jbctl ]; then
+      /var/jb/basebin/jbctl reboot_userspace >> /var/mobile/Library/iPFaker/logs/userspace_reboot.log 2>&1 \
+        && exit 0
+    fi
+    # Fallbacks
+    if [ -x /var/jb/usr/bin/launchctl ]; then
+      /var/jb/usr/bin/launchctl reboot userspace >> /var/mobile/Library/iPFaker/logs/userspace_reboot.log 2>&1 && exit 0
+    fi
+    launchctl reboot userspace >> /var/mobile/Library/iPFaker/logs/userspace_reboot.log 2>&1 || true
+    echo "$(date) reboot_userspace failed — open Dopamine → Reboot Userspace" \
+      >> /var/mobile/Library/iPFaker/logs/userspace_reboot.log 2>/dev/null || true
+  ' >/dev/null 2>&1 &
+else
+  echo "iPFaker: skip auto Userspace Reboot (IPFAKER_SKIP_USERSPACE_REBOOT set)" >&2
+fi
+
 exit 0
 """
 
@@ -446,7 +475,7 @@ def control_text(version: str, installed_size_kb: int, has_app: bool, has_dylibs
     desc = (
         "Full lab stack MG(Zalo-safe lean)+CT+Deep+JB+About+AboutID+AboutUI+AA. "
         "Zalo: delayed MG, no UIScreen crash; NET ss via CT. "
-        "Requires ElleKit + Userspace Reboot after install."
+        "Requires ElleKit. Auto Userspace Reboot ~6s after install (Dopamine jbctl)."
     )
     if has_app:
         desc += " Includes iPFaker.app (device pool, wipe, Apply)."

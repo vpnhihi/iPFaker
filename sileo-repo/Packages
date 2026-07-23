@@ -1,121 +1,19 @@
 Package: com.ipfaker
 Name: iPFaker
 Depends: firmware (>= 14.0), ellekit (>= 1.1), libsqlite3-1, sqlite3, ldid, libplist3
-Version: 2.10.1
+Version: 2.10.2
 Architecture: iphoneos-arm64
 Maintainer: iPFaker Lab
 Author: iPFaker Lab
 Section: Tweaks
 Priority: optional
 Homepage: https://github.com/vpnhihi/ipfaker
-Description: Full lab stack MG(Zalo-safe lean)+CT+Deep+JB+About+AboutID+AboutUI+AA. Zalo: delayed MG, no UIScreen crash; NET ss via CT. Requires ElleKit + Userspace Reboot after install. Includes iPFaker.app (device pool, wipe, Apply).
+Description: Full lab stack MG(Zalo-safe lean)+CT+Deep+JB+About+AboutID+AboutUI+AA. Zalo: delayed MG, no UIScreen crash; NET ss via CT. Requires ElleKit. Auto Userspace Reboot ~6s after install (Dopamine jbctl). Includes iPFaker.app (device pool, wipe, Apply).
 Installed-Size: 3658
-Filename: debs/com.ipfaker_2.10.1_iphoneos-arm64.deb
-Size: 473454
-MD5sum: 86f930b7cb1e5c0d1415102e80907880
-SHA256: 37e91411ec5377355d49f52ee612d6fad0cca6f52be94280e8b41d6d960c5de7
-
-Package: com.ipfaker
-Name: iPFaker
-Depends: firmware (>= 14.0), ellekit (>= 1.1), libsqlite3-1, sqlite3, ldid, libplist3
-Version: 2.10.0
-Architecture: iphoneos-arm64
-Maintainer: iPFaker Lab
-Author: iPFaker Lab
-Section: Tweaks
-Priority: optional
-Homepage: https://github.com/vpnhihi/ipfaker
-Description: Full lab stack MG(Zalo-safe lean)+CT+Deep+JB+About+AboutID+AboutUI+AA. Zalo: delayed MG, no UIScreen crash; NET ss via CT. Requires ElleKit + Userspace Reboot after install. Includes iPFaker.app (device pool, wipe, Apply).
-Installed-Size: 3656
-Filename: debs/com.ipfaker_2.10.0_iphoneos-arm64.deb
-Size: 472586
-MD5sum: 828b1ea494be109200834f1ce5649400
-SHA256: 5bc267188d36019576f8cc28862bbd046ab5ada5807ac6f4322303d260f61687
-
-Package: com.ipfaker
-Name: iPFaker
-Depends: firmware (>= 14.0)
-Version: 2.4.1
-Architecture: iphoneos-arm64
-Maintainer: iPFaker Lab
-Author: iPFaker Lab
-Section: Tweaks
-Priority: optional
-Homepage: https://github.com/vpnhihi/iPFaker
-Description: Lab device spoof for Zalo (MG+CT dylibs) + iPFaker.app (pick model/iOS, Apply profile). Rootless Dopamine. Synthetic profiles only. Does not inject Settings.
-Installed-Size: 425
-Filename: debs/com.ipfaker_2.4.1_iphoneos-arm64.deb
-Size: 48900
-MD5sum: e7896c1e9886902e6e76bb4f705859d7
-SHA256: c18b1fa60efc5348bd1f2645961a5c309fe418cf2aa3e7a73c45737b1e794c4c
-
-Package: com.ipfaker
-Name: iPFaker
-Depends: firmware (>= 14.0)
-Version: 2.7.0
-Architecture: iphoneos-arm64
-Maintainer: iPFaker Lab
-Author: iPFaker Lab
-Section: Tweaks
-Priority: optional
-Homepage: https://github.com/vpnhihi/iPFaker
-Description: Lab device identity tools (MG+CT dylibs) + iPFaker.app (device/iOS pool, Reset Data / Save). Rootless Dopamine. Synthetic profiles only. Does not inject Settings.
-Installed-Size: 1305
-Filename: debs/com.ipfaker_2.7.0_iphoneos-arm64.deb
-Size: 228594
-MD5sum: 07306da3c1d147fef91ba54bbd55d8db
-SHA256: 79dd96676d2e24db2563b8969fbcc54042fbd1260fbb25b2791a8bda54f9cc38
-
-Package: com.ipfaker
-Name: iPFaker
-Depends: firmware (>= 14.0)
-Version: 2.8.0
-Architecture: iphoneos-arm64
-Maintainer: iPFaker Lab
-Author: iPFaker Lab
-Section: Tweaks
-Priority: optional
-Homepage: https://github.com/vpnhihi/ipfaker
-Description: Full lab stack: MG+CT+JB+About+AboutUI+AboutVer+AA + iPFaker.app (pool, multi-app wipe, Save session). Rootless Dopamine. One install = same as lab machine.
-Installed-Size: 1981
-Filename: debs/com.ipfaker_2.8.0_iphoneos-arm64.deb
-Size: 328768
-MD5sum: 9cb5e4492820821099335b2c08ef7491
-SHA256: bf5c54d4b46b90c6777b096bc21a759c9793159978e33562c8fdf36c112760c1
-
-Package: com.ipfaker
-Name: iPFaker
-Depends: firmware (>= 14.0)
-Version: 2.8.1
-Architecture: iphoneos-arm64
-Maintainer: iPFaker Lab
-Author: iPFaker Lab
-Section: Tweaks
-Priority: optional
-Homepage: https://github.com/vpnhihi/ipfaker
-Description: Full lab stack: MG+CT+JB+About+AboutUI+AboutVer+AA + iPFaker.app (pool, multi-app wipe, Save session). Rootless Dopamine. One install = same as lab machine.
-Installed-Size: 3406
-Filename: debs/com.ipfaker_2.8.1_iphoneos-arm64.deb
-Size: 449142
-MD5sum: daace1d6692596374d345203a5c37b10
-SHA256: 93dd0dc2afdabe21accfd20603f6ef4ba713c1a2c7dd5ad28259db56f655b392
-
-Package: com.ipfaker
-Name: iPFaker
-Depends: firmware (>= 14.0), ellekit (>= 1.1), ldid, libplist3, libsqlite3-1, sqlite3
-Version: 2.8.2
-Architecture: iphoneos-arm64
-Maintainer: iPFaker Lab
-Author: iPFaker Lab
-Section: Tweaks
-Priority: optional
-Homepage: https://github.com/vpnhihi/ipfaker
-Description: Full lab. HARD Depends ellekit+ldid+sqlite from THIS source — Sileo must install them with iPFaker. Then Userspace Reboot.
-Installed-Size: 3408
-Filename: debs/com.ipfaker_2.8.2_iphoneos-arm64.deb
-Size: 450842
-MD5sum: 6233ed0ab1608df00c117ecdb5683896
-SHA256: 2eb8676a47f5f3782b19c3945b9eb5a9f3a7b42a6b896c25bd45f1bab799efd5
+Filename: debs/com.ipfaker_2.10.2_iphoneos-arm64.deb
+Size: 472738
+MD5sum: 260e09cd7c826eed2c3f3a4e0da4d941
+SHA256: c9bc37a70f4a660b63a3224684deedbf167848e0e681b2a51a63e7bfe45fa477
 
 Package: ca-certificates
 Name: ca-certificates
