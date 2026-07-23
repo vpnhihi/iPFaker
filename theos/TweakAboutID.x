@@ -1,5 +1,6 @@
-// iPFakerAboutID — tiny Preferences UILabel wash for Tên / Số máy / Số sê-ri only.
-// Kept separate from AboutUI so the proven AboutUI binary stays AMFI-loadable.
+// iPFakerAboutID — lean Preferences UILabel wash for identity rows:
+//   Tên / Số máy / Số sê-ri / EID / SEID / IDFA / IDFV (+ BB backup).
+// Kept separate from AboutUI so proven AboutUI stays loadable.
 
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
@@ -52,15 +53,39 @@ static NSDictionary *IPFIDConfig(void) {
     return best;
 }
 
+static BOOL IPFIDAllDigits(NSString *t) {
+    if (!t.length) return NO;
+    for (NSUInteger i = 0; i < t.length; i++) {
+        unichar c = [t characterAtIndex:i];
+        if (c < '0' || c > '9') return NO;
+    }
+    return YES;
+}
+
+/// Serial: 10–14 alnum with at least one letter (exclude pure-digit IMEI 14–15).
 static BOOL IPFIDIsSerial(NSString *t) {
     if (t.length < 10 || t.length > 14) return NO;
     if ([t rangeOfString:@"/"].location != NSNotFound) return NO;
     if ([t rangeOfString:@":"].location != NSNotFound) return NO;
     if ([t rangeOfString:@" "].location != NSNotFound) return NO;
+    if ([t rangeOfString:@"-"].location != NSNotFound) return NO;
+    if (IPFIDAllDigits(t)) return NO; // IMEI / MEID numeric
+    BOOL letter = NO;
     for (NSUInteger i = 0; i < t.length; i++) {
         unichar c = [t characterAtIndex:i];
-        if (!((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')))
-            return NO;
+        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) letter = YES;
+        else if (!(c >= '0' && c <= '9')) return NO;
+    }
+    return letter;
+}
+
+static BOOL IPFIDIsRegAxxxx(NSString *t) {
+    // Host regulatory e.g. A1660
+    if (t.length != 5) return NO;
+    if ([t characterAtIndex:0] != 'A' && [t characterAtIndex:0] != 'a') return NO;
+    for (NSUInteger i = 1; i < 5; i++) {
+        unichar c = [t characterAtIndex:i];
+        if (c < '0' || c > '9') return NO;
     }
     return YES;
 }
@@ -69,7 +94,7 @@ static BOOL IPFIDIsModelNum(NSString *t) {
     if (!t.length || t.length > 18) return NO;
     if ([t rangeOfString:@":"].location != NSNotFound) return NO;
     if ([t rangeOfString:@" "].location != NSNotFound) return NO;
-    // Part number: Mxxxx…/A (must contain digit + slash)
+    if (IPFIDIsRegAxxxx(t)) return NO; // handled as regulatory
     if ([t rangeOfString:@"/"].location != NSNotFound) {
         if (t.length < 5) return NO;
         BOOL digit = NO;
@@ -79,7 +104,6 @@ static BOOL IPFIDIsModelNum(NSString *t) {
         }
         return digit;
     }
-    // Short host codes e.g. MN8G2 — require letter+digit, never pure words (iPhone/Video)
     if (t.length < 4 || t.length > 8) return NO;
     BOOL digit = NO, letter = NO;
     for (NSUInteger i = 0; i < t.length; i++) {
@@ -91,8 +115,54 @@ static BOOL IPFIDIsModelNum(NSString *t) {
     return digit && letter;
 }
 
-static NSInteger IPFIDWash(UIView *root, NSString *wantName, NSString *wantMN,
-                           NSString *wantSN, NSString *wantMk) {
+static BOOL IPFIDIsEID(NSString *t) {
+    return t.length == 32 && IPFIDAllDigits(t);
+}
+
+static BOOL IPFIDIsSEID(NSString *t) {
+    if (t.length != 40) return NO;
+    for (NSUInteger i = 0; i < t.length; i++) {
+        unichar c = [t characterAtIndex:i];
+        BOOL hex = (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f');
+        if (!hex) return NO;
+    }
+    return YES;
+}
+
+static BOOL IPFIDIsUUID(NSString *t) {
+    // 8-4-4-4-12
+    if (t.length != 36) return NO;
+    static NSRegularExpression *re;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        re = [NSRegularExpression
+            regularExpressionWithPattern:
+                @"^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$"
+                                 options:0 error:nil];
+    });
+    return re && [re numberOfMatchesInString:t options:0 range:NSMakeRange(0, t.length)] > 0;
+}
+
+static BOOL IPFIDIsBaseband(NSString *t) {
+    if (!t.length || t.length > 12) return NO;
+    static NSRegularExpression *re;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        re = [NSRegularExpression
+            regularExpressionWithPattern:@"^\\d{1,2}\\.\\d{2}\\.\\d{2}$"
+                                 options:0 error:nil];
+    });
+    return re && [re numberOfMatchesInString:t options:0 range:NSMakeRange(0, t.length)] > 0;
+}
+
+static NSInteger gIPFIDUuidSlot = 0;
+
+static NSInteger IPFIDWash(UIView *root,
+                           NSString *wantName, NSString *wantMN, NSString *wantSN,
+                           NSString *wantMk, NSString *wantReg,
+                           NSString *wantEID, NSString *wantSEID,
+                           NSString *wantIDFA, NSString *wantIDFV,
+                           NSString *wantBB, NSString *wantPV) {
     if (!root) return 0;
     __block NSInteger n = 0;
     NSMutableArray *stack = [NSMutableArray arrayWithObject:root];
@@ -107,11 +177,49 @@ static NSInteger IPFIDWash(UIView *root, NSString *wantName, NSString *wantMN,
             if (wantMN.length && [t isEqualToString:wantMN]) return;
             if (wantSN.length && [t isEqualToString:wantSN]) return;
             if (wantMk.length && [t isEqualToString:wantMk]) return;
+            if (wantReg.length && [t isEqualToString:wantReg]) return;
+            if (wantEID.length && [t isEqualToString:wantEID]) return;
+            if (wantSEID.length && [t caseInsensitiveCompare:wantSEID] == NSOrderedSame) return;
+            if (wantIDFA.length && [t caseInsensitiveCompare:wantIDFA] == NSOrderedSame) return;
+            if (wantIDFV.length && [t caseInsensitiveCompare:wantIDFV] == NSOrderedSame) return;
+            if (wantBB.length && [t isEqualToString:wantBB]) return;
 
+            // EID before serial (32 digits)
+            if (wantEID.length && IPFIDIsEID(t)) {
+                lab.text = wantEID;
+                n++;
+                IPFIDLog([NSString stringWithFormat:@"eid %@ => %@", t, wantEID]);
+                return;
+            }
+            if (wantSEID.length && IPFIDIsSEID(t)) {
+                lab.text = wantSEID;
+                n++;
+                IPFIDLog([NSString stringWithFormat:@"seid %@ => %@", t, wantSEID]);
+                return;
+            }
+            if ((wantIDFA.length || wantIDFV.length) && IPFIDIsUUID(t)) {
+                NSString *repl = nil;
+                if (gIPFIDUuidSlot == 0 && wantIDFA.length) repl = wantIDFA;
+                else if (wantIDFV.length) repl = wantIDFV;
+                else if (wantIDFA.length) repl = wantIDFA;
+                if (repl.length) {
+                    lab.text = repl;
+                    n++;
+                    gIPFIDUuidSlot++;
+                    IPFIDLog([NSString stringWithFormat:@"uuid %@ => %@", t, repl]);
+                }
+                return;
+            }
             if (wantSN.length && IPFIDIsSerial(t)) {
                 lab.text = wantSN;
                 n++;
                 IPFIDLog([NSString stringWithFormat:@"sn %@ => %@", t, wantSN]);
+                return;
+            }
+            if (wantReg.length && IPFIDIsRegAxxxx(t)) {
+                lab.text = wantReg;
+                n++;
+                IPFIDLog([NSString stringWithFormat:@"reg %@ => %@", t, wantReg]);
                 return;
             }
             if (wantMN.length && IPFIDIsModelNum(t)) {
@@ -120,12 +228,19 @@ static NSInteger IPFIDWash(UIView *root, NSString *wantName, NSString *wantMN,
                 IPFIDLog([NSString stringWithFormat:@"mn %@ => %@", t, wantMN]);
                 return;
             }
-            // Host default name is bare "iPhone"
             if (wantName.length && [t isEqualToString:@"iPhone"]
                 && ![wantName isEqualToString:@"iPhone"]) {
                 lab.text = wantName;
                 n++;
                 IPFIDLog([NSString stringWithFormat:@"name %@ => %@", t, wantName]);
+                return;
+            }
+            // Baseband backup (AboutUI primary); skip if equals ProductVersion
+            if (wantBB.length && IPFIDIsBaseband(t)
+                && !(wantPV.length && [t isEqualToString:wantPV])) {
+                lab.text = wantBB;
+                n++;
+                IPFIDLog([NSString stringWithFormat:@"bb %@ => %@", t, wantBB]);
                 return;
             }
         };
@@ -144,14 +259,31 @@ static void IPFIDWashAll(void) {
     if (!cfg) return;
     id en = cfg[@"Enabled"];
     if ([en isKindOfClass:[NSNumber class]] && ![en boolValue]) return;
+
     NSString *wantName = [cfg[@"UserAssignedDeviceName"] description]
         ?: [cfg[@"DeviceName"] description] ?: @"";
     NSString *wantMN = [cfg[@"ModelNumber"] description]
         ?: [cfg[@"PartNumber"] description] ?: @"";
     NSString *wantSN = [cfg[@"SerialNumber"] description] ?: @"";
     NSString *wantMk = [cfg[@"MarketingName"] description] ?: @"";
-    if (!wantName.length && !wantMN.length && !wantSN.length) return;
+    NSString *wantReg = [cfg[@"RegulatoryModelNumber"] description]
+        ?: [cfg[@"ModelNumberAxxxx"] description] ?: @"";
+    NSString *wantEID = [cfg[@"EID"] description] ?: @"";
+    NSString *wantSEID = [cfg[@"SEID"] description]
+        ?: [cfg[@"SecureElementID"] description] ?: @"";
+    NSString *wantIDFA = [cfg[@"IDFA"] description]
+        ?: [cfg[@"AdvertisingIdentifier"] description] ?: @"";
+    NSString *wantIDFV = [cfg[@"IDFV"] description]
+        ?: [cfg[@"identifierForVendor"] description] ?: @"";
+    NSString *wantBB = [cfg[@"BasebandVersion"] description] ?: @"";
+    NSString *wantPV = [cfg[@"ProductVersion"] description] ?: @"";
 
+    if (!wantName.length && !wantMN.length && !wantSN.length
+        && !wantEID.length && !wantSEID.length
+        && !wantIDFA.length && !wantIDFV.length && !wantBB.length)
+        return;
+
+    gIPFIDUuidSlot = 0;
     NSInteger total = 0;
     NSArray *windows = nil;
     if (@available(iOS 13.0, *)) {
@@ -165,18 +297,28 @@ static void IPFIDWashAll(void) {
     }
     if (!windows.count) windows = UIApplication.sharedApplication.windows;
     for (UIWindow *w in windows) {
-        total += IPFIDWash(w, wantName, wantMN, wantSN, wantMk);
+        total += IPFIDWash(w, wantName, wantMN, wantSN, wantMk, wantReg,
+                           wantEID, wantSEID, wantIDFA, wantIDFV, wantBB, wantPV);
         UIViewController *r = w.rootViewController;
-        if (r.view) total += IPFIDWash(r.view, wantName, wantMN, wantSN, wantMk);
+        if (r.view)
+            total += IPFIDWash(r.view, wantName, wantMN, wantSN, wantMk, wantReg,
+                               wantEID, wantSEID, wantIDFA, wantIDFV, wantBB, wantPV);
         UIViewController *p = r.presentedViewController;
         while (p) {
-            if (p.view) total += IPFIDWash(p.view, wantName, wantMN, wantSN, wantMk);
+            if (p.view)
+                total += IPFIDWash(p.view, wantName, wantMN, wantSN, wantMk, wantReg,
+                                   wantEID, wantSEID, wantIDFA, wantIDFV, wantBB, wantPV);
             p = p.presentedViewController;
         }
     }
     if (total > 0)
-        IPFIDLog([NSString stringWithFormat:@"washed %ld name=%@ mn=%@ sn=%@",
-                  (long)total, wantName, wantMN, wantSN]);
+        IPFIDLog([NSString stringWithFormat:
+                  @"washed %ld name=%@ mn=%@ sn=%@ eid=%@ seid=%@ idfa=%@ bb=%@",
+                  (long)total, wantName, wantMN, wantSN,
+                  wantEID.length ? @"Y" : @"-",
+                  wantSEID.length ? @"Y" : @"-",
+                  wantIDFA.length ? @"Y" : @"-",
+                  wantBB.length ? wantBB : @"-"]);
 }
 
 static void IPFIDSchedule(void) {
