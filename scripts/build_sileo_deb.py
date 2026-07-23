@@ -31,7 +31,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION_DEFAULT = "2.13.3"
+VERSION_DEFAULT = "2.13.4"
 PKG = "com.ipfaker"
 ARCH = "iphoneos-arm64"
 
@@ -72,9 +72,19 @@ def _ci_dist_bases() -> list[Path]:
 
 
 def find_stack_dir() -> Path | None:
-    """Directory containing at least MG+CT (full stack preferred; largest MG wins ties)."""
+    """Prefer current theos/dist (this build), then newest mtime among MG+CT pairs."""
+    preferred = [
+        ROOT / "theos" / "dist",
+        ROOT / "dylibs_ci",
+    ]
+    for base in preferred:
+        mg = base / "iPFakerMG.dylib"
+        ct = base / "iPFakerCT.dylib"
+        if mg.is_file() and ct.is_file():
+            return base
+
     best: Path | None = None
-    best_n = -1
+    best_mtime = -1.0
     best_mg = -1
     for base in _ci_dist_bases():
         mg = base / "iPFakerMG.dylib"
@@ -84,11 +94,14 @@ def find_stack_dir() -> Path | None:
             ct = base / "iPFakerCT.arm64e.dylib"
             if not (mg.is_file() and ct.is_file()):
                 continue
-        n = sum(1 for m in STACK_MODULES if (base / f"{m}.dylib").is_file() or (base / f"{m}.arm64e.dylib").is_file())
-        mgsz = mg.stat().st_size
-        # Prefer more modules; on tie pick larger MG (Deep/IOKit fat builds)
-        if n > best_n or (n == best_n and mgsz > best_mg):
-            best_n = n
+        try:
+            mt = mg.stat().st_mtime
+            mgsz = mg.stat().st_size
+        except OSError:
+            continue
+        # Newest first; on same second pick larger MG
+        if mt > best_mtime or (mt == best_mtime and mgsz > best_mg):
+            best_mtime = mt
             best_mg = mgsz
             best = base
     return best
@@ -373,50 +386,43 @@ if [ -f "$ROOT/etc/ipfaker/device_catalog.json" ]; then
   chown mobile:mobile /var/mobile/Library/iPFaker/device_catalog.json 2>/dev/null || true
 fi
 
-# --- Preferences About auto-inject (ElleKit often SKIPS platform Preferences) ---
-# AboutID/AboutUI MUST stay on (customer Settings = lab). AboutVer OFF (crash risk).
+# --- Product: NO About dylib recover / NO prefs_inject (hung Apply + crash Preferences) ---
 for MS in /var/jb/usr/lib/TweakInject /var/jb/Library/MobileSubstrate/DynamicLibraries; do
   [ -d "$MS" ] || continue
-  # Recover AboutID/UI if older package left them .off
-  for n in iPFakerAboutID iPFakerAboutUI iPFakerAbout; do
-    if [ -f "$MS/${n}.dylib.off" ] && [ ! -f "$MS/${n}.dylib" ]; then
-      mv -f "$MS/${n}.dylib.off" "$MS/${n}.dylib" 2>/dev/null || true
+  for n in iPFakerAbout iPFakerAboutUI iPFakerAboutID iPFakerAboutVer iPFakerAA iPFakerJB; do
+    if [ -f "$MS/${n}.dylib" ]; then
+      mv -f "$MS/${n}.dylib" "$MS/${n}.dylib.off" 2>/dev/null || true
     fi
   done
-  if [ -f "$MS/iPFakerAboutVer.dylib" ]; then
-    mv -f "$MS/iPFakerAboutVer.dylib" "$MS/iPFakerAboutVer.dylib.off" 2>/dev/null || true
-  fi
+done
+# Kill leftover prefs inject daemon from older packages
+launchctl bootout system/com.ipfaker.prefs-inject 2>/dev/null || true
+launchctl unload /var/jb/Library/LaunchDaemons/com.ipfaker.prefs-inject.plist 2>/dev/null || true
+rm -f /var/jb/Library/LaunchDaemons/com.ipfaker.prefs-inject.plist 2>/dev/null || true
+for p in $(ps ax 2>/dev/null | grep prefs_inject_daemon | grep -v grep | awk '{print $1}'); do
+  kill -9 "$p" 2>/dev/null || true
 done
 
-# Product flags: deep multi-app ON; Settings About OFF by default
+# Product flags: multi-app deep + STABLE social (lean Extra, no FakeScreen)
 for CFG in /var/jb/etc/ipfaker/config.plist /var/mobile/Library/iPFaker/config.plist; do
   if [ -f "$CFG" ] && command -v plutil >/dev/null 2>&1; then
     plutil -replace Enabled -bool true "$CFG" 2>/dev/null || true
     plutil -replace DeepSpoofSocial -bool true "$CFG" 2>/dev/null || true
     plutil -replace InjectWebKit -bool true "$CFG" 2>/dev/null || true
-    plutil -replace SkipExtraForZalo -bool false "$CFG" 2>/dev/null || true
+    plutil -replace SkipExtraForZalo -bool true "$CFG" 2>/dev/null || true
+    plutil -replace StableSocialHooks -bool true "$CFG" 2>/dev/null || true
     plutil -replace FakeScreen -bool false "$CFG" 2>/dev/null || true
     plutil -replace FakeRealScreen -bool false "$CFG" 2>/dev/null || true
-    # Do not force SpoofSettingsAbout on — product is app deep spoof
+    plutil -replace ClearKeychainOnLaunch -bool false "$CFG" 2>/dev/null || true
     plutil -replace SpoofSettingsAbout -bool false "$CFG" 2>/dev/null || true
   fi
 done
 
-# prefs inject daemon: opainject About+AboutUI+AboutID into Preferences
-DAEMON_SRC="/var/jb/etc/ipfaker/prefs_inject_daemon.sh"
-if [ -f "$DAEMON_SRC" ]; then
-  cp -f "$DAEMON_SRC" /var/mobile/Library/iPFaker/prefs_inject_daemon.sh 2>/dev/null || true
-  chmod 755 /var/mobile/Library/iPFaker/prefs_inject_daemon.sh 2>/dev/null || true
-  chmod 755 "$DAEMON_SRC" 2>/dev/null || true
-  mkdir -p /var/jb/Library/LaunchDaemons 2>/dev/null || true
-  if [ -f /var/jb/etc/ipfaker/com.ipfaker.prefs-inject.plist ]; then
-    cp -f /var/jb/etc/ipfaker/com.ipfaker.prefs-inject.plist \
-      /var/jb/Library/LaunchDaemons/com.ipfaker.prefs-inject.plist 2>/dev/null || true
-    launchctl bootout system/com.ipfaker.prefs-inject 2>/dev/null || true
-    launchctl unload /var/jb/Library/LaunchDaemons/com.ipfaker.prefs-inject.plist 2>/dev/null || true
-    launchctl bootstrap system /var/jb/Library/LaunchDaemons/com.ipfaker.prefs-inject.plist 2>/dev/null \
-      || launchctl load -w /var/jb/Library/LaunchDaemons/com.ipfaker.prefs-inject.plist 2>/dev/null || true
-    launchctl kickstart -k system/com.ipfaker.prefs-inject 2>/dev/null || true
+# prefs inject: DISABLED (do not start daemon)
+if false; then
+  DAEMON_SRC="/var/jb/etc/ipfaker/prefs_inject_daemon.sh"
+  if [ -f "$DAEMON_SRC" ]; then
+    true
   fi
   # ALWAYS nohup fallback (launchctl often fails silently on rootless)
   killall -9 prefs_inject_daemon 2>/dev/null || true
@@ -533,35 +539,41 @@ while [ "$i" -lt "$max" ]; do
   i=$((i + 1))
 done
 
-# HARD rule: if payload is on disk, always reboot (even if dpkg still "busy" after timeout).
-# Customer complaint was: install OK, no reboot. Aborting was worse than rare dpkg interrupt.
+# HARD rule: if payload is on disk, always try reboot.
 if ! payload_ok; then
   log "ABORT: no payload after wait — keep flag for next LaunchDaemon tick"
   exit 0
 fi
 
-rm -f "$FLAG"
-date > "$DONE" 2>/dev/null || true
 log "INSTALL PAYLOAD OK — Userspace Reboot now"
 
-launchctl bootout system/com.ipfaker.userspace-reboot 2>/dev/null || true
-launchctl unload "$PL" 2>/dev/null || true
-rm -f "$PL" 2>/dev/null || true
-launchctl remove com.ipfaker.userspace-reboot 2>/dev/null || true
+do_reboot() {
+  if [ -x /var/jb/basebin/jbctl ]; then
+    log "jbctl reboot_userspace"
+    /var/jb/basebin/jbctl reboot_userspace >> "$LOG" 2>&1 && return 0
+  fi
+  for c in /var/jb/basebin/jbctl /basebin/jbctl; do
+    [ -x "$c" ] || continue
+    log "try $c reboot_userspace"
+    "$c" reboot_userspace >> "$LOG" 2>&1 && return 0
+  done
+  launchctl reboot userspace >> "$LOG" 2>&1 && return 0
+  /bin/launchctl reboot userspace >> "$LOG" 2>&1 && return 0
+  return 1
+}
 
-if [ -x /var/jb/basebin/jbctl ]; then
-  log "jbctl reboot_userspace"
-  /var/jb/basebin/jbctl reboot_userspace >> "$LOG" 2>&1 && exit 0
+if do_reboot; then
+  rm -f "$FLAG"
+  date > "$DONE" 2>/dev/null || true
+  launchctl bootout system/com.ipfaker.userspace-reboot 2>/dev/null || true
+  launchctl unload "$PL" 2>/dev/null || true
+  rm -f "$PL" 2>/dev/null || true
+  log "reboot command accepted"
+  exit 0
 fi
-# Dopamine alternate paths
-for c in /var/jb/basebin/jbctl /basebin/jbctl; do
-  [ -x "$c" ] || continue
-  log "try $c reboot_userspace"
-  "$c" reboot_userspace >> "$LOG" 2>&1 && exit 0
-done
-launchctl reboot userspace >> "$LOG" 2>&1 || true
-/bin/launchctl reboot userspace >> "$LOG" 2>&1 || true
-log "reboot_userspace FAILED — open Dopamine → Reboot Userspace manually"
+
+# Keep FLAG so StartInterval / next nohup can retry (do NOT set DONE)
+log "reboot_userspace FAILED — keep flag for retry; or Dopamine → Reboot Userspace"
 exit 0
 REBOOT_EOF
   chmod 755 "$REBOOT_SH" 2>/dev/null || true

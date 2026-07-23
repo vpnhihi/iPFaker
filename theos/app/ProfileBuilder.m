@@ -1235,11 +1235,16 @@
                 [failMsgs componentsJoinedByString:@"\n"]];
     }
 
-    // Settings → Giới thiệu: MobileGestalt on-disk cache holds MarketingNameString/ProductType
-    // (Preferences may not re-query live MG for Tên kiểu máy). Patch dual with spoof flat.
-    NSString *mgCacheNote = [self patchMobileGestaltCacheWithFlat:flat];
-    // Flush Preferences + gestalt helpers so About re-reads ProductVersion / ModelNumber / RegionInfo
-    NSString *bounceNote = [self bounceSettingsAboutConsumers];
+    // Product path: skip Settings About bounce (waitpid hang risk). Only if user enabled.
+    NSString *mgCacheNote = @"";
+    NSString *bounceNote = @"";
+    BOOL wantAbout = NO;
+    id sa = flat[@"SpoofSettingsAbout"];
+    if ([sa respondsToSelector:@selector(boolValue)]) wantAbout = [sa boolValue];
+    if (wantAbout) {
+        mgCacheNote = [self patchMobileGestaltCacheWithFlat:flat] ?: @"";
+        bounceNote = [self bounceSettingsAboutConsumers] ?: @"";
+    }
 
     NSString *mk = flat[@"MarketingName"] ?: @"?";
     NSString *pt = flat[@"ProductType"] ?: @"?";
@@ -1298,9 +1303,7 @@
             pid_t pid = 0;
             const char *argv[] = { sudoBin.UTF8String, "-n", "sh", path.UTF8String, NULL };
             if (posix_spawn(&pid, sudoBin.UTF8String, NULL, NULL, (char *const *)argv, NULL) == 0 && pid > 0) {
-                int st = 0;
-                waitpid(pid, &st, 0);
-                if (WIFEXITED(st)) rc = WEXITSTATUS(st);
+                rc = [self waitPid:pid timeoutSec:5];
                 if (rc == 0) break;
             }
         }
@@ -1309,9 +1312,7 @@
             pid_t pid = 0;
             const char *argv[] = { killall.UTF8String, "-9", name.UTF8String, NULL };
             if (posix_spawn(&pid, killall.UTF8String, NULL, NULL, (char *const *)argv, NULL) == 0 && pid > 0) {
-                int st = 0;
-                waitpid(pid, &st, 0);
-                if (WIFEXITED(st) && WEXITSTATUS(st) == 0) rc = 0;
+                rc = [self waitPid:pid timeoutSec:3];
             }
         }
         if (rc == 0) killed++;

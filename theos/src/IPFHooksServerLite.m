@@ -425,47 +425,43 @@ static void IPFServerLiteCtor(void) {
             if (!pMS) { IPFLiteTrace(@"no MSHook"); return; }
             IPFLiteTrace(@"ServerLite begin");
 
-            // DeviceCheck/AppAttest frameworks may load after first UIKit tick
+            // DeviceCheck/AppAttest — install once only (multi MSHook = crash)
             void (^installAA)(void) = ^{
+                static BOOL s_aaOnce = NO;
+                if (s_aaOnce) return;
+                s_aaOnce = YES;
                 dlopen("/System/Library/Frameworks/DeviceCheck.framework/DeviceCheck", RTLD_NOW);
                 Class aas = objc_getClass("DCAppAttestService");
                 if (aas) {
                     SEL genKey = NSSelectorFromString(@"generateKeyWithCompletionHandler:");
                     SEL attest = NSSelectorFromString(@"attestKey:clientDataHash:completionHandler:");
                     SEL asrt = NSSelectorFromString(@"generateAssertion:clientDataHash:completionHandler:");
-                    if (class_getInstanceMethod(aas, genKey))
+                    if (class_getInstanceMethod(aas, genKey) && !o_genKey)
                         pMS(aas, genKey, (IMP)s_genKey, (IMP *)&o_genKey);
-                    if (class_getInstanceMethod(aas, attest))
+                    if (class_getInstanceMethod(aas, attest) && !o_attest)
                         pMS(aas, attest, (IMP)s_attest, (IMP *)&o_attest);
-                    if (class_getInstanceMethod(aas, asrt))
+                    if (class_getInstanceMethod(aas, asrt) && !o_assert)
                         pMS(aas, asrt, (IMP)s_assert, (IMP *)&o_assert);
-                    if (class_getInstanceMethod(aas, @selector(isSupported)))
+                    if (class_getInstanceMethod(aas, @selector(isSupported)) && !o_isSup)
                         pMS(aas, @selector(isSupported), (IMP)s_isSup, (IMP *)&o_isSup);
                     Class meta = object_getClass(aas);
-                    if (meta && class_getInstanceMethod(meta, @selector(isSupported)))
+                    if (meta && class_getInstanceMethod(meta, @selector(isSupported)) && !o_isSup)
                         pMS(meta, @selector(isSupported), (IMP)s_isSup, (IMP *)&o_isSup);
-                    // sharedService class method path
-                    SEL shared = NSSelectorFromString(@"sharedService");
-                    if (meta && class_getInstanceMethod(meta, shared)) {
-                        // isSupported already hooked
-                    }
                     IPFLiteTrace(@"AppAttest OK");
                 } else {
                     IPFLiteTrace(@"AppAttest class nil");
+                    s_aaOnce = NO; // retry later if class loads late
                 }
                 Class dcd = objc_getClass("DCDevice");
                 if (dcd) {
                     Class meta = object_getClass(dcd);
                     SEL tok = NSSelectorFromString(@"generateTokenWithCompletionHandler:");
-                    SEL cur = NSSelectorFromString(@"currentDevice");
-                    if (class_getInstanceMethod(dcd, tok))
+                    if (class_getInstanceMethod(dcd, tok) && !o_dcTok)
                         pMS(dcd, tok, (IMP)s_dcTok, (IMP *)&o_dcTok);
-                    if (class_getInstanceMethod(dcd, @selector(isSupported)))
+                    if (class_getInstanceMethod(dcd, @selector(isSupported)) && !o_dcSup)
                         pMS(dcd, @selector(isSupported), (IMP)s_dcSup, (IMP *)&o_dcSup);
-                    if (meta && class_getInstanceMethod(meta, @selector(isSupported)))
+                    if (meta && class_getInstanceMethod(meta, @selector(isSupported)) && !o_dcSup)
                         pMS(meta, @selector(isSupported), (IMP)s_dcSup, (IMP *)&o_dcSup);
-                    // Some SDKs call +currentDevice then -generateToken
-                    (void)cur;
                     IPFLiteTrace(@"DeviceCheck OK");
                 }
             };
