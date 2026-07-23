@@ -15,7 +15,7 @@ include $(THEOS)/makefiles/common.mk
 #   CT = telephony + deep rewrite
 #   JB = expanded hide (fopen/getenv/fileExists) — optional, fails independently
 # AA = ServerLite (AppAttest/Proxy/WebRTC) — loads first alphabetically, tiny, no IPFConfig.m
-TWEAK_NAME = iPFakerAA iPFakerAbout iPFakerAboutUI iPFakerAboutVer iPFakerMG iPFakerCT iPFakerJB
+TWEAK_NAME = iPFakerAA iPFakerAbout iPFakerAboutID iPFakerAboutUI iPFakerAboutVer iPFakerMG iPFakerCT iPFakerJB
 
 # MG = spoof + Extra (screen/disk/UA/getifaddrs/access-stat/WKWebView)
 # fishhook.c OFF by default: keeps MG ~123k AMFI-safe. ElleKit MSHook is primary on Dopamine.
@@ -40,6 +40,13 @@ iPFakerAboutVer_CFLAGS = -fobjc-arc -Os -fvisibility=hidden -ffunction-sections 
 iPFakerAboutVer_FRAMEWORKS = Foundation UIKit
 iPFakerAboutVer_LIBRARIES = substrate
 iPFakerAboutVer_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerAboutVer.dylib -Wl,-dead_strip -Wl,-x
+
+# AboutID: tiny wash for Settings Tên / Số máy / Số sê-ri (kept lean for Preferences inject)
+iPFakerAboutID_FILES = TweakAboutID.x
+iPFakerAboutID_CFLAGS = -fobjc-arc -Os -fvisibility=hidden -ffunction-sections -fdata-sections -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations
+iPFakerAboutID_FRAMEWORKS = Foundation UIKit
+iPFakerAboutID_LIBRARIES = substrate
+iPFakerAboutID_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerAboutID.dylib -Wl,-dead_strip -Wl,-x
 
 # AboutUI: delayed UILabel wash for host 15.5 → config ProductVersion (Preferences only)
 iPFakerAboutUI_FILES = TweakAboutUI.x

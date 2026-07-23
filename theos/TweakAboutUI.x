@@ -179,41 +179,11 @@ static BOOL IPFUIIsBaseband(NSString *t) {
     return re && [re numberOfMatchesInString:t options:0 range:NSMakeRange(0, t.length)] > 0;
 }
 
-
-static BOOL IPFUILooksLikeSerial(NSString *t) {
-    if (t.length < 10 || t.length > 14) return NO;
-    if ([t rangeOfString:@"/"].location != NSNotFound) return NO;
-    if ([t rangeOfString:@":"].location != NSNotFound) return NO;
-    if ([t rangeOfString:@","].location != NSNotFound) return NO;
-    if ([t rangeOfString:@" "].location != NSNotFound) return NO;
-    for (NSUInteger i = 0; i < t.length; i++) {
-        unichar c = [t characterAtIndex:i];
-        if (!((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')))
-            return NO;
-    }
-    return YES;
-}
-
-static BOOL IPFUILooksLikeModelNumber(NSString *t) {
-    if (!t.length || t.length > 18) return NO;
-    if ([t rangeOfString:@":"].location != NSNotFound) return NO;
-    if ([t rangeOfString:@" "].location != NSNotFound) return NO;
-    if ([t rangeOfString:@"/"].location != NSNotFound) return t.length >= 5;
-    if (t.length < 4 || t.length > 8) return NO;
-    for (NSUInteger i = 0; i < t.length; i++) {
-        unichar c = [t characterAtIndex:i];
-        if (!((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')))
-            return NO;
-    }
-    return YES;
-}
-
 // macSlot: 0 → next host MAC becomes Wifi, 1 → BT (Settings row order)
 static NSInteger gIPFUIMacSlot = 0;
 
 static NSInteger IPFUIWashView(UIView *root,
                                NSString *wantPV, NSString *wantMk, NSString *wantName,
-                               NSString *wantMN, NSString *wantSN,
                                NSString *wantWifi, NSString *wantBT,
                                NSString *wantEID, NSString *wantSEID, NSString *wantBB,
                                NSArray *hostVers) {
@@ -228,8 +198,6 @@ static NSInteger IPFUIWashView(UIView *root,
             NSString *t = lab.text;
             if (![t isKindOfClass:[NSString class]] || !t.length) return;
             if (wantName.length && [t isEqualToString:wantName]) return;
-            if (wantMN.length && [t isEqualToString:wantMN]) return;
-            if (wantSN.length && [t isEqualToString:wantSN]) return;
 
             if (wantPV.length && IPFUIShouldReplaceVersion(t, wantPV, hostVers)) {
                 lab.text = wantPV;
@@ -241,25 +209,6 @@ static NSInteger IPFUIWashView(UIView *root,
                 lab.text = wantMk;
                 n++;
                 IPFUILog([NSString stringWithFormat:@"label model %@ => %@", t, wantMk]);
-                return;
-            }
-            if (wantSN.length && IPFUILooksLikeSerial(t) && ![t isEqualToString:wantSN]) {
-                lab.text = wantSN;
-                n++;
-                IPFUILog([NSString stringWithFormat:@"label sn %@ => %@", t, wantSN]);
-                return;
-            }
-            if (wantMN.length && IPFUILooksLikeModelNumber(t) && ![t isEqualToString:wantMN]) {
-                lab.text = wantMN;
-                n++;
-                IPFUILog([NSString stringWithFormat:@"label mn %@ => %@", t, wantMN]);
-                return;
-            }
-            if (wantName.length && [t isEqualToString:@"iPhone"]
-                && ![wantName isEqualToString:@"iPhone"]) {
-                lab.text = wantName;
-                n++;
-                IPFUILog([NSString stringWithFormat:@"label name %@ => %@", t, wantName]);
                 return;
             }
             if ((wantWifi.length || wantBT.length) && IPFUIIsMAC(t)) {
@@ -317,9 +266,6 @@ static void IPFUIWashAllWindows(void) {
     NSString *wantMk = [cfg[@"MarketingName"] description] ?: @"";
     NSString *wantName = [cfg[@"UserAssignedDeviceName"] description]
         ?: [cfg[@"DeviceName"] description] ?: @"";
-    NSString *wantMN = [cfg[@"ModelNumber"] description]
-        ?: [cfg[@"PartNumber"] description] ?: @"";
-    NSString *wantSN = [cfg[@"SerialNumber"] description] ?: @"";
     NSString *wantWifi = [cfg[@"WifiAddress"] description] ?: @"";
     NSString *wantBT = [cfg[@"BluetoothAddress"] description] ?: @"";
     NSString *wantEID = [cfg[@"EID"] description] ?: @"";
@@ -345,16 +291,16 @@ static void IPFUIWashAllWindows(void) {
     if (!windows.count)
         windows = UIApplication.sharedApplication.windows;
     for (UIWindow *w in windows) {
-        total += IPFUIWashView(w, wantPV, wantMk, wantName, wantMN, wantSN, wantWifi, wantBT,
+        total += IPFUIWashView(w, wantPV, wantMk, wantName, wantWifi, wantBT,
                               wantEID, wantSEID, wantBB, hostVers);
         UIViewController *r = w.rootViewController;
         if (r.view)
-            total += IPFUIWashView(r.view, wantPV, wantMk, wantName, wantMN, wantSN, wantWifi, wantBT,
+            total += IPFUIWashView(r.view, wantPV, wantMk, wantName, wantWifi, wantBT,
                                   wantEID, wantSEID, wantBB, hostVers);
         UIViewController *p = r.presentedViewController;
         while (p) {
             if (p.view)
-                total += IPFUIWashView(p.view, wantPV, wantMk, wantName, wantMN, wantSN, wantWifi, wantBT,
+                total += IPFUIWashView(p.view, wantPV, wantMk, wantName, wantWifi, wantBT,
                                       wantEID, wantSEID, wantBB, hostVers);
             p = p.presentedViewController;
         }
@@ -370,7 +316,7 @@ static void IPFUIWashAllWindows(void) {
 }
 
 static void IPFUIScheduleWashes(void) {
-    NSArray *delays = @[ @0.3, @0.8, @1.5, @2.5, @4.0, @6.0, @10.0, @15.0 ];
+    NSArray *delays = @[ @0.3, @0.8, @1.5, @2.5, @4.0, @6.0 ];
     for (NSNumber *d in delays) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(d.doubleValue * NSEC_PER_SEC)),
                        dispatch_get_main_queue(), ^{

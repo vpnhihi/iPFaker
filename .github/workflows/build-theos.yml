@@ -59,6 +59,9 @@ jobs:
           cp -f layout/Library/MobileSubstrate/DynamicLibraries/iPFakerAboutUI.plist ./iPFakerAboutUI.plist 2>/dev/null \
             || cp -f ./iPFakerAbout.plist ./iPFakerAboutUI.plist
           cp -f ./iPFakerAboutUI.plist layout/Library/MobileSubstrate/DynamicLibraries/iPFakerAboutUI.plist
+          cp -f layout/Library/MobileSubstrate/DynamicLibraries/iPFakerAboutID.plist ./iPFakerAboutID.plist 2>/dev/null \
+            || cp -f ./iPFakerAbout.plist ./iPFakerAboutID.plist
+          cp -f ./iPFakerAboutID.plist layout/Library/MobileSubstrate/DynamicLibraries/iPFakerAboutID.plist
           cp -f layout/Library/MobileSubstrate/DynamicLibraries/iPFakerMG.plist ./iPFakerAA.plist
           cp -f ./iPFakerAA.plist layout/Library/MobileSubstrate/DynamicLibraries/iPFakerAA.plist
           make clean || true
@@ -73,7 +76,7 @@ jobs:
           set -e
           mkdir -p dist
           find .theos/obj -name 'iPFaker*.dylib' 2>/dev/null | head -20
-          for name in iPFakerAA iPFakerAbout iPFakerAboutUI iPFakerAboutVer iPFakerMG iPFakerCT iPFakerJB; do
+          for name in iPFakerAA iPFakerAbout iPFakerAboutID iPFakerAboutUI iPFakerAboutVer iPFakerMG iPFakerCT iPFakerJB; do
             f=$(find .theos -path '*debug*' -prune -o -name "${name}.dylib" -print 2>/dev/null | head -1)
             if [ -z "$f" ]; then f=$(find .theos -name "${name}.dylib" | head -1); fi
             if [ -z "$f" ]; then
