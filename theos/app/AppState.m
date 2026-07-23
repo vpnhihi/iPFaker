@@ -226,16 +226,13 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
 }
 
 - (NSArray<NSString *> *)filterSpoofTargets {
-    // Inject: selected social apps + Safari/WebKit/Maps (HIOS surface)
+    // Inject: selected social apps + Safari/WebKit/Maps (HIOS surface).
+    // Never inject Preferences here — About path was removed from Apply (hung customers).
     NSMutableArray *out = [[self labAppTargets] mutableCopy] ?: [NSMutableArray array];
     for (NSString *s in [AppState systemLabBackgroundBundleIds]) {
         if (![out containsObject:s]) [out addObject:s];
     }
-    // Settings About only if user explicitly enabled (default OFF — not product focus)
-    if ([self toggleForKey:@"SpoofSettingsAbout" defaultOn:NO]) {
-        if (![out containsObject:@"com.apple.Preferences"])
-            [out addObject:@"com.apple.Preferences"];
-    }
+    [out removeObject:@"com.apple.Preferences"];
     return out;
 }
 
@@ -580,7 +577,7 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
 
 - (NSString *)applySpoofAppFiltersProgress:(void (^)(NSString *))progress {
     [self ensureDefaults];
-    if (progress) progress(@"Ghi filter inject (app lab + system ngầm)…");
+    if (progress) progress(@"Ghi filter inject (MG+CT, app lab + WebKit)…");
     NSString *msg = [ProfileBuilder applySpoofFiltersForBundles:[self filterSpoofTargets]
                                                        progress:progress];
     self.statusText = msg;

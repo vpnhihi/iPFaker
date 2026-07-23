@@ -1,5 +1,5 @@
 #!/bin/sh
-# iPFaker postinst — reboot ONLY after dpkg fully finishes (no mid-install reboot).
+# iPFaker postinst (Theos path) — schedule reboot only after payload on disk.
 ROOT="${JBROOT:-/var/jb}"
 export PATH="/var/jb/usr/bin:/var/jb/usr/sbin:/var/jb/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 
@@ -10,10 +10,8 @@ for d in \
   "/var/jb/Library/MobileSubstrate/DynamicLibraries"
 do
   [ -d "$d" ] || continue
-  for f in iPFakerMG.dylib iPFakerCT.dylib iPFakerJB.dylib \
-           iPFakerAbout.dylib iPFakerAboutUI.dylib iPFakerAboutVer.dylib iPFakerAA.dylib \
-           iPFakerMG.plist iPFakerCT.plist iPFakerJB.plist \
-           iPFakerAbout.plist iPFakerAboutUI.plist iPFakerAboutVer.plist iPFakerAA.plist; do
+  for f in iPFakerMG.dylib iPFakerCT.dylib \
+           iPFakerMG.plist iPFakerCT.plist; do
     p="$d/$f"
     [ -e "$p" ] || continue
     chown root:wheel "$p" 2>/dev/null || true
@@ -31,10 +29,11 @@ killall -9 Zalo 2>/dev/null || true
 killall -9 Preferences 2>/dev/null || true
 
 if [ -z "$IPFAKER_SKIP_USERSPACE_REBOOT" ]; then
-  # Full waiter is written by Sileo package postinst; minimal schedule here for Theos path
   if [ -x /var/jb/etc/ipfaker/userspace_reboot_once.sh ]; then
+    rm -f /var/jb/etc/ipfaker/.userspace_reboot_done 2>/dev/null || true
     touch /var/jb/etc/ipfaker/.pending_userspace_reboot 2>/dev/null || true
-    nohup /bin/sh /var/jb/etc/ipfaker/userspace_reboot_once.sh >/dev/null 2>&1 &
+    ( nohup /bin/sh /var/jb/etc/ipfaker/userspace_reboot_once.sh </dev/null \
+        >>/var/mobile/Library/iPFaker/logs/userspace_reboot.log 2>&1 & ) >/dev/null 2>&1 || true
   fi
 fi
 

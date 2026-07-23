@@ -8,6 +8,7 @@
 #import <unistd.h>
 #import <time.h>
 #import <stdlib.h>
+#import <signal.h>
 #import <sys/sysctl.h>
 #import <string.h>
 
@@ -849,7 +850,8 @@
         @"AnalyticsOsv": iosMeta[@"ProductVersion"] ?: iosVer ?: @"",
         @"AnalyticsSs": [NSString stringWithFormat:@"%ldx%ld", (long)w, (long)h],
         @"hw.machine": device[@"ProductType"] ?: @"",
-        @"SpoofSettingsAbout": @YES,
+        // Product = multi-app deep spoof only. Settings About is optional lab toggle (default OFF).
+        @"SpoofSettingsAbout": @NO,
         // Lean MG inside Zalo (skip Extra) — stable A10–A11 rootless; Safari still gets Extra via filter
         @"SkipExtraForZalo": @YES,
         // Darwin (iOS N.M → (N+6).M.0) filled after dict build — see below
@@ -1128,8 +1130,9 @@
             if (!safeFlat[fk]) safeFlat[fk] = @YES;
         }
         safeFlat[@"DisableAppAttest"] = @YES;
+        // Never auto-enable Settings About (daemon inject hung Apply for customers).
         if (safeFlat[@"SpoofSettingsAbout"] == nil)
-            safeFlat[@"SpoofSettingsAbout"] = @YES;
+            safeFlat[@"SpoofSettingsAbout"] = @NO;
     }
     flat = [safeFlat copy];
 
@@ -2646,32 +2649,22 @@
     [ctPl writeToFile:[stage stringByAppendingPathComponent:@"iPFakerCT.plist"] atomically:YES];
     [jbPl writeToFile:[stage stringByAppendingPathComponent:@"iPFakerJB.plist"] atomically:YES];
 
-    // Settings → Giới thiệu: tiny iPFakerAbout only (full MG is CODESIGN-killed in Preferences)
-    NSData *aboutPl = [self filterPlistDataForBundles:@[ @"com.apple.Preferences" ] includeCommCenter:NO];
-    if (aboutPl.length)
-        [aboutPl writeToFile:[stage stringByAppendingPathComponent:@"iPFakerAbout.plist"] atomically:YES];
-
-    // Manifest for PC / debug
+    // Manifest for PC / debug — product path is multi-app only (no Settings About)
     NSDictionary *manifest = @{
-        @"schema": @"ipfaker.spoof_apps/1",
+        @"schema": @"ipfaker.spoof_apps/2",
         @"bundles": bids,
-        @"settingsAbout": @[ @"com.apple.Preferences" ],
+        @"settingsAbout": @[],
         @"updated": @([[NSDate date] timeIntervalSince1970]),
     };
     NSData *json = [NSJSONSerialization dataWithJSONObject:manifest options:NSJSONWritingPrettyPrinted error:nil];
     if (json) [json writeToFile:[stage stringByAppendingPathComponent:@"spoof_apps.json"] atomically:YES];
 
-    step(@"Cài filter vào TweakInject (root)…");
+    step(@"Cài filter MG+CT (root, timeout 20s)…");
     NSString *script = [stage stringByAppendingPathComponent:@"install_spoof_filters.sh"];
-    // No set -e. About* always forced to Preferences (never multi-app).
+    // HIOS product: ONLY MG+CT plists. No About* / prefs_inject / launchctl (those hung Apply).
     NSString *sh = @"#!/bin/sh\n"
         "STAGE=/var/mobile/Library/iPFaker\n"
         "OK=0\n"
-        "ABOUT='<?xml version=\"1.0\" encoding=\"UTF-8\"?>\\n"
-        "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\\n"
-        "<plist version=\"1.0\"><dict><key>Filter</key><dict><key>Bundles</key>"
-        "<array><string>com.apple.Preferences</string></array>"
-        "<key>Mode</key><string>Any</string></dict></dict></plist>\\n'\n"
         "for INJ in /var/jb/usr/lib/TweakInject /var/jb/Library/MobileSubstrate/DynamicLibraries; do\n"
         "  [ -d \"$INJ\" ] || continue\n"
         "  for n in iPFakerMG iPFakerCT; do\n"
@@ -2679,21 +2672,6 @@
         "      cp -f \"$STAGE/${n}.plist\" \"$INJ/${n}.plist\" && OK=1\n"
         "      chmod 644 \"$INJ/${n}.plist\" 2>/dev/null || true\n"
         "      chown root:wheel \"$INJ/${n}.plist\" 2>/dev/null || true\n"
-        "    fi\n"
-        "  done\n"
-        "  for n in iPFakerAbout iPFakerAboutUI iPFakerAboutID iPFakerAboutVer; do\n"
-        "    if [ -f \"$STAGE/${n}.plist\" ] && grep -q 'com.apple.Preferences' \"$STAGE/${n}.plist\" 2>/dev/null; then\n"
-        "      cp -f \"$STAGE/${n}.plist\" \"$INJ/${n}.plist\" && OK=1\n"
-        "    else\n"
-        "      printf '%s' \"$ABOUT\" > \"$INJ/${n}.plist\" && OK=1\n"
-        "    fi\n"
-        "    chmod 644 \"$INJ/${n}.plist\" 2>/dev/null || true\n"
-        "    chown root:wheel \"$INJ/${n}.plist\" 2>/dev/null || true\n"
-        "  done\n"
-        "  # Re-enable AboutUI/AboutID if postinst left .off (customer Settings sync)\n"
-        "  for n in iPFakerAboutUI iPFakerAboutID; do\n"
-        "    if [ -f \"$INJ/${n}.dylib.off\" ] && [ ! -f \"$INJ/${n}.dylib\" ]; then\n"
-        "      mv -f \"$INJ/${n}.dylib.off\" \"$INJ/${n}.dylib\" 2>/dev/null || true\n"
         "    fi\n"
         "  done\n"
         "done\n"
@@ -2704,9 +2682,9 @@
     [sh writeToFile:script atomically:YES encoding:NSUTF8StringEncoding error:nil];
     [fm setAttributes:@{ NSFilePosixPermissions: @0755 } ofItemAtPath:script error:nil];
 
-    int rc = [self runRootShellScript:script];
+    int rc = [self runRootShellScript:script timeoutSec:20];
     if (rc != 0) {
-        // Direct overwrite (remove first — copyItem fails when dst exists)
+        // Direct overwrite as mobile (TweakInject often world-writable after postinst)
         for (NSString *inj in @[
                  @"/var/jb/usr/lib/TweakInject",
                  @"/var/jb/Library/MobileSubstrate/DynamicLibraries" ]) {
@@ -2721,11 +2699,19 @@
                     rc = 0;
             }
         }
+        if (rc == 0)
+            step(@"Filter ghi trực tiếp (không cần root)…");
+        else
+            step([NSString stringWithFormat:@"⚠ Root/script rc=%d — thử ghi trực tiếp thất bại", rc]);
     }
 
     // VERIFY live inject matches stage — Zalo only worked because package default lists it
     NSString *liveMG = @"/var/jb/usr/lib/TweakInject/iPFakerMG.plist";
     NSString *liveTxt = [NSString stringWithContentsOfFile:liveMG encoding:NSUTF8StringEncoding error:nil] ?: @"";
+    if (!liveTxt.length) {
+        liveMG = @"/var/jb/Library/MobileSubstrate/DynamicLibraries/iPFakerMG.plist";
+        liveTxt = [NSString stringWithContentsOfFile:liveMG encoding:NSUTF8StringEncoding error:nil] ?: @"";
+    }
     NSUInteger missing = 0;
     for (NSString *bid in bids) {
         if ([bid hasPrefix:@"com.apple."]) continue;
@@ -2738,20 +2724,12 @@
         step(@"Filter LIVE: khớp app lab (inject OK)");
 
     step(@"Đóng app spoof để lần mở sau inject…");
-    for (NSString *bid in bids)
+    for (NSString *bid in bids) {
+        if ([bid hasPrefix:@"com.apple."]) continue; // skip Safari/Maps kill spam
         [self killAppBundleId:bid executable:nil];
-    [self killAppBundleId:@"com.apple.Preferences" executable:nil];
+    }
 
-    // Settings About optional only — product focus is multi-app deep spoof
-    NSString *aboutSync = @"";
-    BOOL wantAbout = NO;
-    @try {
-        NSDictionary *cfg = [NSDictionary dictionaryWithContentsOfFile:@"/var/jb/etc/ipfaker/config.plist"]
-            ?: [NSDictionary dictionaryWithContentsOfFile:@"/var/mobile/Library/iPFaker/config.plist"];
-        wantAbout = [cfg[@"SpoofSettingsAbout"] boolValue];
-    } @catch (__unused NSException *ex) {}
-    if (wantAbout)
-        aboutSync = [self ensureSettingsAboutSyncProgress:progress];
+    // NO Settings About / prefs_inject daemon — that path hung Apply for minutes–hours.
 
     NSString *preview = bids.count <= 6
         ? [bids componentsJoinedByString:@", "]
@@ -2760,121 +2738,65 @@
            (unsigned long)(bids.count - 4)];
     return [NSString stringWithFormat:
             @"Deep multi-app: %lu target · CT CommCenter · WebKit %@\n%@\n"
-            @"Filter LIVE=%@ · kill+reopen apps = spoof active\n"
-            @"%@rc=%d",
+            @"Filter LIVE=%@ · kill+reopen apps = spoof active · rc=%d",
             (unsigned long)bids.count,
             injectWK ? @"ON" : @"OFF",
             preview,
             liveOK ? @"OK" : [NSString stringWithFormat:@"THIẾU %lu", (unsigned long)missing],
-            aboutSync.length ? [aboutSync stringByAppendingString:@"\n"] : @"",
             rc];
 }
 
 + (NSString *)ensureSettingsAboutSyncProgress:(IPFWipeProgress)progress {
-    void (^step)(NSString *) = ^(NSString *s) { if (progress) progress(s); };
-    step(@"Đồng bộ Cài đặt → Giới thiệu (daemon inject)…");
+    // Product path removed prefs_inject / launchctl (hung Apply forever).
+    // Optional Settings About only via Settings toggle + package dylibs if ever re-enabled.
+    if (progress) progress(@"Settings About: bỏ qua (không daemon inject)");
+    return @"Settings About: skipped (no daemon)";
+}
 
-    NSFileManager *fm = [NSFileManager defaultManager];
-    NSString *stage = @"/var/mobile/Library/iPFaker";
-    [fm createDirectoryAtPath:stage withIntermediateDirectories:YES attributes:nil error:nil];
-    [fm createDirectoryAtPath:[stage stringByAppendingPathComponent:@"logs"]
-  withIntermediateDirectories:YES attributes:nil error:nil];
-
-    // Preferences-only filter for all About* modules
-    NSString *aboutXML =
-        @"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-        "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" "
-        "\"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
-        "<plist version=\"1.0\"><dict><key>Filter</key><dict>"
-        "<key>Bundles</key><array><string>com.apple.Preferences</string></array>"
-        "<key>Mode</key><string>Any</string></dict></dict></plist>\n";
-    NSData *aboutData = [aboutXML dataUsingEncoding:NSUTF8StringEncoding];
-    for (NSString *n in @[ @"iPFakerAbout", @"iPFakerAboutUI", @"iPFakerAboutID", @"iPFakerAboutVer" ]) {
-        NSString *p = [stage stringByAppendingPathComponent:[n stringByAppendingString:@".plist"]];
-        [aboutData writeToFile:p atomically:YES];
+/// Wait up to timeoutSec; kill child on timeout. Returns exit code or -9 on kill, -1 on fail.
++ (int)waitPid:(pid_t)pid timeoutSec:(int)timeoutSec {
+    if (pid <= 0) return -1;
+    if (timeoutSec <= 0) timeoutSec = 30;
+    int st = 0;
+    time_t deadline = time(NULL) + timeoutSec;
+    while (1) {
+        pid_t r = waitpid(pid, &st, WNOHANG);
+        if (r == pid) {
+            if (WIFEXITED(st)) return WEXITSTATUS(st);
+            if (WIFSIGNALED(st)) return 128 + WTERMSIG(st);
+            return -1;
+        }
+        if (r < 0) return -1;
+        if (time(NULL) >= deadline) {
+            kill(pid, SIGKILL);
+            waitpid(pid, &st, 0);
+            return -9;
+        }
+        usleep(100 * 1000);
     }
-
-    NSString *script = [stage stringByAppendingPathComponent:@"ensure_settings_about.sh"];
-    NSString *sh =
-        @"#!/bin/sh\n"
-        "export PATH=/var/jb/usr/bin:/var/jb/usr/sbin:/var/jb/basebin:/usr/bin:/bin:/sbin:$PATH\n"
-        "STAGE=/var/mobile/Library/iPFaker\n"
-        "LOG=$STAGE/logs/ensure_settings_about.log\n"
-        "mkdir -p \"$STAGE/logs\" 2>/dev/null\n"
-        "echo \"$(date) ensure_settings_about start\" >> \"$LOG\"\n"
-        "ABOUT_XML='<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-        "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
-        "<plist version=\"1.0\"><dict><key>Filter</key><dict><key>Bundles</key>"
-        "<array><string>com.apple.Preferences</string></array>"
-        "<key>Mode</key><string>Any</string></dict></dict></plist>\n'\n"
-        "for INJ in /var/jb/usr/lib/TweakInject /var/jb/Library/MobileSubstrate/DynamicLibraries; do\n"
-        "  [ -d \"$INJ\" ] || continue\n"
-        "  for n in iPFakerAbout iPFakerAboutUI iPFakerAboutID; do\n"
-        "    # recover .off from old packages\n"
-        "    if [ -f \"$INJ/${n}.dylib.off\" ] && [ ! -f \"$INJ/${n}.dylib\" ]; then\n"
-        "      mv -f \"$INJ/${n}.dylib.off\" \"$INJ/${n}.dylib\" 2>/dev/null || true\n"
-        "    fi\n"
-        "    printf '%s' \"$ABOUT_XML\" > \"$INJ/${n}.plist\"\n"
-        "    chmod 644 \"$INJ/${n}.plist\" 2>/dev/null || true\n"
-        "  done\n"
-        "done\n"
-        "# LaunchDaemon prefs-inject (survives app exit)\n"
-        "DAEMON_SRC=/var/jb/etc/ipfaker/prefs_inject_daemon.sh\n"
-        "DAEMON_DST=/var/mobile/Library/iPFaker/prefs_inject_daemon.sh\n"
-        "if [ -f \"$DAEMON_SRC\" ]; then cp -f \"$DAEMON_SRC\" \"$DAEMON_DST\" 2>/dev/null || true; fi\n"
-        "chmod 755 \"$DAEMON_DST\" 2>/dev/null || true\n"
-        "PL_SRC=/var/jb/etc/ipfaker/com.ipfaker.prefs-inject.plist\n"
-        "PL_DST=/var/jb/Library/LaunchDaemons/com.ipfaker.prefs-inject.plist\n"
-        "mkdir -p /var/jb/Library/LaunchDaemons 2>/dev/null || true\n"
-        "if [ -f \"$PL_SRC\" ]; then cp -f \"$PL_SRC\" \"$PL_DST\" 2>/dev/null || true; fi\n"
-        "if [ -f \"$PL_DST\" ]; then\n"
-        "  launchctl bootout system/com.ipfaker.prefs-inject 2>/dev/null || true\n"
-        "  launchctl unload \"$PL_DST\" 2>/dev/null || true\n"
-        "  launchctl bootstrap system \"$PL_DST\" 2>/dev/null || launchctl load -w \"$PL_DST\" 2>/dev/null || true\n"
-        "  launchctl kickstart -k system/com.ipfaker.prefs-inject 2>/dev/null || true\n"
-        "fi\n"
-        "# Kill stale daemon loops; start fresh\n"
-        "for p in $(ps ax 2>/dev/null | grep prefs_inject_daemon | grep -v grep | awk '{print $1}'); do\n"
-        "  kill -9 \"$p\" 2>/dev/null || true\n"
-        "done\n"
-        "if [ -x \"$DAEMON_DST\" ] || [ -f \"$DAEMON_DST\" ]; then\n"
-        "  nohup /bin/sh \"$DAEMON_DST\" >>\"$STAGE/logs/prefs_inject_daemon.out\" 2>&1 &\n"
-        "  echo \"$(date) daemon pid=$!\" >> \"$LOG\"\n"
-        "fi\n"
-        "# Kill Preferences so next open gets fresh inject + wash\n"
-        "killall -9 Preferences 2>/dev/null || true\n"
-        "echo \"$(date) ensure_settings_about done\" >> \"$LOG\"\n"
-        "echo OK ensure_settings_about\n"
-        "exit 0\n";
-    [sh writeToFile:script atomically:YES encoding:NSUTF8StringEncoding error:nil];
-    [fm setAttributes:@{ NSFilePosixPermissions: @0755 } ofItemAtPath:script error:nil];
-    int rc = [self runRootShellScript:script];
-    NSString *msg = (rc == 0)
-        ? @"Settings About: daemon ON · mở Cài đặt → Giới thiệu = khớp lab"
-        : [NSString stringWithFormat:@"Settings About: daemon rc=%d (mở lại Cài đặt sau Apply)", rc];
-    step(msg);
-    return msg;
 }
 
 /// Run shell script as root: sudo -n → sudo -S (.root_pass / lab alpine) → direct sh.
 /// Treat wipe exit 4/5 as completed elevated runs (not found / residual).
 + (int)runRootShellScript:(NSString *)scriptPath {
+    return [self runRootShellScript:scriptPath timeoutSec:45];
+}
+
++ (int)runRootShellScript:(NSString *)scriptPath timeoutSec:(int)timeoutSec {
     if (!scriptPath.length) return -1;
     NSFileManager *fm = [NSFileManager defaultManager];
     if (![fm fileExistsAtPath:scriptPath]) return -1;
     [fm setAttributes:@{ NSFilePosixPermissions: @0755 } ofItemAtPath:scriptPath error:nil];
+    if (timeoutSec <= 0) timeoutSec = 45;
 
     for (NSString *sudoBin in @[ @"/var/jb/usr/bin/sudo", @"/usr/bin/sudo" ]) {
         if (![fm isExecutableFileAtPath:sudoBin]) continue;
         pid_t pid = 0;
         const char *argv[] = { sudoBin.UTF8String, "-n", "sh", scriptPath.UTF8String, NULL };
         if (posix_spawn(&pid, sudoBin.UTF8String, NULL, NULL, (char *const *)argv, NULL) == 0 && pid > 0) {
-            int st = 0;
-            waitpid(pid, &st, 0);
-            if (WIFEXITED(st)) {
-                int code = WEXITSTATUS(st);
-                if (code == 0 || code == 4 || code == 5) return code;
-            }
+            int code = [self waitPid:pid timeoutSec:timeoutSec];
+            if (code == 0 || code == 4 || code == 5) return code;
+            if (code == -9) return -9; // timed out — do not try slower sudo paths forever
         }
     }
 
@@ -2894,23 +2816,21 @@
         if (![fm isExecutableFileAtPath:shBin]) shBin = @"/var/jb/bin/sh";
         if (![fm isExecutableFileAtPath:shBin]) continue;
         NSString *safePass = [pass stringByReplacingOccurrencesOfString:@"'" withString:@""];
+        // Timeout wrapper around sudo so Apply cannot hang forever
         NSString *cmd = [NSString stringWithFormat:
                          @"echo '%@' | '%@' -S -p '' sh '%@'",
                          safePass, sudoBin, scriptPath];
         pid_t pid = 0;
         const char *argv[] = { shBin.UTF8String, "-c", cmd.UTF8String, NULL };
         if (posix_spawn(&pid, shBin.UTF8String, NULL, NULL, (char *const *)argv, NULL) == 0 && pid > 0) {
-            int st = 0;
-            waitpid(pid, &st, 0);
-            if (WIFEXITED(st)) {
-                int code = WEXITSTATUS(st);
-                if (code == 0 || code == 4 || code == 5) return code;
-            }
+            int code = [self waitPid:pid timeoutSec:timeoutSec];
+            if (code == 0 || code == 4 || code == 5) return code;
+            if (code == -9) return -9;
         }
     }
 
-    int direct = [self runShellScript:scriptPath args:@[]];
-    return direct;
+    // Direct (no root) — often enough for TweakInject plists after postinst chmod
+    return [self runShellScript:scriptPath args:@[]];
 }
 
 @end
