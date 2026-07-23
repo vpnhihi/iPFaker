@@ -3,7 +3,7 @@ name: Sileo repo (GitHub Pages)
 
 on:
   push:
-    branches: [master, main]
+    branches: [master, main, lab-gap-fill]
     paths:
       - "sileo-repo/**"
       - ".github/workflows/sileo-pages.yml"
