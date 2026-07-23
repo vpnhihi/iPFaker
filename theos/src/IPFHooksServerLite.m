@@ -320,6 +320,80 @@ static OSStatus s_SecDel(CFDictionaryRef query) {
     return o_SecDel ? o_SecDel(query) : errSecUnimplemented;
 }
 
+/// HIOS wipe_gen / Clear keychain on launch — purge app keychain when generation bumps
+static void IPFLiteMaybeWipeKeychainOnLaunch(void) {
+    @try {
+        NSString *bid = [[NSBundle mainBundle] bundleIdentifier] ?: @"";
+        if (!bid.length) return;
+        BOOL clearEvery = IPFLiteFlag(@"ClearKeychainOnLaunch", NO)
+            || IPFLiteFlag(@"keychainReset", NO)
+            || IPFLiteFlag(@"fake_keychain", YES);
+        NSString *genPath = @"/var/mobile/Library/iPFaker/wipe_gen";
+        NSString *seenPath = [NSString stringWithFormat:
+            @"/var/mobile/Library/iPFaker/wipe_gen_seen_%@.txt",
+            [[bid stringByReplacingOccurrencesOfString:@"." withString:@"_"] pathComponents].lastObject ?: @"app"];
+        // simpler seen path
+        seenPath = [NSString stringWithFormat:@"/var/mobile/Library/iPFaker/wipe_gen_seen/%@", bid];
+        NSString *gen = [NSString stringWithContentsOfFile:genPath encoding:NSUTF8StringEncoding error:nil] ?: @"0";
+        gen = [gen stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        NSString *dir = [seenPath stringByDeletingLastPathComponent];
+        [[NSFileManager defaultManager] createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:nil];
+        NSString *seen = [NSString stringWithContentsOfFile:seenPath encoding:NSUTF8StringEncoding error:nil] ?: @"";
+        seen = [seen stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        BOOL genBumped = gen.length && ![gen isEqualToString:seen];
+        if (!clearEvery && !genBumped) return;
+
+        // SecItemDelete for this bundle + known social agrp patterns
+        NSArray *groups = @[
+            bid,
+            [NSString stringWithFormat:@"group.%@", bid],
+            @"CVB6BX97VM.group.keychain.vn.com.vng.zalo",
+            @"69V327AA4Z.group.viber.share.keychain",
+        ];
+        for (NSString *g in groups) {
+            NSDictionary *q = @{
+                (__bridge id)kSecClass: (__bridge id)kSecClassGenericPassword,
+                (__bridge id)kSecAttrAccessGroup: g,
+            };
+            if (o_SecDel) o_SecDel((__bridge CFDictionaryRef)q);
+            // also without agrp — match service containing bid
+            NSDictionary *q2 = @{
+                (__bridge id)kSecClass: (__bridge id)kSecClassGenericPassword,
+                (__bridge id)kSecAttrService: bid,
+            };
+            if (o_SecDel) o_SecDel((__bridge CFDictionaryRef)q2);
+        }
+        // Broad match via account/service like (best-effort)
+        NSDictionary *qAll = @{
+            (__bridge id)kSecClass: (__bridge id)kSecClassGenericPassword,
+            (__bridge id)kSecMatchLimit: (__bridge id)kSecMatchLimitAll,
+            (__bridge id)kSecReturnAttributes: @YES,
+        };
+        CFTypeRef res = NULL;
+        if (o_SecCopy && o_SecCopy((__bridge CFDictionaryRef)qAll, &res) == errSecSuccess && res) {
+            NSArray *items = CFBridgingRelease(res);
+            if ([items isKindOfClass:[NSArray class]]) {
+                NSString *bl = bid.lowercaseString;
+                for (NSDictionary *it in items) {
+                    NSString *blob = [[NSString stringWithFormat:@"%@ %@ %@",
+                                      it[(__bridge id)kSecAttrAccessGroup] ?: @"",
+                                      it[(__bridge id)kSecAttrService] ?: @"",
+                                      it[(__bridge id)kSecAttrAccount] ?: @""] lowercaseString];
+                    if ([blob containsString:bl] || [blob containsString:@"zalo"]
+                        || [blob containsString:@"zingalo"] || [blob containsString:@"facebook"]
+                        || [blob containsString:@"instagram"] || [blob containsString:@"telegram"]
+                        || [blob containsString:@"viber"] || [blob containsString:@"devicecheck"]
+                        || [blob containsString:@"appattest"]) {
+                        if (o_SecDel) o_SecDel((__bridge CFDictionaryRef)it);
+                    }
+                }
+            }
+        }
+        [gen writeToFile:seenPath atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        IPFLiteTrace([NSString stringWithFormat:@"wipeZaloKC/wipe_gen gen=%@ clearEvery=%d", gen, clearEvery ? 1 : 0]);
+    } @catch (__unused NSException *ex) {}
+}
+
 static void IPFLiteInstallSecItem(void) {
     typedef void (*MSHookFunction_t)(void *, void *, void **);
     MSHookFunction_t pHF = NULL;
@@ -405,6 +479,8 @@ static void IPFServerLiteCtor(void) {
 
             // Keychain SecItem — HIOS P0
             IPFLiteInstallSecItem();
+            // wipe_gen / clear KC after SecItem hooks installed
+            IPFLiteMaybeWipeKeychainOnLaunch();
 
             Class usc = objc_getClass("NSURLSessionConfiguration");
             if (usc) {

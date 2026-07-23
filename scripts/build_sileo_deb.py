@@ -31,7 +31,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION_DEFAULT = "2.11.2"
+VERSION_DEFAULT = "2.12.0"
 PKG = "com.ipfaker"
 ARCH = "iphoneos-arm64"
 
@@ -640,8 +640,8 @@ exit 0
 
 def control_text(version: str, installed_size_kb: int, has_app: bool, has_dylibs: bool) -> str:
     desc = (
-        "HIOS-parity: IOKit MAC/serial + Deep HTTP + Zalo UA/device_id + SecItem + "
-        "DeviceCheck + residue wipe. Multi-app Zalo/FB/IG/TG/Viber. Requires ElleKit."
+        "HIOS gap-close: dyldHide+fork+SCDynamicStore+CNCopyIfaces+wipe_gen KC + "
+        "IOKit/Deep/SecItem/DC. Multi-app Zalo/FB/IG/TG/Viber. Requires ElleKit."
     )
     if has_app:
         desc += " Includes iPFaker.app (device pool, wipe, Apply)."

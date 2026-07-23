@@ -641,6 +641,63 @@ static CFDictionaryRef stub_CNCopyCurrentNetworkInfo(CFStringRef interfaceName) 
     }
 }
 
+// HIOS: list WiFi interfaces — always report en0 so CNCopyCurrentNetworkInfo path is used
+typedef CFArrayRef (*CNCopySupportedInterfaces_t)(void);
+static CNCopySupportedInterfaces_t orig_CNCopySupportedInterfaces = NULL;
+static CFArrayRef stub_CNCopySupportedInterfaces(void) {
+    if (![[IPFConfig shared] flag:@"FakeWifi" defaultYes:YES]
+        && ![[IPFConfig shared] flag:@"FakeNetwork" defaultYes:YES]) {
+        return orig_CNCopySupportedInterfaces ? orig_CNCopySupportedInterfaces() : NULL;
+    }
+    @autoreleasepool {
+        NSArray *a = @[ @"en0" ];
+        IPFExTrace(@"CNCopySupportedInterfaces FAKE en0");
+        return CFBridgingRetain(a);
+    }
+}
+
+// HIOS SCDSCopyName — computer / local hostname from spoof profile
+typedef CFStringRef (*SCDSCopyName_t)(void *store, void *enc);
+static SCDSCopyName_t orig_SCDSCopyComputerName = NULL;
+static SCDSCopyName_t orig_SCDSCopyLocalHostName = NULL;
+
+static CFStringRef IPFHostnameCF(void) {
+    IPFConfig *cfg = [IPFConfig shared];
+    NSString *hn = [cfg stringForKey:@"Hostname"]
+        ?: [cfg stringForKey:@"kern.hostname"]
+        ?: [cfg stringForKey:@"DeviceName"]
+        ?: @"iPhone";
+    // DNS-safe label
+    NSMutableString *clean = [NSMutableString string];
+    for (NSUInteger i = 0; i < hn.length && clean.length < 63; i++) {
+        unichar c = [hn characterAtIndex:i];
+        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-')
+            [clean appendFormat:@"%C", c];
+        else if (c == ' ')
+            [clean appendString:@"-"];
+    }
+    if (!clean.length) [clean appendString:@"iPhone"];
+    return CFBridgingRetain(clean);
+}
+
+static CFStringRef stub_SCDSCopyComputerName(void *store, void *enc) {
+    if (![[IPFConfig shared] flag:@"FakeDevice" defaultYes:YES]
+        && ![[IPFConfig shared] flag:@"FakeNetwork" defaultYes:YES]) {
+        return orig_SCDSCopyComputerName ? orig_SCDSCopyComputerName(store, enc) : NULL;
+    }
+    IPFExTrace(@"SCDynamicStoreCopyComputerName FAKE");
+    return IPFHostnameCF();
+}
+
+static CFStringRef stub_SCDSCopyLocalHostName(void *store, void *enc) {
+    if (![[IPFConfig shared] flag:@"FakeDevice" defaultYes:YES]
+        && ![[IPFConfig shared] flag:@"FakeNetwork" defaultYes:YES]) {
+        return orig_SCDSCopyLocalHostName ? orig_SCDSCopyLocalHostName(store, enc) : NULL;
+    }
+    IPFExTrace(@"SCDynamicStoreCopyLocalHostName FAKE");
+    return IPFHostnameCF();
+}
+
 #pragma mark - WKWebView UA + JS screen spoof (FakeBrowser)
 // Apple WebKit: WKWebView.customUserAgent, WKUserScript atDocumentStart
 // MDN: screen.width/height, window.devicePixelRatio, navigator.userAgent
@@ -1062,6 +1119,28 @@ void IPFInstallExtraHooks(void) {
         if (cn) {
             pMSHookFunction(cn, (void *)stub_CNCopyCurrentNetworkInfo, (void **)&orig_CNCopyCurrentNetworkInfo);
             IPFExTrace(@"CNCopyCurrentNetworkInfo OK");
+        }
+        // HIOS: CNCopySupportedInterfaces — return en0-only list
+        void *csi = dlsym(RTLD_DEFAULT, "CNCopySupportedInterfaces");
+        if (!csi) {
+            void *sc2 = dlopen("/System/Library/Frameworks/SystemConfiguration.framework/SystemConfiguration", RTLD_NOW);
+            if (sc2) csi = dlsym(sc2, "CNCopySupportedInterfaces");
+        }
+        if (csi) {
+            pMSHookFunction(csi, (void *)stub_CNCopySupportedInterfaces, (void **)&orig_CNCopySupportedInterfaces);
+            IPFExTrace(@"CNCopySupportedInterfaces OK");
+        }
+        // HIOS: SCDynamicStoreCopyComputerName / LocalHostName
+        void *scfw = dlopen("/System/Library/Frameworks/SystemConfiguration.framework/SystemConfiguration", RTLD_NOW);
+        void *sccn = scfw ? dlsym(scfw, "SCDynamicStoreCopyComputerName") : dlsym(RTLD_DEFAULT, "SCDynamicStoreCopyComputerName");
+        void *sclh = scfw ? dlsym(scfw, "SCDynamicStoreCopyLocalHostName") : dlsym(RTLD_DEFAULT, "SCDynamicStoreCopyLocalHostName");
+        if (sccn) {
+            pMSHookFunction(sccn, (void *)stub_SCDSCopyComputerName, (void **)&orig_SCDSCopyComputerName);
+            IPFExTrace(@"SCDynamicStoreCopyComputerName OK");
+        }
+        if (sclh) {
+            pMSHookFunction(sclh, (void *)stub_SCDSCopyLocalHostName, (void **)&orig_SCDSCopyLocalHostName);
+            IPFExTrace(@"SCDynamicStoreCopyLocalHostName OK");
         }
     }
 

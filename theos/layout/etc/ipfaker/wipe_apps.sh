@@ -516,6 +516,18 @@ if [ "$DRY" -eq 0 ] && [ "$HAS_THIRD" -eq 1 ]; then
   fi
 fi
 
+# ── wipe_gen counter (HIOS) — apps re-purge keychain on next launch via AA ──
+if [ "$DRY" -eq 0 ]; then
+  GENF=/var/mobile/Library/iPFaker/wipe_gen
+  mkdir -p /var/mobile/Library/iPFaker 2>/dev/null || true
+  g=$(cat "$GENF" 2>/dev/null | tr -cd '0-9')
+  [ -z "$g" ] && g=0
+  g=$((g + 1))
+  echo "$g" > "$GENF"
+  chmod 666 "$GENF" 2>/dev/null || true
+  log "wipe_gen=$g (apps will wipeZaloKC/SecItem on next launch)"
+fi
+
 # ── HIOS-style cross-app residue wipe (Safari/WebKit/Maps/cookies/geo) ──
 # Social apps leak identity via shared WebKit cookies, Maps cache, geod, etc.
 if [ "$DRY" -eq 0 ]; then

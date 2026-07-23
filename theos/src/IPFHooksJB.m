@@ -236,6 +236,104 @@ static int stub_openat(int fd, const char *path, int flags, mode_t mode) {
     return orig_openat ? orig_openat(fd, path, flags, mode) : -1;
 }
 
+#pragma mark - dyldHide (HIOS) — hide JB images from dyld enumeration
+
+#import <mach-o/dyld.h>
+
+static BOOL IPFJBIsHiddenImagePath(const char *path) {
+    if (!path || !path[0]) return NO;
+    if (IPFJBAllowlisted(path)) return NO; // never hide our own dylibs
+    static const char *kHide[] = {
+        "TweakInject", "MobileSubstrate", "CydiaSubstrate", "libsubstrate",
+        "libellekit", "ellekit", "substitute", "libhooker",
+        "frida", "FridaGadget", "cynject", "libcycript",
+        "/var/jb/", "/private/var/jb/",
+        NULL
+    };
+    for (int i = 0; kHide[i]; i++) {
+        if (strstr(path, kHide[i])) {
+            // Still allow our own product path under TweakInject
+            if (strstr(path, "iPFaker") || strstr(path, "ipfaker")) return NO;
+            return YES;
+        }
+    }
+    return NO;
+}
+
+static uint32_t (*orig_dyld_image_count)(void) = NULL;
+static const char *(*orig_dyld_get_image_name)(uint32_t) = NULL;
+static const struct mach_header *(*orig_dyld_get_image_header)(uint32_t) = NULL;
+static intptr_t (*orig_dyld_get_image_vmaddr_slide)(uint32_t) = NULL;
+
+// Map visible index → real dyld index (skip hidden)
+static uint32_t IPFJBMapVisibleToReal(uint32_t vis) {
+    if (!orig_dyld_image_count || !orig_dyld_get_image_name) return vis;
+    uint32_t realCount = orig_dyld_image_count();
+    uint32_t seen = 0;
+    for (uint32_t i = 0; i < realCount; i++) {
+        const char *n = orig_dyld_get_image_name(i);
+        if (IPFJBIsHiddenImagePath(n)) continue;
+        if (seen == vis) return i;
+        seen++;
+    }
+    return realCount; // OOB
+}
+
+static uint32_t stub_dyld_image_count(void) {
+    if (!orig_dyld_image_count || !orig_dyld_get_image_name)
+        return orig_dyld_image_count ? orig_dyld_image_count() : 0;
+    uint32_t realCount = orig_dyld_image_count();
+    uint32_t vis = 0;
+    for (uint32_t i = 0; i < realCount; i++) {
+        const char *n = orig_dyld_get_image_name(i);
+        if (!IPFJBIsHiddenImagePath(n)) vis++;
+    }
+    return vis;
+}
+
+static const char *stub_dyld_get_image_name(uint32_t image_index) {
+    if (!orig_dyld_get_image_name) return NULL;
+    uint32_t real = IPFJBMapVisibleToReal(image_index);
+    return orig_dyld_get_image_name(real);
+}
+
+static const struct mach_header *stub_dyld_get_image_header(uint32_t image_index) {
+    if (!orig_dyld_get_image_header) return NULL;
+    uint32_t real = IPFJBMapVisibleToReal(image_index);
+    return orig_dyld_get_image_header(real);
+}
+
+static intptr_t stub_dyld_get_image_vmaddr_slide(uint32_t image_index) {
+    if (!orig_dyld_get_image_vmaddr_slide) return 0;
+    uint32_t real = IPFJBMapVisibleToReal(image_index);
+    return orig_dyld_get_image_vmaddr_slide(real);
+}
+
+#pragma mark - fork block (HIOS)
+
+static pid_t (*orig_fork)(void) = NULL;
+static pid_t (*orig_vfork)(void) = NULL;
+
+static pid_t stub_fork(void) {
+    if ([[IPFConfig shared] flag:@"BlockFork" defaultYes:YES]
+        || [[IPFConfig shared] flag:@"HideJailbreak" defaultYes:YES]) {
+        IPFJBTrace(@"fork blocked");
+        errno = EPERM;
+        return -1;
+    }
+    return orig_fork ? orig_fork() : -1;
+}
+
+static pid_t stub_vfork(void) {
+    if ([[IPFConfig shared] flag:@"BlockFork" defaultYes:YES]
+        || [[IPFConfig shared] flag:@"HideJailbreak" defaultYes:YES]) {
+        IPFJBTrace(@"vfork blocked");
+        errno = EPERM;
+        return -1;
+    }
+    return orig_vfork ? orig_vfork() : -1;
+}
+
 void IPFInstallJBHooks(void) {
     IPFJBResolve();
     if (![[IPFConfig shared] flag:@"HideJailbreak" defaultYes:YES]) {
@@ -268,6 +366,25 @@ void IPFInstallJBHooks(void) {
         if (op) pMSHookFunction(op, (void *)stub_open, (void **)&orig_open);
         void *oa = dlsym(RTLD_DEFAULT, "openat");
         if (oa) pMSHookFunction(oa, (void *)stub_openat, (void **)&orig_openat);
+
+        // dyldHide
+        void *dic = dlsym(RTLD_DEFAULT, "_dyld_image_count");
+        void *din = dlsym(RTLD_DEFAULT, "_dyld_get_image_name");
+        void *dih = dlsym(RTLD_DEFAULT, "_dyld_get_image_header");
+        void *dis = dlsym(RTLD_DEFAULT, "_dyld_get_image_vmaddr_slide");
+        if (dic) pMSHookFunction(dic, (void *)stub_dyld_image_count, (void **)&orig_dyld_image_count);
+        if (din) pMSHookFunction(din, (void *)stub_dyld_get_image_name, (void **)&orig_dyld_get_image_name);
+        if (dih) pMSHookFunction(dih, (void *)stub_dyld_get_image_header, (void **)&orig_dyld_get_image_header);
+        if (dis) pMSHookFunction(dis, (void *)stub_dyld_get_image_vmaddr_slide, (void **)&orig_dyld_get_image_vmaddr_slide);
+        IPFJBTrace([NSString stringWithFormat:@"dyldHide cnt=%p name=%p", dic, din]);
+
+        // fork block
+        void *fk = dlsym(RTLD_DEFAULT, "fork");
+        void *vf = dlsym(RTLD_DEFAULT, "vfork");
+        if (fk) pMSHookFunction(fk, (void *)stub_fork, (void **)&orig_fork);
+        if (vf) pMSHookFunction(vf, (void *)stub_vfork, (void **)&orig_vfork);
+        IPFJBTrace([NSString stringWithFormat:@"fork blocked=%p", fk]);
+
         IPFJBTrace(@"fopen/getenv/open/openat JB hide OK");
     }
 

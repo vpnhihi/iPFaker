@@ -2381,6 +2381,15 @@
          ]) {
         if ([fm fileExistsAtPath:p] && [fm removeItemAtPath:p error:nil]) crumb++;
     }
+    // HIOS wipe_gen — AA dylib purges SecItem on next app launch
+    {
+        NSString *genf = @"/var/mobile/Library/iPFaker/wipe_gen";
+        NSString *g = [NSString stringWithContentsOfFile:genf encoding:NSUTF8StringEncoding error:nil] ?: @"0";
+        NSInteger n = g.integerValue + 1;
+        [[NSString stringWithFormat:@"%ld", (long)n] writeToFile:genf atomically:YES
+                                                      encoding:NSUTF8StringEncoding error:nil];
+        [log addObject:[NSString stringWithFormat:@"wipe_gen=%ld (KC purge next launch)", (long)n]];
+    }
     [log addObject:[NSString stringWithFormat:@"⑤ Tuỳ chọn/cache/residue HIOS ~%lu", (unsigned long)crumb]];
 
     // Keychain / session deep: wipe_apps.sh now applies Zalo-depth to ALL third-party

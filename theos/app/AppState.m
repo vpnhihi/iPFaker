@@ -771,6 +771,10 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     mflat[@"InjectWebKit"] = @YES;
     mflat[@"KeychainSpoof"] = @YES;
     mflat[@"WipeResidueHIOS"] = @YES;
+    mflat[@"fake_keychain"] = @YES;
+    mflat[@"ClearKeychainOnLaunch"] = @NO; // wipe_gen bumps on reset — on-launch purge then
+    mflat[@"BlockFork"] = @YES;
+    mflat[@"HideJailbreak"] = @YES;
     // Settings About is optional noise — default OFF
     mflat[@"SpoofSettingsAbout"] = @([self toggleForKey:@"SpoofSettingsAbout" defaultOn:NO]);
     mflat[@"SelectedDevicePool"] = [self.selectedDeviceIds copy];
