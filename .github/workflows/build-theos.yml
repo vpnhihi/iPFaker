@@ -129,7 +129,7 @@ jobs:
           find packages -name '*.deb' -exec cp -f {} dist/ \; 2>/dev/null || true
           ls -la dist
           file dist/iPFaker*.dylib || true
-          for d in dist/iPFakerAA.dylib dist/iPFakerAbout.dylib dist/iPFakerAboutUI.dylib dist/iPFakerAboutVer.dylib dist/iPFakerMG.dylib dist/iPFakerCT.dylib dist/iPFakerJB.dylib; do
+          for d in dist/iPFakerMG.dylib dist/iPFakerCT.dylib; do
             echo "=== fixup $d ==="
             otool -L "$d" || true
             install_name_tool -change \
