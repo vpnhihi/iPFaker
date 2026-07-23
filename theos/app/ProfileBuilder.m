@@ -11,6 +11,7 @@
 #import <signal.h>
 #import <sys/sysctl.h>
 #import <string.h>
+#import <CoreFoundation/CoreFoundation.h>
 
 @implementation ProfileBuilder
 
@@ -998,6 +999,113 @@
     return ok;
 }
 
+/// Write HIOS ChangeInfo 4.2.6 config (dylibs read ONLY this path).
+/// Keys use fake_* style HIOS expects. Dual-write with iPFaker config.
++ (NSString *)writeHIOSChangeInfoConfigFromFlat:(NSDictionary *)flat {
+    if (![flat isKindOfClass:[NSDictionary class]] || flat.count == 0)
+        return @"HIOS config: empty";
+    NSMutableDictionary *h = [NSMutableDictionary dictionary];
+    // Pass-through identity keys HIOS MG reads by name
+    for (NSString *k in @[
+             @"Enabled", @"ProductType", @"ProductVersion", @"BuildVersion", @"ProductBuildVersion",
+             @"MarketingName", @"HWModelStr", @"HardwareModel", @"ModelNumber", @"PartNumber",
+             @"SerialNumber", @"Serial", @"UserAssignedDeviceName", @"DeviceName", @"Hostname",
+             @"IDFA", @"IDFV", @"identifierForVendor", @"advertisingIdentifier",
+             @"WifiAddress", @"BluetoothAddress", @"EthernetMacAddress", @"BSSID", @"SSID",
+             @"IMEI", @"MEID", @"EID", @"SEID", @"BasebandVersion",
+             @"InternationalMobileEquipmentIdentity", @"MobileEquipmentIdentifier",
+             @"latitude", @"longitude", @"Latitude", @"Longitude",
+             @"CarrierName", @"MobileCountryCode", @"MobileNetworkCode", @"ISOCountryCode",
+             @"locale", @"timezone", @"TimeZone", @"RegionInfo",
+             @"UserAgent", @"HTTPUserAgent", @"kern.osrelease", @"kern.osversion",
+             @"kern.hostname", @"hw.machine", @"hw.model",
+         ]) {
+        id v = flat[k];
+        if (v != nil) h[k] = v;
+    }
+    // Alias serials
+    NSString *sn = [flat[@"SerialNumber"] description] ?: [flat[@"Serial"] description];
+    if (sn.length) {
+        h[@"SerialNumber"] = sn;
+        h[@"Serial"] = sn;
+        h[@"IOPlatformSerialNumber"] = sn;
+        h[@"MLBSerialNumber"] = sn;
+    }
+    NSString *wifi = [flat[@"WifiAddress"] description];
+    if (wifi.length) {
+        h[@"WifiAddress"] = wifi;
+        h[@"EthernetMacAddress"] = wifi;
+        if (![h[@"BSSID"] description].length) h[@"BSSID"] = wifi;
+    }
+    // HIOS fake_* flags (from our Fake* or existing fake_*)
+    void (^setFake)(NSString *, NSString *, BOOL) = ^(NSString *hiosKey, NSString *ourKey, BOOL def) {
+        id v = flat[hiosKey] ?: flat[ourKey];
+        if (v != nil && [v respondsToSelector:@selector(boolValue)])
+            h[hiosKey] = @([v boolValue]);
+        else
+            h[hiosKey] = @(def);
+    };
+    h[@"Enabled"] = @YES;
+    setFake(@"fake_hardware", @"FakeHardware", YES);
+    setFake(@"fake_uiddevice", @"FakeDevice", YES);
+    setFake(@"fake_uiddevice2", @"FakeDevice", YES);
+    setFake(@"fake_ads", @"FakeAds", YES);
+    setFake(@"fake_screen", @"FakeScreen", YES);
+    setFake(@"fake_realscreen", @"FakeRealScreen", YES);
+    setFake(@"fake_browser", @"FakeBrowser", YES);
+    setFake(@"fake_network", @"FakeNetwork", YES);
+    setFake(@"fake_wifi", @"FakeWifi", YES);
+    setFake(@"fake_sysctl", @"FakeSysctl", YES);
+    setFake(@"fake_sysosversion", @"FakeSysOSVersion", YES);
+    setFake(@"fake_jbhide", @"HideJailbreak", YES);
+    setFake(@"fake_locale", @"FakeLocale", YES);
+    setFake(@"fake_locale2", @"FakeLocale", YES);
+    setFake(@"fake_location", @"FakeLocation", YES);
+    setFake(@"fake_sensor", @"FakeSensor", YES);
+    setFake(@"fake_webrtc", @"FakeWebRTC", YES);
+    setFake(@"fake_keychain", @"fake_keychain", YES);
+    setFake(@"fake_battery", @"FakeHardware", YES);
+    setFake(@"fake_metal", @"FakeHardware", YES);
+    setFake(@"fake_processinfo", @"FakeSysOSVersion", YES);
+    // Never clear KC every launch (HIOS has flag; we force off unless user set)
+    h[@"keychainReset"] = @NO;
+    h[@"ClearKeychainOnLaunch"] = @NO;
+
+    NSString *dir = @"/var/jb/etc/changeinfoios";
+    NSFileManager *fm = [NSFileManager defaultManager];
+    [fm createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:nil];
+    NSString *path = [dir stringByAppendingPathComponent:@"config.plist"];
+    BOOL ok = [h writeToFile:path atomically:YES];
+    if (!ok) {
+        // root may own — try via shell
+        NSString *tmp = @"/var/mobile/Library/iPFaker/changeinfoios_config.plist";
+        [h writeToFile:tmp atomically:YES];
+        NSString *sh = [NSString stringWithFormat:
+                        @"#!/bin/sh\n"
+                        @"mkdir -p /var/jb/etc/changeinfoios\n"
+                        @"cp -f '%@' /var/jb/etc/changeinfoios/config.plist\n"
+                        @"chown mobile:mobile /var/jb/etc/changeinfoios/config.plist\n"
+                        @"chmod 644 /var/jb/etc/changeinfoios/config.plist\n"
+                        @"exit 0\n", tmp];
+        NSString *sp = @"/var/mobile/Library/iPFaker/write_hios_config.sh";
+        [sh writeToFile:sp atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        int rc = [self runRootShellScript:sp timeoutSec:15];
+        ok = (rc == 0) || [fm fileExistsAtPath:path];
+    }
+    // Notify HIOS dylibs to reload
+    CFNotificationCenterPostNotification(
+        CFNotificationCenterGetDarwinNotifyCenter(),
+        CFSTR("com.changeinfoios/ReloadConfig"),
+        NULL, NULL, true);
+    CFNotificationCenterPostNotification(
+        CFNotificationCenterGetDarwinNotifyCenter(),
+        CFSTR("com.changeinfoios.v3/ReloadConfig"),
+        NULL, NULL, true);
+    return ok
+        ? [NSString stringWithFormat:@"HIOS config OK (%lu keys) → %@", (unsigned long)h.count, path]
+        : @"HIOS config WRITE FAIL (check /var/jb/etc/changeinfoios perms)";
+}
+
 + (NSString *)applyFlatProfile:(NSDictionary *)flat deviceId:(NSString *)deviceId ios:(NSString *)ios {
     NSError *err = nil;
     // Force identity alias sync before any write (Settings + Lab + dylib same SoT)
@@ -1236,7 +1344,10 @@
                 [failMsgs componentsJoinedByString:@"\n"]];
     }
 
-    // Product path: skip Settings About bounce (waitpid hang risk). Only if user enabled.
+    // HIOS 4.2.6 dylibs read /var/jb/etc/changeinfoios/config.plist only
+    NSString *hiosNote = [self writeHIOSChangeInfoConfigFromFlat:flat] ?: @"";
+
+    // Product path: skip Settings About bounce unless user enabled
     NSString *mgCacheNote = @"";
     NSString *bounceNote = @"";
     BOOL wantAbout = NO;
@@ -1253,6 +1364,8 @@
                      @"Đã áp dụng %@ (%@) iOS %@ → %@",
                      mk, pt, ios ?: @"?",
                      [okPaths componentsJoinedByString:@", "]];
+    if (hiosNote.length)
+        msg = [msg stringByAppendingFormat:@"\n%@", hiosNote];
     if (mgCacheNote.length)
         msg = [msg stringByAppendingFormat:@"\n%@", mgCacheNote];
     if (bounceNote.length)

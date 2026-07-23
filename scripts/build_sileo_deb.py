@@ -31,11 +31,21 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION_DEFAULT = "2.15.0"
+VERSION_DEFAULT = "2.16.0"
 PKG = "com.ipfaker"
 ARCH = "iphoneos-arm64"
 
-# HIOS-style: only 2 dylibs shipped (MG full wall + CT telephony)
+# 2.16: ship HIOS ChangeInfo 4.2.6 dylibs 1:1 (not our reimplementation).
+# Path: vendor/hios_426/dylibs/ChangeInfoIos{MG,CT}.dylib + plists
+# iPFaker.app UI kept; config dual-write → /var/jb/etc/changeinfoios/config.plist
+HIOS_VENDOR = ROOT / "vendor" / "hios_426"
+HIOS_MG = HIOS_VENDOR / "dylibs" / "ChangeInfoIosMG.dylib"
+HIOS_CT = HIOS_VENDOR / "dylibs" / "ChangeInfoIosCT.dylib"
+HIOS_MG_PL = HIOS_VENDOR / "dylibs" / "ChangeInfoIosMG.plist"
+HIOS_CT_PL = HIOS_VENDOR / "dylibs" / "ChangeInfoIosCT.plist"
+HIOS_CDHASHES = HIOS_VENDOR / "etc" / "cdhashes"
+
+# Legacy (unused when HIOS vendor present)
 STACK_MODULES = (
     "iPFakerMG",
     "iPFakerCT",
@@ -298,22 +308,58 @@ trust_add() {
   done
 }
 
-# --- dirs (mobile MUST write jb config — Zalo only reads /var/jb/etc/ipfaker) ---
+# --- dirs: iPFaker UI config + HIOS dylib config (ChangeInfo reads changeinfoios) ---
 mkdir -p "$ROOT/etc/ipfaker" 2>/dev/null || true
 mkdir -p /var/jb/etc/ipfaker 2>/dev/null || true
+mkdir -p /var/jb/etc/changeinfoios 2>/dev/null || true
 mkdir -p /var/mobile/Library/iPFaker 2>/dev/null || true
 chown -R mobile:mobile /var/mobile/Library/iPFaker 2>/dev/null || true
-chown -R mobile:mobile "$ROOT/etc/ipfaker" 2>/dev/null || true
-chown -R mobile:mobile /var/jb/etc/ipfaker 2>/dev/null || true
+chown -R mobile:mobile "$ROOT/etc/ipfaker" /var/jb/etc/ipfaker 2>/dev/null || true
+chown -R mobile:mobile /var/jb/etc/changeinfoios 2>/dev/null || true
+chmod 777 /var/jb/etc/changeinfoios 2>/dev/null || true
 chmod 775 /var/mobile/Library/iPFaker "$ROOT/etc/ipfaker" /var/jb/etc/ipfaker 2>/dev/null || true
-# If config.plist was root-owned from older package, reclaim for app Apply
 for f in "$ROOT/etc/ipfaker/config.plist" /var/jb/etc/ipfaker/config.plist \
+         /var/jb/etc/changeinfoios/config.plist \
          "$ROOT/etc/ipfaker/active_profile.json" /var/jb/etc/ipfaker/active_profile.json; do
   if [ -f "$f" ]; then
     chown mobile:mobile "$f" 2>/dev/null || true
     chmod 644 "$f" 2>/dev/null || true
   fi
 done
+# HIOS binary 1:1 — trust ChangeInfo dylibs; DISABLE our old iPFakerMG/CT (double inject crash)
+for MS in /var/jb/usr/lib/TweakInject /var/jb/Library/MobileSubstrate/DynamicLibraries; do
+  [ -d "$MS" ] || continue
+  for f in ChangeInfoIosMG.dylib ChangeInfoIosCT.dylib; do
+    [ -f "$MS/$f" ] || continue
+    chown root:wheel "$MS/$f" 2>/dev/null || true
+    chmod 0755 "$MS/$f" 2>/dev/null || true
+    trust_add "$MS/$f"
+  done
+  for f in ChangeInfoIosMG.plist ChangeInfoIosCT.plist; do
+    [ -f "$MS/$f" ] || continue
+    chown root:wheel "$MS/$f" 2>/dev/null || true
+    chmod 0644 "$MS/$f" 2>/dev/null || true
+  done
+  # HIOS postinst: strip weather from filters (crashes WeatherCore)
+  for P in "$MS/ChangeInfoIosMG.plist" "$MS/ChangeInfoIosCT.plist"; do
+    [ -f "$P" ] || continue
+    sed -i '' '/com\.apple\.weather/d' "$P" 2>/dev/null || sed -i '/com\.apple\.weather/d' "$P" 2>/dev/null || true
+  done
+  # Disable OUR reimplementation dylibs if present (must not load next to HIOS)
+  for n in iPFakerMG iPFakerCT iPFakerJB iPFakerAA iPFakerAbout iPFakerAboutUI iPFakerAboutID iPFakerAboutVer; do
+    if [ -f "$MS/${n}.dylib" ]; then
+      mv -f "$MS/${n}.dylib" "$MS/${n}.dylib.off" 2>/dev/null || true
+    fi
+  done
+done
+# HIOS cdhashes
+if [ -n "$JBCTL" ] && [ -f /var/jb/etc/changeinfoios/cdhashes ]; then
+  while IFS= read -r h; do
+    [ -z "$h" ] && continue
+    H=$(echo "$h" | tr 'A-F' 'a-f' | cut -c1-40)
+    [ ${#H} -eq 40 ] && "$JBCTL" trustcache add "$H" 2>/dev/null || true
+  done < /var/jb/etc/changeinfoios/cdhashes
+fi
 # Wipe helpers (multi-app + Zalo legacy)
 for w in /var/jb/usr/libexec/ipfaker-wipe-apps /var/jb/etc/ipfaker/wipe_apps.sh \
          /var/mobile/Library/iPFaker/wipe_apps.sh \
@@ -656,8 +702,8 @@ exit 0
 
 def control_text(version: str, installed_size_kb: int, has_app: bool, has_dylibs: bool) -> str:
     desc = (
-        "2.15 HIOS 4.2.6 parity: MG wall (UIScreen/IOKit/dyld/SecItem/DC/WK) + CT+Env. "
-        "iPFaker UI kept. Multi-app Zalo/FB/IG/TG/Viber. ElleKit + Userspace Reboot."
+        "2.16 HIOS 4.2.6 BINARY 1:1 (ChangeInfoIosMG+CT). iPFaker UI only. "
+        "Config→/var/jb/etc/changeinfoios. ElleKit + Userspace Reboot."
     )
     if has_app:
         desc += " Includes iPFaker.app (device pool, wipe, Apply)."
@@ -798,15 +844,23 @@ def _filter_for_module(name: str, pl_mg: bytes, pl_ct: bytes, pl_about: bytes) -
 
 
 def build(version: str, app_path: str | None) -> Path:
-    stack = find_stack_dir()
-    mg, ct = find_dylibs()
     app = find_app(app_path)
     catalog = ROOT / "config" / "device_catalog.json"
     if not catalog.exists():
         catalog = ROOT / "theos" / "app" / "Resources" / "device_catalog.json"
 
-    if not mg or not ct or not stack:
-        raise SystemExit("Missing iPFakerMG/CT dylibs (_ci_art_ui/theos/dist, dylibs_ci/, or theos/dist)")
+    use_hios = HIOS_MG.is_file() and HIOS_CT.is_file() and HIOS_MG_PL.is_file() and HIOS_CT_PL.is_file()
+    stack = find_stack_dir()
+    mg, ct = find_dylibs()
+    if not use_hios and (not mg or not ct or not stack):
+        raise SystemExit(
+            "Missing HIOS vendor (vendor/hios_426/dylibs) AND iPFakerMG/CT dylibs"
+        )
+    if use_hios:
+        print(f"PACK MODE: HIOS 4.2.6 BINARY 1:1 from {HIOS_VENDOR}")
+        print(f"  MG={HIOS_MG.stat().st_size} CT={HIOS_CT.stat().st_size}")
+    else:
+        print("PACK MODE: fallback iPFaker theos dylibs (HIOS vendor missing)")
 
     out_dir = ROOT / "dist" / "sileo"
     repo_dir = out_dir / "repo" / "debs"
@@ -826,7 +880,6 @@ def build(version: str, app_path: str | None) -> Path:
 
         # Full paths under /var/jb (lab flat).
         # NOTE: On Dopamine, DynamicLibraries -> symlink to TweakInject.
-        # Package ONLY TweakInject to avoid dpkg double-extract failure.
         for d in (
             "var/",
             "var/jb/",
@@ -836,6 +889,7 @@ def build(version: str, app_path: str | None) -> Path:
             "var/jb/usr/libexec/",
             "var/jb/etc/",
             "var/jb/etc/ipfaker/",
+            "var/jb/etc/changeinfoios/",
             "var/jb/Applications/",
             "var/mobile/",
             "var/mobile/Library/",
@@ -849,55 +903,82 @@ def build(version: str, app_path: str | None) -> Path:
             info.gid = 0
             tar.addfile(info)
 
-        # Distinct filters: MG/JB/AA = lab-core; CT = +CommCenter; About* = Preferences only
-        pl_mg = zalo_only_plist()
-        pl_ct = ct_filter_plist()
-        pl_about = about_prefs_only_plist()
-        if b"CommCenter" not in pl_ct:
-            raise SystemExit("FATAL: CT filter missing CommCenter — refuse package")
         dest = "var/jb/usr/lib/TweakInject"
-        mg_bytes = mg.read_bytes()
-        if len(mg_bytes) > MG_SAFE_MAX:
-            raise SystemExit(
-                f"FATAL: iPFakerMG.dylib {len(mg_bytes)} > {MG_SAFE_MAX} "
-                f"(refuse package)."
-            )
-        if len(mg_bytes) > MG_HYBRID_HINT:
-            print(
-                f"WARN: MG size {len(mg_bytes)} > {MG_HYBRID_HINT} "
-                f"— full lab stack still packaged (trustcache postinst)."
-            )
-
         packed: list[str] = []
-        for mod in STACK_MODULES:
-            dy = _resolve_dylib(stack, mod)
-            if not dy:
-                # allow missing optional only if not MG/CT
-                if mod in ("iPFakerMG", "iPFakerCT"):
-                    raise SystemExit(f"FATAL: missing required {mod}.dylib in {stack}")
-                print(f"skip optional {mod} (not in {stack.name})")
-                continue
-            raw = track(dy.read_bytes())
-            add_file(tar, f"{dest}/{mod}.dylib", raw, 0o755)
-            filt = _filter_for_module(mod, pl_mg, pl_ct, pl_about)
-            add_file(tar, f"{dest}/{mod}.plist", track(filt), 0o644)
-            packed.append(f"{mod}={len(raw)}")
-        print(f"stack dir: {stack}")
-        print("pack " + " ".join(packed))
+
+        if use_hios:
+            # === HIOS ChangeInfo 4.2.6 dylibs 1:1 (bytes unchanged) ===
+            mg_raw = track(HIOS_MG.read_bytes())
+            ct_raw = track(HIOS_CT.read_bytes())
+            # Prefer HIOS plists; strip weather already done in vendor copy
+            pl_mg = HIOS_MG_PL.read_bytes()
+            pl_ct = HIOS_CT_PL.read_bytes()
+            if b"CommCenter" not in pl_ct:
+                # HIOS CT uses Executables — ensure present
+                print("WARN: HIOS CT plist may lack CommCenter string (check Executables)")
+            add_file(tar, f"{dest}/ChangeInfoIosMG.dylib", mg_raw, 0o755)
+            add_file(tar, f"{dest}/ChangeInfoIosMG.plist", track(pl_mg), 0o644)
+            add_file(tar, f"{dest}/ChangeInfoIosCT.dylib", ct_raw, 0o755)
+            add_file(tar, f"{dest}/ChangeInfoIosCT.plist", track(pl_ct), 0o644)
+            packed.append(f"ChangeInfoIosMG={len(mg_raw)}")
+            packed.append(f"ChangeInfoIosCT={len(ct_raw)}")
+            # HIOS cdhashes for trustcache
+            if HIOS_CDHASHES.is_file():
+                add_file(
+                    tar,
+                    "var/jb/etc/changeinfoios/cdhashes",
+                    track(HIOS_CDHASHES.read_bytes()),
+                    0o644,
+                )
+            # Marker so app/UI knows inject engine
+            add_file(
+                tar,
+                "var/jb/etc/changeinfoios/ENGINE.txt",
+                track(b"ChangeInfoIos-v3_4.2.6 binary 1:1 via iPFaker 2.16\n"),
+                0o644,
+            )
+            add_file(
+                tar,
+                "var/jb/etc/ipfaker/ENGINE.txt",
+                track(b"HIOS_BINARY_1_1=ChangeInfoIos-4.2.6\n"),
+                0o644,
+            )
+            print("pack HIOS 1:1 " + " ".join(packed))
+        else:
+            pl_mg = zalo_only_plist()
+            pl_ct = ct_filter_plist()
+            pl_about = about_prefs_only_plist()
+            if b"CommCenter" not in pl_ct:
+                raise SystemExit("FATAL: CT filter missing CommCenter — refuse package")
+            for mod in STACK_MODULES:
+                dy = _resolve_dylib(stack, mod)
+                if not dy:
+                    if mod in ("iPFakerMG", "iPFakerCT"):
+                        raise SystemExit(f"FATAL: missing required {mod}.dylib in {stack}")
+                    continue
+                raw = track(dy.read_bytes())
+                add_file(tar, f"{dest}/{mod}.dylib", raw, 0o755)
+                filt = _filter_for_module(mod, pl_mg, pl_ct, pl_about)
+                add_file(tar, f"{dest}/{mod}.plist", track(filt), 0o644)
+                packed.append(f"{mod}={len(raw)}")
+            print(f"stack dir: {stack}")
+            print("pack " + " ".join(packed))
 
         if catalog.exists():
             cdata = track(catalog.read_bytes())
             add_file(tar, "var/jb/etc/ipfaker/device_catalog.json", cdata, 0o644)
             add_file(tar, "var/mobile/Library/iPFaker/device_catalog.json", cdata, 0o644)
+            add_file(tar, "var/jb/etc/changeinfoios/device_catalog.json", cdata, 0o644)
 
         readme = (
-            b"iPFaker lab config dir (new device = same as dev).\n"
-            b"- config.plist + active_profile.json from iPFaker.app Apply\n"
-            b"- Stack: MG CT JB About AboutUI AboutVer AA + wipe_apps.sh\n"
-            b"- Dual-arch: arm64 (A9-A11) + arm64e (A12+)\n"
-            b"- Mirror: /var/mobile/Library/iPFaker/\n"
+            b"iPFaker 2.16 - inject engine = HIOS ChangeInfo 4.2.6 BINARY 1:1\n"
+            b"- Dylibs: ChangeInfoIosMG + ChangeInfoIosCT (vendor/hios_426)\n"
+            b"- Config for dylibs: /var/jb/etc/changeinfoios/config.plist\n"
+            b"- iPFaker.app Apply dual-writes ipfaker + changeinfoios\n"
+            b"- UI: iPFaker.app only (not HIOSFakerV3)\n"
         )
         add_file(tar, "var/jb/etc/ipfaker/README.txt", track(readme), 0o644)
+        add_file(tar, "var/jb/etc/changeinfoios/README.txt", track(readme), 0o644)
         ent = ROOT / "theos" / "app" / "entitlements.plist"
         if ent.is_file():
             add_file(tar, "var/jb/etc/ipfaker/entitlements.plist", track(ent.read_bytes()), 0o644)
