@@ -31,7 +31,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION_DEFAULT = "2.10.2"
+VERSION_DEFAULT = "2.10.3"
 PKG = "com.ipfaker"
 ARCH = "iphoneos-arm64"
 
@@ -254,7 +254,7 @@ exit 0
 
 def postinst_script() -> str:
     return r"""#!/bin/sh
-set -e
+# Do NOT use set -e: Sileo postinst must always reach auto-reboot scheduler.
 ROOT="${JBROOT:-/var/jb}"
 # Rootless: ldid/uicache live under /var/jb, often NOT on default PATH
 export PATH="/var/jb/usr/bin:/var/jb/usr/sbin:/var/jb/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
@@ -432,29 +432,91 @@ killall -9 Zalo 2>/dev/null || true
 killall -9 Preferences 2>/dev/null || true
 
 # --- Auto Userspace Reboot (Dopamine) ---
-# Tweaks only inject after launchd userspace restart. Delay so Sileo/dpkg can
-# finish the transaction and show Done before reboot3 runs.
+# Sileo/dpkg kills nohup children when postinst ends — use launchd one-shot + flag.
 # Skip: IPFAKER_SKIP_USERSPACE_REBOOT=1 dpkg -i ... (lab only)
 if [ -z "$IPFAKER_SKIP_USERSPACE_REBOOT" ]; then
-  echo "iPFaker: Userspace Reboot in ~6s (tweak inject + About daemon)..." >&2
-  mkdir -p /var/mobile/Library/iPFaker/logs 2>/dev/null || true
-  # Detach fully so package manager exits cleanly (no hang on open fd)
-  nohup /bin/sh -c '
-    sleep 6
-    echo "$(date) auto userspace reboot start" >> /var/mobile/Library/iPFaker/logs/userspace_reboot.log 2>/dev/null || true
-    # Official Dopamine path: jbctl reboot_userspace → reboot3(RB2_USERREBOOT)
-    if [ -x /var/jb/basebin/jbctl ]; then
-      /var/jb/basebin/jbctl reboot_userspace >> /var/mobile/Library/iPFaker/logs/userspace_reboot.log 2>&1 \
-        && exit 0
-    fi
-    # Fallbacks
-    if [ -x /var/jb/usr/bin/launchctl ]; then
-      /var/jb/usr/bin/launchctl reboot userspace >> /var/mobile/Library/iPFaker/logs/userspace_reboot.log 2>&1 && exit 0
-    fi
-    launchctl reboot userspace >> /var/mobile/Library/iPFaker/logs/userspace_reboot.log 2>&1 || true
-    echo "$(date) reboot_userspace failed — open Dopamine → Reboot Userspace" \
-      >> /var/mobile/Library/iPFaker/logs/userspace_reboot.log 2>/dev/null || true
-  ' >/dev/null 2>&1 &
+  echo "iPFaker: scheduling Userspace Reboot (~8s, launchd)..." >&2
+  mkdir -p /var/mobile/Library/iPFaker/logs /var/jb/etc/ipfaker /var/jb/Library/LaunchDaemons 2>/dev/null || true
+  REBOOT_SH="/var/jb/etc/ipfaker/userspace_reboot_once.sh"
+  REBOOT_PL="/var/jb/Library/LaunchDaemons/com.ipfaker.userspace-reboot.plist"
+  REBOOT_FLAG="/var/jb/etc/ipfaker/.pending_userspace_reboot"
+  LOGF="/var/mobile/Library/iPFaker/logs/userspace_reboot.log"
+  # Prefer packaged script; always rewrite so upgrades pick up fixes
+  cat > "$REBOOT_SH" <<'REBOOT_EOF'
+#!/bin/sh
+export PATH="/var/jb/usr/bin:/var/jb/usr/sbin:/var/jb/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+FLAG="/var/jb/etc/ipfaker/.pending_userspace_reboot"
+LOG="/var/mobile/Library/iPFaker/logs/userspace_reboot.log"
+PL="/var/jb/Library/LaunchDaemons/com.ipfaker.userspace-reboot.plist"
+mkdir -p /var/mobile/Library/iPFaker/logs 2>/dev/null || true
+if [ ! -f "$FLAG" ]; then
+  echo "$(date) no pending flag — skip" >> "$LOG" 2>/dev/null || true
+  exit 0
+fi
+# Consume flag first so a failed half-reboot does not loop forever on every boot
+rm -f "$FLAG"
+echo "$(date) pending userspace reboot — sleep 8s" >> "$LOG" 2>/dev/null || true
+sleep 8
+# Unload self so after reboot we do not fire again
+launchctl bootout system/com.ipfaker.userspace-reboot 2>/dev/null || true
+launchctl unload "$PL" 2>/dev/null || true
+rm -f "$PL" 2>/dev/null || true
+launchctl remove com.ipfaker.userspace-reboot 2>/dev/null || true
+echo "$(date) calling jbctl reboot_userspace" >> "$LOG" 2>/dev/null || true
+if [ -x /var/jb/basebin/jbctl ]; then
+  /var/jb/basebin/jbctl reboot_userspace >> "$LOG" 2>&1 && exit 0
+fi
+if [ -x /var/jb/basebin/jbctl ]; then
+  # older builds may only accept via help-hidden path; try again with full path env
+  /var/jb/basebin/jbctl reboot_userspace >> "$LOG" 2>&1 || true
+fi
+launchctl reboot userspace >> "$LOG" 2>&1 || true
+/bin/launchctl reboot userspace >> "$LOG" 2>&1 || true
+echo "$(date) reboot_userspace FAILED — open Dopamine → Reboot Userspace" >> "$LOG" 2>/dev/null || true
+exit 0
+REBOOT_EOF
+  chmod 755 "$REBOOT_SH" 2>/dev/null || true
+  cp -f "$REBOOT_SH" /var/mobile/Library/iPFaker/userspace_reboot_once.sh 2>/dev/null || true
+  touch "$REBOOT_FLAG" 2>/dev/null || true
+  chmod 644 "$REBOOT_FLAG" 2>/dev/null || true
+  cat > "$REBOOT_PL" <<'PLIST_EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.ipfaker.userspace-reboot</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/sh</string>
+		<string>/var/jb/etc/ipfaker/userspace_reboot_once.sh</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>AbandonProcessGroup</key>
+	<true/>
+	<key>StandardOutPath</key>
+	<string>/var/mobile/Library/iPFaker/logs/userspace_reboot_launchd.out</string>
+	<key>StandardErrorPath</key>
+	<string>/var/mobile/Library/iPFaker/logs/userspace_reboot_launchd.err</string>
+</dict>
+</plist>
+PLIST_EOF
+  chmod 644 "$REBOOT_PL" 2>/dev/null || true
+  # load via launchd (survives Sileo/dpkg killing postinst process group)
+  launchctl bootout system/com.ipfaker.userspace-reboot 2>/dev/null || true
+  launchctl unload "$REBOOT_PL" 2>/dev/null || true
+  launchctl bootstrap system "$REBOOT_PL" 2>/dev/null \
+    || launchctl load -w "$REBOOT_PL" 2>/dev/null || true
+  launchctl kickstart -k system/com.ipfaker.userspace-reboot 2>/dev/null || true
+  # One-shot submit (some Dopamine builds)
+  launchctl submit -l com.ipfaker.userspace-reboot-submit -- /bin/sh "$REBOOT_SH" 2>/dev/null || true
+  # Extra detach methods (if launchd load failed on weird hosts)
+  if command -v setsid >/dev/null 2>&1; then
+    setsid /bin/sh "$REBOOT_SH" </dev/null >>"$LOGF" 2>&1 &
+  fi
+  nohup /bin/sh "$REBOOT_SH" </dev/null >>"$LOGF" 2>&1 &
+  echo "$(date) scheduled userspace reboot (flag+launchd+nohup)" >> "$LOGF" 2>/dev/null || true
 else
   echo "iPFaker: skip auto Userspace Reboot (IPFAKER_SKIP_USERSPACE_REBOOT set)" >&2
 fi
@@ -475,7 +537,7 @@ def control_text(version: str, installed_size_kb: int, has_app: bool, has_dylibs
     desc = (
         "Full lab stack MG(Zalo-safe lean)+CT+Deep+JB+About+AboutID+AboutUI+AA. "
         "Zalo: delayed MG, no UIScreen crash; NET ss via CT. "
-        "Requires ElleKit. Auto Userspace Reboot ~6s after install (Dopamine jbctl)."
+        "Requires ElleKit. Auto Userspace Reboot ~8s via launchd after install (Dopamine jbctl)."
     )
     if has_app:
         desc += " Includes iPFaker.app (device pool, wipe, Apply)."

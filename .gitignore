@@ -55,6 +55,7 @@ sileo-repo/debs/com.ipfaker_2.8.*
 sileo-repo/debs/com.ipfaker_2.9.*
 sileo-repo/debs/com.ipfaker_2.10.0*
 sileo-repo/debs/com.ipfaker_2.10.1*
+sileo-repo/debs/com.ipfaker_2.10.2*
 sileo-repo/fix_*.sh
 sileo-repo/*.sh
 

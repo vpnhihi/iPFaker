@@ -1,9 +1,5 @@
-iPFaker 2.10.2 — full stack (same as lab)
+iPFaker 2.10.3 — auto Userspace Reboot via launchd (~8s)
 Source: https://vpnhihi.github.io/ipfaker/
-
-1) Sileo -> Sources -> https://vpnhihi.github.io/ipfaker/
-2) Install iPFaker 2.10.2 (pulls ellekit/ldid/sqlite)
-3) Wait ~6s — auto Userspace Reboot (Dopamine)
-4) Open iPFaker -> pick device -> Apply -> Reset app data -> Zalo
-
-MG Zalo-safe lean. CT Deep. About inject daemon. Auto reboot after install.
+1) Sileo source -> install iPFaker 2.10.3
+2) Wait ~8s for auto Userspace Reboot
+3) Open iPFaker -> Apply
