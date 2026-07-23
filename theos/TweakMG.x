@@ -8,6 +8,8 @@
 #import "IPFHooksMG.h"
 #import "IPFHooksExtra.h"
 #import "IPFHooksDeep.h"
+#import "IPFHooksJB.h"
+// ServerLite installs via its own constructor (IPFHooksServerLite.m)
 
 static void IPFMark(const char *msg) {
     NSString *bid = [[NSBundle mainBundle] bundleIdentifier] ?: @"(nil)";
@@ -71,12 +73,15 @@ static BOOL IPFIsDeepSpoofBid(NSString *bid) {
 static void IPFInstallDeepStack(const char *tag) {
     @autoreleasepool {
         @try {
-            // Full MG (screen keys still gated by FakeScreen / Zalo MG block in IPFAllowMGKey)
+            // Full MG (screen keys gated by FakeScreen / Zalo MG block)
             IPFInstallMGHooks();
-            // Full Extra: ifaddrs/hostname/CNCopy/WKWebView UA — UIScreen only if FakeScreen ON
+            // Extra: ifaddrs/hostname/CNCopy/SCDynamic/WKWebView UA
             IPFInstallExtraHooks();
-            // Deep: IOKit serial/MAC + HTTP body/header rewrite (HIOS parity; also in CT)
+            // Deep: IOKit serial/MAC + HTTP rewrite
             IPFInstallDeepHooks();
+            // JB: dyldHide + fork + fopen/getenv hide
+            IPFInstallJBHooks();
+            // SecItem/DeviceCheck/Proxy/WebRTC: ServerLite __attribute__((constructor))
             IPFMark(tag);
         } @catch (NSException *ex) {
             NSString *m = [NSString stringWithFormat:@"CTOR_DEEP_EXC %@", ex.reason ?: @"?"];

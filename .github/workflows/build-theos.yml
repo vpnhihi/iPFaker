@@ -81,7 +81,8 @@ jobs:
           set -e
           mkdir -p dist
           find .theos/obj -name 'iPFaker*.dylib' 2>/dev/null | head -20
-          for name in iPFakerAA iPFakerAbout iPFakerAboutID iPFakerAboutUI iPFakerAboutVer iPFakerMG iPFakerCT iPFakerJB; do
+          # HIOS 2-dylib ship: only MG + CT required
+          for name in iPFakerMG iPFakerCT; do
             # Prefer fat (cafebabe) FINALPACKAGE dylib — never thin arm64e-only (breaks A10/A11)
             f=""
             best=""
@@ -149,35 +150,20 @@ jobs:
           fi
           MGSIZE=$(stat -f%z dist/iPFakerMG.dylib 2>/dev/null || stat -c%s dist/iPFakerMG.dylib)
           CTSIZE=$(stat -f%z dist/iPFakerCT.dylib 2>/dev/null || stat -c%s dist/iPFakerCT.dylib)
-          AASIZE=$(stat -f%z dist/iPFakerAA.dylib 2>/dev/null || stat -c%s dist/iPFakerAA.dylib)
-          JBSIZE=$(stat -f%z dist/iPFakerJB.dylib 2>/dev/null || stat -c%s dist/iPFakerJB.dylib)
-          ABOUTSIZE=$(stat -f%z dist/iPFakerAbout.dylib 2>/dev/null || stat -c%s dist/iPFakerAbout.dylib)
-          echo "MGSIZE=$MGSIZE CTSIZE=$CTSIZE AASIZE=$AASIZE JBSIZE=$JBSIZE ABOUTSIZE=$ABOUTSIZE"
-          # Dual-arch fat ≈ 2× thin arm64e. AMFI cares about the loaded slice, not full fat size.
-          # Thin arm64e MG ~155k → fat ~310k; About ~105k → fat ~210k.
-          # Fat + Extra + Deep (IOKit/HTTP) HIOS-parity
-          if [ "$MGSIZE" -gt 520000 ]; then
-            echo "FATAL: MG $MGSIZE > 520000 — unexpected fat size"
+          echo "MGSIZE=$MGSIZE CTSIZE=$CTSIZE (HIOS 2-dylib only)"
+          if [ "$MGSIZE" -gt 900000 ]; then
+            echo "FATAL: MG $MGSIZE > 900000 — unexpected fat size"
             exit 1
           fi
-          # Fat arm64+arm64e + SecItem/DeviceCheck: allow ~280k (was 200k pre-P0)
-          if [ "$AASIZE" -gt 280000 ]; then
-            echo "FATAL: AA $AASIZE too large for lite dylib (fat)"
-            exit 1
-          fi
-          # Preferences (platform) — About must stay lean per-slice
-          if [ "$ABOUTSIZE" -gt 290000 ]; then
-            echo "FATAL: About $ABOUTSIZE > 290000 — unexpected fat size"
+          if [ "$CTSIZE" -lt 50000 ]; then
+            echo "FATAL: CT too small $CTSIZE"
             exit 1
           fi
           file dist/iPFakerMG.dylib || true
           lipo -info dist/iPFakerMG.dylib 2>/dev/null || true
-          lipo -info dist/iPFakerAbout.dylib 2>/dev/null || true
+          lipo -info dist/iPFakerCT.dylib 2>/dev/null || true
           ldid -h dist/iPFakerMG.dylib 2>&1 | grep -q CDHash=
           ldid -h dist/iPFakerCT.dylib 2>&1 | grep -q CDHash=
-          ldid -h dist/iPFakerJB.dylib 2>&1 | grep -q CDHash=
-          ldid -h dist/iPFakerAA.dylib 2>&1 | grep -q CDHash=
-          ldid -h dist/iPFakerAbout.dylib 2>&1 | grep -q CDHash=
 
 
       - name: Build iPFaker.app
@@ -238,7 +224,7 @@ jobs:
             echo "Skip Sileo deb (no app)"
             exit 0
           fi
-          python3 scripts/build_sileo_deb.py --version 2.12.0 --app theos/dist/app/iPFaker.app
+          python3 scripts/build_sileo_deb.py --version 2.13.0 --app theos/dist/app/iPFaker.app
           ls -la dist/sileo/repo/debs/ || true
           mkdir -p sileo-repo/debs
           # Keep dependency debs; replace only com.ipfaker

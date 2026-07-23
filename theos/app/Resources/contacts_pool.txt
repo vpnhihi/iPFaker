@@ -1,0 +1,26 @@
+# name|phone — iPFaker lab pool (HIOS-style seed)
+Nguyen Van An|0901123001
+Tran Thi Binh|0901123002
+Le Van Cuong|0901123003
+Pham Thi Dung|0901123004
+Hoang Van Em|0901123005
+Vu Thi Phuong|0901123006
+Dang Van Giang|0901123007
+Bui Thi Hoa|0901123008
+Do Van Hung|0901123009
+Ngo Thi Khanh|0901123010
+Duong Van Long|0901123011
+Ly Thi Mai|0901123012
+Truong Van Nam|0901123013
+Phan Thi Oanh|0901123014
+Vo Van Phuc|0901123015
+Dinh Thi Quynh|0901123016
+Lam Van Son|0901123017
+Mai Thi Trang|0901123018
+Cao Van Tuan|0901123019
+To Thi Uyen|0901123020
+Ha Van Viet|0901123021
+Chu Thi Xuan|0901123022
+La Van Yen|0901123023
+Ta Thi Anh|0901123024
+Ong Van Bao|0901123025

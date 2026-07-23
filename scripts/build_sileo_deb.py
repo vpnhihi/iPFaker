@@ -31,20 +31,14 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION_DEFAULT = "2.12.0"
+VERSION_DEFAULT = "2.13.0"
 PKG = "com.ipfaker"
 ARCH = "iphoneos-arm64"
 
-# Full lab stack shipped to every Sileo install (same as dev after CI)
+# HIOS-style: only 2 dylibs shipped (MG full wall + CT telephony)
 STACK_MODULES = (
     "iPFakerMG",
     "iPFakerCT",
-    "iPFakerJB",
-    "iPFakerAbout",
-    "iPFakerAboutID",
-    "iPFakerAboutUI",
-    "iPFakerAboutVer",
-    "iPFakerAA",
 )
 
 
@@ -233,9 +227,9 @@ def ct_filter_plist() -> bytes:
 
 
 # Soft size hint — thin arm64e MG ~155KB; dual-arch fat ~310KB
-# Fat arm64+arm64e with Extra+Deep (IOKit/HTTP) HIOS-parity — ~400k is expected
-MG_SAFE_MAX = 520_000
-MG_HYBRID_HINT = 200_000
+# Fat MG = Extra+Deep+JB+ServerLite (2-dylib HIOS wall) — up to ~700k expected
+MG_SAFE_MAX = 900_000
+MG_HYBRID_HINT = 300_000
 
 
 def preinst_script() -> str:
@@ -640,8 +634,8 @@ exit 0
 
 def control_text(version: str, installed_size_kb: int, has_app: bool, has_dylibs: bool) -> str:
     desc = (
-        "HIOS gap-close: dyldHide+fork+SCDynamicStore+CNCopyIfaces+wipe_gen KC + "
-        "IOKit/Deep/SecItem/DC. Multi-app Zalo/FB/IG/TG/Viber. Requires ElleKit."
+        "HIOS 2-dylib: MG(full wall)+CT. Contacts seed/clear + RRS backup/restore + "
+        "dyldHide/fork/SecItem/DC/IOKit. Multi-app Zalo/FB/IG/TG/Viber. Requires ElleKit."
     )
     if has_app:
         desc += " Includes iPFaker.app (device pool, wipe, Apply)."

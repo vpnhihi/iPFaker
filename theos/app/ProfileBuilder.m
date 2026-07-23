@@ -1,4 +1,6 @@
 #import "ProfileBuilder.h"
+#import "IPFContactsLab.h"
+#import "IPFRRS.h"
 #import <UIKit/UIKit.h>
 #import <objc/message.h>
 #import <spawn.h>
@@ -2278,6 +2280,9 @@
     };
     BOOL skipKeychain = [options[@"skipKeychain"] boolValue];
     BOOL skipScript = [options[@"skipScript"] boolValue];
+    // HIOS: backup before wipe by default (RRS); set rrsBackup=NO to skip
+    BOOL rrsBackup = options[@"rrsBackup"] ? [options[@"rrsBackup"] boolValue] : YES;
+    BOOL contactsReset = options[@"contactsReset"] ? [options[@"contactsReset"] boolValue] : YES;
 
     NSMutableArray *log = [NSMutableArray array];
     NSFileManager *fm = [NSFileManager defaultManager];
@@ -2286,6 +2291,26 @@
 
     step([NSString stringWithFormat:@"Bắt đầu xóa dữ liệu %lu app…", (unsigned long)bundles.count]);
     [log addObject:[NSString stringWithFormat:@"Mục tiêu: %@", [bundles componentsJoinedByString:@", "]]];
+
+    // HIOS Step 0 — RRS backup
+    if (rrsBackup) {
+        @try {
+            NSString *msg = [IPFRRS backupBundles:bundles progress:progress];
+            if (msg.length) [log addObject:msg];
+        } @catch (NSException *ex) {
+            [log addObject:[NSString stringWithFormat:@"RRS backup EX: %@", ex.reason ?: @"?"]];
+        }
+    }
+
+    // HIOS Step 1 — contacts clear + seed lab pool
+    if (contactsReset) {
+        @try {
+            NSString *msg = [IPFContactsLab resetLabContactsCount:20];
+            if (msg.length) [log addObject:msg];
+        } @catch (NSException *ex) {
+            [log addObject:[NSString stringWithFormat:@"contacts EX: %@", ex.reason ?: @"?"]];
+        }
+    }
 
     for (NSString *bid in bundles) {
         step([NSString stringWithFormat:@"Đóng: %@", bid.pathExtension.length ? bid : bid]);
@@ -2391,6 +2416,10 @@
         [log addObject:[NSString stringWithFormat:@"wipe_gen=%ld (KC purge next launch)", (long)n]];
     }
     [log addObject:[NSString stringWithFormat:@"⑤ Tuỳ chọn/cache/residue HIOS ~%lu", (unsigned long)crumb]];
+    @try {
+        [IPFRRS writeWipeMarkerForBundles:bundles];
+        [log addObject:@"wipe marker OK"];
+    } @catch (__unused NSException *ex) {}
 
     // Keychain / session deep: wipe_apps.sh now applies Zalo-depth to ALL third-party
     // (kill by path + CFBundleExecutable, crumbs, keychain agrp, pass-2 residual).
@@ -2645,7 +2674,7 @@
         "<key>Mode</key><string>Any</string></dict></dict></plist>\\n'\n"
         "for INJ in /var/jb/usr/lib/TweakInject /var/jb/Library/MobileSubstrate/DynamicLibraries; do\n"
         "  [ -d \"$INJ\" ] || continue\n"
-        "  for n in iPFakerMG iPFakerCT iPFakerJB iPFakerAA; do\n"
+        "  for n in iPFakerMG iPFakerCT; do\n"
         "    if [ -f \"$STAGE/${n}.plist\" ]; then\n"
         "      cp -f \"$STAGE/${n}.plist\" \"$INJ/${n}.plist\" && OK=1\n"
         "      chmod 644 \"$INJ/${n}.plist\" 2>/dev/null || true\n"
@@ -2682,7 +2711,7 @@
                  @"/var/jb/usr/lib/TweakInject",
                  @"/var/jb/Library/MobileSubstrate/DynamicLibraries" ]) {
             if (![fm fileExistsAtPath:inj]) continue;
-            for (NSString *n in @[ @"iPFakerMG", @"iPFakerCT", @"iPFakerJB", @"iPFakerAbout", @"iPFakerAA" ]) {
+            for (NSString *n in @[ @"iPFakerMG", @"iPFakerCT" ]) {
                 NSString *src = [stage stringByAppendingPathComponent:[n stringByAppendingString:@".plist"]];
                 NSString *dst = [inj stringByAppendingPathComponent:[n stringByAppendingString:@".plist"]];
                 if (![fm fileExistsAtPath:src]) continue;
