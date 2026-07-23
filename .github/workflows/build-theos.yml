@@ -1,4 +1,4 @@
-﻿# Build iPFaker MG+CT dylibs on GitHub-hosted macOS (no local Mac needed)
+# Build iPFaker MG+CT dylibs on GitHub-hosted macOS (no local Mac needed)
 # Trigger: Actions â†’ "Build Theos rootless" â†’ Run workflow
 # Artifact: ipfaker-dylibs.zip (iPFakerMG.dylib, iPFakerCT.dylib, plists)
 
