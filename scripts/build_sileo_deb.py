@@ -31,7 +31,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION_DEFAULT = "2.10.0"
+VERSION_DEFAULT = "2.10.1"
 PKG = "com.ipfaker"
 ARCH = "iphoneos-arm64"
 
@@ -326,7 +326,7 @@ for MS in \
 do
   [ -d "$MS" ] || continue
   for f in iPFakerMG.dylib iPFakerCT.dylib iPFakerJB.dylib \
-           iPFakerAbout.dylib iPFakerAboutUI.dylib iPFakerAboutVer.dylib iPFakerAA.dylib; do
+           iPFakerAbout.dylib iPFakerAboutID.dylib iPFakerAboutUI.dylib iPFakerAboutVer.dylib iPFakerAA.dylib; do
     if [ -f "$MS/$f" ]; then
       chown root:wheel "$MS/$f" 2>/dev/null || true
       chmod 755 "$MS/$f" 2>/dev/null || true
@@ -337,7 +337,7 @@ do
     fi
   done
   for f in iPFakerMG.plist iPFakerCT.plist iPFakerJB.plist \
-           iPFakerAbout.plist iPFakerAboutUI.plist iPFakerAboutVer.plist iPFakerAA.plist; do
+           iPFakerAbout.plist iPFakerAboutID.plist iPFakerAboutUI.plist iPFakerAboutVer.plist iPFakerAA.plist; do
     # mobile-writable so Fake can extend inject list live (Zalo-depth multi-app)
     [ -f "$MS/$f" ] && chmod 666 "$MS/$f" 2>/dev/null || true
   done
@@ -376,33 +376,56 @@ if [ -f "$ROOT/etc/ipfaker/device_catalog.json" ]; then
   chown mobile:mobile /var/mobile/Library/iPFaker/device_catalog.json 2>/dev/null || true
 fi
 
-# --- Preferences About auto-inject (ElleKit often skips platform apps) ---
-# AboutVer stays disabled by default (can crash Preferences on some devices)
+# --- Preferences About auto-inject (ElleKit often SKIPS platform Preferences) ---
+# AboutVer OFF by default (Preferences crash history on some hosts)
 for MS in /var/jb/usr/lib/TweakInject /var/jb/Library/MobileSubstrate/DynamicLibraries; do
   [ -d "$MS" ] || continue
   if [ -f "$MS/iPFakerAboutVer.dylib" ]; then
     mv -f "$MS/iPFakerAboutVer.dylib" "$MS/iPFakerAboutVer.dylib.off" 2>/dev/null || true
   fi
 done
-# Install prefs inject daemon (opainject About when Settings opens)
+
+# Ensure SpoofSettingsAbout default on seed config if missing
+for CFG in /var/jb/etc/ipfaker/config.plist /var/mobile/Library/iPFaker/config.plist; do
+  if [ -f "$CFG" ] && command -v plutil >/dev/null 2>&1; then
+    plutil -replace SpoofSettingsAbout -bool true "$CFG" 2>/dev/null || true
+    plutil -replace Enabled -bool true "$CFG" 2>/dev/null || true
+  fi
+done
+
+# prefs inject daemon: opainject About+AboutUI+AboutID into Preferences
 DAEMON_SRC="/var/jb/etc/ipfaker/prefs_inject_daemon.sh"
 if [ -f "$DAEMON_SRC" ]; then
   cp -f "$DAEMON_SRC" /var/mobile/Library/iPFaker/prefs_inject_daemon.sh 2>/dev/null || true
   chmod 755 /var/mobile/Library/iPFaker/prefs_inject_daemon.sh 2>/dev/null || true
+  chmod 755 "$DAEMON_SRC" 2>/dev/null || true
   mkdir -p /var/jb/Library/LaunchDaemons 2>/dev/null || true
   if [ -f /var/jb/etc/ipfaker/com.ipfaker.prefs-inject.plist ]; then
     cp -f /var/jb/etc/ipfaker/com.ipfaker.prefs-inject.plist \
       /var/jb/Library/LaunchDaemons/com.ipfaker.prefs-inject.plist 2>/dev/null || true
     launchctl bootout system/com.ipfaker.prefs-inject 2>/dev/null || true
+    launchctl unload /var/jb/Library/LaunchDaemons/com.ipfaker.prefs-inject.plist 2>/dev/null || true
     launchctl bootstrap system /var/jb/Library/LaunchDaemons/com.ipfaker.prefs-inject.plist 2>/dev/null \
-      || launchctl load /var/jb/Library/LaunchDaemons/com.ipfaker.prefs-inject.plist 2>/dev/null || true
+      || launchctl load -w /var/jb/Library/LaunchDaemons/com.ipfaker.prefs-inject.plist 2>/dev/null || true
     launchctl kickstart -k system/com.ipfaker.prefs-inject 2>/dev/null || true
   fi
+  # ALWAYS nohup fallback (launchctl often fails silently on rootless)
+  killall -9 prefs_inject_daemon 2>/dev/null || true
+  # kill old loops by pattern
+  for p in $(ps ax | grep 'prefs_inject_daemon.sh' | grep -v grep | awk '{print $1}'); do
+    kill -9 "$p" 2>/dev/null || true
+  done
+  nohup /bin/sh /var/mobile/Library/iPFaker/prefs_inject_daemon.sh \
+    >/var/mobile/Library/iPFaker/logs/prefs_inject_daemon.out 2>&1 &
+  echo "prefs_inject_daemon started pid=$!" >> /var/mobile/Library/iPFaker/logs/prefs_inject_daemon.log 2>/dev/null || true
 fi
 
 # Hard requirement check (new phone often misses these if installed without deps)
 if [ ! -e /var/jb/usr/lib/libellekit.dylib ] && [ ! -e /var/jb/usr/lib/libsubstrate.dylib ]; then
   echo "WARN: ElleKit missing — install package ellekit from same Sileo source, then Userspace Reboot" >&2
+fi
+if [ ! -x /var/jb/basebin/opainject ]; then
+  echo "WARN: opainject missing — Settings About spoof needs opainject (Dopamine basebin)" >&2
 fi
 
 killall -9 Zalo 2>/dev/null || true
@@ -668,23 +691,45 @@ def build(version: str, app_path: str | None) -> Path:
         if ent.is_file():
             add_file(tar, "var/jb/etc/ipfaker/entitlements.plist", track(ent.read_bytes()), 0o644)
 
-        # Preferences About auto-inject daemon (required: ElleKit often skips platform apps)
+        # Preferences About: ElleKit often SKIPS platform Preferences — must opainject.
         daemon_sh = r"""#!/bin/sh
-export PATH=/var/jb/usr/bin:/var/jb/usr/sbin:/usr/bin:/bin:$PATH
+# iPFaker prefs inject — About + AboutUI + AboutID into Settings
+export PATH=/var/jb/usr/bin:/var/jb/usr/sbin:/var/jb/basebin:/usr/bin:/bin:/sbin:$PATH
 LAST=""
-LOG=/var/mobile/Library/iPFaker/logs/prefs_inject_daemon.log
-mkdir -p /var/mobile/Library/iPFaker/logs 2>/dev/null
-echo "$(date) daemon start" >> "$LOG" 2>/dev/null
+LOGDIR=/var/mobile/Library/iPFaker/logs
+LOG=$LOGDIR/prefs_inject_daemon.log
+mkdir -p "$LOGDIR" 2>/dev/null
+chmod 755 "$LOGDIR" 2>/dev/null
+echo "$(date) daemon start sh=$(command -v sh) opainject=$(command -v opainject || echo /var/jb/basebin/opainject)" >> "$LOG" 2>/dev/null
+OPAINJECT=/var/jb/basebin/opainject
+[ -x "$OPAINJECT" ] || OPAINJECT=$(command -v opainject 2>/dev/null)
+JBCTL=/var/jb/basebin/jbctl
+TI=/var/jb/usr/lib/TweakInject
+# order matters: About (MG lite) then UI wash then ID wash
+DYLIBS="iPFakerAbout iPFakerAboutUI iPFakerAboutID"
 while true; do
-  PID=$(ps ax -o pid=,command= 2>/dev/null | grep 'Preferences.app/Preferences' | grep -v grep | head -1 | sed 's/^ *//' | cut -d' ' -f1)
+  PID=$(ps ax 2>/dev/null | grep 'Preferences.app/Preferences' | grep -v grep | head -1 | awk '{print $1}')
+  if [ -z "$PID" ]; then
+    # alternate path some iOS
+    PID=$(ps ax 2>/dev/null | grep '[P]references' | grep -v grep | head -1 | awk '{print $1}')
+  fi
   if [ -n "$PID" ] && [ "$PID" != "$LAST" ]; then
-    /var/jb/basebin/jbctl proc_set_debugged "$PID" >/dev/null 2>&1
-    for d in iPFakerAbout iPFakerAboutUI; do
-      DY=/var/jb/usr/lib/TweakInject/$d.dylib
-      [ -f "$DY" ] || continue
-      /var/jb/basebin/opainject "$PID" "$DY" >>"$LOG" 2>&1
+    echo "$(date) Preferences pid=$PID inject…" >> "$LOG" 2>/dev/null
+    [ -x "$JBCTL" ] && "$JBCTL" proc_set_debugged "$PID" >/dev/null 2>&1
+    for d in $DYLIBS; do
+      DY="$TI/$d.dylib"
+      if [ ! -f "$DY" ]; then
+        echo "$(date) missing $DY" >> "$LOG" 2>/dev/null
+        continue
+      fi
+      if [ -x "$OPAINJECT" ]; then
+        "$OPAINJECT" "$PID" "$DY" >>"$LOG" 2>&1
+        echo "$(date) opainject $d -> $PID rc=$?" >> "$LOG" 2>/dev/null
+      else
+        echo "$(date) NO opainject — cannot inject $d" >> "$LOG" 2>/dev/null
+      fi
+      sleep 0.3
     done
-    echo "$(date) injected pid=$PID" >> "$LOG" 2>/dev/null
     LAST="$PID"
   fi
   if [ -z "$PID" ]; then LAST=""; fi
@@ -701,7 +746,7 @@ done
 	<string>com.ipfaker.prefs-inject</string>
 	<key>ProgramArguments</key>
 	<array>
-		<string>/var/jb/bin/sh</string>
+		<string>/bin/sh</string>
 		<string>/var/mobile/Library/iPFaker/prefs_inject_daemon.sh</string>
 	</array>
 	<key>RunAtLoad</key>
@@ -710,6 +755,10 @@ done
 	<true/>
 	<key>UserName</key>
 	<string>root</string>
+	<key>StandardOutPath</key>
+	<string>/var/mobile/Library/iPFaker/logs/prefs_inject_launchd.out</string>
+	<key>StandardErrorPath</key>
+	<string>/var/mobile/Library/iPFaker/logs/prefs_inject_launchd.err</string>
 </dict>
 </plist>
 """

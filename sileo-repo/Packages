@@ -1,6 +1,23 @@
 Package: com.ipfaker
 Name: iPFaker
 Depends: firmware (>= 14.0), ellekit (>= 1.1), libsqlite3-1, sqlite3, ldid, libplist3
+Version: 2.10.1
+Architecture: iphoneos-arm64
+Maintainer: iPFaker Lab
+Author: iPFaker Lab
+Section: Tweaks
+Priority: optional
+Homepage: https://github.com/vpnhihi/ipfaker
+Description: Full lab stack MG(Zalo-safe lean)+CT+Deep+JB+About+AboutID+AboutUI+AA. Zalo: delayed MG, no UIScreen crash; NET ss via CT. Requires ElleKit + Userspace Reboot after install. Includes iPFaker.app (device pool, wipe, Apply).
+Installed-Size: 3658
+Filename: debs/com.ipfaker_2.10.1_iphoneos-arm64.deb
+Size: 473454
+MD5sum: 86f930b7cb1e5c0d1415102e80907880
+SHA256: 37e91411ec5377355d49f52ee612d6fad0cca6f52be94280e8b41d6d960c5de7
+
+Package: com.ipfaker
+Name: iPFaker
+Depends: firmware (>= 14.0), ellekit (>= 1.1), libsqlite3-1, sqlite3, ldid, libplist3
 Version: 2.10.0
 Architecture: iphoneos-arm64
 Maintainer: iPFaker Lab
@@ -266,4 +283,3 @@ Filename: debs/sqlite3_3.34.1_iphoneos-arm64.deb
 Size: 103598
 MD5sum: b6560b79e1c7fca0dd3cf29d043f0e6a
 SHA256: c953ad4daaf337bdafa3c38ba82416fd2d62b396d253ad3c936e8543719ceaf1
-
