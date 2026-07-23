@@ -31,7 +31,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION_DEFAULT = "2.11.0"
+VERSION_DEFAULT = "2.11.1"
 PKG = "com.ipfaker"
 ARCH = "iphoneos-arm64"
 
@@ -642,9 +642,8 @@ exit 0
 
 def control_text(version: str, installed_size_kb: int, has_app: bool, has_dylibs: bool) -> str:
     desc = (
-        "HIOS-style deep multi-app spoof: Zalo/FB/IG/Telegram/Viber + WebKit + CommCenter. "
-        "Full MG+Extra (no lean delay). Screen spoof off (stable). Wipe+Apply. "
-        "Requires ElleKit. Userspace Reboot after dpkg completes."
+        "HIOS-depth: multi-app deep spoof + SecItem keychain + DeviceCheck block + "
+        "Safari/WebKit/Maps residue wipe. Zalo/FB/IG/TG/Viber. Requires ElleKit."
     )
     if has_app:
         desc += " Includes iPFaker.app (device pool, wipe, Apply)."

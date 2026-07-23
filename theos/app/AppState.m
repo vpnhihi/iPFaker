@@ -769,6 +769,8 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     mflat[@"SkipExtraForZalo"] = @NO;
     mflat[@"DeepSpoofSocial"] = @YES;
     mflat[@"InjectWebKit"] = @YES;
+    mflat[@"KeychainSpoof"] = @YES;
+    mflat[@"WipeResidueHIOS"] = @YES;
     // Settings About is optional noise — default OFF
     mflat[@"SpoofSettingsAbout"] = @([self toggleForKey:@"SpoofSettingsAbout" defaultOn:NO]);
     mflat[@"SelectedDevicePool"] = [self.selectedDeviceIds copy];

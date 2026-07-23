@@ -23,7 +23,7 @@ TWEAK_NAME = iPFakerAA iPFakerAbout iPFakerAboutID iPFakerAboutUI iPFakerAboutVe
 # AA: server mitigations lite (AppAttest/Proxy/WebRTC) — own dylib, no CFNetwork, no IPFConfig.m
 iPFakerAA_FILES = src/IPFHooksServerLite.m
 iPFakerAA_CFLAGS = -fobjc-arc -Os -fvisibility=hidden -Wno-unused-variable -Wno-unused-function -I$(THEOS_PROJECT_DIR)/src
-iPFakerAA_FRAMEWORKS = Foundation
+iPFakerAA_FRAMEWORKS = Foundation Security
 iPFakerAA_LIBRARIES = substrate
 iPFakerAA_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerAA.dylib -Wl,-dead_strip
 

@@ -2346,7 +2346,7 @@
         [log addObject:@"③ Containers: script đã xóa — residual nhẹ"];
     }
 
-    step(@"Xóa tuỳ chọn / cookie / bộ nhớ đệm…");
+    step(@"Xóa tuỳ chọn / cookie / bộ nhớ đệm + residue HIOS…");
     NSUInteger crumb = 0;
     for (NSString *bid in bundles) {
         for (NSString *p in @[
@@ -2358,7 +2358,30 @@
             if ([fm fileExistsAtPath:p] && [fm removeItemAtPath:p error:nil]) crumb++;
         }
     }
-    [log addObject:[NSString stringWithFormat:@"⑤ Tuỳ chọn/bộ nhớ đệm ~%lu", (unsigned long)crumb]];
+    // HIOS cross-app residue (always — shared WebKit/Maps/geo graph)
+    for (NSString *p in @[
+             @"/var/mobile/Library/Cookies/com.apple.mobilesafari.binarycookies",
+             @"/var/mobile/Library/Cookies/com.apple.WebKit.binarycookies",
+             @"/var/mobile/Library/HTTPStorages/com.apple.mobilesafari",
+             @"/var/mobile/Library/Caches/com.apple.mobilesafari",
+             @"/var/mobile/Library/Caches/com.apple.WebKit.WebContent",
+             @"/var/mobile/Library/Caches/com.apple.WebKit.Networking",
+             @"/var/mobile/Library/Caches/com.apple.WebKit.GPU",
+             @"/var/mobile/Library/Caches/WebKit",
+             @"/var/mobile/Library/WebKit",
+             @"/var/mobile/Library/Safari",
+             @"/var/mobile/Library/Caches/com.apple.Maps",
+             @"/var/mobile/Library/Caches/com.apple.MapKit",
+             @"/var/mobile/Library/Caches/GeoServices",
+             @"/var/mobile/Library/Caches/com.apple.geod",
+             @"/var/mobile/Library/Caches/com.apple.routined",
+             @"/var/mobile/Library/Maps",
+             @"/var/mobile/Library/Preferences/com.apple.Maps.plist",
+             @"/var/mobile/Library/Preferences/com.apple.geod.plist",
+         ]) {
+        if ([fm fileExistsAtPath:p] && [fm removeItemAtPath:p error:nil]) crumb++;
+    }
+    [log addObject:[NSString stringWithFormat:@"⑤ Tuỳ chọn/cache/residue HIOS ~%lu", (unsigned long)crumb]];
 
     // Keychain / session deep: wipe_apps.sh now applies Zalo-depth to ALL third-party
     // (kill by path + CFBundleExecutable, crumbs, keychain agrp, pass-2 residual).

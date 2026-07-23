@@ -516,6 +516,102 @@ if [ "$DRY" -eq 0 ] && [ "$HAS_THIRD" -eq 1 ]; then
   fi
 fi
 
+# ── HIOS-style cross-app residue wipe (Safari/WebKit/Maps/cookies/geo) ──
+# Social apps leak identity via shared WebKit cookies, Maps cache, geod, etc.
+if [ "$DRY" -eq 0 ]; then
+  log "HIOS residue wipe: Safari/WebKit/Maps/geo/cookies"
+  # Kill system helpers that hold residue open
+  for p in MobileSafari com.apple.WebKit.WebContent com.apple.WebKit.Networking \
+           com.apple.WebKit.GPU Maps weatherd geod routined nsurlsessiond; do
+    killall -9 "$p" 2>/dev/null || true
+  done
+  sleep 0.2 2>/dev/null || true
+
+  # Global cookie / HTTP storage / WebKit
+  rm -rf \
+    /var/mobile/Library/Cookies/com.apple.mobilesafari.binarycookies \
+    /var/mobile/Library/Cookies/com.apple.WebKit.binarycookies \
+    /var/mobile/Library/Cookies/*.binarycookies \
+    /var/mobile/Library/HTTPStorages/com.apple.mobilesafari \
+    /var/mobile/Library/HTTPStorages/com.apple.WebKit* \
+    /var/mobile/Library/Caches/com.apple.mobilesafari \
+    /var/mobile/Library/Caches/com.apple.WebKit.WebContent \
+    /var/mobile/Library/Caches/com.apple.WebKit.Networking \
+    /var/mobile/Library/Caches/com.apple.WebKit.GPU \
+    /var/mobile/Library/Caches/com.apple.WebKit.PluginAgent \
+    /var/mobile/Library/Caches/WebKit \
+    /var/mobile/Library/WebKit \
+    /var/mobile/Library/Safari \
+    /var/mobile/Library/SafariViewService \
+    /var/mobile/Library/Caches/com.apple.SafariViewService \
+    /var/mobile/Library/Saved\ Application\ State/com.apple.mobilesafari.savedState \
+    2>/dev/null || true
+
+  # Maps / geo / weather residue (identity + location graph)
+  rm -rf \
+    /var/mobile/Library/Caches/com.apple.Maps \
+    /var/mobile/Library/Caches/com.apple.MapKit \
+    /var/mobile/Library/Caches/com.apple.MobileSlideShow.Maps \
+    /var/mobile/Library/Caches/GeoServices \
+    /var/mobile/Library/Caches/com.apple.geod \
+    /var/mobile/Library/Caches/com.apple.routined \
+    /var/mobile/Library/Caches/com.apple.nsurlsessiond \
+    /var/mobile/Library/Maps \
+    /var/mobile/Library/Preferences/com.apple.Maps.plist \
+    /var/mobile/Library/Preferences/com.apple.MapKit.plist \
+    /var/mobile/Library/Preferences/com.apple.geod.plist \
+    /var/mobile/Library/Caches/com.apple.weather \
+    /var/mobile/Library/Caches/com.apple.weatherd \
+    /var/mobile/Library/Caches/WeatherDaemon \
+    /var/mobile/Library/Weather \
+    /var/mobile/Library/Preferences/com.apple.weather.plist \
+    /var/mobile/Library/Preferences/com.apple.weatherd.plist \
+    /var/mobile/Library/Preferences/com.apple.weather.tracking.plist \
+    2>/dev/null || true
+
+  # DeviceCheck / App Attest state files (if present)
+  find /var/mobile/Library -maxdepth 4 \( \
+      -iname '*DeviceCheck*' -o -iname '*AppAttest*' -o -iname '*dcappattest*' \
+    \) 2>/dev/null | while IFS= read -r p; do
+    rm -rf "$p" 2>/dev/null || true
+  done
+
+  # Pasteboard / TCC noise
+  rm -rf /var/mobile/Library/Caches/com.apple.Pasteboard/* 2>/dev/null || true
+
+  log "HIOS residue wipe done"
+fi
+
+# ── Extra keychain agrp patterns for FB/IG/Telegram/Viber (HIOS multi-app) ──
+if [ "$DRY" -eq 0 ] && [ "$HAS_THIRD" -eq 1 ]; then
+  KC_DB=""
+  for p in /var/Keychains/keychain-2.db /private/var/Keychains/keychain-2.db; do
+    [ -f "$p" ] && KC_DB="$p" && break
+  done
+  SQLITE=""
+  for s in /var/jb/usr/bin/sqlite3 /var/jb/bin/sqlite3 /usr/bin/sqlite3; do
+    [ -x "$s" ] && SQLITE="$s" && break
+  done
+  if [ -n "$KC_DB" ] && [ -n "$SQLITE" ]; then
+    EXTRA_WHERE="agrp LIKE '%facebook%' OR agrp LIKE '%instagram%' OR agrp LIKE '%burbn%' OR agrp LIKE '%telegra%' OR agrp LIKE '%telegram%' OR agrp LIKE '%viber%' OR agrp LIKE '%DeviceCheck%' OR agrp LIKE '%AppAttest%' OR svce LIKE '%DeviceCheck%' OR svce LIKE '%AppAttest%'"
+    # Also team-style Zalo if not already wiped
+    EXTRA_WHERE="$EXTRA_WHERE OR agrp LIKE '%CVB6BX97VM%' OR agrp LIKE '%group.keychain.vn.com.vng.zalo%'"
+    B2=$("$SQLITE" "$KC_DB" "SELECT COUNT(*) FROM genp WHERE $EXTRA_WHERE;" 2>/dev/null | tr -cd '0-9')
+    [ -z "$B2" ] && B2=0
+    if [ "$B2" -gt 0 ] 2>/dev/null; then
+      log "keychain social/dc extra genp before=$B2"
+      killall -STOP securityd 2>/dev/null || true
+      "$SQLITE" "$KC_DB" "DELETE FROM genp WHERE $EXTRA_WHERE;" 2>>"$LOG_FILE" || true
+      "$SQLITE" "$KC_DB" "DELETE FROM inet WHERE $EXTRA_WHERE;" 2>>"$LOG_FILE" || true
+      "$SQLITE" "$KC_DB" "DELETE FROM keys WHERE $EXTRA_WHERE;" 2>>"$LOG_FILE" || true
+      "$SQLITE" "$KC_DB" "PRAGMA wal_checkpoint(TRUNCATE);" 2>>"$LOG_FILE" || true
+      killall -CONT securityd 2>/dev/null || true
+      killall -9 securityd 2>/dev/null || true
+      log "keychain social/dc extra purged"
+    fi
+  fi
+fi
+
 # ── Zalo extra deep session script (WebKit/SDK crumbs + team agrp) ──
 if [ "$HAS_ZALO" -eq 1 ] && [ "$DRY" -eq 0 ]; then
   SESS=""
