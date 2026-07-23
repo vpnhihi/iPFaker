@@ -150,9 +150,9 @@ static BOOL IPFAllowMGKey(NSString *k) {
         || [k isEqualToString:@"mZfUC7qo4pURNhyMHZ62RQ"]   // BuildVersion
         || [k isEqualToString:@"FbsJngVSVXK87pG0SJtlNg"])  // ProductBuildVersion
         return [c flag:@"FakeSysOSVersion" defaultYes:YES];
-    // Screen MG keys (non-social only — social blocked above). Default OFF if key missing.
+    // Screen MG keys — social still blocked above (IsCompact). Others follow FakeScreen.
     if ([lk containsString:@"screen"] || [lk containsString:@"display"])
-        return [c flag:@"FakeScreen" defaultYes:NO] || [c flag:@"FakeRealScreen" defaultYes:NO];
+        return [c flag:@"FakeScreen" defaultYes:YES] || [c flag:@"FakeRealScreen" defaultYes:NO];
     // Hardware identity (+ eSIM EID, Secure Element SEID, baseband/modem)
     if ([lk containsString:@"serial"] || [lk containsString:@"unique"] || [lk containsString:@"chip"]
         || [lk containsString:@"imei"] || [lk containsString:@"meid"] || [lk containsString:@"eid"]

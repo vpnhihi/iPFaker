@@ -432,45 +432,12 @@ static void IPFServerLiteCtor(void) {
             if ([bid hasPrefix:@"com.ipfaker"] || [bid containsString:@"ipfaker"]) return;
             (void)IPFLiteCfg();
 
-            // CRASH-SAFE: social apps — NO SecItem / wipe / WebRTC / Proxy in process.
-            // Only light AppAttest block after delay (optional).
-            BOOL social = IPFLiteIsSocialBid(bid);
-            BOOL crashSafe = social || IPFLiteFlag(@"CrashSafeMode", YES);
-            if (crashSafe && !IPFLiteFlag(@"AllowDeepSocial", NO)) {
-                IPFLiteTrace(@"ServerLite SKIP heavy (crash-safe social)");
-                // Optional AA only — after 2s, once
-                void *h = dlopen("/var/jb/usr/lib/libellekit.dylib", RTLD_NOW);
-                if (!h) h = dlopen("/var/jb/usr/lib/libsubstrate.dylib", RTLD_NOW);
-                if (h) pMS = (MSHookMessageEx_t)dlsym(h, "MSHookMessageEx");
-                if (!pMS) pMS = (MSHookMessageEx_t)dlsym(RTLD_DEFAULT, "MSHookMessageEx");
-                if (pMS) {
-                    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)),
-                                   dispatch_get_main_queue(), ^{
-                        static BOOL once = NO;
-                        if (once || !pMS) return;
-                        once = YES;
-                        @try {
-                            dlopen("/System/Library/Frameworks/DeviceCheck.framework/DeviceCheck", RTLD_NOW);
-                            Class aas = objc_getClass("DCAppAttestService");
-                            if (aas) {
-                                SEL genKey = NSSelectorFromString(@"generateKeyWithCompletionHandler:");
-                                if (class_getInstanceMethod(aas, genKey) && !o_genKey)
-                                    pMS(aas, genKey, (IMP)s_genKey, (IMP *)&o_genKey);
-                                if (class_getInstanceMethod(aas, @selector(isSupported)) && !o_isSup)
-                                    pMS(aas, @selector(isSupported), (IMP)s_isSup, (IMP *)&o_isSup);
-                            }
-                            Class dcd = objc_getClass("DCDevice");
-                            if (dcd) {
-                                SEL tok = NSSelectorFromString(@"generateTokenWithCompletionHandler:");
-                                if (class_getInstanceMethod(dcd, tok) && !o_dcTok)
-                                    pMS(dcd, tok, (IMP)s_dcTok, (IMP *)&o_dcTok);
-                            }
-                            IPFLiteTrace(@"ServerLite AA-only OK");
-                        } @catch (__unused NSException *ex) {}
-                    });
-                }
+            // Optional ultra-safe: skip ServerLite only if CrashSafeMode=YES
+            if (IPFLiteFlag(@"CrashSafeMode", NO)) {
+                IPFLiteTrace(@"ServerLite skip (CrashSafeMode)");
                 return;
             }
+            (void)IPFLiteIsSocialBid; // keep helper for traces
 
             void *h = dlopen("/var/jb/usr/lib/libellekit.dylib", RTLD_NOW);
             if (!h) h = dlopen("/var/jb/usr/lib/libsubstrate.dylib", RTLD_NOW);

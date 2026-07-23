@@ -792,9 +792,9 @@
     NSMutableDictionary *m = [@{
         @"Enabled": @YES,
         @"FakeDevice": @YES,
-        // Screen OFF default — dims mismatch host → crash Zalo/FB/TG (UIFont/IsCompact)
-        @"FakeScreen": @NO,
-        @"FakeRealScreen": @NO,
+        // HIOS parity — UIScreen/dims from catalog device
+        @"FakeScreen": @YES,
+        @"FakeRealScreen": @YES,
         @"FakeHardware": @YES,
         @"FakeAds": @YES,
         @"FakeWifi": @YES,
@@ -1130,11 +1130,12 @@
                                  @"FakeLocale", @"Enabled" ]) {
             if (!safeFlat[fk]) safeFlat[fk] = @YES;
         }
-        if (safeFlat[@"FakeScreen"] == nil) safeFlat[@"FakeScreen"] = @NO;
-        if (safeFlat[@"FakeRealScreen"] == nil) safeFlat[@"FakeRealScreen"] = @NO;
+        if (safeFlat[@"FakeScreen"] == nil) safeFlat[@"FakeScreen"] = @YES;
+        if (safeFlat[@"FakeRealScreen"] == nil) safeFlat[@"FakeRealScreen"] = @YES;
         if (safeFlat[@"ClearKeychainOnLaunch"] == nil) safeFlat[@"ClearKeychainOnLaunch"] = @NO;
-        if (safeFlat[@"SkipExtraForZalo"] == nil) safeFlat[@"SkipExtraForZalo"] = @YES;
-        if (safeFlat[@"StableSocialHooks"] == nil) safeFlat[@"StableSocialHooks"] = @YES;
+        if (safeFlat[@"CrashSafeMode"] == nil) safeFlat[@"CrashSafeMode"] = @NO;
+        if (safeFlat[@"SkipExtraForZalo"] == nil) safeFlat[@"SkipExtraForZalo"] = @NO;
+        if (safeFlat[@"HideJailbreak"] == nil) safeFlat[@"HideJailbreak"] = @YES;
         safeFlat[@"DisableAppAttest"] = @YES;
         // Never auto-enable Settings About (daemon inject hung Apply for customers).
         if (safeFlat[@"SpoofSettingsAbout"] == nil)

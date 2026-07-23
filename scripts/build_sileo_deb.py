@@ -31,7 +31,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION_DEFAULT = "2.14.0"
+VERSION_DEFAULT = "2.15.0"
 PKG = "com.ipfaker"
 ARCH = "iphoneos-arm64"
 
@@ -409,18 +409,30 @@ for CFG in /var/jb/etc/ipfaker/config.plist /var/mobile/Library/iPFaker/config.p
     plutil -replace Enabled -bool true "$CFG" 2>/dev/null || true
     plutil -replace DeepSpoofSocial -bool true "$CFG" 2>/dev/null || true
     plutil -replace InjectWebKit -bool true "$CFG" 2>/dev/null || true
-    plutil -replace CrashSafeMode -bool true "$CFG" 2>/dev/null || true
-    plutil -replace AllowDeepSocial -bool false "$CFG" 2>/dev/null || true
-    plutil -replace AllowEnvSocial -bool false "$CFG" 2>/dev/null || true
-    plutil -replace SkipExtraForZalo -bool true "$CFG" 2>/dev/null || true
-    plutil -replace StableSocialHooks -bool true "$CFG" 2>/dev/null || true
-    plutil -replace DeepSpoofSocial -bool false "$CFG" 2>/dev/null || true
-    plutil -replace FakeScreen -bool false "$CFG" 2>/dev/null || true
-    plutil -replace FakeRealScreen -bool false "$CFG" 2>/dev/null || true
+    # HIOS parity flags (full wall). CrashSafeMode OFF.
+    plutil -replace CrashSafeMode -bool false "$CFG" 2>/dev/null || true
+    plutil -replace AllowDeepSocial -bool true "$CFG" 2>/dev/null || true
+    plutil -replace AllowEnvSocial -bool true "$CFG" 2>/dev/null || true
+    plutil -replace SkipExtraForZalo -bool false "$CFG" 2>/dev/null || true
+    plutil -replace StableSocialHooks -bool false "$CFG" 2>/dev/null || true
+    plutil -replace DeepSpoofSocial -bool true "$CFG" 2>/dev/null || true
+    plutil -replace FakeDevice -bool true "$CFG" 2>/dev/null || true
+    plutil -replace FakeHardware -bool true "$CFG" 2>/dev/null || true
+    plutil -replace FakeScreen -bool true "$CFG" 2>/dev/null || true
+    plutil -replace FakeRealScreen -bool true "$CFG" 2>/dev/null || true
+    plutil -replace FakeBrowser -bool true "$CFG" 2>/dev/null || true
+    plutil -replace FakeNetwork -bool true "$CFG" 2>/dev/null || true
+    plutil -replace FakeWifi -bool true "$CFG" 2>/dev/null || true
+    plutil -replace FakeSysctl -bool true "$CFG" 2>/dev/null || true
+    plutil -replace FakeSysOSVersion -bool true "$CFG" 2>/dev/null || true
+    plutil -replace FakeLocale -bool true "$CFG" 2>/dev/null || true
+    plutil -replace FakeLocation -bool true "$CFG" 2>/dev/null || true
+    plutil -replace FakeSensor -bool true "$CFG" 2>/dev/null || true
+    plutil -replace FakeWebRTC -bool true "$CFG" 2>/dev/null || true
+    plutil -replace HideJailbreak -bool true "$CFG" 2>/dev/null || true
+    plutil -replace BlockFork -bool true "$CFG" 2>/dev/null || true
+    plutil -replace fake_keychain -bool true "$CFG" 2>/dev/null || true
     plutil -replace ClearKeychainOnLaunch -bool false "$CFG" 2>/dev/null || true
-    plutil -replace HideJailbreak -bool false "$CFG" 2>/dev/null || true
-    plutil -replace BlockFork -bool false "$CFG" 2>/dev/null || true
-    plutil -replace fake_keychain -bool false "$CFG" 2>/dev/null || true
     plutil -replace SpoofSettingsAbout -bool false "$CFG" 2>/dev/null || true
   fi
 done
@@ -644,8 +656,8 @@ exit 0
 
 def control_text(version: str, installed_size_kb: int, has_app: bool, has_dylibs: bool) -> str:
     desc = (
-        "2.14 crash-safe: MG identity + CT only on social (no UIScreen/dyld/fork/KC wipe). "
-        "Multi-app Zalo/FB/IG/TG/Viber. Requires ElleKit + Userspace Reboot."
+        "2.15 HIOS 4.2.6 parity: MG wall (UIScreen/IOKit/dyld/SecItem/DC/WK) + CT+Env. "
+        "iPFaker UI kept. Multi-app Zalo/FB/IG/TG/Viber. ElleKit + Userspace Reboot."
     )
     if has_app:
         desc += " Includes iPFaker.app (device pool, wipe, Apply)."

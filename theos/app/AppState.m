@@ -739,42 +739,43 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     void (^setFlag)(NSString *, BOOL) = ^(NSString *k, BOOL def) {
         mflat[k] = @([self toggleForKey:k defaultOn:def]);
     };
-    // HIOS-style deep identity wall (apps), not Settings UI vanity
+    // HIOS 4.2.6 feature parity (ChangeInfoIosMG surfaces) — iPFaker UI only
     setFlag(@"FakeDevice", YES);
     setFlag(@"FakeHardware", YES);
     setFlag(@"FakeAds", YES);
-    // Screen OFF — host pixels; spoofing screen dims crashes Zalo UIFont/IsCompact on A10
-    setFlag(@"FakeScreen", NO);
-    setFlag(@"FakeRealScreen", NO);
+    // Screen: HIOS hooks UIScreen. Default ON for parity; MG still blocks screen keys on Zalo-class.
+    // If host is A10 and spoof huge phone, turn FakeScreen OFF in Settings.
+    setFlag(@"FakeScreen", YES);
+    setFlag(@"FakeRealScreen", YES);
     setFlag(@"FakeBrowser", YES);
     setFlag(@"FakeNetwork", YES);
     setFlag(@"FakeWifi", YES);
     setFlag(@"FakeSysctl", YES);
     setFlag(@"FakeSysOSVersion", YES);
-    setFlag(@"HideJailbreak", NO);
+    setFlag(@"HideJailbreak", YES);
     setFlag(@"FakeLocale", YES);
     setFlag(@"FakeDateTime", NO);
-    setFlag(@"FakeLocation", NO);
-    setFlag(@"FakeSensor", NO);
-    setFlag(@"FakeWebRTC", NO);
+    setFlag(@"FakeLocation", YES);
+    setFlag(@"FakeSensor", YES);
+    setFlag(@"FakeWebRTC", YES);
     setFlag(@"DisableWebRTC", NO);
     setFlag(@"DisableAppAttest", YES);
     setFlag(@"FakeWifi", YES);
     setFlag(@"FakeProxy", [self proxyEnabled]);
-    // CRASH-SAFE product defaults — MG identity only on social (no Deep/JB/SecItem)
-    mflat[@"CrashSafeMode"] = @YES;
-    mflat[@"AllowDeepSocial"] = @NO;
-    mflat[@"AllowEnvSocial"] = @NO;
-    mflat[@"SkipExtraForZalo"] = @YES;
-    mflat[@"StableSocialHooks"] = @YES;
-    mflat[@"DeepSpoofSocial"] = @NO;
+    // Full HIOS wall (not crash-safe-only)
+    mflat[@"CrashSafeMode"] = @NO;
+    mflat[@"AllowDeepSocial"] = @YES;
+    mflat[@"AllowEnvSocial"] = @YES;
+    mflat[@"SkipExtraForZalo"] = @NO;
+    mflat[@"StableSocialHooks"] = @NO;
+    mflat[@"DeepSpoofSocial"] = @YES;
     mflat[@"InjectWebKit"] = @YES;
-    mflat[@"KeychainSpoof"] = @NO;
+    mflat[@"KeychainSpoof"] = @YES;
     mflat[@"WipeResidueHIOS"] = @YES;
-    mflat[@"fake_keychain"] = @NO;
-    mflat[@"ClearKeychainOnLaunch"] = @NO;
-    mflat[@"BlockFork"] = @NO;
-    mflat[@"HideJailbreak"] = @NO;
+    mflat[@"fake_keychain"] = @YES; // rewrite SecItem values (HIOS has SecItem)
+    mflat[@"ClearKeychainOnLaunch"] = @NO; // wipe only via wipe_gen after session wipe
+    mflat[@"BlockFork"] = @YES;
+    mflat[@"HideJailbreak"] = @YES;
     // Settings About is optional noise — default OFF
     mflat[@"SpoofSettingsAbout"] = @([self toggleForKey:@"SpoofSettingsAbout" defaultOn:NO]);
     mflat[@"SelectedDevicePool"] = [self.selectedDeviceIds copy];
@@ -945,21 +946,16 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
 
     if (progress) progress(@"② Spoof máy + iOS + flags…");
     NSArray *flagsOn = @[
-        @"FakeDevice", @"FakeHardware", @"FakeAds",
+        @"FakeDevice", @"FakeHardware", @"FakeAds", @"FakeScreen", @"FakeRealScreen",
         @"FakeBrowser", @"FakeNetwork", @"FakeWifi", @"FakeSysctl", @"FakeSysOSVersion",
-        @"FakeLocale", @"DisableAppAttest", @"Enabled",
+        @"HideJailbreak", @"FakeLocale", @"FakeLocation", @"FakeSensor",
+        @"FakeWebRTC", @"DisableAppAttest", @"Enabled",
     ];
     for (NSString *k in flagsOn)
         [self setToggle:YES forKey:k];
-    // Crash-safe: no screen / sensor / location hooks / JB / deep
-    [self setToggle:NO forKey:@"FakeScreen"];
-    [self setToggle:NO forKey:@"FakeRealScreen"];
-    [self setToggle:NO forKey:@"FakeLocation"];
-    [self setToggle:NO forKey:@"FakeSensor"];
-    [self setToggle:NO forKey:@"FakeWebRTC"];
-    [self setToggle:NO forKey:@"HideJailbreak"];
     [self setToggle:NO forKey:@"DisableWebRTC"];
     [self setToggle:NO forKey:@"ClearKeychainOnLaunch"];
+    [self setToggle:NO forKey:@"CrashSafeMode"];
     [self savePools];
     [self saveProxyAppAttest];
     BOOL hasProxy = [self proxyEnabled] && [self proxyHost].length > 0;
@@ -1084,20 +1080,16 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     [log addObject:filt ?: @"filter"];
 
     NSArray *flagsOn = @[
-        @"FakeDevice", @"FakeHardware", @"FakeAds",
+        @"FakeDevice", @"FakeHardware", @"FakeAds", @"FakeScreen", @"FakeRealScreen",
         @"FakeBrowser", @"FakeNetwork", @"FakeWifi", @"FakeSysctl", @"FakeSysOSVersion",
-        @"FakeLocale", @"DisableAppAttest", @"Enabled",
+        @"HideJailbreak", @"FakeLocale", @"FakeLocation", @"FakeSensor",
+        @"FakeWebRTC", @"DisableAppAttest", @"Enabled",
     ];
     for (NSString *k in flagsOn)
         [self setToggle:YES forKey:k];
-    [self setToggle:NO forKey:@"FakeScreen"];
-    [self setToggle:NO forKey:@"FakeRealScreen"];
-    [self setToggle:NO forKey:@"FakeLocation"];
-    [self setToggle:NO forKey:@"FakeSensor"];
-    [self setToggle:NO forKey:@"FakeWebRTC"];
-    [self setToggle:NO forKey:@"HideJailbreak"];
     [self setToggle:NO forKey:@"DisableWebRTC"];
     [self setToggle:NO forKey:@"ClearKeychainOnLaunch"];
+    [self setToggle:NO forKey:@"CrashSafeMode"];
     [self savePools];
     [self saveProxyAppAttest];
     BOOL hasProxy = [self proxyEnabled] && [self proxyHost].length > 0;

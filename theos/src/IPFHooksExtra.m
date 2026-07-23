@@ -74,9 +74,9 @@ static void IPFResolve(void) {
 // Disk: NSFileManager NSFileSystemSize/FreeSize + statfs(2) — must match catalog storage
 
 static BOOL IPFScreenOn(void) {
-    // Full surface only when explicitly ON (default OFF — social crash history)
-    return [[IPFConfig shared] flag:@"FakeScreen" defaultYes:NO]
-        || [[IPFConfig shared] flag:@"FakeRealScreen" defaultYes:NO];
+    // HIOS: UIScreen spoof when flags on (defaults match HIOS parity config)
+    return [[IPFConfig shared] flag:@"FakeScreen" defaultYes:YES]
+        || [[IPFConfig shared] flag:@"FakeRealScreen" defaultYes:YES];
 }
 
 static CGFloat IPFScale(void) {

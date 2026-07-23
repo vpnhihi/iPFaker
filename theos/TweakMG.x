@@ -1,7 +1,7 @@
-// iPFakerMG — CRASH-SAFE product path for social apps
-// Zalo/FB/TG/IG/Viber: ONLY MobileGestalt/UIDevice/sysctl identity.
-// No UIScreen, no getifaddrs, no dyldHide, no fork, no IOKit, no SecItem wipe.
-// Optional deep via config AllowDeepSocial=YES (default NO).
+// iPFakerMG — HIOS ChangeInfoIosMG parity (4.2.6 feature set)
+// Ships: MG identity + Extra (UIScreen/net/WK) + Deep IOKit/HTTP + JB dyld/hide
+//         + ServerLite (SecItem/DeviceCheck) via IPFHooksServerLite.m
+// UI remains iPFaker.app (not HIOS UI). Settings About optional only.
 
 #import <Foundation/Foundation.h>
 #import <stdio.h>
@@ -12,7 +12,6 @@
 #import "IPFHooksJB.h"
 
 static void IPFMark(const char *msg) {
-    // Minimal mark — avoid multi-path disk spam in %ctor (sandbox / launch races)
     NSString *bid = [[NSBundle mainBundle] bundleIdentifier] ?: @"(nil)";
     NSLog(@"[iPFakerMG] %s bid=%@", msg, bid);
     @try {
@@ -27,6 +26,7 @@ static BOOL IPFIsSocialBid(NSString *bid) {
     static NSArray *kDeep;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
+        // Match HIOS ChangeInfoIosMG.plist filter set
         kDeep = @[
             @"vn.com.vng.zingalo", @"com.zing.zalo",
             @"com.facebook.Facebook", @"com.facebook.Messenger",
@@ -34,10 +34,11 @@ static BOOL IPFIsSocialBid(NSString *bid) {
             @"com.zhiliaoapp.musically", @"com.ss.iphone.ugc.Ame",
             @"ph.telegra.Telegraph",
             @"com.viber",
-            @"com.shopee.vn", @"vn.shopee.vnapp", @"com.shopee.ShopeeVN", @"vn.shopee.app",
+            @"com.shopee.vn", @"vn.shopee.vnapp",
             @"com.apple.mobilesafari",
             @"com.apple.WebKit.WebContent",
             @"com.apple.Maps",
+            @"com.apple.weather",
         ];
     });
     if ([kDeep containsObject:bid]) return YES;
@@ -46,9 +47,25 @@ static BOOL IPFIsSocialBid(NSString *bid) {
     if ([l containsString:@"facebook"] || [l containsString:@"instagram"]) return YES;
     if ([l containsString:@"telegram"] || [l containsString:@"viber"]) return YES;
     if ([l containsString:@"musically"] || [l containsString:@"tiktok"]) return YES;
-    if ([l containsString:@"shopee"]) return YES;
-    if ([l containsString:@"webkit"]) return YES;
+    if ([l containsString:@"shopee"] || [l containsString:@"webkit"]) return YES;
     return NO;
+}
+
+/// HIOS MG wall — install once, ordered like ChangeInfoIosMG surface set
+static void IPFInstallHIOSMGWall(const char *tag) {
+    @autoreleasepool {
+        @try {
+            IPFInstallMGHooks();       // MGCopyAnswer / UIDevice / sysctl / IDFA
+            IPFInstallExtraHooks();    // UIScreen, getifaddrs, CNCopy, SCDynamic, WK UA
+            IPFInstallDeepHooks();     // IOKit registry + HTTP body rewrite
+            IPFInstallJBHooks();       // dyld hide, fopen/access, fork block
+            // SecItem + DeviceCheck: ServerLite constructor (same dylib)
+            IPFMark(tag);
+        } @catch (NSException *ex) {
+            NSString *m = [NSString stringWithFormat:@"CTOR_HIOS_EXC %@", ex.reason ?: @"?"];
+            IPFMark(m.UTF8String);
+        }
+    }
 }
 
 %ctor {
@@ -57,6 +74,7 @@ static BOOL IPFIsSocialBid(NSString *bid) {
 
         NSString *bid = [[NSBundle mainBundle] bundleIdentifier] ?: @"";
 
+        // Keep iPFaker.app clean (our UI only)
         if ([bid hasPrefix:@"com.ipfaker"] || [bid containsString:@"ipfaker"]) {
             IPFMark("CTOR_SKIP_IPFAKER_APP");
             return;
@@ -66,6 +84,7 @@ static BOOL IPFIsSocialBid(NSString *bid) {
             return;
         }
 
+        // Settings → Giới thiệu: optional (iPFaker keeps own About lab UI)
         if ([bid isEqualToString:@"com.apple.Preferences"]) {
             BOOL okPrefs = [[IPFConfig shared] reload];
             if (!okPrefs || ![IPFConfig shared].enabled) {
@@ -85,48 +104,20 @@ static BOOL IPFIsSocialBid(NSString *bid) {
         if (!ok)
             IPFMark("CTOR_NO_FILE_CONFIG_USE_EMBED");
 
-        BOOL social = IPFIsSocialBid(bid);
-        // Crash-safe is DEFAULT for social (and global unless AllowDeepSocial)
-        BOOL crashSafe = social
-            || [[IPFConfig shared] flag:@"CrashSafeMode" defaultYes:YES]
-            || [[IPFConfig shared] flag:@"StableSocialHooks" defaultYes:YES];
-        // Deep only if user explicitly opts in (default OFF — was still crashing when deferred)
-        BOOL allowDeep = [[IPFConfig shared] flag:@"AllowDeepSocial" defaultYes:NO]
-            && ![[IPFConfig shared] flag:@"CrashSafeMode" defaultYes:YES];
-
-        if (crashSafe || social) {
+        // HIOS parity default: full wall for all injected targets
+        // CrashSafeMode only if user explicitly re-enables it
+        BOOL crashSafe = [[IPFConfig shared] flag:@"CrashSafeMode" defaultYes:NO];
+        if (crashSafe) {
             @try {
-                // IDENTITY ONLY — proven least-crash path
                 IPFInstallMGHooks();
-                IPFMark(social ? "CTOR_SOCIAL_MG_ONLY" : "CTOR_SAFE_MG_ONLY");
-            } @catch (NSException *ex) {
-                NSString *m = [NSString stringWithFormat:@"CTOR_MG_EXC %@", ex.reason ?: @"?"];
-                IPFMark(m.UTF8String);
-                return;
-            }
-
-            if (allowDeep && social) {
-                // Optional: net lean only, still no dyld/fork/IOKit
-                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)),
-                               dispatch_get_main_queue(), ^{
-                    @try {
-                        IPFInstallExtraNetLeanHooks();
-                        IPFMark("CTOR_OPT_NET_LEAN");
-                    } @catch (__unused NSException *ex) {}
-                });
-            }
-            // Deep/JB NEVER auto on social — was crash source even when deferred
+                IPFMark("CTOR_CRASHSAFE_MG_ONLY");
+            } @catch (__unused NSException *ex) {}
             return;
         }
 
-        // Non-social rare path
-        @try {
-            IPFInstallMGHooks();
-            IPFInstallExtraNetLeanHooks();
-            IPFMark("CTOR_NONSOCIAL_LEAN");
-        } @catch (NSException *ex) {
-            NSString *m = [NSString stringWithFormat:@"CTOR_NS_EXC %@", ex.reason ?: @"?"];
-            IPFMark(m.UTF8String);
-        }
+        BOOL social = IPFIsSocialBid(bid);
+        // Immediate HIOS wall (HIOS does not use "lean only" for Zalo)
+        // Once-guards inside each Install* prevent double hook
+        IPFInstallHIOSMGWall(social ? "CTOR_HIOS_SOCIAL_OK" : "CTOR_HIOS_FULL_OK");
     }
 }
