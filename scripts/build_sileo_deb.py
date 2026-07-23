@@ -49,35 +49,31 @@ STACK_MODULES = (
 
 
 def _ci_dist_bases() -> list[Path]:
-    """Prefer newest CI/lab artifacts, then local build dirs."""
+    """All local CI/theos dist dirs (includes Deep/IOKit fat builds under any _ci_art*)."""
     bases: list[Path] = []
-    # Newest first among known lab snapshots
-    for name in (
-        "_ci_art_mglean",  # newest Zalo-safe MG lean
-        "_ci_art_sot",
-        "_ci_art_dual",
-        "_ci_art_ui",
-        "_ci_art_swver2",
-        "_ci_art_swver",
-        "_ci_art_aboutver_ok",
-        "_ci_art_open",
-        "_ci_art21011b",
-        "_ci_art21011",
-        "_ci_art21010",
-    ):
-        for sub in (
-            ROOT / name / "ipfaker-sileo" / "theos" / "dist",
-            ROOT / name / "theos" / "dist",
-        ):
-            if sub.is_dir():
-                bases.append(sub)
+    seen: set[str] = set()
+
+    def add(p: Path) -> None:
+        try:
+            key = str(p.resolve())
+        except Exception:
+            key = str(p)
+        if key in seen or not p.is_dir():
+            return
+        seen.add(key)
+        bases.append(p)
+
+    for art in ROOT.glob("_ci_art*"):
+        if not art.is_dir():
+            continue
+        add(art / "ipfaker-sileo" / "theos" / "dist")
+        add(art / "theos" / "dist")
     for base in (
         ROOT / "theos" / "dist",
         ROOT / "dylibs_ci",
         ROOT / "dylibs",
     ):
-        if base.is_dir():
-            bases.append(base)
+        add(base)
     return bases
 
 
