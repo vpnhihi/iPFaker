@@ -236,8 +236,9 @@ def ct_filter_plist() -> bytes:
 
 
 # Soft size hint — thin arm64e MG ~155KB; dual-arch fat ~310KB
-MG_SAFE_MAX = 360_000
-MG_HYBRID_HINT = 130_000
+# Fat arm64+arm64e with Extra+Deep (IOKit/HTTP) HIOS-parity — ~400k is expected
+MG_SAFE_MAX = 520_000
+MG_HYBRID_HINT = 200_000
 
 
 def preinst_script() -> str:
