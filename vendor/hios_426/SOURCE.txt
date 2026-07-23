@@ -1,0 +1,33 @@
+HIOS / ChangeInfoIos import — 100% payload
+==========================================
+Source deb : C:\Users\Pem\Downloads\ChangeInfoIos-v3_4.2.6_iphoneos-arm64.deb
+DEB size   : 218752
+DEB SHA256 : 7d52c33f987e14b71e608f905b52ac9b414ea4b2743e444d14c65872163f4799
+Imported   : full data + control + ar members
+
+Debian control:
+Package: com.changeinfoios.v3
+Name: HIOS Faker v3
+Version: 4.2.6
+Architecture: iphoneos-arm64
+Description: ChangeInfoIos v3 — focused device-spoof for popular iOS apps. Zero injection into target apps; central spoof in MobileGestaltHelper + CoreTelephony daemons.
+Maintainer: ChangeInfoIos
+Author: ChangeInfoIos
+Section: Tweaks
+Depends: ellekit | mobilesubstrate, firmware (>= 15.0)
+Replaces: com.changeinfoios.tweak, com.changeinfoios.app, com.changeinfoios, com.changeinfoios.bundle, com.changeinfoios.safari, com.changeinfoios.location, com.changeinfoios.zalo
+Conflicts: com.changeinfoios.tweak, com.changeinfoios.bundle
+Provides: com.changeinfoios.tweak
+
+
+Layout:
+  DEBIAN/           control scripts from deb
+  dylibs/           ChangeInfoIos MG+CT (original bytes)
+  etc/cdhashes      trustcache list
+  app/HIOSFakerV3.app/  full UI app from HIOS
+  root/             full extracted data tree
+  ar/               debian-binary, control.tar.xz, data.tar.xz
+
+Rebuild iPFaker package:
+  python scripts/build_sileo_deb.py --version 2.17.0
+  python scripts/verify_hios_deb.py

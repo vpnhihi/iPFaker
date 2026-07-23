@@ -776,8 +776,8 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     mflat[@"ClearKeychainOnLaunch"] = @NO; // wipe only via wipe_gen after session wipe
     mflat[@"BlockFork"] = @YES;
     mflat[@"HideJailbreak"] = @YES;
-    // Settings About is optional noise — default OFF
-    mflat[@"SpoofSettingsAbout"] = @([self toggleForKey:@"SpoofSettingsAbout" defaultOn:NO]);
+    // Settings → Giới thiệu — default ON for HIOS-full parity
+    mflat[@"SpoofSettingsAbout"] = @([self toggleForKey:@"SpoofSettingsAbout" defaultOn:YES]);
     mflat[@"SelectedDevicePool"] = [self.selectedDeviceIds copy];
     mflat[@"SelectedIOSPool"] = [self.selectedIOSList copy];
     flat = mflat;

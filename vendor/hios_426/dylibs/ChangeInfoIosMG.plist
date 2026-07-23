@@ -21,7 +21,8 @@
 			<string>com.apple.mobilesafari</string>
 			<string>com.apple.WebKit.WebContent</string>
 			<string>com.apple.Maps</string>
-</array>
+			<string>com.apple.weather</string>
+		</array>
 		<key>Mode</key>
 		<string>Any</string>
 	</dict>

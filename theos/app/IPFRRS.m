@@ -36,12 +36,14 @@
     [fm createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:nil];
     if (progress) progress(@"RRS Step 0: backup config + containers…");
 
-    // Device config dual-path
+    // Device config dual-path + HIOS changeinfoios (engine config)
     for (NSString *src in @[
              @"/var/jb/etc/ipfaker/config.plist",
              @"/var/mobile/Library/iPFaker/config.plist",
              @"/var/jb/etc/ipfaker/active_profile.json",
              @"/var/mobile/Library/iPFaker/active_profile.json",
+             @"/var/jb/etc/changeinfoios/config.plist",
+             @"/var/mobile/Library/Preferences/com.changeinfoios.plist",
          ]) {
         if (![fm fileExistsAtPath:src]) continue;
         NSString *dst = [dir stringByAppendingPathComponent:

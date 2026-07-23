@@ -1,0 +1,47 @@
+#!/bin/sh
+set -e
+ROOT=/var/jb
+MS="$ROOT/Library/MobileSubstrate/DynamicLibraries"
+ETC="$ROOT/etc/changeinfoios"
+JBCTL=""
+for c in "$ROOT/basebin/jbctl" "/var/jb/basebin/jbctl" "$ROOT/usr/bin/jbctl"; do
+  [ -x "$c" ] && JBCTL="$c" && break
+done
+
+for f in "$MS/ChangeInfoIosMG.dylib" "$MS/ChangeInfoIosMG.plist" \
+         "$MS/ChangeInfoIosCT.dylib" "$MS/ChangeInfoIosCT.plist"; do
+  [ -e "$f" ] || continue
+  chown root:wheel "$f" 2>/dev/null || true
+  case "$f" in
+    *.dylib) chmod 0755 "$f" 2>/dev/null || true ;;
+    *)       chmod 0644 "$f" 2>/dev/null || true ;;
+  esac
+done
+
+# v4.0.4: strip com.apple.weather from the injection filters. Our dylib
+# crashes it (WeatherCore dispatchPrecondition SIGTRAP on the main
+# queue) and it has zero spoof value. Rescues devices whose
+# runtime-written filter still lists it. Idempotent.
+# (com.apple.Maps is intentionally NOT stripped — it is safe to inject
+#  and shows the faked GPS via the light CLLocationManager hook.)
+for P in "$MS/ChangeInfoIosMG.plist" "$MS/ChangeInfoIosCT.plist"; do
+  [ -f "$P" ] || continue
+  sed -i '/<string>com\.apple\.weather<\/string>/d' "$P" 2>/dev/null || true
+done
+
+mkdir -p "$ETC" 2>/dev/null || true
+chmod 0777 "$ETC" 2>/dev/null || true
+
+if [ -n "$JBCTL" ] && [ -f "$ETC/cdhashes" ]; then
+  while IFS= read -r h; do
+    [ -z "$h" ] && continue
+    "$JBCTL" trustcache add "$h" 2>/dev/null || true
+  done < "$ETC/cdhashes"
+fi
+
+APP="$ROOT/Applications/HIOSFakerV3.app"
+for u in uicache "$ROOT/usr/bin/uicache" /var/jb/usr/bin/uicache /usr/bin/uicache; do
+  command -v "$u" >/dev/null 2>&1 && "$u" -p "$APP" 2>/dev/null && break
+done
+
+exit 0

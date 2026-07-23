@@ -6,6 +6,16 @@ name: Build Theos rootless
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: "com.ipfaker package version"
+        required: false
+        default: "2.18.0"
+      publish_sileo:
+        description: "Publish sileo-repo to gh-pages"
+        type: boolean
+        required: false
+        default: false
   push:
     branches: [master, main, lab-gap-fill]
 
@@ -228,8 +238,17 @@ jobs:
           test -f vendor/hios_426/dylibs/ChangeInfoIosMG.dylib
           test -f vendor/hios_426/dylibs/ChangeInfoIosCT.dylib
           ls -la vendor/hios_426/dylibs/
-          python3 scripts/build_sileo_deb.py --version 2.16.2 --app theos/dist/app/iPFaker.app
+          # Lab: patch HIOS MG license gate (UNLICENSED → inert) before pack
+          python3 scripts/patch_hios_license_gate.py || true
+          VER="${{ github.event.inputs.version }}"
+          if [ -z "$VER" ]; then VER="2.18.0"; fi
+          echo "Building Sileo deb version=$VER"
+          python3 scripts/build_sileo_deb.py --version "$VER" --app theos/dist/app/iPFaker.app
           python3 scripts/verify_hios_deb.py
+          # Prove app version label
+          plutil -p theos/dist/app/iPFaker.app/Info.plist 2>/dev/null | grep -i version || true
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' theos/dist/app/iPFaker.app/Info.plist || true
+          strings theos/dist/app/iPFaker.app/iPFaker | grep -E 'writeHIOS|_ci_enable_sysctl|fake_tracking' | head -10 || true
           ls -la dist/sileo/repo/debs/ || true
           mkdir -p sileo-repo/debs
           # Keep dependency debs; replace only com.ipfaker
@@ -249,8 +268,9 @@ jobs:
             sileo-repo/**
           if-no-files-found: error
 
+      # Publish only on explicit workflow_dispatch publish_sileo=true (not every push)
       - name: Publish Sileo to GitHub Pages
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/lab-gap-fill'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish_sileo == 'true'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}

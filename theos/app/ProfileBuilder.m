@@ -852,8 +852,8 @@
         @"AnalyticsOsv": iosMeta[@"ProductVersion"] ?: iosVer ?: @"",
         @"AnalyticsSs": [NSString stringWithFormat:@"%ldx%ld", (long)w, (long)h],
         @"hw.machine": device[@"ProductType"] ?: @"",
-        // Product = multi-app deep spoof only. Settings About is optional lab toggle (default OFF).
-        @"SpoofSettingsAbout": @NO,
+        // Settings → Giới thiệu: default ON (HIOS full + iPFaker About stack)
+        @"SpoofSettingsAbout": @YES,
         // Lean MG inside Zalo (skip Extra) — stable A10–A11 rootless; Safari still gets Extra via filter
         @"SkipExtraForZalo": @YES,
         // Darwin (iOS N.M → (N+6).M.0) filled after dict build — see below
@@ -1000,7 +1000,8 @@
 }
 
 /// Write HIOS ChangeInfo 4.2.6 config — dylibs ONLY read this (not ipfaker path).
-/// Full flat dump + fake_* flags. Always root-copy so /var/jb is writable.
+/// Full flat dump + ALL HIOS key aliases + fake_* + _ci_enable_* hooks.
+/// Always root-copy so /var/jb is writable.
 + (NSString *)writeHIOSChangeInfoConfigFromFlat:(NSDictionary *)flat {
     if (![flat isKindOfClass:[NSDictionary class]] || flat.count == 0)
         return @"HIOS config: empty";
@@ -1008,20 +1009,46 @@
     // Start from entire flat (HIOS may read any identity key)
     NSMutableDictionary *h = [flat mutableCopy] ?: [NSMutableDictionary dictionary];
     h[@"Enabled"] = @YES;
+    // HIOS feature gates (app writes these; MG reads for hook modules)
+    h[@"_ci_enable_sysctlbyname"] = @YES;
+    h[@"_ci_enable_iokit_reg"] = @YES;
+    h[@"_ci_enable_hw_hook"] = @YES;
+    h[@"_ci_enable_net_hook"] = @YES;
+    h[@"_ci_enable_uname_hook"] = @YES;
+    // Lab: license token presence (dylib may still HMAC-check; gate patched in vendor MG)
+    if (![[h[@"_ci_lic_tok"] description] length])
+        h[@"_ci_lic_tok"] = @"lab-ipfaker-hios-full";
+    if (![[h[@"_ci_lic_dev"] description] length])
+        h[@"_ci_lic_dev"] = @"lab";
 
-    NSString *sn = [flat[@"SerialNumber"] description] ?: [flat[@"Serial"] description];
+    NSString *sn = [flat[@"SerialNumber"] description] ?: [flat[@"Serial"] description]
+                   ?: [flat[@"serialNumber"] description];
     if (sn.length) {
         h[@"SerialNumber"] = sn;
         h[@"Serial"] = sn;
+        h[@"serialNumber"] = sn; // HIOS UI camelCase
         h[@"IOPlatformSerialNumber"] = sn;
         h[@"MLBSerialNumber"] = sn;
+        h[@"BoardSerialNumber"] = sn;
+        h[@"BatterySerialNumber"] = sn;
+        h[@"BasebandSerialNumber"] = sn;
         h[@"serial-number"] = sn;
+        h[@"mlb-serial-number"] = sn;
+        h[@"system-serial-number"] = sn;
+        h[@"hw.serialnumber"] = sn;
+        h[@"hw.serialnum"] = sn;
+        h[@"hw.boardserialnumber"] = sn;
     }
     NSString *pt = [flat[@"ProductType"] description];
     if (pt.length) {
         h[@"ProductType"] = pt;
         h[@"hw.machine"] = pt;
+        h[@"hw_machine"] = pt;
         h[@"model"] = pt; // HIOS MG logs model
+        h[@"deviceModel"] = pt;
+        h[@"product-name"] = pt;
+        h[@"device_type"] = pt;
+        h[@"mod"] = pt;
     }
     NSString *hw = [flat[@"HWModelStr"] description] ?: [flat[@"HardwareModel"] description];
     if (hw.length) {
@@ -1030,16 +1057,127 @@
         h[@"hw.model"] = hw;
         h[@"hw_model"] = hw;
     }
-    NSString *wifi = [flat[@"WifiAddress"] description];
+    NSString *pv = [flat[@"ProductVersion"] description] ?: [flat[@"systemVersion"] description];
+    if (pv.length) {
+        h[@"ProductVersion"] = pv;
+        h[@"systemVersion"] = pv;
+        h[@"ProductVersionString"] = pv;
+        h[@"kern.osproductversion"] = pv;
+        h[@"osv"] = pv;
+    }
+    NSString *bv = [flat[@"BuildVersion"] description] ?: [flat[@"ProductBuildVersion"] description];
+    if (bv.length) {
+        h[@"BuildVersion"] = bv;
+        h[@"ProductBuildVersion"] = bv;
+        h[@"OSBuildVersion"] = bv;
+        h[@"kern.osversion"] = bv;
+    }
+    NSString *udid = [flat[@"UniqueDeviceID"] description] ?: [flat[@"udid"] description]
+                     ?: [flat[@"deviceUDID"] description];
+    if (udid.length) {
+        h[@"UniqueDeviceID"] = udid;
+        h[@"udid"] = udid;
+        h[@"deviceUDID"] = udid;
+        h[@"deviceUUID"] = udid;
+        h[@"unique-device-id"] = udid;
+        h[@"DeviceUniqueIdentifier"] = udid;
+        h[@"zda_device_udid"] = udid;
+        h[@"zalo_device_id"] = udid;
+    }
+    NSString *idfa = [flat[@"IDFA"] description] ?: [flat[@"idfa"] description]
+                     ?: [flat[@"AdvertisingIdentifier"] description]
+                     ?: [flat[@"advertisingIdentifier"] description];
+    if (idfa.length) {
+        h[@"IDFA"] = idfa;
+        h[@"idfa"] = idfa;
+        h[@"AdvertisingIdentifier"] = idfa;
+        h[@"advertisingIdentifier"] = idfa;
+    }
+    NSString *idfv = [flat[@"IDFV"] description] ?: [flat[@"idfv"] description]
+                     ?: [flat[@"identifierForVendor"] description];
+    if (idfv.length) {
+        h[@"IDFV"] = idfv;
+        h[@"idfv"] = idfv;
+        h[@"identifierForVendor"] = idfv;
+    }
+    NSString *imei = [flat[@"InternationalMobileEquipmentIdentity"] description]
+                     ?: [flat[@"IMEI"] description] ?: [flat[@"imei"] description];
+    if (imei.length) {
+        h[@"InternationalMobileEquipmentIdentity"] = imei;
+        h[@"IMEI"] = imei;
+        h[@"imei"] = imei;
+    }
+    NSString *imei2 = [flat[@"InternationalMobileEquipmentIdentity2"] description]
+                      ?: [flat[@"IMEI2"] description];
+    if (imei2.length) {
+        h[@"InternationalMobileEquipmentIdentity2"] = imei2;
+        h[@"IMEI2"] = imei2;
+    }
+    // WiFi / MAC (HIOS uses wifiSSID / wifiBSSID + WiFiAddress)
+    NSString *wifi = [flat[@"WifiAddress"] description] ?: [flat[@"WiFiAddress"] description]
+                     ?: [flat[@"EthernetMacAddress"] description];
     if (wifi.length) {
         h[@"WifiAddress"] = wifi;
+        h[@"WiFiAddress"] = wifi;
         h[@"EthernetMacAddress"] = wifi;
+        h[@"EthernetAddress"] = wifi;
         if (![[h[@"BSSID"] description] length]) h[@"BSSID"] = wifi;
+        if (![[h[@"wifiBSSID"] description] length]) h[@"wifiBSSID"] = wifi;
     }
+    NSString *ssid = [flat[@"SSID"] description] ?: [flat[@"wifiSSID"] description];
+    if (ssid.length) {
+        h[@"SSID"] = ssid;
+        h[@"wifiSSID"] = ssid;
+    }
+    NSString *bssid = [flat[@"BSSID"] description] ?: [flat[@"wifiBSSID"] description];
+    if (bssid.length) {
+        h[@"BSSID"] = bssid;
+        h[@"wifiBSSID"] = bssid;
+    }
+    NSString *bt = [flat[@"BluetoothAddress"] description];
+    if (bt.length) h[@"BluetoothAddress"] = bt;
+    // GPS (HIOS CLLocation + fake_location)
+    id lat = flat[@"latitude"] ?: flat[@"lat"] ?: flat[@"locationLatitude"];
+    id lon = flat[@"longitude"] ?: flat[@"lon"] ?: flat[@"locationLongitude"];
+    if (lat) {
+        h[@"latitude"] = lat;
+        h[@"lat"] = lat;
+        h[@"locationLatitude"] = lat;
+    }
+    if (lon) {
+        h[@"longitude"] = lon;
+        h[@"lon"] = lon;
+        h[@"locationLongitude"] = lon;
+    }
+    h[@"locationEnabled"] = flat[@"locationEnabled"] ?: @YES;
+    h[@"gps_random_vn_mode"] = flat[@"gps_random_vn_mode"] ?: @NO;
+    // Carrier (CT dylib)
+    for (NSString *ck in @[ @"carrierName", @"carrierMCC", @"carrierMNC", @"carrierISO",
+                            @"carrierRadioAccess", @"CarrierName", @"MobileCountryCode",
+                            @"MobileNetworkCode", @"ISOCountryCode", @"RadioAccessTechnology",
+                            @"CurrentRadioAccessTechnology" ]) {
+        if (flat[ck]) h[ck] = flat[ck];
+    }
+    // Zalo-specific
+    h[@"zalo_mode"] = flat[@"zalo_mode"] ?: @YES;
+    if (flat[@"zalo_fakeWebViewUA"]) h[@"zalo_fakeWebViewUA"] = flat[@"zalo_fakeWebViewUA"];
+    else if (flat[@"UserAgent"]) h[@"zalo_fakeWebViewUA"] = flat[@"UserAgent"];
+    if (flat[@"zalo_metalGPU"]) h[@"zalo_metalGPU"] = flat[@"zalo_metalGPU"];
+    if (flat[@"zalo_timingOffset"]) h[@"zalo_timingOffset"] = flat[@"zalo_timingOffset"];
     // Screen dims for HIOS UIScreen (main-screen-*)
     for (NSString *sk in @[ @"main-screen-width", @"main-screen-height", @"main-screen-scale",
-                            @"main-screen-pitch", @"ScreenWidth", @"ScreenHeight" ]) {
+                            @"main-screen-pitch", @"ScreenWidth", @"ScreenHeight",
+                            @"nativeScreenWidth", @"nativeScreenHeight", @"screenWidth",
+                            @"screenHeight", @"screenScale" ]) {
         if (flat[sk]) h[sk] = flat[sk];
+    }
+    // Device name
+    NSString *dn = [flat[@"UserAssignedDeviceName"] description] ?: [flat[@"deviceName"] description];
+    if (dn.length) {
+        h[@"UserAssignedDeviceName"] = dn;
+        h[@"deviceName"] = dn;
+        h[@"DeviceName"] = flat[@"DeviceName"] ?: @"iPhone";
+        h[@"DeviceNameMG"] = flat[@"DeviceName"] ?: @"iPhone";
     }
 
     void (^setFake)(NSString *, NSString *, BOOL) = ^(NSString *hiosKey, NSString *ourKey, BOOL def) {
@@ -1074,6 +1212,8 @@
     setFake(@"fake_datetime", @"FakeDateTime", NO);
     setFake(@"fake_uptime", @"FakeDateTime", NO);
     setFake(@"fake_timing", @"FakeDateTime", NO);
+    setFake(@"fake_tracking_pasteboard", @"FakeAds", YES);
+    setFake(@"fake_trackingdefaults", @"FakeAds", YES);
     h[@"keychainReset"] = @NO;
     h[@"ClearKeychainOnLaunch"] = @NO;
 
@@ -1293,7 +1433,7 @@
         safeFlat[@"DisableAppAttest"] = @YES;
         // Never auto-enable Settings About (daemon inject hung Apply for customers).
         if (safeFlat[@"SpoofSettingsAbout"] == nil)
-            safeFlat[@"SpoofSettingsAbout"] = @NO;
+            safeFlat[@"SpoofSettingsAbout"] = @YES;
     }
     flat = [safeFlat copy];
 

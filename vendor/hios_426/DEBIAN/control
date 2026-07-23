@@ -1,0 +1,12 @@
+Package: com.changeinfoios.v3
+Name: HIOS Faker v3
+Version: 4.2.6
+Architecture: iphoneos-arm64
+Description: ChangeInfoIos v3 — focused device-spoof for popular iOS apps. Zero injection into target apps; central spoof in MobileGestaltHelper + CoreTelephony daemons.
+Maintainer: ChangeInfoIos
+Author: ChangeInfoIos
+Section: Tweaks
+Depends: ellekit | mobilesubstrate, firmware (>= 15.0)
+Replaces: com.changeinfoios.tweak, com.changeinfoios.app, com.changeinfoios, com.changeinfoios.bundle, com.changeinfoios.safari, com.changeinfoios.location, com.changeinfoios.zalo
+Conflicts: com.changeinfoios.tweak, com.changeinfoios.bundle
+Provides: com.changeinfoios.tweak
