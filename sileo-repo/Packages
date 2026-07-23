@@ -1,16 +1,19 @@
-Package: ca-certificates
-Name: ca-certificates
-Version: 20240602
-Architecture: all
-Maintainer: Procursus Team <support@procurs.us>
-Section: Utilities
+Package: com.ipfaker
+Name: iPFaker
+Depends: firmware (>= 14.0), ellekit (>= 1.1), libsqlite3-1, sqlite3, ldid, libplist3
+Version: 2.10.0
+Architecture: iphoneos-arm64
+Maintainer: iPFaker Lab
+Author: iPFaker Lab
+Section: Tweaks
 Priority: optional
-Description: Common CA certificates Contains the certificate authorities shipped with Mozilla's browser to allow SSL-based applications to check for the authenticity of SSL connections. . Please note that Procursus can neither confirm nor deny whether the certificate authorities whose certificates are included in this package have in any way been audited for trustworthiness or RFC 3647 compliance. Full responsibility to assess them belongs to the local system administrator.
-Installed-Size: 232
-Filename: debs/ca-certificates_20240602_all.deb
-Size: 128768
-MD5sum: 039f19f76471e28496f3b81c82495ca2
-SHA256: 593ec6ccf471f046c5c51d03f819d723ff06d91c678503abe48390440b687eb6
+Homepage: https://github.com/vpnhihi/ipfaker
+Description: Full lab stack MG(Zalo-safe lean)+CT+Deep+JB+About+AboutID+AboutUI+AA. Zalo: delayed MG, no UIScreen crash; NET ss via CT. Requires ElleKit + Userspace Reboot after install. Includes iPFaker.app (device pool, wipe, Apply).
+Installed-Size: 3656
+Filename: debs/com.ipfaker_2.10.0_iphoneos-arm64.deb
+Size: 472586
+MD5sum: 828b1ea494be109200834f1ce5649400
+SHA256: 5bc267188d36019576f8cc28862bbd046ab5ada5807ac6f4322303d260f61687
 
 Package: com.ipfaker
 Name: iPFaker
@@ -96,6 +99,20 @@ Filename: debs/com.ipfaker_2.8.2_iphoneos-arm64.deb
 Size: 450842
 MD5sum: 6233ed0ab1608df00c117ecdb5683896
 SHA256: 2eb8676a47f5f3782b19c3945b9eb5a9f3a7b42a6b896c25bd45f1bab799efd5
+
+Package: ca-certificates
+Name: ca-certificates
+Version: 20240602
+Architecture: all
+Maintainer: Procursus Team <support@procurs.us>
+Section: Utilities
+Priority: optional
+Description: Common CA certificates Contains the certificate authorities shipped with Mozilla's browser to allow SSL-based applications to check for the authenticity of SSL connections. . Please note that Procursus can neither confirm nor deny whether the certificate authorities whose certificates are included in this package have in any way been audited for trustworthiness or RFC 3647 compliance. Full responsibility to assess them belongs to the local system administrator.
+Installed-Size: 232
+Filename: debs/ca-certificates_20240602_all.deb
+Size: 128768
+MD5sum: 039f19f76471e28496f3b81c82495ca2
+SHA256: 593ec6ccf471f046c5c51d03f819d723ff06d91c678503abe48390440b687eb6
 
 Package: ellekit
 Name: ElleKit
@@ -249,3 +266,4 @@ Filename: debs/sqlite3_3.34.1_iphoneos-arm64.deb
 Size: 103598
 MD5sum: b6560b79e1c7fca0dd3cf29d043f0e6a
 SHA256: c953ad4daaf337bdafa3c38ba82416fd2d62b396d253ad3c936e8543719ceaf1
+

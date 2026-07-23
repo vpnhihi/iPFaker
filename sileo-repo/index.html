@@ -1,34 +1,28 @@
 <!DOCTYPE html>
 <html lang="vi"><head><meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>iPFaker Sileo — full deps</title>
+<title>iPFaker Sileo</title>
 <style>
-body{font-family:-apple-system,sans-serif;max-width:680px;margin:2rem auto;padding:0 1rem;background:#0b0d10;color:#e8eaed}
+body{font-family:-apple-system,sans-serif;max-width:640px;margin:2rem auto;padding:0 1rem;background:#0b0d10;color:#e8eaed;line-height:1.5}
 .url{background:#111;color:#4ade80;padding:1rem;border-radius:8px;word-break:break-all}
 a{color:#60a5fa}
-.box{background:#151820;border:1px solid #2a3140;border-radius:10px;padding:1rem;margin:1rem 0}
-li{margin:.35rem 0}
+.box{background:#151820;padding:1rem;border-radius:8px;margin:1rem 0}
+.warn{color:#fbbf24}
 </style></head><body>
-<h1>iPFaker — nguồn full (bắt buộc kèm ElleKit)</h1>
+<h1>iPFaker — nguồn Sileo</h1>
 <p class="url">https://vpnhihi.github.io/ipfaker/</p>
+<p>Gói <b>com.ipfaker 2.10.0</b> · full stack lab/dev · rootless · iphoneos-arm64 · Dopamine</p>
 <div class="box">
-<p><b>Cài iPFaker 2.8.2</b> → Sileo <b>bắt buộc</b> cài kèm:</p>
-<ul>
-<li><b>ellekit</b> — inject tweak (máy lab có, máy mới thiếu là spoof chết)</li>
-<li><b>ldid</b> + <b>libplist3</b></li>
-<li><b>sqlite3</b> + <b>libsqlite3-1</b> — wipe keychain</li>
-</ul>
-<p>Tất cả nằm trong nguồn này (thư mục debs/). Sau cài: <b>Dopamine → Userspace Reboot</b>.</p>
+<strong>Máy khách = máy lab</strong> khi cài <b>2.10.0+</b> + <b>ElleKit</b> + <b>Userspace Reboot</b>.
+Bản ≤2.8.2 thiếu MG Zalo-safe / CT Deep mới — spoof sẽ “thiếu chức năng”.
 </div>
 <ol>
-<li>Sileo → Sources → + → dán URL → Add → Refresh</li>
-<li>Tìm <b>iPFaker</b> 2.8.2 → Get/Cài (Sileo hiện danh sách phụ thuộc → Cài tất cả)</li>
-<li>Userspace Reboot → mở iPFaker → Apply</li>
+<li>Sileo → Sources → +</li>
+<li>Dán URL (chữ thường <code>ipfaker</code>) → Add → Refresh</li>
+<li>Cài <b>ElleKit</b> (nếu chưa) → <b>iPFaker 2.10.0</b></li>
+<li class="warn">Dopamine → <b>Userspace Reboot</b> (bắt buộc)</li>
+<li>Mở iPFaker → chọn máy → Apply → Đặt lại dữ liệu app → mở Zalo</li>
 </ol>
-<p>
-<a href="debs/com.ipfaker_2.8.2_iphoneos-arm64.deb">iPFaker 2.8.2</a> ·
-<a href="debs/ellekit_1.1.3_iphoneos-arm64.deb">ElleKit</a> ·
-<a href="debs/sqlite3_3.34.1_iphoneos-arm64.deb">sqlite3</a> ·
-<a href="debs/ldid_2.1.5-procursus7_iphoneos-arm64.deb">ldid</a>
-</p>
+<p><a href="debs/com.ipfaker_2.10.0_iphoneos-arm64.deb">Tải .deb 2.10.0 trực tiếp</a></p>
+<p><a href="INSTALL.txt">INSTALL.txt</a> · <a href="https://github.com/vpnhihi/ipfaker">GitHub</a></p>
 </body></html>

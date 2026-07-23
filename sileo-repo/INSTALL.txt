@@ -1,0 +1,7 @@
+﻿iPFaker 2.10.0 — same stack as lab/dev
+Source: https://vpnhihi.github.io/ipfaker/
+1) Sileo -> Sources -> https://vpnhihi.github.io/ipfaker/
+2) Install iPFaker 2.10.0 (pulls ellekit/ldid/sqlite)
+3) Dopamine -> Userspace Reboot (REQUIRED)
+4) Open iPFaker -> Apply device -> Reset app data -> Zalo
+MG Zalo-safe lean (no UIScreen crash). CT Deep for mod/osv/ss on NET.

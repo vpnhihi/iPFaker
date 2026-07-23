@@ -2,8 +2,7 @@ Origin: iPFaker Lab
 Label: iPFaker
 Suite: stable
 Version: 1.0
-Codename: ipfaker
+Codename: rootless
 Architectures: iphoneos-arm64
 Components: main
-Description: iPFaker + ElleKit + sqlite + ldid (full lab deps for new devices)
-Date: Wed, 22 Jul 2026 13:08:03 +0000
+Description: iPFaker full stack for Dopamine rootless — match lab/dev

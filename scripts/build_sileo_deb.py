@@ -31,16 +31,17 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION_DEFAULT = "2.8.2"
+VERSION_DEFAULT = "2.10.0"
 PKG = "com.ipfaker"
 ARCH = "iphoneos-arm64"
 
-# Full lab stack shipped to new devices (ElleKit TweakInject)
+# Full lab stack shipped to every Sileo install (same as dev after CI)
 STACK_MODULES = (
     "iPFakerMG",
     "iPFakerCT",
     "iPFakerJB",
     "iPFakerAbout",
+    "iPFakerAboutID",
     "iPFakerAboutUI",
     "iPFakerAboutVer",
     "iPFakerAA",
@@ -52,6 +53,8 @@ def _ci_dist_bases() -> list[Path]:
     bases: list[Path] = []
     # Newest first among known lab snapshots
     for name in (
+        "_ci_art_mglean",  # newest Zalo-safe MG lean
+        "_ci_art_sot",
         "_ci_art_dual",
         "_ci_art_ui",
         "_ci_art_swver2",
@@ -417,10 +420,13 @@ exit 0
 
 
 def control_text(version: str, installed_size_kb: int, has_app: bool, has_dylibs: bool) -> str:
-    desc = "Full lab stack: MG+CT+JB+About+AboutUI+AboutVer+AA"
+    desc = (
+        "Full lab stack MG(Zalo-safe lean)+CT+Deep+JB+About+AboutID+AboutUI+AA. "
+        "Zalo: delayed MG, no UIScreen crash; NET ss via CT. "
+        "Requires ElleKit + Userspace Reboot after install."
+    )
     if has_app:
-        desc += " + iPFaker.app (pool, multi-app wipe, Save session)"
-    desc += ". Rootless Dopamine. One install = same as lab machine."
+        desc += " Includes iPFaker.app (device pool, wipe, Apply)."
     return f"""Package: {PKG}
 Name: iPFaker
 Depends: firmware (>= 14.0), ellekit (>= 1.1), libsqlite3-1, sqlite3, ldid, libplist3
@@ -552,7 +558,7 @@ def _resolve_dylib(base: Path, name: str) -> Path | None:
 def _filter_for_module(name: str, pl_mg: bytes, pl_ct: bytes, pl_about: bytes) -> bytes:
     if name == "iPFakerCT":
         return pl_ct
-    if name in ("iPFakerAbout", "iPFakerAboutUI", "iPFakerAboutVer"):
+    if name in ("iPFakerAbout", "iPFakerAboutID", "iPFakerAboutUI", "iPFakerAboutVer"):
         return pl_about
     return pl_mg
 

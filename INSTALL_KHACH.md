@@ -26,16 +26,27 @@ Sileo → **Nguồn** → **+** → dán URL → **Add** → refresh.
 | **libplist3** | Phụ thuộc ldid | ✅ |
 | **ldid** | Ký / trustcache | ✅ |
 | **libsqlite3-1** + **sqlite3** | Wipe keychain session | ✅ |
-| **com.ipfaker 2.8.2+** | App + 7 dylib + wipe + About inject daemon | ✅ |
+| **com.ipfaker 2.10.0+** | App + MG lean Zalo-safe + CT Deep + AA + About* + wipe | ✅ (sau publish) |
 
-**Cách nhanh:** cài **iPFaker 2.8.2** — Depends sẽ kéo ElleKit + sqlite + ldid nếu nguồn đã add.
+**Cách nhanh:** cài **iPFaker 2.10.0** — Depends kéo ElleKit + sqlite + ldid.
 
-**Thứ tự an toàn:** ElleKit → sqlite/ldid → iPFaker → **Dopamine → Userspace Reboot**.
+**Thứ tự an toàn:** ElleKit → sqlite/ldid → iPFaker → **Dopamine → Userspace Reboot** (bắt buộc, không skip).
 
 ### Deb trực tiếp
 
-- iPFaker: `https://vpnhihi.github.io/ipfaker/debs/com.ipfaker_2.8.2_iphoneos-arm64.deb`
+- iPFaker: `https://vpnhihi.github.io/ipfaker/debs/com.ipfaker_2.10.0_iphoneos-arm64.deb`
 - ElleKit: `https://vpnhihi.github.io/ipfaker/debs/ellekit_1.1.3_iphoneos-arm64.deb`
+
+### Máy dev vs máy khách (vì sao “thiếu chức năng”)
+
+| | Máy lab/dev | Máy cài Sileo cũ (≤2.8.2) |
+|--|-------------|---------------------------|
+| Dylib | SSH/CI **mới mỗi ngày** | Deb **cũ trên Pages** |
+| MG Zalo-safe delay | Có (2.10+) | Không |
+| CT Deep `ss`/UA | Có | Thiếu / cũ |
+| AboutID | Có | Có thể thiếu |
+
+→ **Máy khác phải cài / nâng lên 2.10.0+** rồi Userspace Reboot — không chỉ copy app.
 
 ## 3. Sau reboot
 
