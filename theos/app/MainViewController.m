@@ -75,7 +75,19 @@
     title.translatesAutoresizingMaskIntoConstraints = NO;
 
     UILabel *ver = [[UILabel alloc] init];
-    ver.text = @"Lab rootless · spoof multi-device";
+    {
+        NSString *bv = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"?";
+        NSString *eng = @"?";
+        NSString *et = [NSString stringWithContentsOfFile:@"/var/jb/etc/ipfaker/ENGINE.txt"
+                                                encoding:NSUTF8StringEncoding error:nil];
+        if ([et containsString:@"HIOS"] || [et containsString:@"ChangeInfo"])
+            eng = @"HIOS-MG";
+        else if ([[NSFileManager defaultManager] fileExistsAtPath:@"/var/jb/usr/lib/TweakInject/ChangeInfoIosMG.dylib"])
+            eng = @"HIOS-MG";
+        else if ([[NSFileManager defaultManager] fileExistsAtPath:@"/var/jb/usr/lib/TweakInject/iPFakerMG.dylib"])
+            eng = @"iPFakerMG";
+        ver.text = [NSString stringWithFormat:@"%@ · eng=%@", bv, eng];
+    }
     ver.font = AppTheme.captionFont;
     ver.textColor = AppTheme.textSecondary;
     ver.translatesAutoresizingMaskIntoConstraints = NO;

@@ -999,45 +999,49 @@
     return ok;
 }
 
-/// Write HIOS ChangeInfo 4.2.6 config (dylibs read ONLY this path).
-/// Keys use fake_* style HIOS expects. Dual-write with iPFaker config.
+/// Write HIOS ChangeInfo 4.2.6 config — dylibs ONLY read this (not ipfaker path).
+/// Full flat dump + fake_* flags. Always root-copy so /var/jb is writable.
 + (NSString *)writeHIOSChangeInfoConfigFromFlat:(NSDictionary *)flat {
     if (![flat isKindOfClass:[NSDictionary class]] || flat.count == 0)
         return @"HIOS config: empty";
-    NSMutableDictionary *h = [NSMutableDictionary dictionary];
-    // Pass-through identity keys HIOS MG reads by name
-    for (NSString *k in @[
-             @"Enabled", @"ProductType", @"ProductVersion", @"BuildVersion", @"ProductBuildVersion",
-             @"MarketingName", @"HWModelStr", @"HardwareModel", @"ModelNumber", @"PartNumber",
-             @"SerialNumber", @"Serial", @"UserAssignedDeviceName", @"DeviceName", @"Hostname",
-             @"IDFA", @"IDFV", @"identifierForVendor", @"advertisingIdentifier",
-             @"WifiAddress", @"BluetoothAddress", @"EthernetMacAddress", @"BSSID", @"SSID",
-             @"IMEI", @"MEID", @"EID", @"SEID", @"BasebandVersion",
-             @"InternationalMobileEquipmentIdentity", @"MobileEquipmentIdentifier",
-             @"latitude", @"longitude", @"Latitude", @"Longitude",
-             @"CarrierName", @"MobileCountryCode", @"MobileNetworkCode", @"ISOCountryCode",
-             @"locale", @"timezone", @"TimeZone", @"RegionInfo",
-             @"UserAgent", @"HTTPUserAgent", @"kern.osrelease", @"kern.osversion",
-             @"kern.hostname", @"hw.machine", @"hw.model",
-         ]) {
-        id v = flat[k];
-        if (v != nil) h[k] = v;
-    }
-    // Alias serials
+
+    // Start from entire flat (HIOS may read any identity key)
+    NSMutableDictionary *h = [flat mutableCopy] ?: [NSMutableDictionary dictionary];
+    h[@"Enabled"] = @YES;
+
     NSString *sn = [flat[@"SerialNumber"] description] ?: [flat[@"Serial"] description];
     if (sn.length) {
         h[@"SerialNumber"] = sn;
         h[@"Serial"] = sn;
         h[@"IOPlatformSerialNumber"] = sn;
         h[@"MLBSerialNumber"] = sn;
+        h[@"serial-number"] = sn;
+    }
+    NSString *pt = [flat[@"ProductType"] description];
+    if (pt.length) {
+        h[@"ProductType"] = pt;
+        h[@"hw.machine"] = pt;
+        h[@"model"] = pt; // HIOS MG logs model
+    }
+    NSString *hw = [flat[@"HWModelStr"] description] ?: [flat[@"HardwareModel"] description];
+    if (hw.length) {
+        h[@"HWModelStr"] = hw;
+        h[@"HardwareModel"] = hw;
+        h[@"hw.model"] = hw;
+        h[@"hw_model"] = hw;
     }
     NSString *wifi = [flat[@"WifiAddress"] description];
     if (wifi.length) {
         h[@"WifiAddress"] = wifi;
         h[@"EthernetMacAddress"] = wifi;
-        if (![h[@"BSSID"] description].length) h[@"BSSID"] = wifi;
+        if (![[h[@"BSSID"] description] length]) h[@"BSSID"] = wifi;
     }
-    // HIOS fake_* flags (from our Fake* or existing fake_*)
+    // Screen dims for HIOS UIScreen (main-screen-*)
+    for (NSString *sk in @[ @"main-screen-width", @"main-screen-height", @"main-screen-scale",
+                            @"main-screen-pitch", @"ScreenWidth", @"ScreenHeight" ]) {
+        if (flat[sk]) h[sk] = flat[sk];
+    }
+
     void (^setFake)(NSString *, NSString *, BOOL) = ^(NSString *hiosKey, NSString *ourKey, BOOL def) {
         id v = flat[hiosKey] ?: flat[ourKey];
         if (v != nil && [v respondsToSelector:@selector(boolValue)])
@@ -1045,8 +1049,8 @@
         else
             h[hiosKey] = @(def);
     };
-    h[@"Enabled"] = @YES;
     setFake(@"fake_hardware", @"FakeHardware", YES);
+    setFake(@"fake_uidevice", @"FakeDevice", YES);
     setFake(@"fake_uiddevice", @"FakeDevice", YES);
     setFake(@"fake_uiddevice2", @"FakeDevice", YES);
     setFake(@"fake_ads", @"FakeAds", YES);
@@ -1067,43 +1071,85 @@
     setFake(@"fake_battery", @"FakeHardware", YES);
     setFake(@"fake_metal", @"FakeHardware", YES);
     setFake(@"fake_processinfo", @"FakeSysOSVersion", YES);
-    // Never clear KC every launch (HIOS has flag; we force off unless user set)
+    setFake(@"fake_datetime", @"FakeDateTime", NO);
+    setFake(@"fake_uptime", @"FakeDateTime", NO);
+    setFake(@"fake_timing", @"FakeDateTime", NO);
     h[@"keychainReset"] = @NO;
     h[@"ClearKeychainOnLaunch"] = @NO;
 
-    NSString *dir = @"/var/jb/etc/changeinfoios";
-    NSFileManager *fm = [NSFileManager defaultManager];
-    [fm createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:nil];
-    NSString *path = [dir stringByAppendingPathComponent:@"config.plist"];
-    BOOL ok = [h writeToFile:path atomically:YES];
-    if (!ok) {
-        // root may own — try via shell
-        NSString *tmp = @"/var/mobile/Library/iPFaker/changeinfoios_config.plist";
-        [h writeToFile:tmp atomically:YES];
-        NSString *sh = [NSString stringWithFormat:
-                        @"#!/bin/sh\n"
-                        @"mkdir -p /var/jb/etc/changeinfoios\n"
-                        @"cp -f '%@' /var/jb/etc/changeinfoios/config.plist\n"
-                        @"chown mobile:mobile /var/jb/etc/changeinfoios/config.plist\n"
-                        @"chmod 644 /var/jb/etc/changeinfoios/config.plist\n"
-                        @"exit 0\n", tmp];
-        NSString *sp = @"/var/mobile/Library/iPFaker/write_hios_config.sh";
-        [sh writeToFile:sp atomically:YES encoding:NSUTF8StringEncoding error:nil];
-        int rc = [self runRootShellScript:sp timeoutSec:15];
-        ok = (rc == 0) || [fm fileExistsAtPath:path];
+    // XML plist (HIOS uses NSPropertyListSerialization — binary or XML both OK)
+    NSError *serErr = nil;
+    NSData *plistData = [NSPropertyListSerialization dataWithPropertyList:h
+                                                                   format:NSPropertyListXMLFormat_v1_0
+                                                                  options:0
+                                                                    error:&serErr];
+    if (!plistData.length) {
+        return [NSString stringWithFormat:@"HIOS config serialize FAIL: %@", serErr.localizedDescription ?: @"?"];
     }
-    // Notify HIOS dylibs to reload
+
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSString *tmp = @"/var/mobile/Library/iPFaker/changeinfoios_config.plist";
+    [fm createDirectoryAtPath:@"/var/mobile/Library/iPFaker"
+  withIntermediateDirectories:YES attributes:nil error:nil];
+    if (![plistData writeToFile:tmp atomically:YES])
+        return @"HIOS config: cannot write temp plist";
+
+    // ALWAYS root copy — mobile often cannot create /var/jb/etc/changeinfoios
+    NSString *sh = [NSString stringWithFormat:
+                    @"#!/bin/sh\n"
+                    @"export PATH=/var/jb/usr/bin:/var/jb/bin:/usr/bin:/bin:$PATH\n"
+                    @"mkdir -p /var/jb/etc/changeinfoios /var/mobile/Library/Preferences 2>/dev/null\n"
+                    @"chmod 777 /var/jb/etc/changeinfoios 2>/dev/null || true\n"
+                    @"cp -f '%@' /var/jb/etc/changeinfoios/config.plist\n"
+                    @"cp -f '%@' /var/mobile/Library/Preferences/com.changeinfoios.plist\n"
+                    @"chown mobile:mobile /var/jb/etc/changeinfoios/config.plist 2>/dev/null || true\n"
+                    @"chown mobile:mobile /var/mobile/Library/Preferences/com.changeinfoios.plist 2>/dev/null || true\n"
+                    @"chmod 644 /var/jb/etc/changeinfoios/config.plist /var/mobile/Library/Preferences/com.changeinfoios.plist 2>/dev/null || true\n"
+                    @"# ensure HIOS dylibs present and our old MG off\n"
+                    @"TI=/var/jb/usr/lib/TweakInject\n"
+                    @"for n in iPFakerMG iPFakerCT; do\n"
+                    @"  [ -f \"$TI/${n}.dylib\" ] && mv -f \"$TI/${n}.dylib\" \"$TI/${n}.dylib.off\" 2>/dev/null || true\n"
+                    @"done\n"
+                    @"test -f /var/jb/etc/changeinfoios/config.plist || exit 1\n"
+                    @"test -f $TI/ChangeInfoIosMG.dylib || exit 2\n"
+                    @"sz=$(wc -c < /var/jb/etc/changeinfoios/config.plist | tr -d ' ')\n"
+                    @"echo OK hios_cfg sz=$sz pt=%@\n"
+                    @"exit 0\n",
+                    tmp, tmp, pt.length ? pt : @"?"];
+    NSString *sp = @"/var/mobile/Library/iPFaker/write_hios_config.sh";
+    [sh writeToFile:sp atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    [fm setAttributes:@{ NSFilePosixPermissions: @0755 } ofItemAtPath:sp error:nil];
+    int rc = [self runRootShellScript:sp timeoutSec:20];
+
+    BOOL okFile = [fm fileExistsAtPath:@"/var/jb/etc/changeinfoios/config.plist"];
+    // Direct write fallback if rootless allows
+    if (!okFile) {
+        [fm createDirectoryAtPath:@"/var/jb/etc/changeinfoios"
+      withIntermediateDirectories:YES attributes:nil error:nil];
+        okFile = [plistData writeToFile:@"/var/jb/etc/changeinfoios/config.plist" atomically:YES];
+    }
+
     CFNotificationCenterPostNotification(
         CFNotificationCenterGetDarwinNotifyCenter(),
-        CFSTR("com.changeinfoios/ReloadConfig"),
-        NULL, NULL, true);
+        CFSTR("com.changeinfoios/ReloadConfig"), NULL, NULL, true);
     CFNotificationCenterPostNotification(
         CFNotificationCenterGetDarwinNotifyCenter(),
-        CFSTR("com.changeinfoios.v3/ReloadConfig"),
-        NULL, NULL, true);
-    return ok
-        ? [NSString stringWithFormat:@"HIOS config OK (%lu keys) → %@", (unsigned long)h.count, path]
-        : @"HIOS config WRITE FAIL (check /var/jb/etc/changeinfoios perms)";
+        CFSTR("com.changeinfoios.v3/ReloadConfig"), NULL, NULL, true);
+    CFNotificationCenterPostNotification(
+        CFNotificationCenterGetDarwinNotifyCenter(),
+        CFSTR("com.changeinfoios/ReloadPrefs"), NULL, NULL, true);
+
+    NSString *ptOut = [h[@"ProductType"] description] ?: @"?";
+    NSString *mkOut = [h[@"MarketingName"] description] ?: @"?";
+    if (okFile && (rc == 0 || rc == -1)) {
+        return [NSString stringWithFormat:
+                @"HIOS eng OK · %@ (%@) · keys=%lu · rc=%d\n"
+                @"→ kill Zalo + mở lại (session cũ vẫn hiện máy cũ)",
+                mkOut, ptOut, (unsigned long)h.count, rc];
+    }
+    return [NSString stringWithFormat:
+            @"HIOS config FAIL rc=%d file=%d — sudo chown -R mobile /var/jb/etc/changeinfoios",
+            rc, okFile ? 1 : 0];
 }
 
 + (NSString *)applyFlatProfile:(NSDictionary *)flat deviceId:(NSString *)deviceId ios:(NSString *)ios {
