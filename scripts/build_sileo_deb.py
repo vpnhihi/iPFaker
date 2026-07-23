@@ -82,24 +82,25 @@ def _ci_dist_bases() -> list[Path]:
 
 
 def find_stack_dir() -> Path | None:
-    """Directory containing at least MG+CT (full stack preferred)."""
+    """Directory containing at least MG+CT (full stack preferred; largest MG wins ties)."""
     best: Path | None = None
     best_n = -1
+    best_mg = -1
     for base in _ci_dist_bases():
         mg = base / "iPFakerMG.dylib"
         ct = base / "iPFakerCT.dylib"
         if not (mg.is_file() and ct.is_file()):
-            # arm64e names
             mg = base / "iPFakerMG.arm64e.dylib"
             ct = base / "iPFakerCT.arm64e.dylib"
             if not (mg.is_file() and ct.is_file()):
                 continue
         n = sum(1 for m in STACK_MODULES if (base / f"{m}.dylib").is_file() or (base / f"{m}.arm64e.dylib").is_file())
-        if n > best_n:
+        mgsz = mg.stat().st_size
+        # Prefer more modules; on tie pick larger MG (Deep/IOKit fat builds)
+        if n > best_n or (n == best_n and mgsz > best_mg):
             best_n = n
+            best_mg = mgsz
             best = base
-            if n >= len(STACK_MODULES):
-                break
     return best
 
 
