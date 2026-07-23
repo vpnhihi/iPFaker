@@ -404,9 +404,19 @@ static NSData *IPFRewritePayload(NSData *data) {
             // dId: IDFV preferred (vendor-scoped device id in Zalo analytics)
             if (safeDid.length >= 8)
                 forceField(@"dId", safeDid);
-            // adId: IDFA (advertising id) — B P0 gap that was still failing
+            // adId: IDFA (advertising id)
             if (safeAd.length >= 8)
                 forceField(@"adId", safeAd);
+            // HIOS-style Zalo-specific keys
+            if (safeDid.length >= 8) {
+                forceField(@"zalo_device_id", safeDid);
+                forceField(@"zaloDeviceId", safeDid);
+                forceField(@"device_id", safeDid);
+            }
+            if (safeUdid.length >= 8) {
+                forceField(@"zalo_udid", safeUdid);
+                forceField(@"udid", safeUdid);
+            }
         }
         if (changed) {
             IPFLog([NSString stringWithFormat:@"NET rewrite body len %lu → PT=%@ osv=%@ ss=%@",
@@ -424,16 +434,67 @@ static CFTypeRef (*orig_IORegSearch)(io_registry_entry_t entry, const io_name_t 
 
 static CFTypeRef IPFMaybeSpoofIOKitValue(CFStringRef key, CFTypeRef value) {
     if (!key || !value) return value;
-    if (CFGetTypeID(value) != CFStringGetTypeID()) return value;
+    // Data MAC (6 bytes) or CFString
     @autoreleasepool {
         NSString *k = (__bridge NSString *)key;
-        NSString *v = (__bridge NSString *)value;
         NSString *kl = k.lowercaseString;
+
+        // HIOS-style MAC keys
+        BOOL isMac =
+            [kl containsString:@"mac"] || [kl containsString:@"ethernet"]
+            || [kl containsString:@"wifi"] || [kl containsString:@"80211"]
+            || [kl isEqualToString:@"iomacaddress"]
+            || [kl isEqualToString:@"io80211interfacemacaddress"]
+            || [kl isEqualToString:@"ioethernetmacaddress"]
+            || [kl containsString:@"bluetooth"];
+        if (isMac) {
+            NSString *wifi = [[IPFConfig shared] stringForKey:@"WifiAddress"]
+                ?: [[IPFConfig shared] mgValueForKey:@"WifiAddress"];
+            NSString *bt = [[IPFConfig shared] stringForKey:@"BluetoothAddress"]
+                ?: [[IPFConfig shared] mgValueForKey:@"BluetoothAddress"]
+                ?: wifi;
+            NSString *want = ([kl containsString:@"bluetooth"] || [kl containsString:@"bt"])
+                ? (bt ?: wifi) : (wifi ?: bt);
+            if (!want.length) return value;
+            // Normalize AA:BB:CC:DD:EE:FF
+            want = [[want uppercaseString]
+                stringByReplacingOccurrencesOfString:@"-" withString:@":"];
+            if (CFGetTypeID(value) == CFStringGetTypeID()) {
+                NSString *v = (__bridge NSString *)value;
+                if (![v.uppercaseString isEqualToString:want]) {
+                    IPFLog([NSString stringWithFormat:@"IOKit MAC %@ : %@ => %@", k, v, want]);
+                    return CFBridgingRetain(want);
+                }
+            } else if (CFGetTypeID(value) == CFDataGetTypeID()) {
+                // 6-byte EUI-48
+                NSArray *parts = [want componentsSeparatedByString:@":"];
+                if (parts.count == 6) {
+                    uint8_t bytes[6];
+                    BOOL ok = YES;
+                    for (int i = 0; i < 6; i++) {
+                        unsigned x = 0;
+                        NSScanner *sc = [NSScanner scannerWithString:parts[i]];
+                        if (![sc scanHexInt:&x]) { ok = NO; break; }
+                        bytes[i] = (uint8_t)x;
+                    }
+                    if (ok) {
+                        IPFLog([NSString stringWithFormat:@"IOKit MAC data %@ => %@", k, want]);
+                        return CFDataCreate(kCFAllocatorDefault, bytes, 6);
+                    }
+                }
+            }
+            return value;
+        }
+
+        if (CFGetTypeID(value) != CFStringGetTypeID()) return value;
+        NSString *v = (__bridge NSString *)value;
         BOOL interesting =
             [kl containsString:@"model"] ||
             [kl containsString:@"product"] ||
             [kl containsString:@"machine"] ||
             [kl containsString:@"serial"] ||
+            [kl containsString:@"chip"] ||
+            [kl containsString:@"unique"] ||
             [kl isEqualToString:@"hw.model"] ||
             [kl isEqualToString:@"product-name"] ||
             [kl isEqualToString:@"model-number"] ||
@@ -442,10 +503,6 @@ static CFTypeRef IPFMaybeSpoofIOKitValue(CFStringRef key, CFTypeRef value) {
         if (!interesting) return value;
 
         NSString *fake = nil;
-        // Multi-source serial (identity sync):
-        //  - IOPlatformSerialNumber / serial-number → SerialNumber
-        //  - mlb-serial-number / MLBSerialNumber → MLBSerialNumber (≡ Serial in lab schema)
-        //  - generic *serial* → SerialNumber
         if ([kl isEqualToString:@"mlb-serial-number"] || [kl isEqualToString:@"mlbserialnumber"]
             || [kl containsString:@"mlb"]) {
             fake = [[IPFConfig shared] mgValueForKey:@"MLBSerialNumber"]
@@ -460,6 +517,10 @@ static CFTypeRef IPFMaybeSpoofIOKitValue(CFStringRef key, CFTypeRef value) {
                 ?: [[IPFConfig shared] stringForKey:@"IOPlatformSerialNumber"]
                 ?: [[IPFConfig shared] mgValueForKey:@"SerialNumber"]
                 ?: [[IPFConfig shared] stringForKey:@"SerialNumber"];
+        } else if ([kl containsString:@"uniquechip"] || [kl containsString:@"ecid"]
+                   || [kl isEqualToString:@"uniquechipid"]) {
+            fake = [[IPFConfig shared] stringForKey:@"UniqueChipID"]
+                ?: [[IPFConfig shared] mgValueForKey:@"UniqueChipID"];
         } else if ([v hasPrefix:@"iPhone"] || [v rangeOfString:@"iPhone"].location != NSNotFound)
             fake = IPFFakePT();
         else if ([v containsString:@"D331"] || [kl containsString:@"model"])
@@ -484,6 +545,44 @@ static CFTypeRef stub_IORegSearch(io_registry_entry_t entry, const io_name_t pla
     CFTypeRef s = IPFMaybeSpoofIOKitValue(key, r);
     if (s != r && r) CFRelease(r);
     return s;
+}
+
+// HIOS: IORegistryEntryCreateCFProperties — rewrite whole property dict
+typedef kern_return_t (*IORegCreateProps_t)(io_registry_entry_t, CFMutableDictionaryRef *, CFAllocatorRef, IOOptionBits);
+static IORegCreateProps_t orig_IORegCreateProps = NULL;
+
+static kern_return_t stub_IORegCreateProps(io_registry_entry_t entry, CFMutableDictionaryRef *properties,
+                                           CFAllocatorRef allocator, IOOptionBits options) {
+    kern_return_t kr = orig_IORegCreateProps
+        ? orig_IORegCreateProps(entry, properties, allocator, options)
+        : KERN_FAILURE;
+    if (kr != KERN_SUCCESS || !properties || !*properties) return kr;
+    @autoreleasepool {
+        NSMutableDictionary *d = (__bridge NSMutableDictionary *)(*properties);
+        if (![d isKindOfClass:[NSMutableDictionary class]]) {
+            d = [((__bridge NSDictionary *)(*properties)) mutableCopy];
+            if (!d) return kr;
+            CFRelease(*properties);
+            *properties = (CFMutableDictionaryRef)CFBridgingRetain(d);
+        }
+        NSArray *keys = d.allKeys;
+        for (id key in keys) {
+            if (![key isKindOfClass:[NSString class]]) continue;
+            id val = d[key];
+            CFTypeRef raw = NULL;
+            if ([val isKindOfClass:[NSString class]])
+                raw = (__bridge CFTypeRef)val;
+            else if ([val isKindOfClass:[NSData class]])
+                raw = (__bridge CFTypeRef)val;
+            else
+                continue;
+            CFTypeRef spoofed = IPFMaybeSpoofIOKitValue((__bridge CFStringRef)key, raw);
+            if (spoofed && spoofed != raw) {
+                d[key] = CFBridgingRelease(spoofed);
+            }
+        }
+    }
+    return kr;
 }
 
 #pragma mark - NSURLRequest body + URL query rewrite (ProductType / HW)
@@ -733,6 +832,7 @@ void IPFInstallDeepHooks(void) {
         if (!io) io = dlopen("/System/Library/Frameworks/IOKit.framework/Versions/A/IOKit", RTLD_NOW);
         void *c1 = io ? dlsym(io, "IORegistryEntryCreateCFProperty") : dlsym(RTLD_DEFAULT, "IORegistryEntryCreateCFProperty");
         void *c2 = io ? dlsym(io, "IORegistryEntrySearchCFProperty") : dlsym(RTLD_DEFAULT, "IORegistryEntrySearchCFProperty");
+        void *c3 = io ? dlsym(io, "IORegistryEntryCreateCFProperties") : dlsym(RTLD_DEFAULT, "IORegistryEntryCreateCFProperties");
         if (c1) {
             pMSHookFunction(c1, (void *)stub_IORegCreate, (void **)&orig_IORegCreate);
             IPFLog(@"IORegistryEntryCreateCFProperty hooked");
@@ -740,6 +840,10 @@ void IPFInstallDeepHooks(void) {
         if (c2) {
             pMSHookFunction(c2, (void *)stub_IORegSearch, (void **)&orig_IORegSearch);
             IPFLog(@"IORegistryEntrySearchCFProperty hooked");
+        }
+        if (c3) {
+            pMSHookFunction(c3, (void *)stub_IORegCreateProps, (void **)&orig_IORegCreateProps);
+            IPFLog(@"IORegistryEntryCreateCFProperties hooked");
         }
     }
 

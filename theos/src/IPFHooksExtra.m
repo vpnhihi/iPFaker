@@ -661,10 +661,23 @@ static NSString *IPFSafariUAFromProfile(void) {
 }
 
 static NSString *IPFWebUA(void) {
-    // Prefer Safari-form HTTPUserAgent (sync ProductVersion); then UserAgent if Safari-like
+    NSString *bid = [[NSBundle mainBundle] bundleIdentifier] ?: @"";
+    BOOL isZalo = [bid.lowercaseString containsString:@"zalo"]
+        || [bid.lowercaseString containsString:@"zingalo"];
+    // Prefer Safari-form HTTPUserAgent (sync ProductVersion)
     NSString *http = [[IPFConfig shared] stringForKey:@"HTTPUserAgent"];
     NSString *ua = [[IPFConfig shared] stringForKey:@"UserAgent"];
+    NSString *zaloUA = [[IPFConfig shared] stringForKey:@"zalo_fakeWebViewUA"]
+        ?: [[IPFConfig shared] stringForKey:@"ZaloWebViewUA"];
     NSString *safari = IPFSafariUAFromProfile();
+    // HIOS: Zalo WebView UA must carry spoofed iOS + app marker
+    if (isZalo) {
+        if (zaloUA.length && [zaloUA containsString:@"iPhone OS"])
+            return zaloUA;
+        // Build Zalo-like UA on spoofed Safari base (OS version from profile)
+        NSString *pv = [[IPFConfig shared] stringForKey:@"ProductVersion"] ?: @"15.8.8";
+        return [NSString stringWithFormat:@"%@ Zaloios/%@ (iPFaker)", safari, pv];
+    }
     if (http.length && [http.lowercaseString containsString:@"safari"]
         && [http containsString:@"iPhone OS"])
         return http;
@@ -672,7 +685,6 @@ static NSString *IPFWebUA(void) {
         && [ua containsString:@"iPhone OS"]
         && ![ua.lowercaseString containsString:@"zalo"])
         return ua;
-    // App-custom UA (e.g. Zalo/…) still spoofs OS via Safari template for WebView fingerprint
     return safari;
 }
 

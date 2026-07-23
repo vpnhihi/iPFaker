@@ -7,6 +7,7 @@
 #import "IPFConfig.h"
 #import "IPFHooksMG.h"
 #import "IPFHooksExtra.h"
+#import "IPFHooksDeep.h"
 
 static void IPFMark(const char *msg) {
     NSString *bid = [[NSBundle mainBundle] bundleIdentifier] ?: @"(nil)";
@@ -72,8 +73,10 @@ static void IPFInstallDeepStack(const char *tag) {
         @try {
             // Full MG (screen keys still gated by FakeScreen / Zalo MG block in IPFAllowMGKey)
             IPFInstallMGHooks();
-            // Full Extra: ifaddrs/hostname/sysctl/JB paths/ProcessInfo — UIScreen only if FakeScreen ON
+            // Full Extra: ifaddrs/hostname/CNCopy/WKWebView UA — UIScreen only if FakeScreen ON
             IPFInstallExtraHooks();
+            // Deep: IOKit serial/MAC + HTTP body/header rewrite (HIOS parity; also in CT)
+            IPFInstallDeepHooks();
             IPFMark(tag);
         } @catch (NSException *ex) {
             NSString *m = [NSString stringWithFormat:@"CTOR_DEEP_EXC %@", ex.reason ?: @"?"];

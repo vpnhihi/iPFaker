@@ -579,6 +579,19 @@ if [ "$DRY" -eq 0 ]; then
   # Pasteboard / TCC noise
   rm -rf /var/mobile/Library/Caches/com.apple.Pasteboard/* 2>/dev/null || true
 
+  # Contacts: only remove HIOS/iPFaker-seeded entries list (never wipe user's whole book)
+  SEED_LIST=/var/mobile/Library/iPFaker/seeded_contacts.plist
+  if [ -f "$SEED_LIST" ]; then
+    log "contacts: clearing seeded list $SEED_LIST"
+    rm -f "$SEED_LIST" 2>/dev/null || true
+  fi
+  # Clear CNContact *caches* only (not AddressBook.sqlitedb full wipe — too destructive)
+  rm -rf \
+    /var/mobile/Library/Caches/com.apple.MobileAddressBook* \
+    /var/mobile/Library/Caches/com.apple.ContactsUI \
+    /var/mobile/Library/Caches/com.apple.contacts \
+    2>/dev/null || true
+
   log "HIOS residue wipe done"
 fi
 

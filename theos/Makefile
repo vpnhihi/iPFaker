@@ -55,8 +55,8 @@ iPFakerAboutUI_FRAMEWORKS = Foundation UIKit
 iPFakerAboutUI_LIBRARIES = substrate
 iPFakerAboutUI_LDFLAGS = -install_name /var/jb/usr/lib/TweakInject/iPFakerAboutUI.dylib -Wl,-dead_strip -Wl,-x
 
-# MG: spoof + Extra — must stay under AMFI ~145k (no About-only hooks linked in).
-iPFakerMG_FILES = TweakMG.x src/IPFConfig.m src/IPFHooksMG.m src/IPFHooksExtra.m
+# MG: spoof + Extra + Deep (IOKit/HTTP) — HIOS-depth in one inject path
+iPFakerMG_FILES = TweakMG.x src/IPFConfig.m src/IPFHooksMG.m src/IPFHooksExtra.m src/IPFHooksDeep.m
 # IPF_NO_MG_DEBUG=1 strips verbose ctor logs (AMFI size)
 iPFakerMG_CFLAGS = -fobjc-arc -Os -fvisibility=hidden -DIPF_NO_MG_DEBUG=1 -ffunction-sections -fdata-sections -Wno-unused-variable -Wno-unused-function -Wno-deprecated-declarations -I$(THEOS_PROJECT_DIR)/src
 iPFakerMG_FRAMEWORKS = UIKit Foundation AdSupport
