@@ -428,6 +428,8 @@ static BOOL stub_batteryMon(id self, SEL _cmd) {
 #pragma mark - Install
 
 void IPFInstallEnvHooks(void) {
+    static BOOL s_envOnce = NO;
+    if (s_envOnce) return;
     if (!pMSHookMessageExEnv) {
         void *h = dlopen("/var/jb/usr/lib/libellekit.dylib", RTLD_NOW);
         if (!h) h = dlopen("/var/jb/usr/lib/libsubstrate.dylib", RTLD_NOW);
@@ -439,6 +441,7 @@ void IPFInstallEnvHooks(void) {
         IPFEnvTrace(@"IPFInstallEnvHooks skip");
         return;
     }
+    s_envOnce = YES;
     IPFEnvTrace(@"IPFInstallEnvHooks begin");
 
     Class nsl = object_getClass(objc_getClass("NSLocale"));

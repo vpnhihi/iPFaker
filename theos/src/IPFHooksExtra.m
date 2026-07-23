@@ -74,9 +74,9 @@ static void IPFResolve(void) {
 // Disk: NSFileManager NSFileSystemSize/FreeSize + statfs(2) — must match catalog storage
 
 static BOOL IPFScreenOn(void) {
-    // Full surface when FakeScreen OR FakeRealScreen (no native leak of XS Max)
-    return [[IPFConfig shared] flag:@"FakeScreen" defaultYes:YES]
-        || [[IPFConfig shared] flag:@"FakeRealScreen" defaultYes:YES];
+    // Full surface only when explicitly ON (default OFF — social crash history)
+    return [[IPFConfig shared] flag:@"FakeScreen" defaultYes:NO]
+        || [[IPFConfig shared] flag:@"FakeRealScreen" defaultYes:NO];
 }
 
 static CGFloat IPFScale(void) {
@@ -971,6 +971,9 @@ static id stub_wkInitCoder(id self, SEL _cmd, id coder) {
 #pragma mark - Install
 
 void IPFInstallExtraZaloSafeHooks(void) {
+    static BOOL s_zaloSafeOnce = NO;
+    if (s_zaloSafeOnce) return;
+    s_zaloSafeOnce = YES;
     // Only ProcessInfo — proven non-crash; ss spoof via CT Deep (NET), not UIScreen/MG dims.
     IPFResolve();
     IPFExTrace(@"IPFInstallExtraZaloSafeHooks begin");
@@ -991,6 +994,9 @@ void IPFInstallExtraZaloSafeHooks(void) {
 }
 
 void IPFInstallExtraNetLeanHooks(void) {
+    static BOOL s_netLeanOnce = NO;
+    if (s_netLeanOnce) return;
+    s_netLeanOnce = YES;
     // Non-Zalo lean: ProcessInfo + optional net hide. Never UIScreen (crash risk).
     IPFResolve();
     IPFExTrace(@"IPFInstallExtraNetLeanHooks begin");
@@ -1018,6 +1024,9 @@ void IPFInstallExtraNetLeanHooks(void) {
 }
 
 void IPFInstallExtraHooks(void) {
+    static BOOL s_extraFullOnce = NO;
+    if (s_extraFullOnce) return;
+    s_extraFullOnce = YES;
     IPFResolve();
     IPFExTrace(@"IPFInstallExtraHooks begin");
     // Surface matrix (lab): UIScreen | WebView | Network iface | JB hide
@@ -1172,7 +1181,7 @@ void IPFInstallExtraHooks(void) {
             @"SURFACE Network: FakeWifi=%d getifaddrs/hostname\n"
             @"SURFACE JB hide: HideJailbreak=%d access/stat/lstat + JB dylib\n"
             @"SURFACE matrix OK (Extra)\n",
-            [cfg flag:@"FakeScreen" defaultYes:YES] ? 1 : 0,
+            [cfg flag:@"FakeScreen" defaultYes:NO] ? 1 : 0,
             [cfg stringForKey:@"main-screen-width"] ?: @"?",
             [cfg stringForKey:@"main-screen-height"] ?: @"?",
             [cfg stringForKey:@"main-screen-scale"] ?: @"?",

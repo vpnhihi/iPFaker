@@ -111,6 +111,11 @@ static void IPFInstallDeferredDeep(void) {
             IPFMark("CTOR_SKIP_IPFAKER_APP");
             return;
         }
+        // Empty bid early in process spawn — skip (avoids hooking helper with no identity)
+        if (!bid.length) {
+            IPFMark("CTOR_SKIP_EMPTY_BID");
+            return;
+        }
 
         // Settings About optional — off by default
         if (bid.length > 0 && [bid isEqualToString:@"com.apple.Preferences"]) {

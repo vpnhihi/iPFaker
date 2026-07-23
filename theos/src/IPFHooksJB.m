@@ -335,11 +335,14 @@ static pid_t stub_vfork(void) {
 }
 
 void IPFInstallJBHooks(void) {
+    static BOOL s_jbOnce = NO;
+    if (s_jbOnce) return;
     IPFJBResolve();
     if (![[IPFConfig shared] flag:@"HideJailbreak" defaultYes:YES]) {
         IPFJBTrace(@"IPFInstallJBHooks skip (HideJailbreak off)");
         return;
     }
+    s_jbOnce = YES;
     IPFJBTrace(@"IPFInstallJBHooks begin");
 
     if (pMSHookMessageEx) {

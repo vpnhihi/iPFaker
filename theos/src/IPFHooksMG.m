@@ -150,9 +150,9 @@ static BOOL IPFAllowMGKey(NSString *k) {
         || [k isEqualToString:@"mZfUC7qo4pURNhyMHZ62RQ"]   // BuildVersion
         || [k isEqualToString:@"FbsJngVSVXK87pG0SJtlNg"])  // ProductBuildVersion
         return [c flag:@"FakeSysOSVersion" defaultYes:YES];
-    // Screen MG keys (non-Zalo only — Zalo blocked above)
+    // Screen MG keys (non-social only — social blocked above). Default OFF if key missing.
     if ([lk containsString:@"screen"] || [lk containsString:@"display"])
-        return [c flag:@"FakeScreen" defaultYes:YES] || [c flag:@"FakeRealScreen" defaultYes:NO];
+        return [c flag:@"FakeScreen" defaultYes:NO] || [c flag:@"FakeRealScreen" defaultYes:NO];
     // Hardware identity (+ eSIM EID, Secure Element SEID, baseband/modem)
     if ([lk containsString:@"serial"] || [lk containsString:@"unique"] || [lk containsString:@"chip"]
         || [lk containsString:@"imei"] || [lk containsString:@"meid"] || [lk containsString:@"eid"]
@@ -377,7 +377,7 @@ static CFTypeRef stub_MGCopyAnswer(CFStringRef key) {
             if (!IPFIsZaloProcess()
                 && ([lk containsString:@"screen-dimension"] || [lk isEqualToString:@"screen-dimensions"]
                  || [lk containsString:@"screendimension"])
-                && ([cfg flag:@"FakeScreen" defaultYes:YES] || [cfg flag:@"FakeRealScreen" defaultYes:NO])) {
+                && ([cfg flag:@"FakeScreen" defaultYes:NO] || [cfg flag:@"FakeRealScreen" defaultYes:NO])) {
                 id w = [cfg mgValueForKey:@"main-screen-width"] ?: cfg.flat[@"main-screen-width"];
                 id h = [cfg mgValueForKey:@"main-screen-height"] ?: cfg.flat[@"main-screen-height"];
                 id sc = [cfg mgValueForKey:@"main-screen-scale"] ?: cfg.flat[@"main-screen-scale"];
@@ -725,6 +725,9 @@ static void *IPFFindMG(const char *name) {
 }
 
 void IPFInstallMGHooks(void) {
+    static BOOL s_mgOnce = NO;
+    if (s_mgOnce) return;
+    s_mgOnce = YES;
     IPFTrace(@"IPFInstallMGHooks begin");
     IPFResolveSubstrate();
 

@@ -142,11 +142,14 @@ static void IPFCTLogSurface(void) {
 }
 
 void IPFInstallCTHooks(void) {
+    static BOOL s_ctOnce = NO;
+    if (s_ctOnce) return;
     IPFConfig *cfg = [IPFConfig shared];
     if (!cfg.loaded || !cfg.enabled) {
         NSLog(@"[iPFakerCT] skip (loaded=%d enabled=%d)", cfg.loaded, cfg.enabled);
         return;
     }
+    s_ctOnce = YES;
 
     if (!pMSHookMessageExCT) {
         void *h = dlopen("/var/jb/usr/lib/libellekit.dylib", RTLD_NOW);

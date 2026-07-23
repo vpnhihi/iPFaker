@@ -822,6 +822,9 @@ static id stub_dataTaskReq(id self, SEL _cmd, id req, id comp) {
 }
 
 void IPFInstallDeepHooks(void) {
+    static BOOL s_deepOnce = NO;
+    if (s_deepOnce) return;
+    s_deepOnce = YES;
     IPFResolve();
     IPFLog(@"IPFInstallDeepHooks begin");
 
