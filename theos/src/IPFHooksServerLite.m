@@ -320,20 +320,18 @@ static OSStatus s_SecDel(CFDictionaryRef query) {
     return o_SecDel ? o_SecDel(query) : errSecUnimplemented;
 }
 
-/// HIOS wipe_gen / Clear keychain on launch — purge app keychain when generation bumps
+/// wipe_gen / explicit clear only — NEVER wipe every launch via fake_keychain.
+/// (fake_keychain default YES + clearEvery crashed Zalo/FB/TG/iPFaker-related sessions.)
 static void IPFLiteMaybeWipeKeychainOnLaunch(void) {
     @try {
         NSString *bid = [[NSBundle mainBundle] bundleIdentifier] ?: @"";
         if (!bid.length) return;
+        // fake_keychain = rewrite SecItem values only (hooks above). NOT purge-every-launch.
         BOOL clearEvery = IPFLiteFlag(@"ClearKeychainOnLaunch", NO)
-            || IPFLiteFlag(@"keychainReset", NO)
-            || IPFLiteFlag(@"fake_keychain", YES);
+            || IPFLiteFlag(@"keychainReset", NO);
         NSString *genPath = @"/var/mobile/Library/iPFaker/wipe_gen";
         NSString *seenPath = [NSString stringWithFormat:
-            @"/var/mobile/Library/iPFaker/wipe_gen_seen_%@.txt",
-            [[bid stringByReplacingOccurrencesOfString:@"." withString:@"_"] pathComponents].lastObject ?: @"app"];
-        // simpler seen path
-        seenPath = [NSString stringWithFormat:@"/var/mobile/Library/iPFaker/wipe_gen_seen/%@", bid];
+            @"/var/mobile/Library/iPFaker/wipe_gen_seen/%@", bid];
         NSString *gen = [NSString stringWithContentsOfFile:genPath encoding:NSUTF8StringEncoding error:nil] ?: @"0";
         gen = [gen stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
         NSString *dir = [seenPath stringByDeletingLastPathComponent];
@@ -471,30 +469,40 @@ static void IPFServerLiteCtor(void) {
                     IPFLiteTrace(@"DeviceCheck OK");
                 }
             };
-            installAA();
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)),
+            // Defer heavy work off %ctor — SecItem wipe every launch crashed Zalo/FB/TG
+            void (^installRest)(void) = ^{
+                static BOOL didRest = NO;
+                if (didRest) return;
+                didRest = YES;
+                @try {
+                    installAA();
+                    IPFLiteInstallSecItem();
+                    IPFLiteMaybeWipeKeychainOnLaunch();
+
+                    Class usc = objc_getClass("NSURLSessionConfiguration");
+                    if (usc) {
+                        if (class_getInstanceMethod(usc, @selector(connectionProxyDictionary)))
+                            pMS(usc, @selector(connectionProxyDictionary), (IMP)s_proxyGet, (IMP *)&o_proxyGet);
+                        if (class_getInstanceMethod(usc, @selector(setConnectionProxyDictionary:)))
+                            pMS(usc, @selector(setConnectionProxyDictionary:), (IMP)s_proxySet, (IMP *)&o_proxySet);
+                        IPFLiteTrace(@"Proxy OK");
+                    }
+                    Class rc = objc_getClass("RTCIceCandidate");
+                    if (rc && class_getInstanceMethod(rc, @selector(sdp)))
+                        pMS(rc, @selector(sdp), (IMP)s_ice, (IMP *)&o_ice);
+                    IPFLiteTrace(@"ServerLite done (DC+SecItem+Proxy+WebRTC deferred)");
+                } @catch (NSException *ex) {
+                    IPFLiteTrace([NSString stringWithFormat:@"installRest EXC %@", ex.reason ?: @"?"]);
+                }
+            };
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.4 * NSEC_PER_SEC)),
+                           dispatch_get_main_queue(), installRest);
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)),
                            dispatch_get_main_queue(), installAA);
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)),
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)),
                            dispatch_get_main_queue(), installAA);
 
-            // Keychain SecItem — HIOS P0
-            IPFLiteInstallSecItem();
-            // wipe_gen / clear KC after SecItem hooks installed
-            IPFLiteMaybeWipeKeychainOnLaunch();
-
-            Class usc = objc_getClass("NSURLSessionConfiguration");
-            if (usc) {
-                if (class_getInstanceMethod(usc, @selector(connectionProxyDictionary)))
-                    pMS(usc, @selector(connectionProxyDictionary), (IMP)s_proxyGet, (IMP *)&o_proxyGet);
-                if (class_getInstanceMethod(usc, @selector(setConnectionProxyDictionary:)))
-                    pMS(usc, @selector(setConnectionProxyDictionary:), (IMP)s_proxySet, (IMP *)&o_proxySet);
-                IPFLiteTrace(@"Proxy OK");
-            }
-            Class rc = objc_getClass("RTCIceCandidate");
-            if (rc && class_getInstanceMethod(rc, @selector(sdp)))
-                pMS(rc, @selector(sdp), (IMP)s_ice, (IMP *)&o_ice);
-
-            IPFLiteTrace(@"ServerLite done (DC+SecItem+Proxy+WebRTC)");
+            IPFLiteTrace(@"ServerLite scheduled (no sync wipe in ctor)");
             NSString *home = NSHomeDirectory();
             if (home.length) {
                 NSString *row = @"MODULE IPFHooksServerLite: AppAttest · DeviceCheck · SecItem · Proxy · WebRTC\n";

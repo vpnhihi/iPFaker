@@ -31,7 +31,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION_DEFAULT = "2.13.1"
+VERSION_DEFAULT = "2.13.2"
 PKG = "com.ipfaker"
 ARCH = "iphoneos-arm64"
 

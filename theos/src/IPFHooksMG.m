@@ -105,11 +105,19 @@ static void IPFResolveSubstrate(void) {
 static CFTypeRef (*orig_MGCopyAnswer)(CFStringRef key);
 static CFTypeRef (*orig_MGCopyAnswerWithError)(CFStringRef key, int *err);
 
+/// Social apps crash when screen dims spoofed (UIFont/IsCompactDevice) — treat all as Zalo-class.
 static BOOL IPFIsZaloProcess(void) {
     NSString *bid = [[NSBundle mainBundle] bundleIdentifier] ?: @"";
-    return [bid isEqualToString:@"vn.com.vng.zingalo"]
-        || [bid isEqualToString:@"com.zing.zalo"]
-        || [bid containsString:@"zingalo"];
+    if (!bid.length) return NO;
+    if ([bid isEqualToString:@"vn.com.vng.zingalo"] || [bid isEqualToString:@"com.zing.zalo"]
+        || [bid containsString:@"zingalo"] || [bid containsString:@"zalo"])
+        return YES;
+    NSString *l = bid.lowercaseString;
+    if ([l containsString:@"facebook"] || [l containsString:@"instagram"]) return YES;
+    if ([l containsString:@"telegram"] || [l containsString:@"viber"]) return YES;
+    if ([l containsString:@"musically"] || [l containsString:@"tiktok"]) return YES;
+    if ([l containsString:@"shopee"]) return YES;
+    return NO;
 }
 
 /// Gate MG key by Settings Fake* flags (written into config.plist on Apply).

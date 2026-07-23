@@ -1,6 +1,6 @@
-// iPFakerMG — HIOS-style deep spoof for social apps (Zalo/FB/IG/Telegram/Viber/…)
-// Full MG + Extra identity stack. Screen spoof OFF by default (FakeScreen=NO) to avoid
-// Zalo UIFont/IsCompactDevice crash; identity/network/sysctl still full.
+// iPFakerMG — multi-app deep spoof (Zalo/FB/IG/Telegram/Viber/…)
+// Stability first: full Extra (UIScreen) + ctor-time SecItem wipe crashed social apps.
+// Social path = MG identity + net lean + delayed Deep/JB. Screen spoof OFF.
 
 #import <Foundation/Foundation.h>
 #import <stdio.h>
@@ -41,8 +41,8 @@ static void IPFMark(const char *msg) {
     NSLog(@"[iPFakerMG] %s bid=%@", msg, bid);
 }
 
-/// Apps that need full identity wall (HIOS target set)
-static BOOL IPFIsDeepSpoofBid(NSString *bid) {
+/// Social / hybrid targets — never install UIScreen full Extra in %ctor
+static BOOL IPFIsSocialBid(NSString *bid) {
     if (!bid.length) return NO;
     static NSArray *kDeep;
     static dispatch_once_t once;
@@ -67,24 +67,34 @@ static BOOL IPFIsDeepSpoofBid(NSString *bid) {
     if ([l containsString:@"telegram"] || [l containsString:@"viber"]) return YES;
     if ([l containsString:@"musically"] || [l containsString:@"tiktok"]) return YES;
     if ([l containsString:@"shopee"]) return YES;
+    if ([l containsString:@"webkit"]) return YES;
     return NO;
 }
 
-static void IPFInstallDeepStack(const char *tag) {
+/// Core stack that must be up before first network/device probe (safe enough for social).
+static void IPFInstallStableCore(const char *tag) {
     @autoreleasepool {
         @try {
-            // Full MG (screen keys gated by FakeScreen / Zalo MG block)
             IPFInstallMGHooks();
-            // Extra: ifaddrs/hostname/CNCopy/SCDynamic/WKWebView UA
-            IPFInstallExtraHooks();
-            // Deep: IOKit serial/MAC + HTTP rewrite
-            IPFInstallDeepHooks();
-            // JB: dyldHide + fork + fopen/getenv hide
-            IPFInstallJBHooks();
-            // SecItem/DeviceCheck/Proxy/WebRTC: ServerLite __attribute__((constructor))
+            // Net lean: ProcessInfo + getifaddrs/hostname/canOpenURL — NO UIScreen
+            IPFInstallExtraNetLeanHooks();
             IPFMark(tag);
         } @catch (NSException *ex) {
-            NSString *m = [NSString stringWithFormat:@"CTOR_DEEP_EXC %@", ex.reason ?: @"?"];
+            NSString *m = [NSString stringWithFormat:@"CTOR_CORE_EXC %@", ex.reason ?: @"?"];
+            IPFMark(m.UTF8String);
+        }
+    }
+}
+
+/// Deeper hooks after app has finished early init (avoids launch SIGABRT).
+static void IPFInstallDeferredDeep(void) {
+    @autoreleasepool {
+        @try {
+            IPFInstallDeepHooks(); // IOKit + HTTP rewrite
+            IPFInstallJBHooks();   // dyldHide / fork / path hide
+            IPFMark("CTOR_DEFERRED_DEEP_JB_OK");
+        } @catch (NSException *ex) {
+            NSString *m = [NSString stringWithFormat:@"CTOR_DEFERRED_EXC %@", ex.reason ?: @"?"];
             IPFMark(m.UTF8String);
         }
     }
@@ -96,7 +106,13 @@ static void IPFInstallDeepStack(const char *tag) {
 
         NSString *bid = [[NSBundle mainBundle] bundleIdentifier] ?: @"";
 
-        // Settings About optional — off by default (not product focus)
+        // Never inject crash stack into iPFaker.app itself
+        if ([bid hasPrefix:@"com.ipfaker"] || [bid containsString:@"ipfaker"]) {
+            IPFMark("CTOR_SKIP_IPFAKER_APP");
+            return;
+        }
+
+        // Settings About optional — off by default
         if (bid.length > 0 && [bid isEqualToString:@"com.apple.Preferences"]) {
             BOOL okPrefs = [[IPFConfig shared] reload];
             if (!okPrefs || ![IPFConfig shared].enabled) {
@@ -114,12 +130,12 @@ static void IPFInstallDeepStack(const char *tag) {
 
         BOOL ok = [[IPFConfig shared] reload];
         NSString *dbg = [NSString stringWithFormat:
-            @"reload=%d path=%@ ProductType=%@ enabled=%d deep=%d\n",
+            @"reload=%d path=%@ ProductType=%@ enabled=%d social=%d\n",
             ok,
             [IPFConfig shared].profilePath ?: @"(none)",
             [[IPFConfig shared] mgValueForKey:@"ProductType"] ?: @"(nil)",
             [IPFConfig shared].enabled,
-            IPFIsDeepSpoofBid(bid)];
+            IPFIsSocialBid(bid)];
         [dbg writeToFile:@"/var/mobile/Library/iPFaker/v3_mg_debug.log"
               atomically:YES encoding:NSUTF8StringEncoding error:nil];
         [dbg writeToFile:@"/var/jb/etc/ipfaker/v3_mg_debug.log"
@@ -128,8 +144,40 @@ static void IPFInstallDeepStack(const char *tag) {
         if (!ok)
             IPFMark("CTOR_NO_FILE_CONFIG_USE_EMBED");
 
-        // HIOS-style: full deep stack immediately for all injected apps (incl. Zalo)
-        // No lean/delay path — that under-spoofed and failed app detection.
-        IPFInstallDeepStack(IPFIsDeepSpoofBid(bid) ? "CTOR_DEEP_SOCIAL_OK" : "CTOR_DEEP_FULL_OK");
+        BOOL social = IPFIsSocialBid(bid);
+        // Force skip full Extra UIScreen for social even if old config said SkipExtraForZalo=NO
+        BOOL forceLean = social
+            || [[IPFConfig shared] flag:@"SkipExtraForZalo" defaultYes:YES]
+            || [[IPFConfig shared] flag:@"StableSocialHooks" defaultYes:YES];
+
+        if (forceLean || social) {
+            IPFInstallStableCore(social ? "CTOR_SOCIAL_STABLE_OK" : "CTOR_LEAN_OK");
+            // Defer crash-prone Deep/JB until after first runloop ticks
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.6 * NSEC_PER_SEC)),
+                           dispatch_get_main_queue(), ^{
+                IPFInstallDeferredDeep();
+            });
+            // Second pass ~2s if first main queue was too early
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)),
+                           dispatch_get_main_queue(), ^{
+                static BOOL once = NO;
+                if (once) return;
+                once = YES;
+                // Deep install is idempotent enough (double hook bad) — only mark
+                IPFMark("CTOR_SOCIAL_SETTLE");
+            });
+        } else {
+            // Non-social inject targets only: full Extra still allowed
+            @try {
+                IPFInstallMGHooks();
+                IPFInstallExtraHooks();
+                IPFInstallDeepHooks();
+                IPFInstallJBHooks();
+                IPFMark("CTOR_FULL_OK");
+            } @catch (NSException *ex) {
+                NSString *m = [NSString stringWithFormat:@"CTOR_FULL_EXC %@", ex.reason ?: @"?"];
+                IPFMark(m.UTF8String);
+            }
+        }
     }
 }

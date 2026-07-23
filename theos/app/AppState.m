@@ -762,14 +762,16 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     setFlag(@"HideJailbreak", YES);
     setFlag(@"FakeWifi", YES);
     setFlag(@"FakeProxy", [self proxyEnabled]);
-    // Force deep path (legacy lean flags OFF)
-    mflat[@"SkipExtraForZalo"] = @NO;
+    // Stable social: lean Extra (no UIScreen). Deep/JB deferred in TweakMG.
+    mflat[@"SkipExtraForZalo"] = @YES;
+    mflat[@"StableSocialHooks"] = @YES;
     mflat[@"DeepSpoofSocial"] = @YES;
     mflat[@"InjectWebKit"] = @YES;
     mflat[@"KeychainSpoof"] = @YES;
     mflat[@"WipeResidueHIOS"] = @YES;
+    // fake_keychain = rewrite only. NEVER ClearKeychainOnLaunch every open (crashes apps).
     mflat[@"fake_keychain"] = @YES;
-    mflat[@"ClearKeychainOnLaunch"] = @NO; // wipe_gen bumps on reset — on-launch purge then
+    mflat[@"ClearKeychainOnLaunch"] = @NO;
     mflat[@"BlockFork"] = @YES;
     mflat[@"HideJailbreak"] = @YES;
     // Settings About is optional noise — default OFF
@@ -942,14 +944,18 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
 
     if (progress) progress(@"② Spoof máy + iOS + flags…");
     NSArray *flagsOn = @[
-        @"FakeDevice", @"FakeHardware", @"FakeAds", @"FakeScreen", @"FakeRealScreen",
+        @"FakeDevice", @"FakeHardware", @"FakeAds",
         @"FakeBrowser", @"FakeNetwork", @"FakeWifi", @"FakeSysctl", @"FakeSysOSVersion",
         @"HideJailbreak", @"FakeLocale", @"FakeLocation", @"FakeSensor",
         @"FakeWebRTC", @"DisableAppAttest", @"Enabled",
     ];
     for (NSString *k in flagsOn)
         [self setToggle:YES forKey:k];
+    // Screen spoof OFF — UIFont/IsCompact crash Zalo/FB on A10 when dims mismatch host
+    [self setToggle:NO forKey:@"FakeScreen"];
+    [self setToggle:NO forKey:@"FakeRealScreen"];
     [self setToggle:NO forKey:@"DisableWebRTC"];
+    [self setToggle:NO forKey:@"ClearKeychainOnLaunch"];
     [self savePools];
     [self saveProxyAppAttest];
     BOOL hasProxy = [self proxyEnabled] && [self proxyHost].length > 0;
@@ -1075,14 +1081,17 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     [log addObject:filt ?: @"filter"];
 
     NSArray *flagsOn = @[
-        @"FakeDevice", @"FakeHardware", @"FakeAds", @"FakeScreen", @"FakeRealScreen",
+        @"FakeDevice", @"FakeHardware", @"FakeAds",
         @"FakeBrowser", @"FakeNetwork", @"FakeWifi", @"FakeSysctl", @"FakeSysOSVersion",
         @"HideJailbreak", @"FakeLocale", @"FakeLocation", @"FakeSensor",
         @"FakeWebRTC", @"DisableAppAttest", @"Enabled",
     ];
     for (NSString *k in flagsOn)
         [self setToggle:YES forKey:k];
+    [self setToggle:NO forKey:@"FakeScreen"];
+    [self setToggle:NO forKey:@"FakeRealScreen"];
     [self setToggle:NO forKey:@"DisableWebRTC"];
+    [self setToggle:NO forKey:@"ClearKeychainOnLaunch"];
     [self savePools];
     [self saveProxyAppAttest];
     BOOL hasProxy = [self proxyEnabled] && [self proxyHost].length > 0;
