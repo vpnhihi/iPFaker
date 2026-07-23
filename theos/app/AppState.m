@@ -784,6 +784,8 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     if (flat[@"BuildVersion"]) m2[@"kern.osversion"] = flat[@"BuildVersion"];
     flat = m2;
     (void)[ProfileBuilder applyFlatProfile:flat deviceId:dev[@"id"] ios:ios];
+    // Force Settings About = lab (zero-touch customers)
+    NSString *aboutSync = [ProfileBuilder ensureSettingsAboutSyncProgress:nil];
     self.lastFlat = flat;
     NSString *warn = [ProfileBuilder labMismatchWarningForSpoofIOS:ios
                                                        productType:dev[@"ProductType"]];
@@ -792,13 +794,14 @@ static NSString *const kPoolSpoofApps = @"ipf.pool.spoofBundleIds";
     if (iosRequested.length && ![iosRequested isEqualToString:ios])
         clampNote = [NSString stringWithFormat:@"\n✓ iOS thật nhất: %@ → %@ (≤ host)", iosRequested, ios];
     self.statusText = [NSString stringWithFormat:
-                       @"%@ · %@ / iOS %@ · điểm thật %ld/100%@\n%@%@%@",
+                       @"%@ · %@ / iOS %@ · điểm thật %ld/100%@\n%@\n%@%@%@",
                        result ?: @"OK",
                        dev[@"MarketingName"] ?: dev[@"id"],
                        ios,
                        (long)realism,
                        clampNote,
                        filt ?: @"",
+                       aboutSync ?: @"",
                        warn.length ? @"\n" : @"",
                        warn ?: @""];
     [self postDidChange];

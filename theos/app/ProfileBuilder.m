@@ -2604,7 +2604,7 @@
         "      chown root:wheel \"$INJ/${n}.plist\" 2>/dev/null || true\n"
         "    fi\n"
         "  done\n"
-        "  for n in iPFakerAbout iPFakerAboutUI iPFakerAboutVer; do\n"
+        "  for n in iPFakerAbout iPFakerAboutUI iPFakerAboutID iPFakerAboutVer; do\n"
         "    if [ -f \"$STAGE/${n}.plist\" ] && grep -q 'com.apple.Preferences' \"$STAGE/${n}.plist\" 2>/dev/null; then\n"
         "      cp -f \"$STAGE/${n}.plist\" \"$INJ/${n}.plist\" && OK=1\n"
         "    else\n"
@@ -2612,6 +2612,12 @@
         "    fi\n"
         "    chmod 644 \"$INJ/${n}.plist\" 2>/dev/null || true\n"
         "    chown root:wheel \"$INJ/${n}.plist\" 2>/dev/null || true\n"
+        "  done\n"
+        "  # Re-enable AboutUI/AboutID if postinst left .off (customer Settings sync)\n"
+        "  for n in iPFakerAboutUI iPFakerAboutID; do\n"
+        "    if [ -f \"$INJ/${n}.dylib.off\" ] && [ ! -f \"$INJ/${n}.dylib\" ]; then\n"
+        "      mv -f \"$INJ/${n}.dylib.off\" \"$INJ/${n}.dylib\" 2>/dev/null || true\n"
+        "    fi\n"
         "  done\n"
         "done\n"
         "cp -f \"$STAGE/spoof_apps.json\" /var/jb/etc/ipfaker/spoof_apps.json 2>/dev/null || true\n"
@@ -2659,6 +2665,9 @@
         [self killAppBundleId:bid executable:nil];
     [self killAppBundleId:@"com.apple.Preferences" executable:nil];
 
+    // Zero-touch: Cài đặt → Giới thiệu must match lab without SSH
+    NSString *aboutSync = [self ensureSettingsAboutSyncProgress:progress];
+
     NSString *preview = bids.count <= 6
         ? [bids componentsJoinedByString:@", "]
         : [NSString stringWithFormat:@"%@ … (+%lu)",
@@ -2667,10 +2676,97 @@
     return [NSString stringWithFormat:
             @"Multi-app spoof: %lu app · CT CommCenter=ON · Settings About=ON\n%@\n"
             @"Filter LIVE=%@ · mở lại app = spoof active\n"
-            @"rc=%d",
+            @"%@\nrc=%d",
             (unsigned long)bids.count, preview,
             liveOK ? @"OK" : [NSString stringWithFormat:@"THIẾU %lu", (unsigned long)missing],
+            aboutSync ?: @"About sync ?",
             rc];
+}
+
++ (NSString *)ensureSettingsAboutSyncProgress:(IPFWipeProgress)progress {
+    void (^step)(NSString *) = ^(NSString *s) { if (progress) progress(s); };
+    step(@"Đồng bộ Cài đặt → Giới thiệu (daemon inject)…");
+
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSString *stage = @"/var/mobile/Library/iPFaker";
+    [fm createDirectoryAtPath:stage withIntermediateDirectories:YES attributes:nil error:nil];
+    [fm createDirectoryAtPath:[stage stringByAppendingPathComponent:@"logs"]
+  withIntermediateDirectories:YES attributes:nil error:nil];
+
+    // Preferences-only filter for all About* modules
+    NSString *aboutXML =
+        @"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" "
+        "\"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+        "<plist version=\"1.0\"><dict><key>Filter</key><dict>"
+        "<key>Bundles</key><array><string>com.apple.Preferences</string></array>"
+        "<key>Mode</key><string>Any</string></dict></dict></plist>\n";
+    NSData *aboutData = [aboutXML dataUsingEncoding:NSUTF8StringEncoding];
+    for (NSString *n in @[ @"iPFakerAbout", @"iPFakerAboutUI", @"iPFakerAboutID", @"iPFakerAboutVer" ]) {
+        NSString *p = [stage stringByAppendingPathComponent:[n stringByAppendingString:@".plist"]];
+        [aboutData writeToFile:p atomically:YES];
+    }
+
+    NSString *script = [stage stringByAppendingPathComponent:@"ensure_settings_about.sh"];
+    NSString *sh =
+        @"#!/bin/sh\n"
+        "export PATH=/var/jb/usr/bin:/var/jb/usr/sbin:/var/jb/basebin:/usr/bin:/bin:/sbin:$PATH\n"
+        "STAGE=/var/mobile/Library/iPFaker\n"
+        "LOG=$STAGE/logs/ensure_settings_about.log\n"
+        "mkdir -p \"$STAGE/logs\" 2>/dev/null\n"
+        "echo \"$(date) ensure_settings_about start\" >> \"$LOG\"\n"
+        "ABOUT_XML='<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+        "<plist version=\"1.0\"><dict><key>Filter</key><dict><key>Bundles</key>"
+        "<array><string>com.apple.Preferences</string></array>"
+        "<key>Mode</key><string>Any</string></dict></dict></plist>\n'\n"
+        "for INJ in /var/jb/usr/lib/TweakInject /var/jb/Library/MobileSubstrate/DynamicLibraries; do\n"
+        "  [ -d \"$INJ\" ] || continue\n"
+        "  for n in iPFakerAbout iPFakerAboutUI iPFakerAboutID; do\n"
+        "    # recover .off from old packages\n"
+        "    if [ -f \"$INJ/${n}.dylib.off\" ] && [ ! -f \"$INJ/${n}.dylib\" ]; then\n"
+        "      mv -f \"$INJ/${n}.dylib.off\" \"$INJ/${n}.dylib\" 2>/dev/null || true\n"
+        "    fi\n"
+        "    printf '%s' \"$ABOUT_XML\" > \"$INJ/${n}.plist\"\n"
+        "    chmod 644 \"$INJ/${n}.plist\" 2>/dev/null || true\n"
+        "  done\n"
+        "done\n"
+        "# LaunchDaemon prefs-inject (survives app exit)\n"
+        "DAEMON_SRC=/var/jb/etc/ipfaker/prefs_inject_daemon.sh\n"
+        "DAEMON_DST=/var/mobile/Library/iPFaker/prefs_inject_daemon.sh\n"
+        "if [ -f \"$DAEMON_SRC\" ]; then cp -f \"$DAEMON_SRC\" \"$DAEMON_DST\" 2>/dev/null || true; fi\n"
+        "chmod 755 \"$DAEMON_DST\" 2>/dev/null || true\n"
+        "PL_SRC=/var/jb/etc/ipfaker/com.ipfaker.prefs-inject.plist\n"
+        "PL_DST=/var/jb/Library/LaunchDaemons/com.ipfaker.prefs-inject.plist\n"
+        "mkdir -p /var/jb/Library/LaunchDaemons 2>/dev/null || true\n"
+        "if [ -f \"$PL_SRC\" ]; then cp -f \"$PL_SRC\" \"$PL_DST\" 2>/dev/null || true; fi\n"
+        "if [ -f \"$PL_DST\" ]; then\n"
+        "  launchctl bootout system/com.ipfaker.prefs-inject 2>/dev/null || true\n"
+        "  launchctl unload \"$PL_DST\" 2>/dev/null || true\n"
+        "  launchctl bootstrap system \"$PL_DST\" 2>/dev/null || launchctl load -w \"$PL_DST\" 2>/dev/null || true\n"
+        "  launchctl kickstart -k system/com.ipfaker.prefs-inject 2>/dev/null || true\n"
+        "fi\n"
+        "# Kill stale daemon loops; start fresh\n"
+        "for p in $(ps ax 2>/dev/null | grep prefs_inject_daemon | grep -v grep | awk '{print $1}'); do\n"
+        "  kill -9 \"$p\" 2>/dev/null || true\n"
+        "done\n"
+        "if [ -x \"$DAEMON_DST\" ] || [ -f \"$DAEMON_DST\" ]; then\n"
+        "  nohup /bin/sh \"$DAEMON_DST\" >>\"$STAGE/logs/prefs_inject_daemon.out\" 2>&1 &\n"
+        "  echo \"$(date) daemon pid=$!\" >> \"$LOG\"\n"
+        "fi\n"
+        "# Kill Preferences so next open gets fresh inject + wash\n"
+        "killall -9 Preferences 2>/dev/null || true\n"
+        "echo \"$(date) ensure_settings_about done\" >> \"$LOG\"\n"
+        "echo OK ensure_settings_about\n"
+        "exit 0\n";
+    [sh writeToFile:script atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    [fm setAttributes:@{ NSFilePosixPermissions: @0755 } ofItemAtPath:script error:nil];
+    int rc = [self runRootShellScript:script];
+    NSString *msg = (rc == 0)
+        ? @"Settings About: daemon ON · mở Cài đặt → Giới thiệu = khớp lab"
+        : [NSString stringWithFormat:@"Settings About: daemon rc=%d (mở lại Cài đặt sau Apply)", rc];
+    step(msg);
+    return msg;
 }
 
 /// Run shell script as root: sudo -n → sudo -S (.root_pass / lab alpine) → direct sh.

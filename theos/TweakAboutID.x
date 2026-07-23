@@ -155,6 +155,81 @@ static BOOL IPFIDIsBaseband(NSString *t) {
     return re && [re numberOfMatchesInString:t options:0 range:NSMakeRange(0, t.length)] > 0;
 }
 
+/// Host iOS tokens + real UIDevice — so Settings «Phiên bản iOS» syncs without AboutVer.
+static BOOL IPFIDShouldReplaceVersion(NSString *t, NSString *wantPV) {
+    if (!t.length || !wantPV.length) return NO;
+    if ([t isEqualToString:wantPV]) return NO;
+    static NSArray *hosts;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        hosts = @[
+            @"14.0", @"14.1", @"14.2", @"14.3", @"14.4", @"14.5", @"14.6", @"14.7", @"14.8", @"14.8.1",
+            @"15.0", @"15.1", @"15.2", @"15.3", @"15.4", @"15.5", @"15.6", @"15.7", @"15.8",
+            @"15.8.1", @"15.8.2", @"15.8.3", @"15.8.4", @"15.8.5", @"15.8.6", @"15.8.7", @"15.8.8",
+            @"16.0", @"16.1", @"16.2", @"16.3", @"16.4", @"16.5", @"16.6", @"16.7",
+            @"16.7.1", @"16.7.2", @"16.7.3", @"16.7.4", @"16.7.5", @"16.7.6", @"16.7.7", @"16.7.8",
+            @"16.7.9", @"16.7.10", @"16.7.11", @"16.7.12", @"16.7.16",
+            @"17.0", @"17.1", @"17.2", @"17.3", @"17.4", @"17.5", @"17.6", @"17.7",
+            @"18.0", @"18.1", @"18.2", @"18.3", @"18.4", @"18.5", @"18.6", @"18.7",
+        ];
+    });
+    for (NSString *h in hosts) {
+        if ([t isEqualToString:h]) return YES;
+    }
+    @try {
+        NSString *real = UIDevice.currentDevice.systemVersion;
+        if (real.length && [t isEqualToString:real] && ![t isEqualToString:wantPV])
+            return YES;
+    } @catch (__unused NSException *ex) {}
+    // bare X.Y / X.Y.Z pattern not equal want
+    NSRegularExpression *re = [NSRegularExpression
+        regularExpressionWithPattern:@"^\\d{1,2}\\.\\d{1,2}(\\.\\d{1,2})?$" options:0 error:nil];
+    if (re && [re numberOfMatchesInString:t options:0 range:NSMakeRange(0, t.length)] > 0
+        && ![t isEqualToString:wantPV] && t.length <= 10)
+        return YES;
+    return NO;
+}
+
+/// Host marketing names → spoof MarketingName (iPhone X → iPhone 7 Plus, etc.)
+static BOOL IPFIDShouldReplaceModel(NSString *t, NSString *wantMk, NSString *wantName) {
+    if (!t.length || !wantMk.length) return NO;
+    if ([t isEqualToString:wantMk]) return NO;
+    if (wantName.length && [t isEqualToString:wantName]) return NO;
+    static NSArray *hosts;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        hosts = @[
+            @"iPhone 6", @"iPhone 6s", @"iPhone 6s Plus",
+            @"iPhone 7", @"iPhone 7 Plus",
+            @"iPhone 8", @"iPhone 8 Plus",
+            @"iPhone X", @"iPhone XR", @"iPhone XS", @"iPhone XS Max",
+            @"iPhone 11", @"iPhone 11 Pro", @"iPhone 11 Pro Max",
+            @"iPhone 12", @"iPhone 12 mini", @"iPhone 12 Pro", @"iPhone 12 Pro Max",
+            @"iPhone 13", @"iPhone 13 mini", @"iPhone 13 Pro", @"iPhone 13 Pro Max",
+            @"iPhone 14", @"iPhone 14 Plus", @"iPhone 14 Pro", @"iPhone 14 Pro Max",
+            @"iPhone 15", @"iPhone 15 Plus", @"iPhone 15 Pro", @"iPhone 15 Pro Max",
+            @"iPhone 16", @"iPhone 16 Plus", @"iPhone 16 Pro", @"iPhone 16 Pro Max", @"iPhone 16e",
+            @"iPhone SE", @"iPhone SE (2nd generation)", @"iPhone SE (3rd generation)",
+        ];
+    });
+    for (NSString *h in hosts) {
+        if ([t isEqualToString:h]) return YES;
+        if (h.length >= 8 && [t hasPrefix:h] && t.length < h.length + 14
+            && ![t isEqualToString:wantName])
+            return YES;
+    }
+    if ([t hasPrefix:@"iPhone"] && t.length >= 8 && t.length <= 36
+        && [t rangeOfString:@"/"].location == NSNotFound
+        && [t rangeOfString:@"@"].location == NSNotFound) {
+        NSRegularExpression *re = [NSRegularExpression
+            regularExpressionWithPattern:@"^iPhone\\s+(SE|Air|\\d+e?|X[RS]?)(\\s+.*)?$"
+                                 options:0 error:nil];
+        if (re && [re numberOfMatchesInString:t options:0 range:NSMakeRange(0, t.length)] > 0)
+            return YES;
+    }
+    return NO;
+}
+
 static NSInteger gIPFIDUuidSlot = 0;
 
 static NSInteger IPFIDWash(UIView *root,
@@ -178,11 +253,26 @@ static NSInteger IPFIDWash(UIView *root,
             if (wantSN.length && [t isEqualToString:wantSN]) return;
             if (wantMk.length && [t isEqualToString:wantMk]) return;
             if (wantReg.length && [t isEqualToString:wantReg]) return;
+            if (wantPV.length && [t isEqualToString:wantPV]) return;
             if (wantEID.length && [t isEqualToString:wantEID]) return;
             if (wantSEID.length && [t caseInsensitiveCompare:wantSEID] == NSOrderedSame) return;
             if (wantIDFA.length && [t caseInsensitiveCompare:wantIDFA] == NSOrderedSame) return;
             if (wantIDFV.length && [t caseInsensitiveCompare:wantIDFV] == NSOrderedSame) return;
             if (wantBB.length && [t isEqualToString:wantBB]) return;
+
+            // 1) Marketing name + iOS version FIRST (customer Settings sync — was AboutUI-only)
+            if (wantPV.length && IPFIDShouldReplaceVersion(t, wantPV)) {
+                lab.text = wantPV;
+                n++;
+                IPFIDLog([NSString stringWithFormat:@"ver %@ => %@", t, wantPV]);
+                return;
+            }
+            if (wantMk.length && IPFIDShouldReplaceModel(t, wantMk, wantName)) {
+                lab.text = wantMk;
+                n++;
+                IPFIDLog([NSString stringWithFormat:@"model %@ => %@", t, wantMk]);
+                return;
+            }
 
             // EID before serial (32 digits)
             if (wantEID.length && IPFIDIsEID(t)) {
@@ -235,7 +325,7 @@ static NSInteger IPFIDWash(UIView *root,
                 IPFIDLog([NSString stringWithFormat:@"name %@ => %@", t, wantName]);
                 return;
             }
-            // Baseband backup (AboutUI primary); skip if equals ProductVersion
+            // Baseband backup; skip if equals ProductVersion
             if (wantBB.length && IPFIDIsBaseband(t)
                 && !(wantPV.length && [t isEqualToString:wantPV])) {
                 lab.text = wantBB;
@@ -279,6 +369,7 @@ static void IPFIDWashAll(void) {
     NSString *wantPV = [cfg[@"ProductVersion"] description] ?: @"";
 
     if (!wantName.length && !wantMN.length && !wantSN.length
+        && !wantMk.length && !wantPV.length
         && !wantEID.length && !wantSEID.length
         && !wantIDFA.length && !wantIDFV.length && !wantBB.length)
         return;
@@ -313,11 +404,9 @@ static void IPFIDWashAll(void) {
     }
     if (total > 0)
         IPFIDLog([NSString stringWithFormat:
-                  @"washed %ld name=%@ mn=%@ sn=%@ eid=%@ seid=%@ idfa=%@ bb=%@",
-                  (long)total, wantName, wantMN, wantSN,
+                  @"washed %ld name=%@ mk=%@ pv=%@ mn=%@ sn=%@ eid=%@ bb=%@",
+                  (long)total, wantName, wantMk, wantPV, wantMN, wantSN,
                   wantEID.length ? @"Y" : @"-",
-                  wantSEID.length ? @"Y" : @"-",
-                  wantIDFA.length ? @"Y" : @"-",
                   wantBB.length ? wantBB : @"-"]);
 }
 

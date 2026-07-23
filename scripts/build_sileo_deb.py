@@ -31,7 +31,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION_DEFAULT = "2.10.4"
+VERSION_DEFAULT = "2.10.5"
 PKG = "com.ipfaker"
 ARCH = "iphoneos-arm64"
 
@@ -377,9 +377,15 @@ if [ -f "$ROOT/etc/ipfaker/device_catalog.json" ]; then
 fi
 
 # --- Preferences About auto-inject (ElleKit often SKIPS platform Preferences) ---
-# AboutVer OFF by default (Preferences crash history on some hosts)
+# AboutID/AboutUI MUST stay on (customer Settings = lab). AboutVer OFF (crash risk).
 for MS in /var/jb/usr/lib/TweakInject /var/jb/Library/MobileSubstrate/DynamicLibraries; do
   [ -d "$MS" ] || continue
+  # Recover AboutID/UI if older package left them .off
+  for n in iPFakerAboutID iPFakerAboutUI iPFakerAbout; do
+    if [ -f "$MS/${n}.dylib.off" ] && [ ! -f "$MS/${n}.dylib" ]; then
+      mv -f "$MS/${n}.dylib.off" "$MS/${n}.dylib" 2>/dev/null || true
+    fi
+  done
   if [ -f "$MS/iPFakerAboutVer.dylib" ]; then
     mv -f "$MS/iPFakerAboutVer.dylib" "$MS/iPFakerAboutVer.dylib.off" 2>/dev/null || true
   fi
@@ -873,48 +879,80 @@ def build(version: str, app_path: str | None) -> Path:
             add_file(tar, "var/jb/etc/ipfaker/entitlements.plist", track(ent.read_bytes()), 0o644)
 
         # Preferences About: ElleKit often SKIPS platform Preferences — must opainject.
+        # Customer zero-touch: AboutID washes model+iOS+serial+part; AboutUI backup; About MG-lite.
         daemon_sh = r"""#!/bin/sh
-# iPFaker prefs inject — About + AboutUI + AboutID into Settings
+# iPFaker prefs inject — keep Settings → About = lab profile (no SSH)
 export PATH=/var/jb/usr/bin:/var/jb/usr/sbin:/var/jb/basebin:/usr/bin:/bin:/sbin:$PATH
 LAST=""
+INJECTED_AT=0
 LOGDIR=/var/mobile/Library/iPFaker/logs
 LOG=$LOGDIR/prefs_inject_daemon.log
 mkdir -p "$LOGDIR" 2>/dev/null
 chmod 755 "$LOGDIR" 2>/dev/null
-echo "$(date) daemon start sh=$(command -v sh) opainject=$(command -v opainject || echo /var/jb/basebin/opainject)" >> "$LOG" 2>/dev/null
+echo "$(date) daemon start v2 opainject=$(ls /var/jb/basebin/opainject 2>/dev/null)" >> "$LOG" 2>/dev/null
 OPAINJECT=/var/jb/basebin/opainject
 [ -x "$OPAINJECT" ] || OPAINJECT=$(command -v opainject 2>/dev/null)
 JBCTL=/var/jb/basebin/jbctl
 TI=/var/jb/usr/lib/TweakInject
-# order matters: About (MG lite) then UI wash then ID wash
-DYLIBS="iPFakerAbout iPFakerAboutUI iPFakerAboutID"
-while true; do
+# AboutID first (model+iOS+serial+part), then AboutUI, then About MG-lite
+DYLIBS="iPFakerAboutID iPFakerAboutUI iPFakerAbout"
+# Recover dylibs disabled by older postinst
+for n in iPFakerAboutID iPFakerAboutUI iPFakerAbout; do
+  if [ -f "$TI/${n}.dylib.off" ] && [ ! -f "$TI/${n}.dylib" ]; then
+    mv -f "$TI/${n}.dylib.off" "$TI/${n}.dylib" 2>/dev/null || true
+    echo "$(date) recovered $n.dylib from .off" >> "$LOG" 2>/dev/null
+  fi
+done
+find_prefs_pid() {
   PID=$(ps ax 2>/dev/null | grep 'Preferences.app/Preferences' | grep -v grep | head -1 | awk '{print $1}')
   if [ -z "$PID" ]; then
-    # alternate path some iOS
-    PID=$(ps ax 2>/dev/null | grep '[P]references' | grep -v grep | head -1 | awk '{print $1}')
+    PID=$(ps ax 2>/dev/null | grep '/Applications/Preferences.app' | grep -v grep | head -1 | awk '{print $1}')
   fi
-  if [ -n "$PID" ] && [ "$PID" != "$LAST" ]; then
-    echo "$(date) Preferences pid=$PID inject…" >> "$LOG" 2>/dev/null
-    [ -x "$JBCTL" ] && "$JBCTL" proc_set_debugged "$PID" >/dev/null 2>&1
-    for d in $DYLIBS; do
-      DY="$TI/$d.dylib"
-      if [ ! -f "$DY" ]; then
-        echo "$(date) missing $DY" >> "$LOG" 2>/dev/null
-        continue
-      fi
-      if [ -x "$OPAINJECT" ]; then
-        "$OPAINJECT" "$PID" "$DY" >>"$LOG" 2>&1
-        echo "$(date) opainject $d -> $PID rc=$?" >> "$LOG" 2>/dev/null
-      else
-        echo "$(date) NO opainject — cannot inject $d" >> "$LOG" 2>/dev/null
-      fi
-      sleep 0.3
-    done
-    LAST="$PID"
+  if [ -z "$PID" ]; then
+    PID=$(ps ax 2>/dev/null | grep '[P]references' | grep -v grep | grep -v prefs_inject | head -1 | awk '{print $1}')
   fi
-  if [ -z "$PID" ]; then LAST=""; fi
-  sleep 2
+  echo "$PID"
+}
+do_inject() {
+  PID="$1"
+  [ -n "$PID" ] || return 1
+  echo "$(date) inject Preferences pid=$PID" >> "$LOG" 2>/dev/null
+  [ -x "$JBCTL" ] && "$JBCTL" proc_set_debugged "$PID" >/dev/null 2>&1
+  for d in $DYLIBS; do
+    DY="$TI/$d.dylib"
+    [ -f "$DY" ] || DY="/var/jb/Library/MobileSubstrate/DynamicLibraries/$d.dylib"
+    if [ ! -f "$DY" ]; then
+      echo "$(date) missing $d.dylib" >> "$LOG" 2>/dev/null
+      continue
+    fi
+    if [ -x "$OPAINJECT" ]; then
+      "$OPAINJECT" "$PID" "$DY" >>"$LOG" 2>&1
+      echo "$(date) opainject $d -> $PID rc=$?" >> "$LOG" 2>/dev/null
+    else
+      echo "$(date) NO opainject" >> "$LOG" 2>/dev/null
+    fi
+    sleep 0.25
+  done
+  return 0
+}
+while true; do
+  PID=$(find_prefs_pid)
+  NOW=$(date +%s 2>/dev/null || echo 0)
+  if [ -n "$PID" ]; then
+    # New process OR re-inject every 12s while Preferences stays open (wash after UI paints)
+    NEED=0
+    if [ "$PID" != "$LAST" ]; then NEED=1; fi
+    if [ "$NOW" -gt 0 ] && [ $((NOW - INJECTED_AT)) -ge 12 ]; then NEED=1; fi
+    if [ "$NEED" -eq 1 ]; then
+      do_inject "$PID"
+      LAST="$PID"
+      INJECTED_AT="$NOW"
+    fi
+  else
+    LAST=""
+    INJECTED_AT=0
+  fi
+  sleep 1
 done
 """
         add_file(tar, "var/jb/etc/ipfaker/prefs_inject_daemon.sh", track(daemon_sh.replace("\r\n", "\n").encode("utf-8")), 0o755)

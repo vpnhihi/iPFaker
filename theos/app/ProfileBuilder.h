@@ -83,6 +83,10 @@ typedef void (^IPFWipeProgress)(NSString *step);
 + (NSString *)applySpoofFiltersForBundles:(NSArray<NSString *> *)bundleIds
                                  progress:(nullable IPFWipeProgress)progress;
 
+/// Customer zero-touch: start prefs inject daemon + ensure About* into Preferences
+/// so Cài đặt → Giới thiệu matches lab profile (no SSH).
++ (NSString *)ensureSettingsAboutSyncProgress:(nullable IPFWipeProgress)progress;
+
 /// Merge flat keys into existing config.plist (both dual paths) without regenerating identity.
 + (NSString *)mergeKeysIntoConfig:(NSDictionary *)keys
                          progress:(nullable IPFWipeProgress)progress;
