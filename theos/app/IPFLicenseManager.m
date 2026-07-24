@@ -63,8 +63,12 @@ static NSString *const kUDFrozenRemain = @"ipf.lic.frozenRemain";
         return self.lastMessage.length ? self.lastMessage : @"Chưa kích hoạt key";
     }
     NSString *key = [NSUserDefaults.standardUserDefaults stringForKey:kUDKey] ?: @"—";
-    return [NSString stringWithFormat:@"Key: %@ · Còn %ld ngày · ID: %@",
-            key, (long)[self daysRemaining], [self deviceId]];
+    NSInteger left = [self daysRemaining];
+    NSInteger total = [NSUserDefaults.standardUserDefaults integerForKey:kUDTotalDays];
+    if (total >= 30000) {
+        return [NSString stringWithFormat:@"Key: %@ · Không giới hạn ngày", key];
+    }
+    return [NSString stringWithFormat:@"Key: %@ · Còn %ld ngày", key, (long)left];
 }
 
 - (NSInteger)daysRemaining {
@@ -84,6 +88,15 @@ static NSString *const kUDFrozenRemain = @"ipf.lic.frozenRemain";
     NSInteger usedDays = (NSInteger)floor(used / 86400.0);
     NSInteger left = total - usedDays;
     return left > 0 ? left : 0;
+}
+
+/// Cột C optional: >0 = số ngày; trống/0 = không giới hạn (~100 năm).
+- (NSInteger)resolvedDaysFromSheetValue:(NSString *)raw {
+    NSString *s = [raw stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+    if (!s.length) return 36500;
+    NSInteger d = s.integerValue;
+    if (d <= 0) return 36500;
+    return d;
 }
 
 #pragma mark - CSV / Sheet
@@ -147,13 +160,16 @@ static NSString *const kUDFrozenRemain = @"ipf.lic.frozenRemain";
     NSString *s = [raw stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
     if (!s.length) return IPFLicenseStatusUnknown;
     // Prefer exact Vietnamese labels from Sheet dropdown
+    // Sheet dropdown often "CHẠY" / "Chạy" / "DỪNG"
     if ([s caseInsensitiveCompare:@"Chạy"] == NSOrderedSame ||
         [s caseInsensitiveCompare:@"Chay"] == NSOrderedSame ||
+        [s caseInsensitiveCompare:@"CHẠY"] == NSOrderedSame ||
         [s caseInsensitiveCompare:@"Run"] == NSOrderedSame ||
         [s caseInsensitiveCompare:@"Active"] == NSOrderedSame)
         return IPFLicenseStatusActive;
     if ([s caseInsensitiveCompare:@"Dừng"] == NSOrderedSame ||
         [s caseInsensitiveCompare:@"Dung"] == NSOrderedSame ||
+        [s caseInsensitiveCompare:@"DỪNG"] == NSOrderedSame ||
         [s caseInsensitiveCompare:@"Stop"] == NSOrderedSame ||
         [s caseInsensitiveCompare:@"Pause"] == NSOrderedSame)
         return IPFLicenseStatusPaused;
@@ -172,14 +188,15 @@ static NSString *const kUDFrozenRemain = @"ipf.lic.frozenRemain";
     if (!want.length) return nil;
     BOOL header = YES;
     for (NSArray *cols in rows) {
-        if (header) { header = NO; continue; } // skip STT header
+        if (header) { header = NO; continue; } // skip header row
         if (cols.count < 5) continue;
         NSString *b = [cols[1] stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
         if ([b caseInsensitiveCompare:want] == NSOrderedSame) {
+            // Sheet: A STT | B Key | C Hạn | D ID MÁY | E Tình trạng | F GHI CHÚ
+            // App chỉ bắt buộc B + E. C optional; D bỏ hẳn.
             return @{
                 @"key": b,
-                @"days": cols[2] ?: @"0",
-                @"device": [cols[3] stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet] ?: @"",
+                @"days": cols[2] ?: @"",
                 @"status": cols[4] ?: @"",
             };
         }
@@ -195,7 +212,6 @@ static NSString *const kUDFrozenRemain = @"ipf.lic.frozenRemain";
         if (completion) completion(NO, @"Nhập key (cột B trên Sheet).");
         return;
     }
-    NSString *did = [self deviceId];
     __weak typeof(self) weakSelf = self;
     [self fetchSheetRows:^(NSArray *rows, NSError *err) {
         __strong typeof(weakSelf) self = weakSelf;
@@ -213,7 +229,7 @@ static NSString *const kUDFrozenRemain = @"ipf.lic.frozenRemain";
         IPFLicenseStatus st = [self parseStatus:row[@"status"]];
         if (st == IPFLicenseStatusPaused) {
             [self applyPausedRemote];
-            self.lastMessage = @"Key đang Dừng — không dùng được. Đổi Sheet → Chạy rồi kích lại.";
+            self.lastMessage = @"Key đang Dừng — không dùng được. Đổi Sheet cột E → Chạy rồi kích lại.";
             if (completion) completion(NO, self.lastMessage);
             return;
         }
@@ -224,29 +240,18 @@ static NSString *const kUDFrozenRemain = @"ipf.lic.frozenRemain";
             return;
         }
         if (st != IPFLicenseStatusActive && st != IPFLicenseStatusUnknown) {
-            self.lastMessage = @"Tình trạng key không hợp lệ (cần: Chạy).";
+            self.lastMessage = @"Tình trạng key không hợp lệ (cột E cần: Chạy).";
             if (completion) completion(NO, self.lastMessage);
             return;
         }
-        // Unknown with empty status → treat as active for first setup
-        NSString *bound = row[@"device"] ?: @"";
-        if (!bound.length) {
-            self.lastMessage = [NSString stringWithFormat:
-                                @"Chưa gán ID máy trên Sheet.\n\n1) Copy ID máy:\n%@\n2) Dán vào cột D cùng dòng key\n3) Cột E = Chạy\n4) Bấm Kích hoạt lại",
-                                did];
-            if (completion) completion(NO, self.lastMessage);
-            return;
-        }
-        if ([bound caseInsensitiveCompare:did] != NSOrderedSame) {
-            self.lastMessage = [NSString stringWithFormat:
-                                @"Key đã gắn máy khác.\nSheet: %@\nMáy này: %@", bound, did];
-            if (completion) completion(NO, self.lastMessage);
-            return;
-        }
-        NSInteger days = [row[@"days"] integerValue];
-        if (days <= 0) days = 1;
+        // Chỉ B + E — không check cột D (ID máy). Cột C optional.
+        NSInteger days = [self resolvedDaysFromSheetValue:row[@"days"]];
         [self commitActiveKey:k totalDays:days];
-        self.lastMessage = [NSString stringWithFormat:@"Kích hoạt OK · còn %ld ngày", (long)[self daysRemaining]];
+        if (days >= 30000) {
+            self.lastMessage = @"Kích hoạt OK · không giới hạn ngày";
+        } else {
+            self.lastMessage = [NSString stringWithFormat:@"Kích hoạt OK · còn %ld ngày", (long)[self daysRemaining]];
+        }
         if (completion) completion(YES, self.lastMessage);
     }];
 }
@@ -257,7 +262,6 @@ static NSString *const kUDFrozenRemain = @"ipf.lic.frozenRemain";
         if (completion) completion(NO, @"Chưa có key");
         return;
     }
-    NSString *did = [self deviceId];
     __weak typeof(self) weakSelf = self;
     [self fetchSheetRows:^(NSArray *rows, NSError *err) {
         __strong typeof(weakSelf) self = weakSelf;
@@ -280,13 +284,7 @@ static NSString *const kUDFrozenRemain = @"ipf.lic.frozenRemain";
             return;
         }
         IPFLicenseStatus st = [self parseStatus:row[@"status"]];
-        NSString *bound = row[@"device"] ?: @"";
-        if (bound.length && [bound caseInsensitiveCompare:did] != NSOrderedSame) {
-            [self clearAll];
-            self.lastMessage = @"Key đã chuyển máy khác";
-            if (completion) completion(NO, self.lastMessage);
-            return;
-        }
+        // Không check cột D (ID máy) — key dùng được trên mọi máy khi E = Chạy.
         if (st == IPFLicenseStatusPaused) {
             [self applyPausedRemote];
             self.lastMessage = @"Sheet: Dừng — đã đẩy key khỏi máy (không tính ngày khi dừng).";
@@ -299,25 +297,23 @@ static NSString *const kUDFrozenRemain = @"ipf.lic.frozenRemain";
             if (completion) completion(NO, self.lastMessage);
             return;
         }
-        // Active — update total days if sheet changed upward only carefully
-        NSInteger sheetDays = [row[@"days"] integerValue];
-        if (sheetDays > 0) {
-            NSUserDefaults *ud = NSUserDefaults.standardUserDefaults;
-            // if never activated, set now
-            if ([ud doubleForKey:kUDActivation] <= 0) {
-                [self commitActiveKey:key totalDays:sheetDays];
-            } else {
-                [ud setInteger:sheetDays forKey:kUDTotalDays];
-                [ud setBool:YES forKey:kUDActive];
-                // clear freeze
-                [ud setInteger:0 forKey:kUDFrozenRemain];
-                NSTimeInterval ps = [ud doubleForKey:kUDPauseStarted];
-                if (ps > 0) {
-                    NSTimeInterval add = [[NSDate date] timeIntervalSince1970] - ps;
-                    [ud setDouble:[ud doubleForKey:kUDPausedDays] + add forKey:kUDPausedDays];
-                    [ud setDouble:0 forKey:kUDPauseStarted];
-                }
+        // Active — sync days from sheet C (optional)
+        NSInteger sheetDays = [self resolvedDaysFromSheetValue:row[@"days"]];
+        NSUserDefaults *ud = NSUserDefaults.standardUserDefaults;
+        if ([ud doubleForKey:kUDActivation] <= 0) {
+            [self commitActiveKey:key totalDays:sheetDays];
+        } else {
+            [ud setInteger:sheetDays forKey:kUDTotalDays];
+            [ud setBool:YES forKey:kUDActive];
+            [ud setInteger:0 forKey:kUDFrozenRemain];
+            NSTimeInterval ps = [ud doubleForKey:kUDPauseStarted];
+            if (ps > 0) {
+                NSTimeInterval add = [[NSDate date] timeIntervalSince1970] - ps;
+                [ud setDouble:[ud doubleForKey:kUDPausedDays] + add forKey:kUDPausedDays];
+                [ud setDouble:0 forKey:kUDPauseStarted];
             }
+            [ud synchronize];
+            [self persistLicenseFile];
         }
         if ([self daysRemaining] <= 0) {
             [self logout];

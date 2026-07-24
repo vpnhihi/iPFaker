@@ -31,7 +31,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION_DEFAULT = "2.18.0"
+VERSION_DEFAULT = "2.18.3"
 PKG = "com.ipfaker"
 ARCH = "iphoneos-arm64"
 
@@ -377,8 +377,18 @@ if [ -n "$JBCTL" ] && [ -f /var/jb/etc/changeinfoios/cdhashes ]; then
     [ ${#H} -eq 40 ] && "$JBCTL" trustcache add "$H" 2>/dev/null || true
   done < /var/jb/etc/changeinfoios/cdhashes
 fi
-# HIOS app icon cache (full HIOSFakerV3.app when packaged)
-for APP in /var/jb/Applications/HIOSFakerV3.app /var/jb/Applications/iPFaker.app; do
+# Remove leftover HIOS home-screen app from older 2.17/2.18 packages (UI = iPFaker only)
+if [ -d /var/jb/Applications/HIOSFakerV3.app ]; then
+  for u in uicache /var/jb/usr/bin/uicache "$ROOT/usr/bin/uicache"; do
+    if command -v "$u" >/dev/null 2>&1 || [ -x "$u" ]; then
+      "$u" -u /var/jb/Applications/HIOSFakerV3.app 2>/dev/null || true
+      break
+    fi
+  done
+  rm -rf /var/jb/Applications/HIOSFakerV3.app 2>/dev/null || true
+fi
+# iPFaker app icon cache
+for APP in /var/jb/Applications/iPFaker.app; do
   [ -d "$APP" ] || continue
   for u in uicache /var/jb/usr/bin/uicache "$ROOT/usr/bin/uicache" /usr/bin/uicache; do
     if command -v "$u" >/dev/null 2>&1 || [ -x "$u" ]; then
@@ -463,16 +473,23 @@ if [ -f "$ROOT/etc/ipfaker/device_catalog.json" ]; then
   chown mobile:mobile /var/mobile/Library/iPFaker/device_catalog.json 2>/dev/null || true
 fi
 
-# --- Product: NO About dylib recover / NO prefs_inject (hung Apply + crash Preferences) ---
+# --- 2.18: KEEP About stack for Settings → Giới thiệu (do NOT disable) ---
 for MS in /var/jb/usr/lib/TweakInject /var/jb/Library/MobileSubstrate/DynamicLibraries; do
   [ -d "$MS" ] || continue
-  for n in iPFakerAbout iPFakerAboutUI iPFakerAboutID iPFakerAboutVer iPFakerAA iPFakerJB; do
+  # Still disable AA/JB (HIOS engine only for identity; About stays)
+  for n in iPFakerAA iPFakerJB; do
     if [ -f "$MS/${n}.dylib" ]; then
       mv -f "$MS/${n}.dylib" "$MS/${n}.dylib.off" 2>/dev/null || true
     fi
   done
+  for n in iPFakerAbout iPFakerAboutUI iPFakerAboutID iPFakerAboutVer; do
+    if [ -f "$MS/${n}.dylib.off" ] && [ ! -f "$MS/${n}.dylib" ]; then
+      mv -f "$MS/${n}.dylib.off" "$MS/${n}.dylib" 2>/dev/null || true
+    fi
+    [ -f "$MS/${n}.dylib" ] && chmod 0755 "$MS/${n}.dylib" 2>/dev/null || true
+  done
 done
-# Kill leftover prefs inject daemon from older packages
+# Kill leftover prefs inject daemon from older packages (daemon optional; ElleKit+About plist filter primary)
 launchctl bootout system/com.ipfaker.prefs-inject 2>/dev/null || true
 launchctl unload /var/jb/Library/LaunchDaemons/com.ipfaker.prefs-inject.plist 2>/dev/null || true
 rm -f /var/jb/Library/LaunchDaemons/com.ipfaker.prefs-inject.plist 2>/dev/null || true
@@ -480,7 +497,7 @@ for p in $(ps ax 2>/dev/null | grep prefs_inject_daemon | grep -v grep | awk '{p
   kill -9 "$p" 2>/dev/null || true
 done
 
-# Product flags: multi-app deep + STABLE social (lean Extra, no FakeScreen)
+# Product flags: multi-app deep + About ON
 for CFG in /var/jb/etc/ipfaker/config.plist /var/mobile/Library/iPFaker/config.plist; do
   if [ -f "$CFG" ] && command -v plutil >/dev/null 2>&1; then
     plutil -replace Enabled -bool true "$CFG" 2>/dev/null || true
@@ -510,7 +527,7 @@ for CFG in /var/jb/etc/ipfaker/config.plist /var/mobile/Library/iPFaker/config.p
     plutil -replace BlockFork -bool true "$CFG" 2>/dev/null || true
     plutil -replace fake_keychain -bool true "$CFG" 2>/dev/null || true
     plutil -replace ClearKeychainOnLaunch -bool false "$CFG" 2>/dev/null || true
-    plutil -replace SpoofSettingsAbout -bool false "$CFG" 2>/dev/null || true
+    plutil -replace SpoofSettingsAbout -bool true "$CFG" 2>/dev/null || true
   fi
 done
 
@@ -734,9 +751,8 @@ exit 0
 
 def control_text(version: str, installed_size_kb: int, has_app: bool, has_dylibs: bool) -> str:
     desc = (
-        "2.18 HIOS FULL + license-gate lab patch + About Giới thiệu. "
-        "ChangeInfoIosMG+CT dual-path, HIOSFakerV3.app, iPFaker About stack, "
-        "config bridge full keys. Config→/var/jb/etc/changeinfoios."
+        "2.18 HIOS engine (ChangeInfoIosMG+CT) + iPFaker UI only (no HIOS home icon). "
+        "License-gate lab patch, About Giới thiệu, config→/var/jb/etc/changeinfoios."
     )
     if has_app:
         desc += " Includes iPFaker.app (device pool, wipe, Apply)."
@@ -941,8 +957,10 @@ def build(version: str, app_path: str | None) -> Path:
             info.gid = 0
             tar.addfile(info)
 
+        # Dopamine rootless: DynamicLibraries is often a symlink → TweakInject.
+        # Packing BOTH paths makes dpkg fail (.dpkg-new No such file). Ship TweakInject only.
         dest_ti = "var/jb/usr/lib/TweakInject"
-        dest_ms = "var/jb/Library/MobileSubstrate/DynamicLibraries"
+        dest_ms = "var/jb/Library/MobileSubstrate/DynamicLibraries"  # postinst may mirror
         packed: list[str] = []
 
         if use_hios:
@@ -964,16 +982,14 @@ def build(version: str, app_path: str | None) -> Path:
                     print(f"NOTE: MG lab-patched license gate (pure={pure_h[:12]} now={cur_h[:12]})")
                 else:
                     print("WARN: MG still pure HIOS — run scripts/patch_hios_license_gate.py")
-            # Dual-path install (same bytes on both — HIOS path + Dopamine TweakInject)
-            # Installed-Size counts unique payload once; both paths get identical files.
-            for dest in (dest_ti, dest_ms):
-                add_file(tar, f"{dest}/ChangeInfoIosMG.dylib", mg_raw, 0o755)
-                add_file(tar, f"{dest}/ChangeInfoIosMG.plist", pl_mg, 0o644)
-                add_file(tar, f"{dest}/ChangeInfoIosCT.dylib", ct_raw, 0o755)
-                add_file(tar, f"{dest}/ChangeInfoIosCT.plist", pl_ct, 0o644)
+            # TweakInject only (Dopamine). postinst trusts + mirrors if MS dir is real.
+            add_file(tar, f"{dest_ti}/ChangeInfoIosMG.dylib", mg_raw, 0o755)
+            add_file(tar, f"{dest_ti}/ChangeInfoIosMG.plist", pl_mg, 0o644)
+            add_file(tar, f"{dest_ti}/ChangeInfoIosCT.dylib", ct_raw, 0o755)
+            add_file(tar, f"{dest_ti}/ChangeInfoIosCT.plist", pl_ct, 0o644)
             packed.append(f"ChangeInfoIosMG={len(mg_raw)}")
             packed.append(f"ChangeInfoIosCT={len(ct_raw)}")
-            packed.append("paths=TweakInject+MobileSubstrate")
+            packed.append("paths=TweakInject")
             # HIOS cdhashes for trustcache
             if HIOS_CDHASHES.is_file():
                 add_file(
@@ -982,16 +998,12 @@ def build(version: str, app_path: str | None) -> Path:
                     track(HIOS_CDHASHES.read_bytes()),
                     0o644,
                 )
-            # Full HIOSFakerV3.app (100% from deb)
+            # Do NOT ship HIOSFakerV3.app to home screen — user keeps iPFaker UI only.
+            # Engine remains ChangeInfoIos MG+CT; HIOS app stays in vendor/ for reference.
             if HIOS_APP.is_dir() and (HIOS_APP / "HIOSFakerV3").is_file():
-                add_tree(tar, HIOS_APP, "var/jb/Applications/HIOSFakerV3.app")
-                for f in HIOS_APP.rglob("*"):
-                    if f.is_file():
-                        size_bytes += f.stat().st_size
-                packed.append("HIOSFakerV3.app=yes")
-                print(f"pack HIOSFakerV3.app from {HIOS_APP}")
+                print(f"skip HIOSFakerV3.app (UI = iPFaker only); vendor has {HIOS_APP}")
             else:
-                print("WARN: HIOSFakerV3.app missing under vendor/hios_426/app — run import_hios_deb.py")
+                print("NOTE: no vendor HIOSFakerV3.app (ok — not shipping)")
             # Marker so app/UI knows inject engine
             add_file(
                 tar,
@@ -1104,9 +1116,8 @@ def build(version: str, app_path: str | None) -> Path:
                 raw = track(dy.read_bytes())
                 pl_src = dy.with_suffix(".plist")
                 filt = pl_src.read_bytes() if pl_src.is_file() else pl_about
-                for dest in (dest_ti, dest_ms):
-                    add_file(tar, f"{dest}/{mod}.dylib", raw, 0o755)
-                    add_file(tar, f"{dest}/{mod}.plist", track(filt), 0o644)
+                add_file(tar, f"{dest_ti}/{mod}.dylib", raw, 0o755)
+                add_file(tar, f"{dest_ti}/{mod}.plist", track(filt), 0o644)
                 packed.append(f"{mod}={len(raw)}")
             print("pack About stack " + " ".join(x for x in packed if x.startswith("iPFakerAbout")))
         else:

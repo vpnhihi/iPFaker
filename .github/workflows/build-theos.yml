@@ -10,7 +10,7 @@ on:
       version:
         description: "com.ipfaker package version"
         required: false
-        default: "2.18.0"
+        default: "2.18.3"
       publish_sileo:
         description: "Publish sileo-repo to gh-pages"
         type: boolean

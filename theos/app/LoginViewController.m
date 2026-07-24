@@ -4,7 +4,6 @@
 
 @interface LoginViewController ()
 @property (nonatomic, strong) UITextField *keyField;
-@property (nonatomic, strong) UILabel *deviceIdLabel;
 @property (nonatomic, strong) UILabel *msgLabel;
 @property (nonatomic, strong) UIActivityIndicatorView *spin;
 @property (nonatomic, strong) UIButton *activateBtn;
@@ -35,27 +34,12 @@
     hint.font = AppTheme.captionFont;
     hint.textColor = AppTheme.textSecondary;
     hint.text =
-        @"1) Copy ID máy bên dưới → dán vào cột D trên Google Sheet (cùng dòng key).\n"
-        @"2) Cột B = Key · Cột C = số ngày · Cột E = Chạy.\n"
-        @"3) Nhập key → Kích hoạt.\n\n"
+        @"Chỉ cần 2 cột trên Google Sheet:\n"
+        @"· Cột B = Key\n"
+        @"· Cột E = Chạy (hoặc Dừng / Out)\n\n"
+        @"Không cần cột D (ID máy). Nhập key → Kích hoạt.\n\n"
         @"Sheet phải chia sẻ: Anyone with the link → Viewer.";
     hint.translatesAutoresizingMaskIntoConstraints = NO;
-
-    UILabel *idTitle = [[UILabel alloc] init];
-    idTitle.text = @"ID máy (cột D)";
-    idTitle.font = AppTheme.sectionFont;
-    idTitle.textColor = AppTheme.textPrimary;
-    idTitle.translatesAutoresizingMaskIntoConstraints = NO;
-
-    self.deviceIdLabel = [[UILabel alloc] init];
-    self.deviceIdLabel.text = [IPFLicenseManager.shared deviceId];
-    self.deviceIdLabel.font = [UIFont monospacedDigitSystemFontOfSize:15 weight:UIFontWeightSemibold];
-    self.deviceIdLabel.textColor = AppTheme.accent;
-    self.deviceIdLabel.numberOfLines = 2;
-    self.deviceIdLabel.translatesAutoresizingMaskIntoConstraints = NO;
-
-    UIButton *copyBtn = [AppTheme primaryButtonWithTitle:@"Copy ID máy" target:self action:@selector(copyId)];
-    copyBtn.backgroundColor = [UIColor colorWithRed:0.25 green:0.45 blue:0.75 alpha:1];
 
     UILabel *keyTitle = [[UILabel alloc] init];
     keyTitle.text = @"Key (cột B)";
@@ -64,7 +48,7 @@
     keyTitle.translatesAutoresizingMaskIntoConstraints = NO;
 
     self.keyField = [[UITextField alloc] init];
-    self.keyField.placeholder = @"Ví dụ: Key1";
+    self.keyField.placeholder = @"Ví dụ: Admin";
     self.keyField.borderStyle = UITextBorderStyleRoundedRect;
     self.keyField.autocapitalizationType = UITextAutocapitalizationTypeNone;
     self.keyField.autocorrectionType = UITextAutocorrectionTypeNo;
@@ -89,7 +73,7 @@
     self.spin.translatesAutoresizingMaskIntoConstraints = NO;
     self.spin.hidesWhenStopped = YES;
 
-    for (UIView *v in @[ title, hint, idTitle, self.deviceIdLabel, copyBtn, keyTitle, self.keyField, self.activateBtn, self.msgLabel, self.spin ]) {
+    for (UIView *v in @[ title, hint, keyTitle, self.keyField, self.activateBtn, self.msgLabel, self.spin ]) {
         [c addSubview:v];
     }
 
@@ -113,19 +97,7 @@
         [hint.leadingAnchor constraintEqualToAnchor:title.leadingAnchor],
         [hint.trailingAnchor constraintEqualToAnchor:title.trailingAnchor],
 
-        [idTitle.topAnchor constraintEqualToAnchor:hint.bottomAnchor constant:20],
-        [idTitle.leadingAnchor constraintEqualToAnchor:title.leadingAnchor],
-
-        [self.deviceIdLabel.topAnchor constraintEqualToAnchor:idTitle.bottomAnchor constant:8],
-        [self.deviceIdLabel.leadingAnchor constraintEqualToAnchor:title.leadingAnchor],
-        [self.deviceIdLabel.trailingAnchor constraintEqualToAnchor:title.trailingAnchor],
-
-        [copyBtn.topAnchor constraintEqualToAnchor:self.deviceIdLabel.bottomAnchor constant:12],
-        [copyBtn.leadingAnchor constraintEqualToAnchor:title.leadingAnchor],
-        [copyBtn.trailingAnchor constraintEqualToAnchor:title.trailingAnchor],
-        [copyBtn.heightAnchor constraintEqualToConstant:48],
-
-        [keyTitle.topAnchor constraintEqualToAnchor:copyBtn.bottomAnchor constant:22],
+        [keyTitle.topAnchor constraintEqualToAnchor:hint.bottomAnchor constant:22],
         [keyTitle.leadingAnchor constraintEqualToAnchor:title.leadingAnchor],
 
         [self.keyField.topAnchor constraintEqualToAnchor:keyTitle.bottomAnchor constant:8],
@@ -146,12 +118,6 @@
         [self.msgLabel.trailingAnchor constraintEqualToAnchor:title.trailingAnchor],
         [self.msgLabel.bottomAnchor constraintEqualToAnchor:c.bottomAnchor constant:-40],
     ]];
-}
-
-- (void)copyId {
-    UIPasteboard.generalPasteboard.string = [IPFLicenseManager.shared deviceId];
-    self.msgLabel.textColor = AppTheme.success;
-    self.msgLabel.text = @"Đã copy ID máy — dán vào cột D trên Sheet.";
 }
 
 - (void)activate {

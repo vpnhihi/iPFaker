@@ -17,9 +17,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>2.18.0</string>
+	<string>2.18.3</string>
 	<key>CFBundleVersion</key>
-	<string>3180</string>
+	<string>3183</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>MinimumOSVersion</key>
@@ -38,6 +38,15 @@
 	</array>
 	<key>UILaunchStoryboardName</key>
 	<string></string>
+	<!-- TCC: without these strings iOS kills the app (SIGABRT / privacy violation) -->
+	<key>NSContactsUsageDescription</key>
+	<string>iPFaker tạo danh bạ gợi ý lab sau mỗi lần đổi device (contacts pool). Không gửi danh bạ ra ngoài.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>iPFaker đồng bộ / giả lập vị trí lab (proxy geo, Maps). Chỉ dùng khi bạn bật Fake Location.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>iPFaker đồng bộ vị trí lab khi bật Fake Location / proxy geo.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>iPFaker có thể cần quyền ảnh cho lab (tuỳ chọn). Không upload ảnh.</string>
 	<key>CFBundleIcons</key>
 	<dict>
 		<key>CFBundlePrimaryIcon</key>

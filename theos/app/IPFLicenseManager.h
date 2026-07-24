@@ -13,7 +13,7 @@ typedef NS_ENUM(NSInteger, IPFLicenseStatus) {
 @interface IPFLicenseManager : NSObject
 + (instancetype)shared;
 
-/// Stable device id for Sheet column D (copy to spreadsheet).
+/// Local lab id (optional UI / license.json only — not required on Sheet).
 - (NSString *)deviceId;
 
 /// Local session currently unlocked for use.
@@ -25,12 +25,14 @@ typedef NS_ENUM(NSInteger, IPFLicenseStatus) {
 /// Last error / message from check.
 @property (nonatomic, copy, nullable) NSString *lastMessage;
 
-/// Days remaining (frozen while paused).
+/// Days remaining (frozen while paused). 0 = hết hạn; unlimited sheet days → large remaining.
 - (NSInteger)daysRemaining;
 
 /**
- Activate with key from Sheet column B.
- User must set column D = this deviceId and E = Chạy first.
+ Activate with key from Sheet:
+ - Cột B = Key (bắt buộc)
+ - Cột E = Tình trạng: Chạy / Dừng / Out (bắt buộc)
+ - Cột C (Hạn) và D (ID máy) không bắt buộc — bỏ check ID máy.
  */
 - (void)activateWithKey:(NSString *)key
              completion:(void (^)(BOOL ok, NSString *message))completion;
