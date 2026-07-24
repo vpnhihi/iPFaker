@@ -90,9 +90,9 @@ def main() -> int:
         "ChangeInfoIosMG.plist",
         "ChangeInfoIosCT.plist",
     ]
+    # Dopamine: TweakInject only (MS path is often symlink — not dual-packed)
     paths_needed = [
         "var/jb/usr/lib/TweakInject",
-        "var/jb/Library/MobileSubstrate/DynamicLibraries",
     ]
 
     errors: list[str] = []
@@ -141,33 +141,15 @@ def main() -> int:
         else:
             print(f"OK 1:1 {cd_key}")
 
-    # HIOS app
-    app_bin = "var/jb/Applications/HIOSFakerV3.app/HIOSFakerV3"
-    vendor_bin = VENDOR / "app" / "HIOSFakerV3.app" / "HIOSFakerV3"
-    if app_bin not in files:
-        errors.append(f"missing {app_bin}")
-    elif vendor_bin.is_file():
-        if sha256(files[app_bin]) != sha256_file(vendor_bin):
-            errors.append("HIOSFakerV3 binary hash mismatch")
-        else:
-            print(f"OK 1:1 {app_bin} ({len(files[app_bin])} bytes)")
-        # all app files
-        app_prefix = "var/jb/Applications/HIOSFakerV3.app/"
-        app_files = [k for k in files if k.startswith(app_prefix)]
-        print(f"HIOSFakerV3.app files in deb: {len(app_files)}")
-        for p in sorted(vendor_bin.parent.rglob("*")):
-            if not p.is_file():
-                continue
-            rel = p.relative_to(vendor_bin.parent).as_posix()
-            key = app_prefix + rel
-            if key not in files:
-                errors.append(f"missing app file {key}")
-            elif sha256(files[key]) != sha256_file(p):
-                errors.append(f"app file mismatch {key}")
+    # HIOS home-screen app must NOT ship (iPFaker UI only)
+    if any("HIOSFakerV3.app" in k for k in files):
+        errors.append("HIOSFakerV3.app must not be packaged (home icon clutter)")
+    else:
+        print("OK no HIOSFakerV3.app (iPFaker UI only)")
 
     # iPFaker.app should still be present (lab UI)
     if not any(k.startswith("var/jb/Applications/iPFaker.app/") for k in files):
-        print("WARN: iPFaker.app not in package (dylibs+HIOS only build?)")
+        print("WARN: iPFaker.app not in package")
 
     if errors:
         for e in errors:
