@@ -1,0 +1,5 @@
+iPFaker 2.18.3 — Userspace Reboot only after dpkg install completes
+Source: https://vpnhihi.github.io/ipfaker/
+1) Install iPFaker 2.18.3
+2) Wait Sileo Done — then auto Userspace Reboot
+3) Open iPFaker -> Apply
